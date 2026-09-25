@@ -58,10 +58,12 @@ echo "Arrêt des services dépendants (PostgREST, Realtime, Functions, Auth)…"
 docker compose stop rest realtime functions auth analytics 2>/dev/null || true
 
 echo "  · base de données"
-docker compose exec -T "$DB_CONTAINER" \
-  psql -v ON_ERROR_STOP=1 -X -d postgres -q -c 'drop schema if exists public cascade; create schema public;'
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+db_resolve
+db_exec -q -c 'drop schema if exists public cascade; create schema public;'
 
-docker compose exec -T "$DB_CONTAINER" pg_restore --no-owner --no-privileges --dbname=postgres <"$target/database.dump"
+db_exec_as postgres \
+  pg_restore -U "$DB_USER_RESOLVED" -d "$DB_NAME_RESOLVED" --no-owner --no-privileges <"$target/database.dump"
 
 echo "  · objets storage"
 docker run --rm \

@@ -30,13 +30,17 @@ if ! docker compose ps --status running --services 2>/dev/null | grep -qx "$DB_C
   exit 1
 fi
 
+# La connexion (utilisateur unix, rôle, base) est centralisée : voir lib-db.sh.
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+
+db_resolve
+
 psql_exec() {
-  docker compose exec -T -e ON_ERROR_STOP=1 "$DB_CONTAINER" \
-    psql -v ON_ERROR_STOP=1 -q -X "$@"
+  db_exec "$@"
 }
 
 # --- Journal ---------------------------------------------------------------
-psql_exec -d postgres -c "
+psql_exec -c "
   create table if not exists public.schema_migrations (
     version    text primary key,
     applied_at timestamptz not null default now()
@@ -47,7 +51,7 @@ psql_exec -d postgres -c "
 
 if [ "${1:-}" = "--status" ]; then
   echo "Migrations appliquées :"
-  psql_exec -d postgres -c "
+  psql_exec -c "
     select version, applied_at from public.schema_migrations order by version;
   "
   echo
@@ -63,7 +67,7 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
   [ -e "$file" ] || continue
   version="$(basename "$file")"
 
-  already="$(psql_exec -d postgres -t -A -c \
+  already="$(psql_exec -t -A -c \
     "select count(*) from public.schema_migrations where version = '$version';")"
 
   if [ "$already" = "1" ]; then
@@ -80,7 +84,7 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
     cat "$file"
     echo "insert into public.schema_migrations (version) values ('$version');"
     echo "commit;"
-  } | psql_exec -d postgres -q -f - >/dev/null
+  } | psql_exec -q -f - >/dev/null
 
   applied=$((applied + 1))
 done
@@ -88,7 +92,7 @@ done
 echo
 echo "Migrations terminées : $applied appliquée(s), $skipped déjà connue(s)."
 echo "Vérification rapide :"
-psql_exec -d postgres -c "
+psql_exec -c "
   select count(*) filter (where not relrowsecurity) as tables_sans_rls,
          count(*) as tables_total
     from pg_class c

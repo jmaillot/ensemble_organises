@@ -40,8 +40,11 @@ echo "Sauvegarde $stamp → $out"
 
 # --- Base de données --------------------------------------------------------
 echo "  · base de données"
-docker compose exec -T "$DB_CONTAINER" \
-  pg_dump --format=custom --compress=9 --no-owner --no-privileges \
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+db_resolve
+db_exec_as postgres \
+  pg_dump -U "$DB_USER_RESOLVED" -d "$DB_NAME_RESOLVED" \
+    --format=custom --compress=9 --no-owner --no-privileges \
   > "$out/database.dump"
 
 # --- Objets stockés ---------------------------------------------------------

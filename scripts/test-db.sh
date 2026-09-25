@@ -27,14 +27,18 @@ if [ ! -f "$TESTS_DIR/_setup.sql" ]; then
   exit 1
 fi
 
+# La connexion (utilisateur unix, rôle, base) est centralisée : voir lib-db.sh.
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+
+db_resolve
+
 psql_exec() {
-  docker compose exec -T -e ON_ERROR_STOP=1 "$DB_CONTAINER" \
-    psql -v ON_ERROR_STOP=1 -X "$@"
+  db_exec "$@"
 }
 
 run_file() {
   printf '  → %s\n' "$(basename "$1")"
-  psql_exec -d postgres -q -f - <"$1" >/dev/null
+  psql_exec -q -f - <"$1" >/dev/null
 }
 
 echo "Installation de l'outillage de test…"
@@ -44,8 +48,7 @@ failed=0
 executed=0
 
 cleanup() {
-  docker compose exec -T "$DB_CONTAINER" \
-    psql -v ON_ERROR_STOP=1 -X -d postgres -q -f - \
+  db_exec -q -f - \
     <<'SQL' >/dev/null 2>&1 || true
 drop schema if exists testkit cascade;
 SQL
@@ -69,7 +72,7 @@ for file in $files; do
     printf '    \033[32mOK\033[0m %s\n' "$(basename "$file")"
   else
     printf '    \033[31mÉCHEC\033[0m %s\n' "$(basename "$file")"
-    psql_exec -d postgres -f "$file" || true
+    psql_exec -f "$file" || true
     failed=$((failed + 1))
   fi
 done
