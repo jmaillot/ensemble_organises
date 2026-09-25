@@ -85,7 +85,12 @@ end;
 $$;
 
 -- Exécute une requête qui doit échouer (RLS, contrainte, privilège).
-create or replace function testkit.expect_denied(p_sql text)
+--
+-- Le second paramètre est le libellé de l'intention. Il n'est pas décoratif :
+-- l'échec doit pouvoir être lu sans remonter au fichier de test pour savoir ce
+-- qui était vérifié. Sans lui, le message ne portait que la requête — et une
+-- longue chaîne `format(...)` n'a jamais décrit une intention.
+create or replace function testkit.expect_denied(p_sql text, p_message text default null)
 returns void
 language plpgsql
 as $$
@@ -95,13 +100,14 @@ begin
   exception when others then
     return;
   end;
-  raise exception 'ASSERTION ÉCHOUÉE : la requête aurait dû échouer : %', p_sql;
+  raise exception 'ASSERTION ÉCHOUÉE : % : %',
+    coalesce(p_message, 'la requête aurait dû échouer'), p_sql;
 end;
 $$;
 
 -- Même chose pour une contrainte DEFERRABLE : la violation n'est levée qu'à la
 -- validation, on force donc l'évaluation immédiate dans la sous-transaction.
-create or replace function testkit.expect_denied_at_commit(p_sql text)
+create or replace function testkit.expect_denied_at_commit(p_sql text, p_message text default null)
 returns void
 language plpgsql
 as $$
@@ -112,7 +118,8 @@ begin
   exception when others then
     return;
   end;
-  raise exception 'ASSERTION ÉCHOUÉE : la contrainte différée aurait dû être violée : %', p_sql;
+  raise exception 'ASSERTION ÉCHOUÉE : % : %',
+    coalesce(p_message, 'la contrainte différée aurait dû être violée'), p_sql;
 end;
 $$;
 

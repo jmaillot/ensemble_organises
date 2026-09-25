@@ -250,6 +250,7 @@ version non enregistrée.
 | `0013_server_rpc.sql` | appartenance vérifiée par acteur, rapport de maintenance des routines, ponts `public.expense_settlement()` et `public.routine_maintenance()` |
 | `0014_rls_child_tables.sql` | active la RLS sur les tables enfants et de rappel dont les politiques existaient déjà sans jamais l'avoir été (voir la note de migration) |
 | `0015_share_uniqueness.sql` | remplace quatre contraintes `unique nulls not distinct` par des index uniques partiels : le partage d'une dépense et d'une liste était impossible dès la deuxième part |
+| `0016_expenses_policies.sql` | donne ses quatre politiques RLS à `public.expenses`, qui n'en avait aucune : table fermée à double tour, donc Ardoise inerte côté client |
 
 > Numérotation : les alertes d'anniversaires (`0012`) précèdent le pont `public`
 > des Edge Functions (`0013`). Les deux sont indépendantes, restent applicables
@@ -367,6 +368,19 @@ inaccessible, pas ouverte.
 > message d'échec. La fonction encapsule désormais la requête et compte
 > vraiment. À garder en tête pour tout utilitaire de test : un helper qui
 > rapporte autre chose que ce que son nom promet produit des tests verts.
+>
+> Quatrième membre de la famille, trouvé dans la même campagne : `expenses` est
+> arrivée sans **aucune** politique. RLS activée, `GRANT … on all tables`
+> ouvert — la table était close à double tour. Personne n'y accédait, pas même
+> l'administrateur légitime, et l'utilisateur voyait une liste vide plutôt
+> qu'une erreur. `0007` avait bien écrit les quatre politiques de la table
+> fille `expense_participants` : c'est la mère qui avait été omise de la liste.
+>
+> Une politique manquante et une politique inerte produisent le même symptôme —
+> « je ne vois rien » — et des causes opposées. D'où les deux contrôles
+> désormais distincts du contrat de schéma : RLS activée sur chaque table,
+> **et** au moins une politique sur chacune, `household_invite_tokens` étant la
+> seule exception documentée.
 
 Deux familles de politiques (`migration 0007`) :
 

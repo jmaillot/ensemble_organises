@@ -112,6 +112,45 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 2 bis. Au moins une politique, ou la table est close à double tour
+-- ---------------------------------------------------------------------------
+-- RLS activée sans politique ne protège de rien : elle ferme tout, y compris
+-- au propriétaire légitime. C'est l'état dans lequel `expenses` est restée —
+-- table sans aucune politique, donc l'Ardoise entièrement inerte côté client,
+-- et l'utilisateur voyait une liste vide plutôt qu'une erreur. `0007` avait
+-- écrit les politiques des tables filles de `expense_participants` en
+-- oubliant la mère.
+--
+-- Seule exception : `household_invite_tokens`, qui ne doit avoir AUCUNE
+-- politique et aucun GRANT, pour rester inatteignable.
+do $$
+declare
+  v_sans text;
+begin
+  select coalesce(array_agg(c.relname order by c.relname)::text, '{}')
+    into v_sans
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relkind = 'r'
+     and c.relname <> 'household_invite_tokens'
+     and not exists (
+       select 1 from pg_policies p
+        where p.schemaname = 'public'
+          and p.tablename = c.relname
+     );
+
+  perform testkit.ok(v_sans = '{}', 'table sans aucune politique RLS : ' || v_sans);
+
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''household_invite_tokens'''),
+    0::bigint,
+    'household_invite_tokens reste sans politique, donc inatteignable'
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- 3. Clé primaire ou contrainte d'unicité explicite sur chaque table
 -- ---------------------------------------------------------------------------
 do $$
