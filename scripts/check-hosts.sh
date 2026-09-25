@@ -26,10 +26,18 @@
 
 set -eu
 
-STACK_ENV="${STACK_ENV:-supabase-project/.env}"
-APP_ENV="${APP_ENV:-.env.app}"
-APP_COMPOSE="${APP_COMPOSE:-compose.app.yaml}"
-STACK_COMPOSE="${STACK_COMPOSE:-supabase-project/docker-compose.traefik.yml}"
+# Chemins ancrés sur l'emplacement du script, jamais sur le répertoire courant.
+# Ce script se lance depuis la racine comme depuis supabase-project/, et un
+# chemin relatif donnerait `supabase-project/supabase-project/.env` dans le
+# second cas — avec un message « fichier introuvable » qui désigne le mauvais
+# endroit.
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+REPO_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+
+STACK_ENV="${STACK_ENV:-$REPO_DIR/supabase-project/.env}"
+APP_ENV="${APP_ENV:-$REPO_DIR/.env.app}"
+APP_COMPOSE="${APP_COMPOSE:-$REPO_DIR/compose.app.yaml}"
+STACK_COMPOSE="${STACK_COMPOSE:-$REPO_DIR/supabase-project/docker-compose.traefik.yml}"
 
 errors=0
 warnings=0
@@ -149,8 +157,8 @@ if [ -f "$STACK_ENV" ]; then
 else
   note_error "fichier stack introuvable : $STACK_ENV"
   echo
-  echo "Impossible de comparer. CREEZ-LE depuis .env.example du snapshot :" >&2
-  echo "  cp $STACK_ENV.example $STACK_ENV" >&2
+  echo "Impossible de comparer. Cherché à l'emplacement :" >&2
+  echo "  $STACK_ENV" >&2
   exit 1
 fi
 echo

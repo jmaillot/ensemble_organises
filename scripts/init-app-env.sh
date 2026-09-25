@@ -25,8 +25,15 @@
 
 set -eu
 
-STACK_ENV="${STACK_ENV:-supabase-project/.env}"
-APP_ENV="${APP_ENV:-.env.app}"
+# Chemins ancrés sur l'emplacement du script. Le .env.app doit atterrir à la
+# racine du dépôt, où vit compose.app.yaml et d'où se lance le `docker compose
+# --env-file .env.app` : l'écrire ailleurs produirait un fichier que personne ne
+# lit, sans le moindre avertissement.
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+REPO_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+
+STACK_ENV="${STACK_ENV:-$REPO_DIR/supabase-project/.env}"
+APP_ENV="${APP_ENV:-$REPO_DIR/.env.app}"
 FORCE=0
 HOST=''
 
@@ -47,8 +54,9 @@ while [ $# -gt 0 ]; do
 done
 
 if [ ! -f "$STACK_ENV" ]; then
-  echo "init-app-env.sh: $STACK_ENV introuvable." >&2
-  echo "  Depuis la racine du dépôt, ou : STACK_ENV=/chemin/vers/.env" >&2
+  echo "init-app-env.sh: fichier de stack introuvable." >&2
+  echo "  Cherché à l'emplacement : $STACK_ENV" >&2
+  echo "  Autre emplacement : STACK_ENV=/chemin/vers/.env" >&2
   exit 1
 fi
 
@@ -117,4 +125,4 @@ echo
 echo "Fichier en permissions 600, comme les .env de la stack."
 echo
 echo "Vérification de cohérence :"
-sh "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/check-hosts.sh"
+sh "$SCRIPT_DIR/check-hosts.sh"
