@@ -345,6 +345,18 @@ inaccessible, pas ouverte.
 >   **toutes** les tables de `public`, sans liste d'exclusion.
 >
 > Toute nouvelle table doit être couverte par les deux.
+>
+> **Second piège, même famille : le GUC du JWT.** Les politiques s'appuient sur
+> `auth.uid()`, qui est une fonction de la stack, pas de notre code. Sur
+> l'instantané `self-hosted/v0.8.2` elle se définit par
+> `nullif(current_setting('request.jwt.claim.sub', true), '')::uuid` : elle ne lit
+> que le GUC **scalaire**, jamais le JSON `request.jwt.claims`. PostgREST pose
+> les deux à chaque requête, donc la production n'est pas concernée ; un harnais
+> qui ne pose que le JSON, en revanche, voit `uid()` à `NULL` et filtre **tout**.
+> C'est ce qui est arrivé, et le symptôme — « Alice voit 0 membre » — ne disait
+> rien de la cause. `testkit.as_user` pose donc les deux formes, par symétrie
+> avec PostgREST, et `0002_rls_isolation.sql` vérifie `auth.uid()` avant sa
+> première assertion pour que le prochain changement de version soit nommé.
 
 Deux familles de politiques (`migration 0007`) :
 
