@@ -52,7 +52,20 @@
  * runtime Deno de la stack auto-hébergée.
  */
 
-import { withSupabase } from 'npm:@supabase/server';
+// Spécificateur BARE, et non `npm:@supabase/server` : le runtime publie une
+// table d'importation à sa racine (`volumes/functions/deno.jsonc`) qui épingle
+// `@supabase/server` à `npm:@supabase/server@^1`. C'est ce mécanisme que
+// Deno applique aux fonctions du fournisseur, et il doit s'appliquer aux
+// nôtres.
+//
+// Un `npm:` non épinglé est résolu à chaque démarrage à froid, depuis la
+// dernière version publiée. Le jour où `@supabase/server` publie une v2, les
+// trois fonctionschangeraient de comportement sans commit, sans revue et sans
+// test — et le premier signe serait une 500 en production, sur un déploiement
+// pourtant inchangé. On dépend donc de l'épinglage du runtime, au même titre
+// que les fonctions qu'il fournit.
+
+import { withSupabase } from '@supabase/server';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
 
