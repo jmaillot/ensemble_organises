@@ -243,23 +243,41 @@ select testkit.eq(testkit.affected(format(
 -- membre courant — parce que « la requête n'a rien touché » ne distingue pas
 -- une politique qui filtre d'un déclencheur qui annule, et que ces deux
 -- causes n'appellent pas le même correctif.
+-- Trois sondes, parce que « la requête n'a rien touché » ne distingue pas
+-- trois causes qui n'appellent pas le même correctif :
+--   1. la ligne visée n'existe plus ou son identifiant ne correspond pas ;
+--   2. un UPDATE qui ne touche pas la propriété passe, et seul le changement
+--      de propriétaire est annulé — donc c'est le déclencheur ;
+--   3. même un UPDATE neutre ne passe pas, et c'est la politique.
 do $$
 declare
   v_home text := (select household_id from testkit.fx where key = 'alice');
   v_alice text := (select row_id from testkit.fx where key = 'alice');
   v_list text := (select row_id from testkit.fx where key = 'private_list');
+  v_rows bigint;
+  v_neutre bigint;
   v_affected bigint;
 begin
+  select count(*) into v_rows from public.gift_lists where id = v_list;
+
+  -- Sonde 2 : mise à jour neutre. Elle n'atteint pas la condition du
+  -- déclencheur de transfert, mais emprunte exactement la même politique.
+  update public.gift_lists set name = name where id = v_list;
+  get diagnostics v_neutre = row_count;
+
   update public.gift_lists set owner_member_id = v_alice where id = v_list;
   get diagnostics v_affected = row_count;
 
   perform testkit.eq(v_affected, 1::bigint, format(
-      'rendre la liste : uid=%s, rôle=%s, membre courant=%s, peut écrire=%s, cible=%s',
+      'rendre la liste — ligne=%s, présente=%s, update neutre=%s, update propriétaire=%s, '
+      'uid=%s, rôle=%s, membre courant=%s, peut écrire=%s, cible=%s',
+      coalesce(v_list, '<null>'),
+      v_rows, v_neutre, v_affected,
       auth.uid(),
       coalesce(private.household_role(v_home), '<null>'),
       coalesce(private.current_member_id(v_home), '<null>'),
       private.can_write_gift_list(v_list),
-      v_alice));
+      coalesce(v_alice, '<null>')));
 end;
 $$;
 

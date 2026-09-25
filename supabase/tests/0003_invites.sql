@@ -372,7 +372,9 @@ begin
   v_result := public.create_household_invite_token(
     p_actor_id => erin,
     p_household_id => home,
-    p_token_hash => (select h1 from testkit.hashes),
+    -- `household_invite_tokens.token_hash` est unique : h1..h6 servent
+    -- déjà plus haut, on prend une empreinte hors du jeu de la fixture.
+    p_token_hash => repeat('0', 64),
     p_expires_at => now() + interval '400 days',
     p_max_uses => 5000
   );
