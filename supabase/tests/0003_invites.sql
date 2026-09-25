@@ -277,9 +277,21 @@ select testkit.expect_denied(format(
   'select public.redeem_household_invite_token(%L, %L, %L)',
   (select h5 from testkit.hashes), (select user_id from testkit.fx where key = 'frank'), 'Frank'),
   'un token expiré est refusé');
+-- Le refus est bien définitif, mais le token reste marqué actif jusqu'à la
+-- purge quotidienne. `redeem_household_invite_token` ne peut pas le
+-- désactiver : l'UPDATE et le `raise` seraient dans la même instruction, et
+-- l'exception annulerait l'UPDATE (migration 0017). Le nettoyage appartient à
+-- `private.prune_expired_invite_tokens` — vérifié en section 9.
 select testkit.eq(
-  (select is_active from public.household_invite_tokens where token_hash = (select h5 from testkit.hashes)), false,
-  'un token expiré est désactivé au moment de l''échange');
+  (select is_active from public.household_invite_tokens where token_hash = (select h5 from testkit.hashes)), true,
+  'le token expiré reste actif jusqu''à la purge, sans être réutilisable');
+
+-- Et surtout : le refus ne tient pas au drapeau `is_active`, mais à la
+-- comparaison de date, rejouée à chaque échange.
+select testkit.expect_denied(format(
+  'select public.redeem_household_invite_token(%L, %L, %L)',
+  (select h5 from testkit.hashes), (select user_id from testkit.fx where key = 'erin'), 'Erin Petit'),
+  'un second échange sur le même token expiré est refusé lui aussi');
 
 -- La date d'expiration est plafonnée à 90 jours.
 select testkit.eq(

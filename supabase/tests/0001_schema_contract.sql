@@ -121,8 +121,15 @@ $$;
 -- écrit les politiques des tables filles de `expense_participants` en
 -- oubliant la mère.
 --
--- Seule exception : `household_invite_tokens`, qui ne doit avoir AUCUNE
--- politique et aucun GRANT, pour rester inatteignable.
+-- Deux exceptions, documentées l'une et l'autre :
+--   * `household_invite_tokens` ne doit avoir AUCUNE politique ni aucun GRANT,
+--     pour rester inatteignable ;
+--   * `schema_migrations` est le journal de `scripts/migrate.sh`, une table
+--     d'outillage sans donnée personnelle. `migrate.sh` la crée sous RLS, sans
+--     politique : inaccessible à `anon` et `authenticated`, lisible par le rôle
+--     propriétaire du script. Même état que la précédente, pour une raison
+--     différente — c'est bien la seule table de `public` qui ne soit pas
+--     une table métier.
 do $$
 declare
   v_sans text;
@@ -133,7 +140,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname <> 'household_invite_tokens'
+     and c.relname not in ('household_invite_tokens', 'schema_migrations')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'

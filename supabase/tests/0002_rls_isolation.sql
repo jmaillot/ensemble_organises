@@ -216,10 +216,32 @@ select testkit.eq(testkit.count(format(
   'Alice voit sa propre liste privée');
 select testkit.eq(testkit.count('select 1 from public.gift_lists'), 2::bigint,
   'Alice voit les deux listes de son foyer');
+-- Le propriétaire d'une liste ne peut pas la transférer : seul un
+-- administrateur du foyer le peut (trigger `guard_gift_list_ownership`).
+-- Alice est à la fois propriétaire ET administratrice de son foyer : son
+-- transfert est donc légitime. C'est Bob, membre ordinaire et non
+-- propriétaire, qu'il faut opposer à la liste.
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
 select testkit.eq(testkit.affected(format(
   'update public.gift_lists set owner_member_id = %L where id = %L',
   (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
-  'un membre non propriétaire ne peut pas s''attribuer une liste privée');
+  'un membre ordinaire ne peut pas s''attribuer la liste privée d''un autre');
+select testkit.eq(testkit.affected(format(
+  'update public.gift_lists set name = %L where id = %L',
+  'Liste de Bob', (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
+  'ni la modifier, ni même la renommer');
+
+-- En revanche l'administratrice du foyer peut transférer une liste. La
+-- propriété est rendue juste après, pour ne pas perturber la suite.
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+select testkit.eq(testkit.affected(format(
+  'update public.gift_lists set owner_member_id = %L where id = %L',
+  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
+  'une administratrice peut transférer une liste de cadeaux');
+select testkit.eq(testkit.affected(format(
+  'update public.gift_lists set owner_member_id = %L where id = %L',
+  (select row_id from testkit.fx where key = 'alice'), (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
+  'et la reprendre, la propriété n''étant pas figée');
 
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(
