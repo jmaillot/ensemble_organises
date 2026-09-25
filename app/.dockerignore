@@ -1,0 +1,30 @@
+# Contexte de build Docker = `app/`. Tout ce qui n'est pas nécessaire au build
+# est exclu : le contexte est envoyé au démon à chaque build, et les artefacts de
+# test comme les secrets ne doivent jamais y entrer.
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+node_modules
+dist
+coverage
+.vite
+
+# Tests, rapports et documentation : rien de tout cela n'entre dans l'image.
+# Le contexte de build est `app/`, le runtime est le bundle Vite servi par Nginx.
+e2e
+playwright.config.ts
+playwright-report
+test-results
+docs
+src/**/*.test.ts
+src/**/*.test.tsx
+*.log
+
+# Système et éditeurs
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+*.swp

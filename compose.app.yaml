@@ -1,0 +1,40 @@
+# Frontend seul : le backend est une application Compose indépendante
+# (`supabase-project/docker-compose.yml` + son override Traefik). Les deux ne
+# sont jamais démarrés par le même fichier.
+#
+#   cp .env.app.example .env.app    # puis renseigner URL et clé publiable
+#   docker compose --env-file .env.app -f compose.app.yaml config
+#   docker compose --env-file .env.app -f compose.app.yaml up -d --wait
+#
+# TLS est terminé par Traefik sur le réseau externe `frontend` : ce service
+# n'ouvre aucun port sur l'hôte.
+
+services:
+  ensemble-organises-app:
+    build:
+      context: ./app
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+    container_name: ensemble-organises-app
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eo-app-rtr.entrypoints=https"
+      - "traefik.http.routers.eo-app-rtr.rule=Host(`app.votredomaine.fr`)"
+      - "traefik.http.routers.eo-app-rtr.service=eo-app-svc"
+      - "traefik.http.services.eo-app-svc.loadbalancer.server.port=8080"
+      - "traefik.docker.network=frontend"
+
+networks:
+  frontend:
+    external: true

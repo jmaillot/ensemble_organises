@@ -1,0 +1,102 @@
+# supabase-project/docker-compose.traefik.yml
+# Override de routage et de durcissement de la stack auto-hébergée.
+#
+# Enregistrement officiel (ne pas maintenir une seconde liste de fichiers) :
+#   cd supabase-project && sh run.sh config add traefik
+#
+# Exigences :
+#   * Docker Compose >= 2.24.4 (syntaxe `!override` ci-dessous) ;
+#   * le réseau externe `frontend` existe et Traefik y est attaché ;
+#   * un middleware `chain-authentik@file` est défini côté hôte (protection de
+#     Studio, qui n'est jamais publié tel quel sur un port).
+#
+# Trois hôtes sont publiés :
+#   app.votredomaine.fr    -> compose.app.yaml (frontend)
+#   api.votredomaine.fr    -> api-gw (Envoy), port interne 8000
+#   studio.votredomaine.fr -> studio, port interne 3000, protégé par Authentik
+#
+# Aucun port de base de données ou de service interne n'est publié sur l'hôte :
+# Traefik accède aux services par le réseau Docker.
+
+services:
+  # --- OAuth Google / Facebook ------------------------------------------------
+  # `add-new-auth-keys.sh` reste le patch local officiel conservé au bootstrap ;
+  # cet override ne fait qu'injecter les variables Google/Facebook.
+  auth:
+    environment:
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${GOOGLE_ENABLED}
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOOGLE_SECRET}
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${API_EXTERNAL_URL}/callback
+      GOTRUE_EXTERNAL_FACEBOOK_ENABLED: ${FACEBOOK_ENABLED}
+      GOTRUE_EXTERNAL_FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID}
+      GOTRUE_EXTERNAL_FACEBOOK_SECRET: ${FACEBOOK_SECRET}
+      GOTRUE_EXTERNAL_FACEBOOK_REDIRECT_URI: ${API_EXTERNAL_URL}/callback
+
+  # --- Edge Functions --------------------------------------------------------
+  # `INVITE_TOKEN_HMAC_SECRET` n'existe que pour la fonction serveur
+  # `household-invite`. Il n'est jamais transmis au frontend ni stocké en base :
+  # seules les empreintes HMAC-SHA-256 des tokens y sont conservées.
+  # Génération : openssl rand -base64 48 (≥ 256 bits), rotation = invalidation
+  # de tous les tokens actifs.
+  #
+  # `FUNCTIONS_VERIFY_JWT=false` est INDISPENSABLE : la stack doit mélanger des
+  # appels navigateur (clé publiable), des appels avec session (JWT utilisateur)
+  # et des appels serveur (clé secrète, job pg_cron). Avec `true`, la passerelle
+  # rejette tout appel qui ne porte pas un JWT utilisateur, donc les modes
+  # `publishable` et `secret`. Chaque Edge Function déclare donc explicitement
+  # ses modes dans `withSupabase` et vérifie elle-même ce qu'elle accepte ; ce
+  # sont la RLS et les fonctions SQL `SECURITY DEFINER` qui font foi, jamais la
+  # seule présence d'un JWT. Valeur par défaut forcée ici, surchargeable par le
+  # `.env` de la stack.
+  functions:
+    environment:
+      INVITE_TOKEN_HMAC_SECRET: ${INVITE_TOKEN_HMAC_SECRET}
+      FUNCTIONS_VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-false}
+      SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+
+  # --- Passerelle API --------------------------------------------------------
+  # La gateway Envoy sert l'API authentifiée par clé publiable, JWT utilisateur
+  # et RLS : AUCUN middleware d'authentification Traefik sur cette route, sinon
+  # l'application serait bloquée. Les WebSockets Realtime doivent conserver
+  # les en-têtes Upgrade/Connection : aucun middleware ne doit les supprimer.
+  api-gw:
+    ports: !override []
+    networks:
+      - default
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eo-api-rtr.entrypoints=https"
+      - "traefik.http.routers.eo-api-rtr.rule=Host(`api.votredomaine.fr`)"
+      - "traefik.http.routers.eo-api-rtr.service=eo-api-svc"
+      - "traefik.http.services.eo-api-svc.loadbalancer.server.port=8000"
+      - "traefik.docker.network=frontend"
+
+  # --- Console Studio --------------------------------------------------------
+  # Directement accessible, donc protégé par le middleware de session.
+  # Le chemin `/` d'`api-gw` sert aussi la console : il reste couvert par
+  # l'authentification Basic du gateway (DASHBOARD_USERNAME/DASHBOARD_PASSWORD).
+  # Tester explicitement ce chemin sur les deux hôtes après chaque mise à jour.
+  studio:
+    networks:
+      - default
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eo-studio-rtr.entrypoints=https"
+      - "traefik.http.routers.eo-studio-rtr.rule=Host(`studio.votredomaine.fr`)"
+      - "traefik.http.routers.eo-studio-rtr.service=eo-studio-svc"
+      - "traefik.http.routers.eo-studio-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.services.eo-studio-svc.loadbalancer.server.port=3000"
+      - "traefik.docker.network=frontend"
+
+  # --- Pooler de connexions : jamais publié ----------------------------------
+  supavisor:
+    ports: !override []
+
+networks:
+  frontend:
+    external: true

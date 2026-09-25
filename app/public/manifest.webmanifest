@@ -1,0 +1,22 @@
+{
+  "name": "Ensemble & Organisés",
+  "short_name": "Ensemble",
+  "description": "L'espace familial pour tout garder en mouvement.",
+  "lang": "fr",
+  "dir": "ltr",
+  "id": "/ensemble-organises",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "oklch(98% 0.004 240)",
+  "background_color": "oklch(98% 0.004 240)",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

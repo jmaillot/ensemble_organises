@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Ensemble & Organisés — fichiers exclus de Git
+#
+# Trois familles de secrets/volumes à ne jamais versionner :
+#   1. les dépendances installées (app/node_modules) ;
+#   2. les fichiers de secrets (.env*) ;
+#   3. le runtime Supabase auto-hébergé, récupéré depuis le snapshot officiel
+#      épinglé par `supabase-project/.supabase-version` (il pèse ~1 Go et
+#      contient des certificats, un .env et des volumes de données).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Dépendances et artefacts de build ────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# ── Secrets ──────────────────────────────────────────────────────────────────
+# Tout `.env*` est ignoré, puis deux exemples sont réadmis : ce sont des
+# gabarits sans valeur. `.env.app` et `supabase-project/.env` restent donc
+# hors du dépôt.
+.env
+.env.*
+!.env.example
+!.env.app.example
+
+# ── Runtime Supabase auto-hébergé (fournisseur) ──────────────────────────────
+# Seul ce que nous maintenons est versionné : le tag épinglé et l'override
+# Traefik. Tout le reste provient du clone du snapshot officiel.
+supabase-project/*
+!supabase-project/.supabase-version
+!supabase-project/docker-compose.traefik.yml
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+shots/
+
+# ── Système et éditeurs ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
