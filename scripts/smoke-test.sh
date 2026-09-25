@@ -24,17 +24,22 @@
 
 set -eu
 
-STACK_ENV="${STACK_ENV:-supabase-project/.env}"
+# Les chemins sont ancrés sur l'emplacement du script, pas sur le répertoire
+# courant : la documentation fait lancer ce script depuis `supabase-project/`
+# comme depuis la racine, et un chemin relatif au répertoire courant donnerait
+# `supabase-project/supabase-project/.env` dans le premier cas.
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+REPO_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+
+STACK_ENV="${STACK_ENV:-$REPO_DIR/supabase-project/.env}"
 API="${API:-}"
 
-if [ -z "$API" ]; then
-  echo "smoke-test.sh: aucune URL de stack." >&2
-  echo "  API=https://api.exemple.fr sh scripts/smoke-test.sh" >&2
-  exit 1
-fi
-
 if [ ! -f "$STACK_ENV" ]; then
-  echo "smoke-test.sh: $STACK_ENV introuvable — lancez depuis la racine du dépôt." >&2
+  echo "smoke-test.sh: $STACK_ENV introuvable." >&2
+  echo "  Depuis la racine du dépôt, ou depuis supabase-project/ :" >&2
+  echo "    sh scripts/smoke-test.sh" >&2
+  echo "    sh ../scripts/smoke-test.sh" >&2
+  echo "  Autre emplacement : STACK_ENV=/chemin/vers/.env" >&2
   exit 1
 fi
 
@@ -48,6 +53,23 @@ stack_value() {
 
 PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$(stack_value SUPABASE_PUBLISHABLE_KEY)}"
 SECRET_KEY="${SECRET_KEY:-$(stack_value SUPABASE_SECRET_KEY)}"
+
+# L'URL est lue après le .env, puisqu'elle en vient. `SUPABASE_PUBLIC_URL` est
+# celle que le frontend consomme comme `VITE_SUPABASE_URL` : le test vise donc
+# exactement la même adresse que l'application.
+if [ -z "$API" ]; then
+  API="$(stack_value SUPABASE_PUBLIC_URL)"
+fi
+
+if [ -z "$API" ]; then
+  echo "smoke-test.sh: aucune URL de stack." >&2
+  echo "  Ni la variable API, ni SUPABASE_PUBLIC_URL dans $STACK_ENV." >&2
+  echo "  API=https://api.exemple.fr sh scripts/smoke-test.sh" >&2
+  exit 1
+fi
+
+# Une barre finale produirait « https://api.exemple.fr//auth/v1/health ».
+API="${API%/}"
 
 if [ -z "$PUBLISHABLE_KEY" ]; then
   echo "smoke-test.sh: SUPABASE_PUBLISHABLE_KEY absent de $STACK_ENV" >&2
