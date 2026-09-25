@@ -178,8 +178,11 @@ sh run.sh config add traefik          # ajoute docker-compose.traefik.yml à COM
 # 2. Déployer les fonctions métier
 sh ../scripts/deploy-functions.sh
 
-# 3. Base seule, aucune route publique
-sh run.sh start db
+# 3. Base et stockage, aucune route publique.
+#    `storage` est indispensable : c'est lui qui crée le schéma
+#    `storage.buckets` utilisé par la migration 0010. `migrate.sh` le
+#    détecte et s'arrête avec cette consigne s'il manque.
+sh run.sh start db storage
 sh ../scripts/migrate.sh
 
 # 4. Tests SQL (base restaurée à l'identique en sortie)

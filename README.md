@@ -196,8 +196,8 @@ sh utils/generate-keys.sh --update-env
 sh utils/add-new-auth-keys.sh --update-env
 sh run.sh config add traefik            # override Traefik, avant le 1er démarrage
 
-# 2. Schéma : base seule, aucune route publique
-sh run.sh start db
+# 2. Schéma : base et stockage, aucune route publique
+sh run.sh start db storage               # `storage` crée le schéma storage.buckets
 sh ../scripts/migrate.sh                # 13 migrations, journalisées
 sh ../scripts/test-db.sh                # contrat, RLS, invitations, cron, ardoise
 
@@ -240,9 +240,12 @@ conteneur Nginx ne fonctionnerait pas.
 1. Le réseau externe `frontend` existe et Traefik y est attaché.
 2. `sh run.sh config add traefik` enregistre l'override (il ajoute
    `docker-compose.traefik.yml` à la variable officielle `COMPOSE_FILE`).
-3. `sh run.sh start db` — la base seule, aucune route publique.
-4. `sh ../scripts/migrate.sh` — le schéma, une transaction par migration,
-   journal dans `public.schema_migrations`.
+3. `sh run.sh start db storage` — la base et le service de stockage, aucune
+   route publique. Le service `storage` crée le schéma `storage.buckets` au
+   démarrage : sans lui, la migration des buckets échoue. `migrate.sh` le
+   vérifie et s'arrête avec la consigne plutôt qu'au milieu d'une série.
+4. `sh ../scripts/migrate.sh` — le schéma, une transaction par fichier
+   (portée par le fichier lui-même), journal dans `public.schema_migrations`.
 5. `sh ../scripts/test-db.sh` — les tests SQL, chaque fichier dans une
    transaction annulée.
 6. `sh ../scripts/deploy-functions.sh` — copie les fonctions métier dans le

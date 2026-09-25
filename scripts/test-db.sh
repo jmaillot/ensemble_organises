@@ -44,6 +44,18 @@ run_file() {
 echo "Installation de l'outillage de test…"
 run_file "$TESTS_DIR/_setup.sql"
 
+# Prérequis : le schéma `storage` vient du service `storage` de la stack, et le
+# contrat de schéma vérifie les buckets et leurs politiques. Mieux vaut le dire
+# ici qu'échouer sur une assertion incompréhensible.
+storage_buckets="$(psql_exec -t -A -c \
+  "select coalesce(to_regclass('storage.buckets')::text, '');" | tr -d ' \r' | head -n 1)"
+if [ -z "$storage_buckets" ]; then
+  echo "test-db.sh: le schéma 'storage' est absent." >&2
+  echo "            cd supabase-project && sh run.sh start db storage" >&2
+  echo "            puis cd supabase-project && sh ../scripts/migrate.sh" >&2
+  exit 1
+fi
+
 failed=0
 executed=0
 

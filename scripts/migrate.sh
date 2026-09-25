@@ -3,13 +3,22 @@
 # Applique les migrations SQL de `supabase/migrations` via le conteneur `db` de
 # la stack auto-hébergée, dans l'ordre lexicographique.
 #
-# Chaque fichier est appliqué dans sa propre transaction avec ON_ERROR_STOP, puis
-# journalisé dans `schema_migrations`. Le script est donc idempotent : relancer
-# une migration déjà appliquée ne fait rien, et un échec laisse la base intacte.
+# Chaque fichier porte sa propre transaction (`begin; … commit;`) : le script ne
+# l'impose pas, il ne l'encadre pas non plus, sinon PostgreSQL signale une
+# transaction déjà ouverte et le `commit;` interne fermerait celle du journal
+# avant l'écriture de celui-ci.
+#
+# Le script est idempotent : une migration déjà journalisée est ignorée. Si un
+# fichier s'applique mais que l'écriture du journal échoue, le fichier sera
+# rejoué au prochain passage — sans risque, tous les fichiers étant idempotents.
 #
 #   sh ../scripts/migrate.sh            # depuis supabase-project/
 #   sh scripts/migrate.sh               # depuis la racine du dépôt
-#   sh scripts/migrate.sh --status      # journal des migrations appliquées
+#   sh ../scripts/migrate.sh --status   # journal des migrations appliquées
+#
+# Prérequis : le service `db` démarré (sh run.sh start db). Les migrations qui
+# touchent au schéma `storage` exigent en plus le service `storage` démarré
+# (sh run.sh start db storage) : c'est lui qui crée ce schéma, pas nous.
 #
 # Variables d'environnement reconnues :
 #   DB_CONTAINER  nom du service Compose (défaut : db)
@@ -46,7 +55,7 @@ psql_exec -c "
     applied_at timestamptz not null default now()
   );
   comment on table public.schema_migrations is
-    'Historique des migrations supabase/migrations, maintained par scripts/migrate.sh';
+    'Historique des migrations supabase/migrations, maintenu par scripts/migrate.sh';
 " >/dev/null
 
 if [ "${1:-}" = "--status" ]; then
@@ -60,6 +69,39 @@ if [ "${1:-}" = "--status" ]; then
   exit 0
 fi
 
+# --- Contrôle préalable ----------------------------------------------------
+# Le schéma `storage` appartient au service `storage` de la stack : sans lui,
+# la 0010 échoue sur `relation "storage.buckets" does not exist`. Mieux vaut
+# s'arrêter ici, avec la bonne consigne, qu'au milieu d'une série de migrations.
+pending="$(mktemp)"
+trap 'rm -f "$pending"' EXIT INT TERM
+
+for file in "$MIGRATIONS_DIR"/*.sql; do
+  [ -e "$file" ] || continue
+  version="$(basename "$file")"
+  already="$(psql_exec -t -A -c \
+    "select count(*) from public.schema_migrations where version = '$version';")"
+  [ "$already" = "1" ] || printf '%s\n' "$file" >> "$pending"
+done
+
+if [ ! -s "$pending" ]; then
+  echo "Toutes les migrations sont déjà appliquées."
+  exit 0
+fi
+
+if grep -ql 'storage\.' $(cat "$pending") 2>/dev/null; then
+  storage_buckets="$(psql_exec -t -A -c \
+    "select coalesce(to_regclass('storage.buckets')::text, '');" | tr -d ' \r' | head -n 1)"
+  if [ -z "$storage_buckets" ]; then
+    echo "migrate.sh: le schéma 'storage' est absent : il est créé par le" >&2
+    echo "           service 'storage' de la stack, pas par nos migrations." >&2
+    echo "           cd supabase-project && sh run.sh start db storage" >&2
+    echo "           (ou 'sh run.sh start' pour toute la stack)" >&2
+    exit 1
+  fi
+fi
+
+# --- Application ------------------------------------------------------------
 applied=0
 skipped=0
 
@@ -77,14 +119,8 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
   fi
 
   echo "  → $version"
-  # La transaction et le journal sont ouverts dans la même session : si le
-  # fichier échoue, le version n'est pas enregistré et rien n'est commité.
-  {
-    echo "begin;"
-    cat "$file"
-    echo "insert into public.schema_migrations (version) values ('$version');"
-    echo "commit;"
-  } | psql_exec -q -f - >/dev/null
+  psql_exec -q -f - <"$file" >/dev/null
+  psql_exec -q -c "insert into public.schema_migrations (version) values ('$version');" >/dev/null
 
   applied=$((applied + 1))
 done
