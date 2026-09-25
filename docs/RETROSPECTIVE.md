@@ -158,22 +158,43 @@ politique, sans donnée personnelle.
 
 La campagne portait sur le schéma. Restent à prouver en conditions réelles :
 
-- **Les trois Edge Functions n'ont jamais été exécutées.** Elles utilisent
-  `@supabase/server`, que le type-checker du frontend ne couvre pas.
-- **Le frontend n'a jamais parlé à un vrai Supabase.** L'adaptateur PostgREST
-  n'a jamais été emprunté : l'application tourne en mode démo IndexedDB. Le
-  premier appel par l'API dira si `auth.uid()` est bien résolu par PostgREST.
+- **Le frontend n'a toujours pas parlé à un vrai Supabase.** L'adaptateur
+  PostgREST reste emprunté pour la première fois par `scripts/smoke-test.sh`,
+  jamais par l'application : celle-ci tourne en mode démo IndexedDB. La chaîne
+  serveur est prouvée, pas l'intégration du client.
 - **Aucune donnée réelle** : pas de signature OAuth, pas de SMTP. L'inscription
-  par courriel exige de confirmer que la configuration et le service de courriel
-  sont branchés.
+  a fonctionné en `ENABLE_EMAIL_AUTOCONFIRM=true`, c'est-à-dire avec une
+  adresse non vérifiée — un réglage à ne pas conserver, une adresse non
+  vérifiée servant à partager une liste de cadeaux.
 - **Web Push absent**, conformément à l'écart assumé : ni abonnement, ni
   notification navigateur.
 - **Les 19 modules n'ont aucun test contre l'API réelle.** La suite e2e
   existante tourne entièrement sur l'adaptateur local.
 
-Chaque ligne est une source de surprises prévisible. Le premier parcours réel —
-inscription, création de foyer, échange d'un token dans un second navigateur —
-est le test qui compte.
+Chaque ligne est une source de surprises prévisible.
+
+### Ce que le parcours réel a levé
+
+`scripts/smoke-test.sh` a été écrit puis exécuté le 25/09/2026. Il lève la
+réserve la plus lourde de cette page : **PostgREST transmet bien le jeton émis
+par GoTrue, `auth.uid()` le résout, et la RLS reconnaît l'utilisateur.** Ce que
+la suite SQL ne pouvait pas prouver, puisqu'elle pose elle-même les GUC du
+jeton : elle vérifiait que les politiques sont correctes, pas que la chaîne JWT
+est câblée. Isolement entre foyers, isolation des tâches, émission et échange
+d'un token — 17 contrôles, aucun échec.
+
+Les trois Edge Functions ont donc été exécutées, ce qui n'était jamais arrivé.
+Elles restent hors du type-checker du frontend, et le parcours n'exerce que
+`household-invite` : `expense-settlement` et `generate-routine-occurrences`
+n'ont pas été appelées.
+
+Le parcours a aussi corrigé le test lui-même, et pour la même raison que les
+fois précédentes : l'assertion était fausse et la production juste. Il attendait
+qu'un échange de token fonctionne **sans session** ; la fonction refuse, à dessein
+— l'échange exige un `p_user_id`, et le nom affiché vient du profil, jamais du
+corps de la requête. L'assertion est devenue sa vérification : un échange anonyme
+**doit** être refusé. C'est une propriété de sécurité, elle se vérifie comme
+telle.
 
 ---
 
