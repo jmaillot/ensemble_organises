@@ -113,6 +113,11 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
+-- Les colonnes de `auth.users` ne sont pas identiques d'une version de GoTrue
+-- à l'autre (la confirmation du courriel a notamment changé de nom). Figer une
+-- liste rendait la fixture dépendante d'un instantané précis : on n'alimente
+-- donc que les colonnes réellement présentes, et la fixture reste valable après
+-- une mise à jour de la stack.
 create or replace function testkit.auth_user(p_email text, p_display_name text default 'Utilisateur test')
 returns uuid
 language plpgsql
@@ -121,17 +126,46 @@ set search_path = ''
 as $$
 declare
   v_id uuid := gen_random_uuid();
+  v_columns text;
+  v_values text;
 begin
-  insert into auth.users (
-    instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-    raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-  ) values (
-    '00000000-0000-0000-0000-000000000000', v_id, 'authenticated', 'authenticated',
-    p_email, 'test-hash', now(),
-    jsonb_build_object('provider', 'email', 'providers', array['email']::text[]),
-    jsonb_build_object('full_name', p_display_name, 'name', p_display_name),
-    now(), now()
+  select string_agg(format('%I', s.column_name), ', ' order by s.ord),
+         string_agg(s.literal, ', ' order by s.ord)
+    into v_columns, v_values
+    from (values
+      ( 1, 'instance_id',        quote_literal('00000000-0000-0000-0000-000000000000')),
+      ( 2, 'id',                 quote_literal(v_id::text)),
+      ( 3, 'aud',                quote_literal('authenticated')),
+      ( 4, 'role',               quote_literal('authenticated')),
+      ( 5, 'email',              quote_literal(p_email)),
+      ( 6, 'encrypted_password', quote_literal('test-hash')),
+      ( 7, 'email_confirmed_at', quote_literal(now()::text)),
+      ( 8, 'confirmed_at',       quote_literal(now()::text)),
+      ( 9, 'raw_app_meta_data',  quote_literal(
+             jsonb_build_object('provider', 'email', 'providers', array['email']::text[])::text)),
+      (10, 'raw_user_meta_data', quote_literal(
+             jsonb_build_object('full_name', p_display_name, 'name', p_display_name)::text)),
+      (11, 'created_at',         quote_literal(now()::text)),
+      (12, 'updated_at',         quote_literal(now()::text))
+    ) as s(ord, column_name, literal)
+   where exists (
+     select 1
+       from pg_catalog.pg_attribute a
+      where a.attrelid = 'auth.users'::regclass
+        and a.attname::text = s.column_name
+        and a.attnum > 0
+        and not a.attisdropped
+   );
+
+  if v_columns is null then
+    raise exception
+      'testkit.auth_user : aucune colonne connue dans auth.users (version de stack inattendue)';
+  end if;
+
+  execute format(
+    'insert into auth.users (%s) values (%s)', v_columns, v_values
   );
+
   return v_id;
 end;
 $$;

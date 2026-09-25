@@ -84,7 +84,10 @@ for file in $files; do
     printf '    \033[32mOK\033[0m %s\n' "$(basename "$file")"
   else
     printf '    \033[31mÉCHEC\033[0m %s\n' "$(basename "$file")"
-    psql_exec -f "$file" || true
+    # Rappel du fichier pour afficher la sortie des assertions. $file est un
+    # chemin d'hôte, inexistant dans le conteneur : on repasse par l'entrée
+    # standard, comme à la première passe.
+    psql_exec -f - <"$file" || true
     failed=$((failed + 1))
   fi
 done

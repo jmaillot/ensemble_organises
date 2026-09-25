@@ -248,6 +248,7 @@ version non enregistrée.
 | `0011_cron.sql` | expansion RRULE, occurrences, retards, purge, jobs pg_cron |
 | `0012_notifications.sql` | prochaine occurrence d'un anniversaire, alertes du mois et des sept prochains jours, job `eo-birthday-alerts` |
 | `0013_server_rpc.sql` | appartenance vérifiée par acteur, rapport de maintenance des routines, ponts `public.expense_settlement()` et `public.routine_maintenance()` |
+| `0014_rls_child_tables.sql` | active la RLS sur les tables enfants et de rappel dont les politiques existaient déjà sans jamais l'avoir été (voir la note de migration) |
 
 > Numérotation : les alertes d'anniversaires (`0012`) précèdent le pont `public`
 > des Edge Functions (`0013`). Les deux sont indépendantes, restent applicables
@@ -327,6 +328,22 @@ politière `household_members_insert` (créateur du foyer) ou
 La RLS est la frontière d'autorisation finale. Elle est activée **dans la
 migration de création de chaque table** : une table sans politique est donc
 inaccessible, pas ouverte.
+
+> **Une politique sans RLS activée est inerte.** C'est le piège qu'a révélé la
+> première application réelle : sept tables enfants et de rappel avaient bien
+> leurs politiques (migration 0007) mais aucune ligne
+> `enable row level security` — le bloc qui suit la création des tables les
+> oubliait. Comme 0009 accorde `... on all tables in schema public to
+> authenticated`, elles étaient alors lisibles et modifiables par tout
+> utilisateur connecté, tous foyers confondus. Deux garde-fous l'empêchent de
+> revenir :
+>
+> * `0014_rls_child_tables.sql` échoue bruyamment si une table attendue n'a ni
+>   RLS ni politique ;
+> * le contrat de schéma (`tests/0001_schema_contract.sql`) exige la RLS sur
+>   **toutes** les tables de `public`, sans liste d'exclusion.
+>
+> Toute nouvelle table doit être couverte par les deux.
 
 Deux familles de politiques (`migration 0007`) :
 

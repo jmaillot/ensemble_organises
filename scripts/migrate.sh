@@ -56,6 +56,10 @@ psql_exec -c "
   );
   comment on table public.schema_migrations is
     'Historique des migrations supabase/migrations, maintenu par scripts/migrate.sh';
+  -- Table d'outillage interne : aucun client n'a à la lire. La RLS activée sans
+  -- politique la rend inaccessible à anon et authenticated ; le rôle propriétaire
+  -- utilisé par ce script n'en est pas affecté.
+  alter table public.schema_migrations enable row level security;
 " >/dev/null
 
 if [ "${1:-}" = "--status" ]; then
