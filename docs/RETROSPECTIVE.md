@@ -1,0 +1,199 @@
+# Première mise en œuvre — ce que l'exécution réelle a révélé
+
+> 25 septembre 2026 · 17 migrations · 6 suites SQL · 244 assertions
+
+Bilan de la première campagne d'exécution du schéma sur une vraie base. Tout ce
+qui suit a été **constaté sur un serveur**, pas déduit d'une lecture du code.
+Cette page sert de point de départ à la suite : les pièges décrits ici sont
+ceux qui reviendront, pas ceux qui n'arriveront pas.
+
+---
+
+## 1. Les quatre défauts réels
+
+Aucun n'a été trouvé à la lecture. Tous ont été trouvés par une suite de tests
+écrite avant la première exécution, et qui n'avait encore jamais tourné.
+
+### 1.1 Sept tables ouvertes à tous les foyers — le plus grave
+
+`task_assignees`, `routine_assignees`, `event_reminders`, `task_reminders`,
+`routine_reminders`, `conversation_members`, `gift_list_shares` avaient bien
+leurs politiques RLS, écrites par `0007`. Mais **la RLS n'était pas activée** :
+le bloc `alter table … enable row level security` qui suit la création des
+tables dans `0003`/`0004` oubliait les tables de jointure et de rappel.
+
+Or `0009` accorde `select, insert, update, delete on all tables in schema
+public to authenticated`. Une politique sans RLS est inerte : ces sept tables
+étaient donc **intégralement lisibles et modifiables par tout utilisateur
+connecté, tous foyers confondus**. Lire les assignataires de toutes les tâches
+de toutes les familles ne demandait aucun privilège.
+
+**Empilement de deux erreurs** : l'omission d'un côté, le `GRANT` générique de
+l'autre. Chacune est anodine ; ensemble elles ouvrent les données.
+
+### 1.2 Aucune politique sur `expenses` — l'Ardoise inerte
+
+`0007` générait les politiques d'un bloc de 21 tables « foyer plat ». `expenses`
+n'y était pas, et n'avait pas de politique écrite à la main non plus. RLS
+activée, aucun droit de lecture : **personne** ne pouvait lire ni écrire une
+dépense, pas même l'administratrice. Le symptôme côté utilisateur était une
+liste vide, pas une erreur.
+
+Sa table fille `expense_participants` recevait bien ses quatre politiques :
+c'est la mère qui avait été omise.
+
+### 1.3 Le partage d'une dépense était impossible
+
+`0004` déclarait les unicités de partage en `unique nulls not distinct`, qui
+traite `NULL` comme égal à `NULL`. Chaque part de type `membre` porte
+`external_participant_id = NULL` : la contrainte externe les collisionnait donc
+toutes. **Une dépense ne pouvait être répartie qu'entre un seul membre du
+foyer**, plus un participant externe au plus. Même défaut, symétrique, sur
+`gift_list_shares` : un partage par membre *ou* par courriel, jamais les deux.
+
+L'intention — « un participant ne peut pas être compté deux fois » — s'exprime
+par un index unique **partiel**, pas par une contrainte globale.
+
+### 1.4 Des effets de bord annulés par leur propre exception
+
+`redeem_household_invite_token` faisait, sur un token périmé :
+
+```sql
+update public.household_invite_tokens set is_active = false where id = …;
+raise exception 'token expiré';
+```
+
+Les deux sont dans la **même instruction** : l'exception remonte, la
+transaction est annulée, et l'`UPDATE` avec. Cette désactivation n'avait jamais
+eu lieu. Le code affichait une intention, pas un comportement.
+
+Non exploitable — chaque échange revérifie `expires_at` — mais le nettoyage réel
+appartient à `prune_expired_invite_tokens`, seul endroit où une désactivation
+peut être réellement committée.
+
+---
+
+## 2. La famille de pièges
+
+Ce qui relie ces défauts est plus utile qu'eux. Quatre fois, la même erreur de
+raisonnement : **supposer un comportement au lieu de le vérifier.**
+
+### 2.1 Une dépendance de la stack, supposée
+
+Les politiques s'appuient sur `auth.uid()`, fonction de la stack et non de notre
+code. Sur l'instantané `self-hosted/v0.8.2` :
+
+```sql
+select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+```
+
+Elle ne lit que le GUC **scalaire**, jamais le JSON `request.jwt.claims`. Un
+harnais qui ne posait que le JSON voyait `uid()` à `NULL` : **aucune politique
+ne reconnaissait personne**, et chaque comptage rendait zéro. PostgREST pose les
+deux formes, donc la production n'était pas concernée — mais rien ne le
+garantissait.
+
+### 2.2 Un outil de test qui mentait sur son nom
+
+`testkit.count()` exécutait la requête et en prenait la **première ligne** : sur
+un `select 1 from household_members` couvrant trois membres, elle rendait `1`. Et
+`NULL` si la RLS n'en montrait aucun. Toutes les assertions de comptage
+comparaient donc une valeur qui n'était pas un compte — et le défaut est resté
+invisible parce qu'un `NULL` et un `1` se ressemblent dans un message d'échec.
+
+### 2.3 Des attentes qui ne tenaient pas compte de leur propre arithmétique
+
+L'Ardoise : le test attendait un solde de −20 € pour un membre qui avait avancé
+30 € et gérait 30 € de parts, soit exactement zéro. La fonction de calcul était
+juste ; c'est le test qui était faux.
+
+L'identique sur un contrat d'API : le test attendait qu'un `p_max_uses => 5000`
+soit **refusé**, la fonction le **ramène** à 100. Les deux comportements sont
+défendables ; l'écart ne l'est pas.
+
+### 2.4 Le faux vert : des tests qui mesurent l'absence de données
+
+Une assertion négative vaut « l'autorisation a été refusée » — mais elle vaut
+aussi « cet acteur n'a **aucun** accès ». Un membre retiré du foyer échoue à
+chacune pour la mauvaise raison, et le fichier est vert.
+
+C'est exactement ce qui est arrivé : une section supprimait Bob du foyer, et la
+section suivante s'intitulait « Bob, membre ordinaire du foyer A » et vérifiait
+qu'il ne pouvait pas s'attribuer `admin`. Sept assertions, sept verts
+frauduleux. Seule l'assertion **positive** du bloc — « un membre peut créer une
+note dans son foyer » — distinguait les deux, et c'est elle qui a parlé.
+
+**Règle** : avant une série d'assertions négatives, prouver que l'acteur a
+accès. Sinon on mesure `count(*) = 0`, ce qui devient une tautologie dès que
+quelqu'un a retiré l'accès.
+
+Corollaire : `anon` se prouve par **privilège**, pas par un compte à zéro. Il
+n'a aucun droit sur les tables de `public` — le refus est antérieur à la RLS, ce
+qui est plus fort, et un `count(*) = 0` présupposerait le droit de lecture.
+
+---
+
+## 3. Les garde-fous désormais en place
+
+Chacun existe parce qu'un défaut l'a rendu nécessaire.
+
+| Garde-fou | Où | Empêche |
+|---|---|---|
+| RLS activée sur **toutes** les tables de `public` | `0001_schema_contract.sql` | 1.1 |
+| Au moins **une politique** sur chaque table | `0001_schema_contract.sql` | 1.2 |
+| Index uniques **partiels** vérifiés comme tels | `0015` | 1.3 |
+| Nettoyage hors du chemin de l'exception | `0017` | 1.4 |
+| `testkit.count()` encapsule et compte vraiment | `_setup.sql` | 2.2 |
+| Ancre positive avant les assertions négatives | `0002` § Bob | 2.4 |
+| `as_user` pose les deux GUC, comme PostgREST | `_setup.sql` | 2.1 |
+
+Deux exceptions documentées au contrôle « au moins une politique » :
+`household_invite_tokens`, inatteignable par conception, et
+`schema_migrations`, table de journal créée par `migrate.sh` — sous RLS, sans
+politique, sans donnée personnelle.
+
+---
+
+## 4. Ce qui n'est toujours pas vérifié
+
+La campagne portait sur le schéma. Restent à prouver en conditions réelles :
+
+- **Les trois Edge Functions n'ont jamais été exécutées.** Elles utilisent
+  `@supabase/server`, que le type-checker du frontend ne couvre pas.
+- **Le frontend n'a jamais parlé à un vrai Supabase.** L'adaptateur PostgREST
+  n'a jamais été emprunté : l'application tourne en mode démo IndexedDB. Le
+  premier appel par l'API dira si `auth.uid()` est bien résolu par PostgREST.
+- **Aucune donnée réelle** : pas de signature OAuth, pas de SMTP. L'inscription
+  par courriel exige de confirmer que la configuration et le service de courriel
+  sont branchés.
+- **Web Push absent**, conformément à l'écart assumé : ni abonnement, ni
+  notification navigateur.
+- **Les 19 modules n'ont aucun test contre l'API réelle.** La suite e2e
+  existante tourne entièrement sur l'adaptateur local.
+
+Chaque ligne est une source de surprises prévisible. Le premier parcours réel —
+inscription, création de foyer, échange d'un token dans un second navigateur —
+est le test qui compte.
+
+---
+
+## 5. Méthode
+
+Trois règles ont fait progresser cette campagne, et méritent d'être appliquées
+au reste du projet.
+
+1. **Écrire les tests avant la première exécution, pas après.** Les quatre
+   défauts sont des oublis d'inventaire : une liste de tables, de politiques, de
+   contraintes. Seul un inventaire automatique les attrape.
+2. **Ne pas interpréter un message d'échec, mesurer.** « Attendu 1, obtenu
+   NULL » ne distingue pas une politique qui filtre, un déclencheur qui annule
+   et une ligne qui n'existe pas. Faire porter par l'assertion elle-même l'état
+   réel de la décision a résolu en un tour ce que la lecture du code
+   n'arrivait pas à trancher.
+3. **Un test qui demande ce que le produit ne promet pas est un test à
+   réécrire, pas un code à corriger.** Trois fois dans cette campagne,
+   l'assertion était fausse et la production juste : une liste de cadeaux
+   transférée n'appartient plus à son ancien propriétaire, une empreinte de
+   token mal formée doit être refusée, un solde nul doit disparaître de la
+   compensation des dettes. Dans les trois cas, la correction a été dans le
+   test.
