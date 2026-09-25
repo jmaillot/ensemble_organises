@@ -127,12 +127,20 @@ PREFER=''
 
 # Extraction d'une valeur d'un JSON, sans dépendance externe. Suffit aux
 # réponses de GoTrue, qui sont plates ou à un niveau.
+# Les espaces autour des « : » sont tolérés, et c'est nécessaire.
+#
+# GoTrue répond au format compact — `"access_token":"…"`. PostgREST rend le jsonb
+# avec une espace — `"id": "…"`. Les extracteurs exigeaient la forme compacte :
+# sur une réponse de fonction SQL, ils ne trouvaient rien, renvoyaient une
+# chaîne vide, et chaque étape suivante partait de là. Le parcours échouait
+# alors sur une cause réelle mais rapportée à la mauvaise ligne — l'erreur
+# survenue dix étapes plus loin.
 json_string() {
-  printf '%s' "$1" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p" | head -n 1
+  printf '%s' "$1" | sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" | head -n 1
 }
 
 json_number() {
-  printf '%s' "$1" | sed -n "s/.*\"$2\":\([0-9][0-9.]*\).*/\1/p" | head -n 1
+  printf '%s' "$1" | sed -n "s/.*\"$2\": *\([0-9][0-9.]*\).*/\1/p" | head -n 1
 }
 
 # Compte les éléments d'un tableau JSON renvoyé sur une seule ligne, ce que fait
@@ -146,11 +154,11 @@ json_number() {
 # extrait de son objet : une recherche du premier « id » orthogonal à l'ordre
 # des clés, et l'ordre d'un jsonb n'est pas garanti.
 json_household_id() {
-  printf '%s' "$1" | sed -n 's/.*"household":{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n 1
+  printf '%s' "$1" | sed -n 's/.*"household": *{[^}]*"id": *"\([^"]*\)".*/\1/p' | head -n 1
 }
 
 json_member_id() {
-  printf '%s' "$1" | sed -n 's/.*"member":{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n 1
+  printf '%s' "$1" | sed -n 's/.*"member": *{[^}]*"id": *"\([^"]*\)".*/\1/p' | head -n 1
 }
 
 json_rows() {
@@ -305,6 +313,17 @@ else
   esac
 fi
 
+# Un prérequis manquant rend tout ce qui suit non évaluable. Continuer produirait
+# des verdicts trompeurs — c'est arrivé : un identifiant de foyer vide a fait
+# échouer l'étape « la RLS reconnaît Alice », alors que la RLS n'avait rien fait
+# de faux. On interrompt donc, et on nomme la cause.
+if [ -z "$HOUSEHOLD_ID" ]; then
+  echo
+  echo "Parcours interrompu : aucun foyer créé, les étapes suivantes n'ont pas" >&2
+  echo "de sens. La cause est celle de l'étape 3." >&2
+  exit 1
+fi
+
 # Le foyer doit être lisible immédiatement après sa création : c'est
 # précisément ce que l'insertion renvoyait mal, la politique de lecture refusant
 # un foyer dont l'appelant n'est pas encore membre.
@@ -394,6 +413,13 @@ else
   esac
 fi
 
+if [ -z "$TOKEN" ]; then
+  echo
+  echo "Parcours interrompu : aucun token émis, les étapes d'échange n'ont pas" >&2
+  echo "de sens. La cause est celle de l'étape 7." >&2
+  exit 1
+fi
+
 # ----------------------------------------------------------------------------
 step "8. Un échange anonyme est refusé — c'est voulu, et c'est vérifié"
 # ----------------------------------------------------------------------------
@@ -421,16 +447,12 @@ step "9. Bob, connecté, échange le token"
 # ----------------------------------------------------------------------------
 # Le parcours réel : on s'inscrit, on est connecté, on colle le token. Bob a un
 # compte, donc une session, donc le rôle `authenticated`.
-if [ -n "$TOKEN" ]; then
-  call "/functions/v1/household-invite" POST \
-    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
-  if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
-    pass "Bob rejoint le foyer (échange atomique, HMAC validé en base)"
-  else
-    fail "échange refusé (code $CODE) : $BODY"
-  fi
+call "/functions/v1/household-invite" POST \
+  "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
+if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+  pass "Bob rejoint le foyer (échange atomique, HMAC validé en base)"
 else
-  fail "pas de token à échanger"
+  fail "échange refusé (code $CODE) : $BODY"
 fi
 
 call "/rest/v1/household_members?household_id=eq.$HOUSEHOLD_ID" GET "" "$BOB_JWT"
@@ -444,15 +466,13 @@ fi
 # ----------------------------------------------------------------------------
 step "10. Le même token, le même compte : pas de double adhésion"
 # ----------------------------------------------------------------------------
-if [ -n "$TOKEN" ]; then
-  call "/functions/v1/household-invite" POST \
-    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
-  case "$CODE" in
-    200|201) pass "le second échange est idempotent (déjà membre)" ;;
-    400|401|403|409) pass "le second échange est refusé (code $CODE), comme attendu" ;;
-    *) fail "le second échange a rendu un code inattendu : $CODE $BODY" ;;
-  esac
-fi
+call "/functions/v1/household-invite" POST \
+  "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
+case "$CODE" in
+  200|201) pass "le second échange est idempotent (déjà membre)" ;;
+  400|401|403|409) pass "le second échange est refusé (code $CODE), comme attendu" ;;
+  *) fail "le second échange a rendu un code inattendu : $CODE $BODY" ;;
+esac
 
 call "/rest/v1/household_members?household_id=eq.$HOUSEHOLD_ID" GET "" "$BOB_JWT"
 rows="$(json_rows "$BODY")"
