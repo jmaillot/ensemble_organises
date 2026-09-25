@@ -153,6 +153,12 @@ BOB_JWT=''
 cleanup() {
   echo
   echo "── Nettoyage"
+
+  if [ -z "$ALICE_ID" ] && [ -z "$BOB_ID" ]; then
+    echo "   (aucun compte n'a été créé, rien à nettoyer)"
+    return 0
+  fi
+
   [ -n "$SECRET_KEY" ] || { echo "   (pas de clé secrète : comptes laissés en place)"; return 0; }
 
   # Le foyer d'abord : `households.created_by` est en `on delete set null`, le
@@ -207,9 +213,31 @@ case "$CODE" in
     fi
     ;;
   422|400)
-    fail "inscription refusée : $BODY"
-    echo "    Si le message évoque la confirmation, activez temporairement"
-    echo "    ENABLE_EMAIL_AUTOCONFIRM=true dans .env, ou configurez le SMTP."
+    fail "inscription refusée (code $CODE) : $BODY"
+    ;;
+  500)
+    # Cas observé sur une stack sans SMTP : GoTrue crée le compte puis échoue
+    # en tentant l'envoi, et remonte une 500. Le corps est ici plus utile que le
+    # code — c'est lui qui nomme la cause.
+    fail "GoTrue n'a pas su envoyer le courriel de confirmation (code $CODE)"
+    case "$BODY" in
+      *confirmation*)
+        echo "    Aucun service SMTP n'est branché, ou ses variables sont encore"
+        echo "    celles de l'exemple du snapshot."
+        echo
+        echo "    Pour valider la chaîne tout de suite, dans .env :"
+        echo "      ENABLE_EMAIL_AUTOCONFIRM=true"
+        echo "    puis redémarrer GoTrue : sh run.sh up -d"
+        echo
+        echo "    À ne pas laisser en production : un compte créé sans confirmation"
+        echo "    porte une adresse non vérifiée, et cette adresse sert à partager"
+        echo "    une liste de cadeaux. Un vrai SMTP reste nécessaire — un service"
+        echo "    d'envoi transactionnel suffit, avec une clé d'API."
+        ;;
+      *)
+        echo "    $BODY"
+        ;;
+    esac
     ;;
   *)
     fail "inscription inattendue (code $CODE) : $BODY"
