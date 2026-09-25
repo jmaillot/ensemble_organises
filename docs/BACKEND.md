@@ -249,6 +249,7 @@ version non enregistrée.
 | `0012_notifications.sql` | prochaine occurrence d'un anniversaire, alertes du mois et des sept prochains jours, job `eo-birthday-alerts` |
 | `0013_server_rpc.sql` | appartenance vérifiée par acteur, rapport de maintenance des routines, ponts `public.expense_settlement()` et `public.routine_maintenance()` |
 | `0014_rls_child_tables.sql` | active la RLS sur les tables enfants et de rappel dont les politiques existaient déjà sans jamais l'avoir été (voir la note de migration) |
+| `0015_share_uniqueness.sql` | remplace quatre contraintes `unique nulls not distinct` par des index uniques partiels : le partage d'une dépense et d'une liste était impossible dès la deuxième part |
 
 > Numérotation : les alertes d'anniversaires (`0012`) précèdent le pont `public`
 > des Edge Functions (`0013`). Les deux sont indépendantes, restent applicables

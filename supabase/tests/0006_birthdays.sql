@@ -127,7 +127,7 @@ begin
   -- Isolation entre foyers.
   perform testkit.eq(
     (select array_agg(a.name order by a.next_occurrence_date)
-       from private.household_birthday_alerts(v_today => v_today) a),
+       from private.household_birthday_alerts(p_today => v_today) a),
     array['Contact du foyer B', 'Anniversaire proche'],
     'sans filtre, tous les foyers sont couverts, chacun avec ses anniversaires'
   );

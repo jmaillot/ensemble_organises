@@ -107,7 +107,7 @@ begin
      and c.relkind = 'r'
      and not c.relrowsecurity;
 
-  perform testkit.ok(v_missing is null, 'RLS désactivée sur : ' || v_missing);
+  perform testkit.ok(v_missing = '{}', 'RLS désactivée sur : ' || v_missing);
 end;
 $$;
 
@@ -128,7 +128,7 @@ begin
        select 1 from pg_constraint k where k.conrelid = c.oid and k.contype in ('p', 'u')
      );
 
-  perform testkit.ok(v_missing is null, 'table sans clé primaire ni unicité : ' || v_missing);
+  perform testkit.ok(v_missing = '{}', 'table sans clé primaire ni unicité : ' || v_missing);
 end;
 $$;
 
@@ -272,33 +272,32 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 9. Le profil est créé par le trigger auth.users, sans liste globale d'emails
 -- ---------------------------------------------------------------------------
-create temporary table fx (key text primary key, user_id uuid) on commit drop;
 
-insert into fx (key, user_id)
+insert into testkit.fx (key, user_id)
 values ('bob', testkit.auth_user('bob@example.fr', 'Bob Martin'));
 
 select testkit.eq(
-  (select count(*) from public.profiles p join fx on fx.user_id = p.id where fx.key = 'bob'), 1,
+  (select count(*) from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'), 1,
   'le trigger sur auth.users doit créer le profil');
 select testkit.eq(
-  (select p.display_name from public.profiles p join fx on fx.user_id = p.id where fx.key = 'bob'),
+  (select p.display_name from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'),
   'Bob Martin',
   'le profil doit reprendre le nom d''affichage des métadonnées Auth');
 select testkit.eq(
-  (select p.provider from public.profiles p join fx on fx.user_id = p.id where fx.key = 'bob'),
+  (select p.provider from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'),
   'email',
   'le fournisseur par défaut est email');
 
 -- email, provider et created_at ne sont pas modifiables par le client.
-select testkit.as_user(user_id, 'bob@example.fr') from fx where key = 'bob';
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
 select testkit.expect_denied(format(
   'update public.profiles set email = %L where id = %L',
-  'pirate@example.fr', (select user_id from fx where key = 'bob')));
+  'pirate@example.fr', (select user_id from testkit.fx where key = 'bob')));
 select testkit.expect_denied(format(
   'update public.profiles set provider = %L where id = %L',
-  'google', (select user_id from fx where key = 'bob')));
+  'google', (select user_id from testkit.fx where key = 'bob')));
 select testkit.expect_denied(format(
   'insert into public.profiles (id, email, display_name, provider) values (%L, %L, %L, %L)',
   gen_random_uuid(), 'x@example.fr', 'X', 'email'));
@@ -307,7 +306,7 @@ select testkit.expect_denied('delete from public.profiles');
 -- en revanche le client peut corriger son propre nom d'affichage
 select testkit.eq(testkit.affected(format(
   'update public.profiles set display_name = %L where id = %L',
-  'Bob M.', (select user_id from fx where key = 'bob'))), 1::bigint,
+  'Bob M.', (select user_id from testkit.fx where key = 'bob'))), 1::bigint,
   'un client peut modifier son propre nom d''affichage');
 
 reset role;

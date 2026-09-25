@@ -39,6 +39,32 @@ begin
 end;
 $$;
 
+-- `eq(anyelement, anyelement, text)` n'accepte que deux arguments du MÊME type :
+-- `eq(count(*), 0)` est un (bigint, integer) et ne résout donc aucune fonction.
+-- Ces deux surcharges couvrent le cas courant — un décompte comparé à un littéral
+-- entier — sans obliger chaque assertion à écrire un cast.
+create or replace function testkit.eq(p_actual bigint, p_expected integer, p_message text)
+returns void
+language plpgsql
+as $$
+begin
+  if p_actual is distinct from p_expected::bigint then
+    raise exception 'ASSERTION ÉCHOUÉE : % (attendu %, obtenu %)', p_message, p_expected, p_actual;
+  end if;
+end;
+$$;
+
+create or replace function testkit.eq(p_actual integer, p_expected bigint, p_message text)
+returns void
+language plpgsql
+as $$
+begin
+  if p_actual::bigint is distinct from p_expected then
+    raise exception 'ASSERTION ÉCHOUÉE : % (attendu %, obtenu %)', p_message, p_expected, p_actual;
+  end if;
+end;
+$$;
+
 -- Exécute une requête et renvoie le nombre de lignes renvoyées.
 create or replace function testkit.count(p_sql text)
 returns bigint
@@ -113,6 +139,23 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
+-- Table de correspondance entre identifiants lisibles (`'alice'`) et identifiants
+-- générés (`gen_random_uuid()`), lisible après `set local role authenticated`.
+--
+-- Elle est VOLONTAIREMENT dans `testkit` et non `temporary` : une table
+-- temporaire appartient au rôle qui l'a créée, donc `authenticated` n'y a
+-- aucun droit et la moindre lecture après un changement de rôle échoue sur
+-- « permission denied for table fx ». Ici le droit de lecture est explicite.
+create table if not exists testkit.fx (
+  key          text primary key,
+  user_id      uuid,
+  household_id text,
+  row_id       text
+);
+grant select on testkit.fx to anon, authenticated;
+comment on table testkit.fx is
+  'Fixture de correspondance libellé → identifiants, partagée par les tests SQL.';
+
 -- Les colonnes de `auth.users` ne sont pas identiques d'une version de GoTrue
 -- à l'autre (la confirmation du courriel a notamment changé de nom). Figer une
 -- liste rendait la fixture dépendante d'un instantané précis : on n'alimente

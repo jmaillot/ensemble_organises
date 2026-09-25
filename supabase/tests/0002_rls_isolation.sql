@@ -12,12 +12,6 @@
 
 begin;
 
-create temporary table fx (
-  key text primary key,
-  user_id uuid,
-  household_id text,
-  row_id text
-) on commit drop;
 
 do $$
 declare
@@ -89,7 +83,7 @@ begin
   values (private.new_id('widget'), alice_m, home_a, 'taches', 0, 0),
          (private.new_id('widget'), carol_m, home_b, 'taches', 0, 0);
 
-  insert into fx (key, user_id, household_id, row_id) values
+  insert into testkit.fx (key, user_id, household_id, row_id) values
     ('alice', alice, home_a, alice_m),
     ('bob', bob, home_a, bob_m),
     ('enfant', kid, home_a, kid_m),
@@ -113,7 +107,7 @@ $$;
 -- ===========================================================================
 -- Alice, administratrice du foyer A
 -- ===========================================================================
-select testkit.as_user(user_id, 'alice@example.fr') from fx where key = 'alice';
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
 -- --- Lecture : uniquement son foyer -----------------------------------------
@@ -141,96 +135,96 @@ select testkit.eq(testkit.count('select 1 from public.dashboard_widgets'), 1::bi
 -- --- Écriture inter-foyer : refusée -----------------------------------------
 select testkit.expect_denied(format(
   'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
-  'task_x', (select household_id from fx where key = 'carol'), 'Intruse'));
+  'task_x', (select household_id from testkit.fx where key = 'carol'), 'Intruse'));
 select testkit.eq(testkit.affected(format(
-  'update public.tasks set name = %L where id = %L', 'Détournée', (select row_id from fx where key = 'task_b'))), 0::bigint,
+  'update public.tasks set name = %L where id = %L', 'Détournée', (select row_id from testkit.fx where key = 'task_b'))), 0::bigint,
   'Alice ne peut pas modifier une tâche du foyer B');
 select testkit.eq(testkit.affected(format(
-  'delete from public.tasks where id = %L', (select row_id from fx where key = 'task_b'))), 0::bigint,
+  'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_b'))), 0::bigint,
   'Alice ne peut pas supprimer une tâche du foyer B');
 select testkit.eq(testkit.affected(format(
-  'delete from public.shopping_list_items where list_id = %L', (select row_id from fx where key = 'list_b'))), 0::bigint,
+  'delete from public.shopping_list_items where list_id = %L', (select row_id from testkit.fx where key = 'list_b'))), 0::bigint,
   'Alice ne peut pas supprimer un objet du foyer B');
 select testkit.eq(testkit.affected(format(
-  'update public.households set name = %L where id = %L', 'Piraté', (select household_id from fx where key = 'carol'))), 0::bigint,
+  'update public.households set name = %L where id = %L', 'Piraté', (select household_id from testkit.fx where key = 'carol'))), 0::bigint,
   'Alice ne peut pas renommer le foyer B');
 select testkit.eq(testkit.affected(format(
-  'delete from public.households where id = %L', (select household_id from fx where key = 'carol'))), 0::bigint,
+  'delete from public.households where id = %L', (select household_id from testkit.fx where key = 'carol'))), 0::bigint,
   'Alice ne peut pas supprimer le foyer B');
 
 -- Un foyer ne peut être créé qu'au nom de son auteur.
 select testkit.expect_denied(format(
   'insert into public.households (id, name, created_by) values (%L, %L, %L)',
-  'household_x', 'Foyer usurpé', (select user_id from fx where key = 'bob')));
+  'household_x', 'Foyer usurpé', (select user_id from testkit.fx where key = 'bob')));
 select testkit.ok(
   testkit.affected(format(
     'insert into public.households (id, name, created_by) values (%L, %L, %L)',
-    'household_own', 'Mon nouveau foyer', (select user_id from fx where key = 'alice'))) = 1,
+    'household_own', 'Mon nouveau foyer', (select user_id from testkit.fx where key = 'alice'))) = 1,
   'un utilisateur connecté crée son propre foyer');
 select testkit.expect_denied(format(
   'insert into public.household_members (id, household_id, user_id, display_name, role)'
   ' values (%L, %L, %L, %L, %L)',
-  'member_own', 'household_own', (select user_id from fx where key = 'alice'), 'Alice', 'membre'),
+  'member_own', 'household_own', (select user_id from testkit.fx where key = 'alice'), 'Alice', 'membre'),
   'le premier membre d''un foyer doit être administrateur');
 select testkit.ok(
   testkit.affected(format(
     'insert into public.household_members (id, household_id, user_id, display_name, role)'
     ' values (%L, %L, %L, %L, %L)',
-    'member_own2', 'household_own', (select user_id from fx where key = 'alice'), 'Alice', 'admin')) = 1,
+    'member_own2', 'household_own', (select user_id from testkit.fx where key = 'alice'), 'Alice', 'admin')) = 1,
   'le créateur peut devenir administrateur de son foyer');
 
 -- --- Tables enfants : accès dérivé du parent ---------------------------------
 select testkit.expect_denied(format(
   'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
-  (select row_id from fx where key = 'task_b'), (select row_id from fx where key = 'alice')));
+  (select row_id from testkit.fx where key = 'task_b'), (select row_id from testkit.fx where key = 'alice')));
 select testkit.expect_denied(format(
   'insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)'
   ' values (%L, %L, ''membre'', %L, 1)',
-  'ep_x', (select row_id from fx where key = 'expense_b'), (select row_id from fx where key = 'alice')));
+  'ep_x', (select row_id from testkit.fx where key = 'expense_b'), (select row_id from testkit.fx where key = 'alice')));
 select testkit.expect_denied(format(
   'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
-  (select row_id from fx where key = 'task_a'), (select row_id from fx where key = 'carol')),
+  (select row_id from testkit.fx where key = 'task_a'), (select row_id from testkit.fx where key = 'carol')),
   'un assignataire doit appartenir au foyer de la tâche');
 
 -- --- Intégrité des colonnes dénormalisées et références ---------------------
 select testkit.expect_denied(format(
   'insert into public.shopping_list_items (id, list_id, household_id, name) values (%L, %L, %L, %L)',
-  'item_x', (select row_id from fx where key = 'list_a'), (select household_id from fx where key = 'carol'), 'Yaourt'));
+  'item_x', (select row_id from testkit.fx where key = 'list_a'), (select household_id from testkit.fx where key = 'carol'), 'Yaourt'));
 select testkit.expect_denied(format(
   'insert into public.expenses (id, household_id, title, amount, paid_by, expense_date)'
   ' values (%L, %L, %L, 10, %L, current_date)',
-  'expense_x', (select household_id from fx where key = 'alice'), 'Interfoyer', (select row_id from fx where key = 'carol')));
+  'expense_x', (select household_id from testkit.fx where key = 'alice'), 'Interfoyer', (select row_id from testkit.fx where key = 'carol')));
 select testkit.expect_denied(format(
   'insert into public.tasks (id, household_id, name, created_by) values (%L, %L, %L, %L)',
-  'task_y', (select household_id from fx where key = 'alice'), 'Au nom de Bob', (select row_id from fx where key = 'bob')),
+  'task_y', (select household_id from testkit.fx where key = 'alice'), 'Au nom de Bob', (select row_id from testkit.fx where key = 'bob')),
   'impossible d''écrire au nom d''un autre membre');
 
 -- --- Listes de cadeaux : visibilité ------------------------------------------
 select testkit.eq(testkit.count(format(
-  'select 1 from public.gift_lists where id = %L', (select row_id from fx where key = 'private_list'))), 1::bigint,
+  'select 1 from public.gift_lists where id = %L', (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
   'Alice voit sa propre liste privée');
 select testkit.eq(testkit.count('select 1 from public.gift_lists'), 2::bigint,
   'Alice voit les deux listes de son foyer');
 select testkit.eq(testkit.affected(format(
   'update public.gift_lists set owner_member_id = %L where id = %L',
-  (select row_id from fx where key = 'bob'), (select row_id from fx where key = 'private_list'))), 0::bigint,
+  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
   'un membre non propriétaire ne peut pas s''attribuer une liste privée');
 
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(
-  'update public.dashboard_widgets set position_x = 9 where member_id = %L', (select row_id from fx where key = 'carol'))), 0::bigint,
+  'update public.dashboard_widgets set position_x = 9 where member_id = %L', (select row_id from testkit.fx where key = 'carol'))), 0::bigint,
   'on ne touche pas aux widgets d''un autre membre');
 select testkit.expect_denied(format(
   'insert into public.dashboard_widgets (id, member_id, household_id, widget_type)'
   ' values (%L, %L, %L, ''meteo'')',
-  'widget_x', (select row_id from fx where key = 'bob'), (select household_id from fx where key = 'alice')));
+  'widget_x', (select row_id from testkit.fx where key = 'bob'), (select household_id from testkit.fx where key = 'alice')));
 
 -- --- Gestion des membres : le dernier administrateur est protégé --------------
 select testkit.eq(testkit.affected(format(
-  'delete from public.household_members where id = %L', (select row_id from fx where key = 'alice'))), 0::bigint,
+  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'alice'))), 0::bigint,
   'le dernier administrateur ne peut pas être supprimé');
 select testkit.eq(testkit.affected(format(
-  'delete from public.household_members where id = %L', (select row_id from fx where key = 'bob'))), 1::bigint,
+  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
   'un administrateur peut retirer un membre ordinaire');
 
 reset role;
@@ -238,39 +232,39 @@ reset role;
 -- ===========================================================================
 -- Bob, membre ordinaire du foyer A — pas d'escalade de privilèges
 -- ===========================================================================
-select testkit.as_user(user_id, 'bob@example.fr') from fx where key = 'bob';
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
-  'update public.household_members set role = %L where id = %L', 'admin', (select row_id from fx where key = 'bob'))), 0::bigint,
+  'update public.household_members set role = %L where id = %L', 'admin', (select row_id from testkit.fx where key = 'bob'))), 0::bigint,
   'un membre ne peut pas s''attribuer le rôle admin');
 select testkit.eq(testkit.affected(format(
-  'update public.household_members set role = %L where id = %L', 'admin', (select row_id from fx where key = 'alice'))), 0::bigint,
+  'update public.household_members set role = %L where id = %L', 'admin', (select row_id from testkit.fx where key = 'alice'))), 0::bigint,
   'un membre ne peut pas promouvoir un autre membre');
 select testkit.expect_denied(format(
   'insert into public.household_members (id, household_id, user_id, display_name, role)'
   ' values (%L, %L, %L, %L, %L)',
-  'member_x', (select household_id from fx where key = 'alice'), (select user_id from fx where key = 'bob'), 'Bob', 'admin'));
+  'member_x', (select household_id from testkit.fx where key = 'alice'), (select user_id from testkit.fx where key = 'bob'), 'Bob', 'admin'));
 select testkit.expect_denied(format(
   'insert into public.household_members (id, household_id, user_id, display_name, role)'
   ' values (%L, %L, %L, %L, %L)',
-  'member_y', (select household_id from fx where key = 'carol'), (select user_id from fx where key = 'bob'), 'Bob', 'membre'),
+  'member_y', (select household_id from testkit.fx where key = 'carol'), (select user_id from testkit.fx where key = 'bob'), 'Bob', 'membre'),
   'on ne peut pas s''inscrire dans un autre foyer');
 select testkit.eq(testkit.affected(format(
-  'delete from public.household_members where id = %L', (select row_id from fx where key = 'alice'))), 0::bigint,
+  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'alice'))), 0::bigint,
   'un membre ne peut pas retirer un administrateur');
 select testkit.eq(testkit.affected(format(
-  'update public.households set name = %L where id = %L', 'Renommé', (select household_id from fx where key = 'alice'))), 0::bigint,
+  'update public.households set name = %L where id = %L', 'Renommé', (select household_id from testkit.fx where key = 'alice'))), 0::bigint,
   'un membre ne peut pas renommer le foyer');
 select testkit.eq(testkit.affected(format(
-  'delete from public.tasks where id = %L', (select row_id from fx where key = 'task_a'))), 0::bigint,
+  'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 0::bigint,
   'la suppression d''une tâche est réservée aux administrateurs');
 
 -- En revanche il écrit dans le contenu de son foyer.
 select testkit.ok(
   testkit.affected(format(
     'insert into public.notes (id, household_id, title, content, created_by) values (%L, %L, %L, %L, %L)',
-    'note_bob', (select household_id from fx where key = 'alice'), 'Note de Bob', 'contenu', (select row_id from fx where key = 'bob'))) = 1,
+    'note_bob', (select household_id from testkit.fx where key = 'alice'), 'Note de Bob', 'contenu', (select row_id from testkit.fx where key = 'bob'))) = 1,
   'un membre peut créer une note dans son foyer');
 
 reset role;
@@ -278,19 +272,19 @@ reset role;
 -- ===========================================================================
 -- Noé, rôle `enfant` — lecture seule
 -- ===========================================================================
-select testkit.as_user(user_id, 'enfant@example.fr') from fx where key = 'enfant';
+select testkit.as_user(user_id, 'enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
 
 select testkit.eq(testkit.count('select 1 from public.tasks'), 1::bigint,
   'un enfant lit les tâches de son foyer');
 select testkit.expect_denied(format(
   'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
-  'task_kid', (select household_id from fx where key = 'alice'), 'Tâche d''enfant'));
+  'task_kid', (select household_id from testkit.fx where key = 'alice'), 'Tâche d''enfant'));
 select testkit.eq(testkit.affected(format(
   'update public.notes set title = %L where title = %L', 'Piraté', 'Note de Bob')), 0::bigint,
   'un enfant ne modifie pas les notes du foyer');
 select testkit.eq(testkit.affected(format(
-  'delete from public.tasks where id = %L', (select row_id from fx where key = 'task_a'))), 0::bigint,
+  'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 0::bigint,
   'un enfant ne supprime pas les tâches du foyer');
 
 reset role;
@@ -298,7 +292,7 @@ reset role;
 -- ===========================================================================
 -- Carol, administratrice du foyer B — la fuite ne joue pas dans l'autre sens
 -- ===========================================================================
-select testkit.as_user(user_id, 'carol@example.fr') from fx where key = 'carol';
+select testkit.as_user(user_id, 'carol@example.fr') from testkit.fx where key = 'carol';
 set local role authenticated;
 
 select testkit.eq(testkit.count('select 1 from public.household_members'), 2::bigint,
@@ -306,15 +300,15 @@ select testkit.eq(testkit.count('select 1 from public.household_members'), 2::bi
 select testkit.eq(testkit.count('select 1 from public.tasks'), 1::bigint,
   'Carol ne voit pas les tâches du foyer A');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.messages where conversation_id = %L', (select row_id from fx where key = 'conv_a'))), 0::bigint,
+  'select 1 from public.messages where conversation_id = %L', (select row_id from testkit.fx where key = 'conv_a'))), 0::bigint,
   'Carol ne voit pas les messages du foyer A');
 select testkit.expect_denied(format(
   'insert into public.conversation_members (conversation_id, member_id) values (%L, %L)',
-  (select row_id from fx where key = 'conv_a'), (select row_id from fx where key = 'carol')));
+  (select row_id from testkit.fx where key = 'conv_a'), (select row_id from testkit.fx where key = 'carol')));
 select testkit.expect_denied(format(
   'insert into public.messages (id, conversation_id, household_id, sender_id, content) values (%L, %L, %L, %L, %L)',
-  'message_x', (select row_id from fx where key = 'conv_a'),
-  (select household_id from fx where key = 'carol'), (select row_id from fx where key = 'carol'), 'Bonjour'),
+  'message_x', (select row_id from testkit.fx where key = 'conv_a'),
+  (select household_id from testkit.fx where key = 'carol'), (select row_id from testkit.fx where key = 'carol'), 'Bonjour'),
   'on ne peut pas écrire dans une conversation d''un autre foyer');
 
 reset role;
@@ -322,14 +316,14 @@ reset role;
 -- ===========================================================================
 -- Listes de cadeaux partagées par email
 -- ===========================================================================
-select testkit.as_user(user_id, 'dave@example.fr') from fx where key = 'dave';
+select testkit.as_user(user_id, 'dave@example.fr') from testkit.fx where key = 'dave';
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
-  'select 1 from public.gift_lists where id = %L', (select row_id from fx where key = 'private_list'))), 1::bigint,
+  'select 1 from public.gift_lists where id = %L', (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
   'Dave accède à la liste privée partagée avec son email');
 select testkit.eq(testkit.affected(format(
-  'update public.gift_lists set visibility = %L where id = %L', 'privee', (select row_id from fx where key = 'private_list'))), 0::bigint,
+  'update public.gift_lists set visibility = %L where id = %L', 'privee', (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
   'un simple destinataire ne peut pas modifier la liste partagée');
 
 reset role;
@@ -337,7 +331,7 @@ reset role;
 -- ===========================================================================
 -- Profils : pas de liste globale d'emails
 -- ===========================================================================
-select testkit.as_user(user_id, 'alice@example.fr') from fx where key = 'alice';
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
 select testkit.eq(testkit.count('select 1 from public.profiles'), 3::bigint,
