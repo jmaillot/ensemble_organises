@@ -301,7 +301,11 @@ select testkit.expect_denied(format(
 select testkit.expect_denied(format(
   'insert into public.profiles (id, email, display_name, provider) values (%L, %L, %L, %L)',
   gen_random_uuid(), 'x@example.fr', 'X', 'email'));
-select testkit.expect_denied('delete from public.profiles');
+-- Un DELETE filtré par la RLS ne lève pas d'erreur : il ne touche aucune
+-- ligne. C'est `affected` qu'il faut lire, pas `expect_denied`.
+select testkit.eq(
+  testkit.affected('delete from public.profiles'), 0::bigint,
+  'un client ne supprime aucun profil, ni le sien ni celui d''un autre');
 
 -- en revanche le client peut corriger son propre nom d'affichage
 select testkit.eq(testkit.affected(format(

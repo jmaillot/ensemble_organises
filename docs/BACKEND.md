@@ -357,6 +357,16 @@ inaccessible, pas ouverte.
 > rien de la cause. `testkit.as_user` pose donc les deux formes, par symétrie
 > avec PostgREST, et `0002_rls_isolation.sql` vérifie `auth.uid()` avant sa
 > première assertion pour que le prochain changement de version soit nommé.
+>
+> **Troisième piège, plus discret : l'outillage qui ment.** `testkit.count()`
+> exécute la requête et en prend la première ligne — un `select 1 from
+> household_members` sur trois membres rendait `1`, pas `3`, et `NULL` si la RLS
+> n'en montrait aucun. Toutes les assertions de comptage de `0002` et `0003`
+> comparaient donc une valeur qui n'était pas un compte, et le défaut est resté
+> invisible précisément parce qu'un `NULL` et un `1` se ressemblent dans un
+> message d'échec. La fonction encapsule désormais la requête et compte
+> vraiment. À garder en tête pour tout utilitaire de test : un helper qui
+> rapporte autre chose que ce que son nom promet produit des tests verts.
 
 Deux familles de politiques (`migration 0007`) :
 

@@ -39,7 +39,13 @@ begin
 end;
 $$;
 
--- Exécute une requête et renvoie le nombre de lignes renvoyées.
+-- Exécute une requête et renvoie le nombre de lignes qu'elle renvoie.
+--
+-- L'implémentation straightforward — `execute p_sql into v_count` — ne
+-- renvoyait que la PREMIÈRE ligne : sur un `select 1 from household_members`
+-- couvrant trois membres, elle rendait 1, pas 3, et NULL si la RLS n'en
+-- montrait aucun. Toutes les assertions de comptage compar donc une valeur qui
+-- n'était pas un compte. On encapsule la requête et on compte vraiment.
 create or replace function testkit.count(p_sql text)
 returns bigint
 language plpgsql
@@ -47,7 +53,7 @@ as $$
 declare
   v_count bigint;
 begin
-  execute p_sql into v_count;
+  execute 'select count(*) from (' || p_sql || ') as counted' into v_count;
   return v_count;
 end;
 $$;

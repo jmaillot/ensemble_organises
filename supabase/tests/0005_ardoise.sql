@@ -64,7 +64,7 @@ begin
   perform testkit.eq(
     (select count(*) from private.simplify_household_debts(home)), 2::bigint,
     'deux transferts suffisent à solder un foyer à trois membres dont aucun '
-    'solde n\'est nul');
+    'solde n''est nul');
   perform testkit.eq(
     (select sum(amount) from private.simplify_household_debts(home) where creditor_id = alice_m), 40.00::numeric,
     'Alice reçoit au total 40 €');

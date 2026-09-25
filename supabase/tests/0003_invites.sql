@@ -122,10 +122,9 @@ select testkit.expect_denied(format(
   (select h2 from testkit.hashes)));
 
 -- Bornes de sécurité sur les paramètres.
-select testkit.expect_denied(format(
-  'select public.create_household_invite_token(p_actor_id => %L, p_household_id => %L, p_token_hash => %L, p_max_uses => 5000)',
-  (select user_id from testkit.fx where key = 'alice'), (select household_id from testkit.fx where key = 'alice'),
-  (select h2 from testkit.hashes)));
+-- `p_max_uses` n'est pas refusé mais ramené à 100, comme `p_expires_at` à
+-- 90 jours : le contrat est « ne jamais accorder plus que la borne », testé
+-- en section 11. On n'affirme donc rien ici.
 select testkit.expect_denied(format(
   'select public.create_household_invite_token(p_actor_id => %L, p_household_id => %L, p_token_hash => %L, p_expires_at => now() - interval ''1 day'')',
   (select user_id from testkit.fx where key = 'alice'), (select household_id from testkit.fx where key = 'alice'),
@@ -336,5 +335,39 @@ select testkit.eq(private.token_hash_matches(repeat('a', 64), repeat('a', 63)), 
   'une longueur différente ne correspond pas');
 select testkit.eq(private.token_hash_matches(null, repeat('a', 64)), false,
   'une empreinte nulle ne correspond pas');
+
+-- ===========================================================================
+-- 11. Bornes : les valeurs excessives sont ramenées, pas refusées
+-- ===========================================================================
+-- Le contrat n'est pas « refuser la requête » mais « ne jamais accorder plus
+-- que la borne » : une expiration au-delà de 90 jours revient à 90 jours, un
+-- nombre d'utilisations au-delà de 100 revient à 100. Un appelant hostile ou
+-- erroné obtient donc une valeur sûre — et la fonction la lui renvoie, pour
+-- qu'il ne croie pas avoir obtenu ce qu'il demandait. Refuser l'appel aurait
+-- été une entrave sans gain de sécurité.
+--
+-- Foyer distinct : chaque appel désactive le token actif du foyer, on ne peut
+-- donc pas enchaîner ces vérifications au milieu du récit.
+do $$
+declare
+  erin uuid := testkit.auth_user('bornes@example.fr', 'Erin Petit');
+  home text := testkit.household(erin, 'Foyer Bornes');
+  v_result jsonb;
+begin
+  v_result := public.create_household_invite_token(
+    p_actor_id => erin,
+    p_household_id => home,
+    p_token_hash => (select h1 from testkit.hashes),
+    p_expires_at => now() + interval '400 days',
+    p_max_uses => 5000
+  );
+
+  perform testkit.eq((v_result ->> 'max_uses')::int, 100,
+    'un nombre d''utilisations excessif est ramené à 100');
+  perform testkit.ok(
+    (v_result ->> 'expires_at')::timestamptz <= now() + interval '90 days',
+    'une expiration lointaine est ramenée à 90 jours');
+end;
+$$;
 
 rollback;
