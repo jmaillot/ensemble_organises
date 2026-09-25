@@ -27,6 +27,13 @@ PROJECT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/../supabase-project" && pwd)"
 FUNCTIONS_DIR="${FUNCTIONS_DIR:-$PROJECT_DIR/volumes/functions}"
 VENDOR_KEEP="main hello"
 
+# Fichiers que le snapshot place à la racine du runtime, hors de tout
+# répertoire de fonction. `deno.jsonc` en fait partie : Deno remonte l'arborescence
+# pour trouver sa configuration, et le snapshot s'en sert pour celle de ses
+# propres fonctions. Ce n'est pas un déchet de déploiement, et le supprimer
+# ferait perdre au runtime sa configuration commune.
+VENDOR_FILES="deno.jsonc"
+
 if [ ! -d "$SOURCE_DIR" ]; then
   echo "deploy-functions.sh: répertoire source introuvable : $SOURCE_DIR" >&2
   exit 1
@@ -68,6 +75,10 @@ if [ "${1:-}" = "--list" ]; then
   echo
   echo "Répertoires fournisseurs préservés :"
   for name in $VENDOR_KEEP; do
+    echo "  - $name"
+  done
+  echo "Fichiers fournisseurs à la racine du runtime :"
+  for name in $VENDOR_FILES; do
     echo "  - $name"
   done
   echo
@@ -135,10 +146,23 @@ done
 # La purge ci-dessus a déjà aligné le runtime : un fichier (et non un
 # répertoire) qui traînerait à la racine ne serait pas supprimé, on le signale
 # sans faire échouer un déploiement pourtant réussi.
+#
+# Les fichiers fournis par le snapshot sont attendus, et acceptés en silence ;
+# seule une surprise mérite l'avertissement.
 for entry in "$FUNCTIONS_DIR"/*; do
   [ -e "$entry" ] || continue
-  if [ ! -d "$entry" ]; then
-    echo "deploy-functions.sh: fichier inattendu à la racine du runtime : $(basename "$entry")" >&2
+  [ -d "$entry" ] && continue
+
+  entry_name="$(basename "$entry")"
+  is_vendor_file=1
+  for kept_file in $VENDOR_FILES; do
+    if [ "$kept_file" = "$entry_name" ]; then
+      is_vendor_file=0
+    fi
+  done
+
+  if [ "$is_vendor_file" -eq 1 ]; then
+    echo "deploy-functions.sh: fichier inattendu à la racine du runtime : $entry_name" >&2
   fi
 done
 
