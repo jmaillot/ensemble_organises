@@ -210,6 +210,8 @@ sh run.sh start
 # 4. Frontend
 cd ..
 cp .env.app.example .env.app            # VITE_SUPABASE_URL + clé publiable
+sh ../scripts/test-db.sh               # 6 suites SQL, 244 assertions
+sh scripts/smoke-test.sh            # parcours réel : inscription → foyer → invitation
 sh scripts/check-hosts.sh            # hôtes Traefik == SITE_URL / API_EXTERNAL_URL
 docker compose --env-file .env.app -f compose.app.yaml config
 docker compose --env-file .env.app -f compose.app.yaml up -d --wait
