@@ -397,10 +397,31 @@ reset role;
 select testkit.as_anon();
 set local role anon;
 
-select testkit.eq(testkit.count('select 1 from public.profiles'), 0::bigint, 'anon ne lit aucun profil');
-select testkit.eq(testkit.count('select 1 from public.tasks'), 0::bigint, 'anon ne lit aucune tâche');
+-- `anon` n'a aucun droit sur les tables de `public` : 0009 fait
+-- `revoke all … from anon` puis n'accorde qu'à `authenticated`. Le refus est
+-- donc antérieur à la RLS, ce qui est plus fort qu'un filtrage — aucune
+-- politique n'a même besoin d'être évaluée.
+--
+-- La preuve se fait par `expect_denied`, pas par un compte à zéro : un
+-- `count(*) = 0` présupposerait le droit de lecture, et échouerait sur
+-- « permission denied for table profiles » — un refus qui dit la même chose,
+-- mais par un autre mécanisme.
+select testkit.expect_denied('select 1 from public.profiles');
+select testkit.expect_denied('select 1 from public.tasks');
 select testkit.expect_denied('select 1 from public.household_invite_tokens');
 select testkit.expect_denied('select 1 from public.household_members');
+select testkit.expect_denied('select 1 from public.expenses');
+
+-- Et le droit est bien absent, et non masqué. On interroge le catalogue plutôt
+-- que `information_schema.role_table_grants` : les lignes de cette vue sont
+-- elles-mêmes filtrées selon le rôle courant, et un compte à zéro y prouverait
+-- aussi peu que le compte à zéro qu'on vient de remplacer.
+select testkit.ok(
+  not has_table_privilege('anon', 'public.profiles', 'select'),
+  'anon n''a aucun droit SELECT sur une table métier');
+select testkit.ok(
+  not has_table_privilege('anon', 'public.tasks', 'insert'),
+  'anon n''a aucun droit d''écriture sur une table métier');
 
 reset role;
 
