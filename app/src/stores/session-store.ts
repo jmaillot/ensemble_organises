@@ -84,22 +84,38 @@ export async function signInDemo() {
   });
 }
 
-/** Crée un foyer en mode local (démo) : le membre courant devient admin. */
-export async function createHouseholdLocal(name: string, color: string): Promise<{ household: HouseholdRow; members: HouseholdMemberRow[] }> {
+/**
+ * Crée un foyer et son premier administrateur.
+ *
+ * Une seule opération, pour deux raisons qui n'en font qu'une :
+ *
+ *  * le foyer et son membre doivent disparaître ensemble. Deux requêtes
+ *    laissaient un foyer sans administratrice si la seconde échouait — et
+ *    `households_delete` exige un administrateur, donc ce foyer ne serait
+ *    supprimable par personne ;
+ *  * en mode Supabase, une insertion qui RENVOIE sa ligne passe la politique
+ *    de lecture, or l'appelant n'est pas encore membre du foyer qu'il crée. Le
+ *    403 qui en résultait ne disait rien de sa cause.
+ *
+ * La fonction SQL `public.create_household` règle les deux : transaction
+ * unique, et foyer renvoyé par sa valeur de retour. L'adaptateur local passe
+ * par les mêmes lignes, l'IndexedDB étant atomique sur une écriture.
+ *
+ * Le nom d'affichage vient du profil côté serveur ; le paramètre `actor` n'est
+ * transmis que par l'adaptateur local.
+ */
+export async function createHousehold(
+  name: string,
+  color: string,
+): Promise<{ household: HouseholdRow; members: HouseholdMemberRow[] }> {
   const user = useSessionStore.getState().user;
-  const household = await data.create<HouseholdRow>('households', {
+  const created = await data.createHousehold({
     name,
-    avatar_color: color,
-    created_by: user?.id ?? null,
+    avatarColor: color,
+    actor: user ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl } : null,
   });
-  const member = await data.create<HouseholdMemberRow>('household_members', {
-    household_id: household.id,
-    user_id: user?.id ?? null,
-    display_name: user?.displayName ?? 'Nouveau foyer',
-    avatar_url: user?.avatarUrl ?? null,
-    color_tag: 'accent',
-    role: 'admin',
-  });
+  const household = created.household as unknown as HouseholdRow;
+  const member = created.member as unknown as HouseholdMemberRow;
   useHouseholdStore.getState().setHousehold(household, [member]);
   return { household, members: [member] };
 }

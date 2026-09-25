@@ -9,9 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { createInviteToken } from '@/lib/invites';
-import { createHouseholdLocal } from '@/stores/session-store';
-import { loadHousehold } from '@/stores/session-store';
-import { isSupabaseConfigured } from '@/lib/supabase/client';
+import { createHousehold, loadHousehold } from '@/stores/session-store';
 import { QrCode } from '@/components/shared/qr-code';
 
 const colors = ['accent', 'coral', 'amber', 'ink'] as const;
@@ -49,13 +47,7 @@ export default function CreateHouseholdPage() {
     setPending(true);
     setError(null);
     try {
-      if (isSupabaseConfigured) {
-        // En production : création via Edge Function transactionnelle.
-        // Le backend n'étant pas déployé ici, on bascule sur le foyer de démonstration.
-        await createHouseholdLocal(values.name, values.color);
-      } else {
-        await createHouseholdLocal(values.name, values.color);
-      }
+      await createHousehold(values.name, values.color);
       await loadHousehold();
       const preview = await createInviteToken({ maxUses: 10 });
       setToken(preview.token);

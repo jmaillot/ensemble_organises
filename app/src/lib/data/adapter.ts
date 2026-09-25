@@ -18,6 +18,28 @@ export interface DataAdapter {
   remove(table: string, id: string): Promise<void>;
   /** Suppression d'un ensemble de lignes correspondant à un filtre (jointures). */
   removeWhere(table: string, filter: RowFilter): Promise<void>;
+  /**
+   * Crée un foyer et son premier membre d'un seul tenant.
+   *
+   * Méthode à part entière, et non deux `create()` : le foyer et son
+   * administrateur forment une seule opération. Deux requêtes laisseraient un
+   * foyer sans administratrice en cas d'échec de la seconde — et
+   * `households_delete` exige un administrateur, donc un foyer orphelin ne
+   * serait supprimable par personne. Côté PostgREST, l'insertion renverrait en
+   * outre la ligne à la politique de lecture, qui refuse un foyer dont
+   * l'appelant n'est pas encore membre.
+   */
+  createHousehold(values: {
+    name: string;
+    avatarColor: string;
+    /**
+     * Acteur, pour l'adaptateur local. L'adaptateur PostgREST l'IGNORE
+     * volontairement : l'acteur y est `auth.uid()`, jamais un paramètre, sinon
+     * un client pourrait créer un foyer au nom d'un autre. Le paramètre existe
+     * pour que le mode local dispose du même contexte, pas pour être transmis.
+     */
+    actor: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  }): Promise<{ household: Row; member: Row }>;
   /** Notifie les abonnés quand une table change (temps réel ou onglet). */
   subscribe(table: string, onChange: () => void): () => void;
 }

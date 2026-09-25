@@ -143,7 +143,7 @@ Toutes les versions sont **épinglées** (pas de plages) dans `app/package.json`
 │   └── package-lock.json
 │
 ├── supabase/
-│   ├── migrations/            # source de vérité du schéma (17 migrations)
+│   ├── migrations/            # source de vérité du schéma (18 migrations)
 │   ├── functions/             # fonctions métier uniquement (3 Edge Functions)
 │   └── tests/                 # tests SQL : contrat, RLS, invitations, cron, ardoise
 │
@@ -200,7 +200,7 @@ sh run.sh config add traefik            # override Traefik, avant le 1er démarr
 
 # 2. Schéma : base et stockage, aucune route publique
 sh run.sh start db storage               # `storage` crée le schéma storage.buckets
-sh ../scripts/migrate.sh                # 17 migrations, journalisées
+sh ../scripts/migrate.sh                # 18 migrations, journalisées
 sh ../scripts/test-db.sh                # contrat, RLS, invitations, cron, ardoise
 
 # 3. Fonctions métier, puis publication

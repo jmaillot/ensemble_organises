@@ -88,6 +88,39 @@ export class SupabaseAdapter implements DataAdapter {
     return row as T;
   }
 
+  async createHousehold(values: {
+    name: string;
+    avatarColor: string;
+    actor: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  }): Promise<{ household: Row; member: Row }> {
+    const client = this.client();
+    // `values.actor` n'est volontairement pas transmis : la fonction SQL prend
+    // l'acteur de `auth.uid()`. Lui envoyer un identifiant rendrait la création
+    // impersonable, et la fonction refuse précisément de prendre l'acteur en
+    // argument.
+    //
+    // La fonction fait les deux insertions dans une transaction et renvoie le
+    // foyer par sa valeur de retour : aucun `RETURNING` n'est exposé à la
+    // politique de lecture, qui refuserait un foyer dont l'appelant n'est pas
+    // encore membre.
+    const { data, error } = await client.rpc('create_household', {
+      p_name: values.name,
+      p_avatar_color: values.avatarColor,
+    });
+    if (error) throw new DataError(error.message, error);
+    // Déstructuré plutôt que lu sur l'objet : c'est ce qui permet à TypeScript
+    // de réduire le type après le garde.
+    const { household, member } = (data ?? {}) as { household?: Row; member?: Row };
+    if (!household || !member) {
+      throw new DataError('Le foyer créé est incomplet.');
+    }
+    // Le cache local est renseigné comme le fait `list` : sinon une lecture
+    // hors ligne faite juste après la création ne trouverait rien.
+    await this.cacheRows('households', [household]);
+    await this.cacheRows('household_members', [member]);
+    return { household, member };
+  }
+
   async update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T> {
     const client = this.client();
     const { data: row, error } = await client.from(table).update(values as never).eq('id', id).select('*').single();

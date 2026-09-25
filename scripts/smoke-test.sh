@@ -101,16 +101,29 @@ fail() {
 }
 
 # Version lisible : une seule requête, corps ET code.
+# `prefer` reprend ce que fait le client : supabase-js termine chaque insertion
+# par `.select('*')`, qui vaut `Prefer: return=representation` — donc
+# l'insertion RENVOIE sa ligne, et PostgreSQL lui applique la politique de
+# lecture.
+#
+# Le smoke test n'envoyait rien, donc PostgREST restait en `return=minimal` et
+# n'appliquait aucune politique. C'est ainsi qu'un 403 du client a pu passer
+# pour un problème de RLS alors que le test, lui, réussissait : un test de
+# bout en bout qui ne parle pas comme le client ne teste pas le client.
 call() {
   path="$1"; method="$2"; payload="$3"; bearer="$4"; key="${5:-$PUBLISHABLE_KEY}"
   auth_header=''
   [ -n "$bearer" ] && auth_header="Authorization: Bearer $bearer"
+  prefer="$PREFER"
+  [ "$method" = "POST" ] && prefer='return=representation'
   response="$(curl -sS -w '\n%{http_code}' -X "$method" "$API$path" \
     -H "apikey: $key" -H 'Content-Type: application/json' -H "$auth_header" \
+    ${prefer:+-H "Prefer: $prefer"} \
     ${payload:+--data "$payload"} 2>/dev/null || printf '\n000')"
   CODE="$(printf '%s' "$response" | tail -n 1)"
   BODY="$(printf '%s' "$response" | sed '$d')"
 }
+PREFER=''
 
 # Extraction d'une valeur d'un JSON, sans dépendance externe. Suffit aux
 # réponses de GoTrue, qui sont plates ou à un niveau.
@@ -129,6 +142,17 @@ json_number() {
 # à une ligne trouvée. Un compte de zéro est la conclusion que l'on tire le
 # plus souvent de cette fonction : « l'isolation tient ». Elle ne doit pas
 # pouvoir devenir un « l'isolation tient » sur une erreur.
+# La fonction renvoie { household: {…}, member: {…} }. Chaque identifiant est
+# extrait de son objet : une recherche du premier « id » orthogonal à l'ordre
+# des clés, et l'ordre d'un jsonb n'est pas garanti.
+json_household_id() {
+  printf '%s' "$1" | sed -n 's/.*"household":{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+json_member_id() {
+  printf '%s' "$1" | sed -n 's/.*"member":{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n 1
+}
+
 json_rows() {
   if printf '%s' "$1" | grep -q '"error":'; then
     echo 0
@@ -142,8 +166,11 @@ ALICE_MAIL="alice-$RUN@example.fr"
 BOB_MAIL="bob-$RUN@example.fr"
 PASSWORD='Mot-de-passe-de-test-2026!'
 
-HOUSEHOLD_ID="household_$(uuid)"
-MEMBER_ID="member_$(uuid)"
+# Renseignés par l'étape 3, depuis la réponse de la fonction. Le test ne les
+# devine pas : il lit ce que le serveur a réellement créé, comme le ferait le
+# client.
+HOUSEHOLD_ID=''
+MEMBER_ID=''
 
 ALICE_ID=''
 ALICE_JWT=''
@@ -253,24 +280,40 @@ if [ -z "$ALICE_JWT" ]; then
 fi
 
 # ----------------------------------------------------------------------------
-step "3. Alice crée son foyer"
+step "3. Alice crée son foyer — foyer et membre en une seule opération"
 # ----------------------------------------------------------------------------
-call "/rest/v1/households" POST \
-  "{\"id\":\"$HOUSEHOLD_ID\",\"name\":\"Foyer de test\",\"avatar_color\":\"accent\",\"created_by\":\"$ALICE_ID\"}" \
+# Le client appelle `public.create_household`, pas deux insertions. Le test fait
+# de même : c'est le chemin réel, et lui seul prouve que le chemin réel
+# fonctionne. Deux requêtes laisseraient un foyer sans administratrice — donc
+# insupprimable, puisque `households_delete` exige un administrateur.
+call "/rest/v1/rpc/create_household" POST \
+  "{\"p_name\":\"Foyer de test\",\"p_avatar_color\":\"accent\"}" \
   "$ALICE_JWT"
-if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
-  pass "le foyer est créé par le client (households_insert)"
+if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+  HOUSEHOLD_ID="$(json_household_id "$BODY")"
+  MEMBER_ID="$(json_member_id "$BODY")"
+  if [ -n "$HOUSEHOLD_ID" ]; then
+    pass "le foyer et son administratrice sont créés en une transaction"
+  else
+    fail "la fonction a répondu sans identifiant de foyer : $BODY"
+  fi
 else
   fail "création refusée (code $CODE) : $BODY"
+  case "$BODY" in
+    *session*) echo "    La fonction exige une session : le jeton n'est pas passé." ;;
+    *) echo "    La fonction est atteinte, donc câblée ; c'est sa logique." ;;
+  esac
 fi
 
-call "/rest/v1/household_members" POST \
-  "{\"id\":\"$MEMBER_ID\",\"household_id\":\"$HOUSEHOLD_ID\",\"user_id\":\"$ALICE_ID\",\"display_name\":\"Alice Martin\",\"color_tag\":\"accent\",\"role\":\"admin\"}" \
-  "$ALICE_JWT"
-if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
-  pass "Alice est membre administratrice de son propre foyer"
+# Le foyer doit être lisible immédiatement après sa création : c'est
+# précisément ce que l'insertion renvoyait mal, la politique de lecture refusant
+# un foyer dont l'appelant n'est pas encore membre.
+call "/rest/v1/households?id=eq.$HOUSEHOLD_ID" GET "" "$ALICE_JWT"
+rows="$(json_rows "$BODY")"
+if [ "$CODE" = "200" ] && [ "$rows" -ge 1 ] 2>/dev/null; then
+  pass "et il est lisible dans la foulée"
 else
-  fail "création du membre refusée (code $CODE) : $BODY"
+  fail "le foyer créé n'est pas lisible (code $CODE, $rows ligne(s)) : $BODY"
 fi
 
 # ----------------------------------------------------------------------------

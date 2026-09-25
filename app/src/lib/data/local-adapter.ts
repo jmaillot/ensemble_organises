@@ -81,6 +81,34 @@ export class LocalAdapter implements DataAdapter {
     return row;
   }
 
+  /**
+   * En mode local, la création d'un foyer passe par la même méthode que le
+   * reste : il n'y a ni politique RLS ni transaction à outrepasser, et
+   * l'adaptateur IndexedDB est lui-même atomique sur une écriture. Le contrat
+   * impose la méthode pour que le code métier soit identique dans les deux
+   * modes — c'est le client, et lui seul, qui choisit le chemin.
+   */
+  async createHousehold(values: {
+    name: string;
+    avatarColor: string;
+    actor: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  }): Promise<{ household: Row; member: Row }> {
+    const household = await this.create<Row>('households', {
+      name: values.name,
+      avatar_color: values.avatarColor,
+      created_by: values.actor?.id ?? null,
+    });
+    const member = await this.create<Row>('household_members', {
+      household_id: household.id,
+      user_id: values.actor?.id ?? null,
+      display_name: values.actor?.displayName ?? 'Nouveau foyer',
+      avatar_url: values.actor?.avatarUrl ?? null,
+      color_tag: values.avatarColor,
+      role: 'admin',
+    });
+    return { household, member };
+  }
+
   async update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T> {
     await this.ensureSeeded();
     const db = getDatabase();

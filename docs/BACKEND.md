@@ -256,6 +256,7 @@ version non enregistrée.
 | `0014_rls_child_tables.sql` | active la RLS sur les tables enfants et de rappel dont les politiques existaient déjà sans jamais l'avoir été (voir la note de migration) |
 | `0015_share_uniqueness.sql` | remplace quatre contraintes `unique nulls not distinct` par des index uniques partiels : le partage d'une dépense et d'une liste était impossible dès la deuxième part |
 | `0016_expenses_policies.sql` | donne ses quatre politiques RLS à `public.expenses`, qui n'en avait aucune : table fermée à double tour, donc Ardoise inerte côté client |
+| `0016_create_household.sql` | crée un foyer et son premier administrateur dans une transaction, via `public.create_household` : deux requêtes laissaient un foyer sans administratrice, donc insupprimable, et l'insertion renvoyée passait la politique de lecture d'un foyer dont l'appelant n'est pas encore membre |
 | `0017_redeem_side_effects.sql` | retire deux `update … set is_active = false` suivis d'un `raise` dans `redeem_household_invite_token` : même instruction, donc l'exception annulait l'UPDATE. La désactivation revient à `prune_expired_invite_tokens` |
 
 > Numérotation : les alertes d'anniversaires (`0012`) précèdent le pont `public`
