@@ -352,14 +352,35 @@ else
 fi
 
 # ----------------------------------------------------------------------------
-step "8. Bob échange le token — sans session, avec la seule clé publiable"
+step "8. Un échange anonyme est refusé — c'est voulu, et c'est vérifié"
 # ----------------------------------------------------------------------------
-# C'est le mode `publishable` de la fonction : l'appel n'est PAS
-# `authenticated`, et c'est voulu — quelqu'un qui rejoint un foyer n'a pas
-# encore de compte dans ce foyer.
+# L'étape demandait initialement qu'un échange fonctionne SANS session, avec la
+# seule clé publiable. La fonction refuse, délibérément : le mode `publishable`
+# de `withSupabase` ne laisse passer la requête que pour que la fonction puisse
+# répondre elle-même, en français, au lieu du refus générique du runtime.
+#
+# Un échange ne peut pas se faire sans compte : `redeem_household_invite_token`
+# exige un `p_user_id`, et le nom affiché vient du profil créé à la première
+# connexion — jamais du corps de la requête, pour qu'un client ne puisse pas
+# choisir le nom sous lequel il apparaît chez les autres. C'est une propriété de
+# sécurité, elle se vérifie comme telle.
+call "/functions/v1/household-invite" POST \
+  "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" ""
+if [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; then
+  pass "un échange sans session est refusé (code $CODE) : le mode publishable ne suffit pas"
+else
+  fail "un échange sans session a été accepté (code $CODE) : $BODY"
+  echo "    Un visiteur sans compte pourrait alors rejoindre un foyer."
+fi
+
+# ----------------------------------------------------------------------------
+step "9. Bob, connecté, échange le token"
+# ----------------------------------------------------------------------------
+# Le parcours réel : on s'inscrit, on est connecté, on colle le token. Bob a un
+# compte, donc une session, donc le rôle `authenticated`.
 if [ -n "$TOKEN" ]; then
   call "/functions/v1/household-invite" POST \
-    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" ""
+    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
   if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
     pass "Bob rejoint le foyer (échange atomique, HMAC validé en base)"
   else
@@ -378,18 +399,24 @@ else
 fi
 
 # ----------------------------------------------------------------------------
-step "9. Un token ne s'échange qu'une fois par usage, et la RLS tient toujours"
+step "10. Le même token, le même compte : pas de double adhésion"
 # ----------------------------------------------------------------------------
 if [ -n "$TOKEN" ]; then
   call "/functions/v1/household-invite" POST \
-    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" ""
-  # Second échange du même token : refusé (épuisé) ou accepté comme
-  # déjà-membre. Les deux sont corrects ; une 500 ne l'est pas.
+    "{\"action\":\"redeem\",\"token\":\"$TOKEN\"}" "$BOB_JWT"
   case "$CODE" in
     200|201) pass "le second échange est idempotent (déjà membre)" ;;
     400|401|403|409) pass "le second échange est refusé (code $CODE), comme attendu" ;;
     *) fail "le second échange a rendu un code inattendu : $CODE $BODY" ;;
   esac
+fi
+
+call "/rest/v1/household_members?household_id=eq.$HOUSEHOLD_ID" GET "" "$BOB_JWT"
+rows="$(json_rows "$BODY")"
+if [ "$CODE" = "200" ] && [ "$rows" -eq 2 ] 2>/dev/null; then
+  pass "et le foyer ne compte toujours que deux membres"
+else
+  fail "le second échange a modifié la liste des membres ($rows)"
 fi
 
 call "/rest/v1/households?id=eq.$HOUSEHOLD_ID" GET "" "$ALICE_JWT"
