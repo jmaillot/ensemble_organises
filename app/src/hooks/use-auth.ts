@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { useSessionStore } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
@@ -14,10 +15,44 @@ export function useSessionUser(): SessionUser | null {
   return useSessionStore((state) => state.user);
 }
 
+/** Traduit un utilisateur Supabase Auth en utilisateur de session. */
+function toSessionUser(user: User): SessionUser {
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    displayName: (metadata.full_name as string | undefined) ?? (user.email ?? 'Membre du foyer'),
+    avatarUrl: (metadata.avatar_url as string | undefined) ?? null,
+    provider: ((user.app_metadata?.provider as SessionUser['provider'] | undefined) ?? 'email') as SessionUser['provider'],
+  };
+}
+
+/**
+ * Établit la session dans le store à partir d'un utilisateur Auth.
+ *
+ * `signIn` est le SEUL chemin qui passe le statut à `authenticated` et charge
+ * le foyer. L'événement `SIGNED_IN` de supabase-js appelait `refreshUser`, qui
+ * ne pose que l'utilisateur : le statut restait celui d'un invité, la garde de
+ * route redirigeait vers `/connexion`, et l'inscription comme la connexion
+ * semblaient ne rien faire. Ce chemin n'avait jamais été exercé — l'application
+ * tournait jusqu'ici en mode démo, où le bootstrap pose le statut directement.
+ *
+ * Une session déjà établie n'est que rafraîchie : un renouvellement de jeton ne
+ * doit pas recharger le foyer.
+ */
+export async function applySession(user: User): Promise<void> {
+  const sessionUser = toSessionUser(user);
+  const store = useSessionStore.getState();
+  if (store.status === 'authenticated' && store.user?.id === sessionUser.id) {
+    store.refreshUser(sessionUser);
+    return;
+  }
+  await store.signIn(sessionUser);
+}
+
 /** Restaure la session Supabase au chargement et le foyer de l'utilisateur. */
 export function useAuthBootstrap() {
   const setStatus = useSessionStore((state) => state.setStatus);
-  const signIn = useSessionStore((state) => state.signIn);
   // Tant que la session n'est pas restaurée, l'application affiche un état de
   // chargement : sinon une route protégée redirigerait vers la connexion.
   const [ready, setReady] = useState(false);
@@ -52,32 +87,20 @@ export function useAuthBootstrap() {
         setReady(true);
         return;
       }
-      const user = session.user;
-      const fallbackName = (user.user_metadata?.full_name as string | undefined) ?? (user.email ?? 'Membre du foyer');
-      const sessionUser: SessionUser = {
-        id: user.id,
-        email: user.email ?? '',
-        displayName: fallbackName,
-        avatarUrl: (user.user_metadata?.avatar_url as string | undefined) ?? null,
-        provider: ((user.app_metadata?.provider as SessionUser['provider'] | undefined) ??
-          (user.email ? 'email' : 'email')) as SessionUser['provider'],
-      };
-      void signIn(sessionUser);
+      void applySession(session.user);
       setReady(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         void useSessionStore.getState().signOut();
-      } else if (session?.user) {
-        const user = session.user;
-        void useSessionStore.getState().refreshUser({
-          id: user.id,
-          email: user.email ?? '',
-          displayName: (user.user_metadata?.full_name as string | undefined) ?? (user.email ?? 'Membre du foyer'),
-          avatarUrl: (user.user_metadata?.avatar_url as string | undefined) ?? null,
-          provider: 'email',
-        });
+        return;
+      }
+      // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED : tous portent
+      // la session courante, et tous doivent pouvoir l'établir. Seuls SIGNED_OUT
+      // et l'absence de session ont un traitement propre.
+      if (session?.user) {
+        void applySession(session.user);
       }
     });
 
@@ -85,7 +108,7 @@ export function useAuthBootstrap() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [setStatus, signIn]);
+  }, [setStatus]);
 
   return ready;
 }
@@ -101,14 +124,25 @@ export async function signInWithProvider(provider: 'google' | 'facebook') {
 
 export async function signInWithEmail(email: string, password: string) {
   if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  if (data.user) await applySession(data.user);
 }
 
 export async function signUpWithEmail(email: string, password: string) {
   if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
+  // Sans session, GoTrue a créé le compte mais attend la confirmation de
+  // l'adresse. Naviguer quand même mènerait à une redirection de la garde, et
+  // l'utilisateur comprendrait que l'inscription a échoué alors que son compte
+  // existe : c'est exactement le symptôme décrit, dans sa version SMTP.
+  if (!data.session || !data.user) {
+    throw new Error(
+      'Compte créé. Consultez votre boîte de réception pour confirmer votre adresse, puis connectez-vous.',
+    );
+  }
+  await applySession(data.user);
 }
 
 export async function signOut() {
