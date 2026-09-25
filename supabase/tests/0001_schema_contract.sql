@@ -277,7 +277,7 @@ insert into testkit.fx (key, user_id)
 values ('bob', testkit.auth_user('bob@example.fr', 'Bob Martin'));
 
 select testkit.eq(
-  (select count(*) from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'), 1,
+  (select count(*) from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'), 1::bigint,
   'le trigger sur auth.users doit créer le profil');
 select testkit.eq(
   (select p.display_name from public.profiles p join testkit.fx on testkit.fx.user_id = p.id where testkit.fx.key = 'bob'),
@@ -318,7 +318,7 @@ do $$
 begin
   perform testkit.eq(
     (select count(*) from storage.buckets where id in ('household-media', 'household-avatars') and public = false),
-    2,
+    2::bigint,
     'les buckets de médias doivent exister et être privés'
   );
   perform testkit.ok(

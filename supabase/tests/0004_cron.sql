@@ -68,7 +68,7 @@ begin
   perform testkit.eq(
     (select count(*) from public.routine_completions
       where routine_id in (daily, weekly) and household_id <> home_a),
-    0,
+    0::bigint,
     'household_id est aligné sur la routine'
   );
 

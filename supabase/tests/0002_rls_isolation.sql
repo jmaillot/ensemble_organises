@@ -110,6 +110,17 @@ $$;
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
+-- Garde-fou d'environnement. `auth.uid()` est une fonction de la stack, pas de
+-- notre code : selon sa version elle lit `request.jwt.claims` ou
+-- `request.jwt.claim.sub`. Si elle ne résout pas le sous, AUCUNE politique ne
+-- reconnaît personne et toutes les assertions ci-dessous lisent zéro — un
+-- échec ici vaut mieux qu'une quarantaine de « Alice voit 0 membre ».
+select testkit.ok(
+  auth.uid() is not null,
+  'auth.uid() doit résoudre le sous du jeton ; la fixture pose request.jwt.claims '
+  'et request.jwt.claim.sub, donc cette version de stack en attend un autre'
+);
+
 -- --- Lecture : uniquement son foyer -----------------------------------------
 select testkit.eq(testkit.count('select 1 from public.household_members'), 3::bigint,
   'Alice voit les 3 membres de son foyer');

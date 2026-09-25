@@ -39,32 +39,6 @@ begin
 end;
 $$;
 
--- `eq(anyelement, anyelement, text)` n'accepte que deux arguments du MÊME type :
--- `eq(count(*), 0)` est un (bigint, integer) et ne résout donc aucune fonction.
--- Ces deux surcharges couvrent le cas courant — un décompte comparé à un littéral
--- entier — sans obliger chaque assertion à écrire un cast.
-create or replace function testkit.eq(p_actual bigint, p_expected integer, p_message text)
-returns void
-language plpgsql
-as $$
-begin
-  if p_actual is distinct from p_expected::bigint then
-    raise exception 'ASSERTION ÉCHOUÉE : % (attendu %, obtenu %)', p_message, p_expected, p_actual;
-  end if;
-end;
-$$;
-
-create or replace function testkit.eq(p_actual integer, p_expected bigint, p_message text)
-returns void
-language plpgsql
-as $$
-begin
-  if p_actual::bigint is distinct from p_expected then
-    raise exception 'ASSERTION ÉCHOUÉE : % (attendu %, obtenu %)', p_message, p_expected, p_actual;
-  end if;
-end;
-$$;
-
 -- Exécute une requête et renvoie le nombre de lignes renvoyées.
 create or replace function testkit.count(p_sql text)
 returns bigint
@@ -255,11 +229,24 @@ returns void
 language plpgsql
 as $$
 begin
+  -- PostgREST pose les DEUX formes à chaque requête : le jeton complet
+  -- (`request.jwt.claims`) et chaque revendication scalaire
+  -- (`request.jwt.claim.sub`, `request.jwt.claim.role`…). Selon sa version,
+  -- `auth.uid()` ne lit que l'une des deux — sur l'instantané self-hosted
+  -- v0.8.2, `current_setting('request.jwt.claim.sub', true)` et rien d'autre.
+  --
+  -- Ne poser que le JSON rendait TOUS les utilisateurs invisibles : uid()
+  -- valait NULL, donc aucune politique ne reconnaissait personne et chaque
+  -- comptage sous `authenticated` rendait zéro. D'où la symétrie avec
+  -- PostgREST, plutôt qu'un choix parmi les deux GUC.
   perform set_config(
     'request.jwt.claims',
     json_build_object('sub', p_user_id::text, 'role', 'authenticated', 'email', p_email)::text,
     true
   );
+  perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.email', p_email, true);
 end;
 $$;
 

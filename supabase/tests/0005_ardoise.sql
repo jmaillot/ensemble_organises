@@ -24,7 +24,7 @@ begin
   insert into public.expenses (id, household_id, title, amount, paid_by, expense_date, split_type)
   values
     (grocery, home, 'Courses du samedi', 60.00, alice_m, current_date, 'egal'),
-    (cinema, home, 'Cinéma', 30.00, bob_m, current_date, 'personnalise');
+    (cinema, home, 'Cinéma', 30.00, lina_m, current_date, 'personnalise');
 
   insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)
   values
@@ -35,15 +35,25 @@ begin
     (private.new_id('expense-participant'), cinema, 'membre', lina_m, 20.00);
 
   -- --- Soldes ---------------------------------------------------------------
+  -- Arithmétique du scénario, vérifiée à la main :
+  --   Courses 60 € payés par Alice, parts 20/20/20 → elle a avancé 60, doit 20.
+  --   Cinéma  30 € payés par Lina,  parts 10/20     → elle a avancé 30, doit 40.
+  --   Bob n'a rien payé et doit 20 (courses) + 10 (cinéma) = 30.
+  -- Soldes : Alice +40, Bob -30, Lina -10 ; somme nulle.
+  --
+  -- Le payeur du cinéma est Lina et non Bob pour que personne ne soit à zéro :
+  -- un solde nul est écarté par `simplify_household_debts` (tolérance 0,005) et
+  -- la compensation n'aurait alors produit qu'un seul transfert, sans exercer
+  -- le glissement des deux plus grands soldes que la fonction annonce.
   perform testkit.eq(
     (select balance from private.household_balances(home) where member_id = alice_m), 40.00::numeric,
     'Alice a avancé 60 € pour 20 € de part : crédit de 40 €');
   perform testkit.eq(
-    (select balance from private.household_balances(home) where member_id = bob_m), (-20.00)::numeric,
-    'Bob a avancé 30 € pour 30 € de parts : débit de 20 €');
+    (select balance from private.household_balances(home) where member_id = bob_m), (-30.00)::numeric,
+    'Bob n''a rien payé et doit 30 € : débit de 30 €');
   perform testkit.eq(
-    (select balance from private.household_balances(home) where member_id = lina_m), (-20.00)::numeric,
-    'Lina doit 20 €');
+    (select balance from private.household_balances(home) where member_id = lina_m), (-10.00)::numeric,
+    'Lina a avancé 30 € pour 40 € de parts : débit de 10 €');
 
   -- La somme des soldes est nulle : l'argent n'est ni créé ni détruit.
   perform testkit.eq(
@@ -53,7 +63,8 @@ begin
   -- --- Compensation --------------------------------------------------------
   perform testkit.eq(
     (select count(*) from private.simplify_household_debts(home)), 2::bigint,
-    'deux transferts suffisent à solder un foyer à trois membres');
+    'deux transferts suffisent à solder un foyer à trois membres dont aucun '
+    'solde n\'est nul');
   perform testkit.eq(
     (select sum(amount) from private.simplify_household_debts(home) where creditor_id = alice_m), 40.00::numeric,
     'Alice reçoit au total 40 €');
