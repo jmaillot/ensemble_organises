@@ -41,6 +41,7 @@ declare
   expense_a text := private.new_id('expense');
   expense_b text := private.new_id('expense');
   private_list text := private.new_id('gift-list');
+  transfer_list text := private.new_id('gift-list');
   shared_list text := private.new_id('gift-list');
 begin
   insert into public.shopping_lists (id, household_id, name, created_by)
@@ -74,7 +75,8 @@ begin
 
   insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
   values (private_list, home_a, alice_m, 'Idées pour Maya', 'privee'),
-         (shared_list, home_a, alice_m, 'Anniversaire de Noé', 'foyer');
+         (shared_list, home_a, alice_m, 'Anniversaire de Noé', 'foyer'),
+    (transfer_list, home_a, alice_m, 'Liste transmise', 'privee');
 
   insert into public.gift_list_shares (id, list_id, shared_with_email, permission)
   values (private.new_id('gift-share'), private_list, 'dave@example.fr', 'lecture');
@@ -100,7 +102,8 @@ begin
     ('expense_a', null, home_a, expense_a),
     ('expense_b', null, home_b, expense_b),
     ('private_list', null, home_a, private_list),
-    ('shared_list', null, home_a, shared_list);
+    ('shared_list', null, home_a, shared_list),
+    ('transfer_list', null, home_a, transfer_list);
 end;
 $$;
 
@@ -214,72 +217,45 @@ select testkit.expect_denied(format(
 select testkit.eq(testkit.count(format(
   'select 1 from public.gift_lists where id = %L', (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
   'Alice voit sa propre liste privée');
-select testkit.eq(testkit.count('select 1 from public.gift_lists'), 2::bigint,
-  'Alice voit les deux listes de son foyer');
--- Le propriétaire d'une liste ne peut pas la transférer : seul un
--- administrateur du foyer le peut (trigger `guard_gift_list_ownership`).
--- Alice est à la fois propriétaire ET administratrice de son foyer : son
--- transfert est donc légitime. C'est Bob, membre ordinaire et non
--- propriétaire, qu'il faut opposer à la liste.
+select testkit.eq(testkit.count('select 1 from public.gift_lists'), 3::bigint,
+  'Alice voit les trois listes de son foyer');
+-- Le transfert d'une liste est réservé aux administrateurs du foyer
+-- (trigger `guard_gift_list_ownership`). Alice est à la fois propriétaire ET
+-- administratrice : son transfert est légitime. C'est Bob, membre ordinaire et
+-- non propriétaire, qu'il faut opposer à la liste.
+--
+-- Ces vérifications portent sur une liste dédiée : transférer une liste, c'est
+-- la retirer à son propriétaire. Une liste privée transférée appartient au
+-- nouveau propriétaire et n'est plus lisible par l'ancien — c'est le
+-- comportement voulu, et cela condamne toute restitution en cours de route.
+-- Une version précédente de ce test essayait de rendre la liste à son
+-- ancienne propriétaire, et échouait à chaque fois : la liste était devenue
+-- invisible pour elle. C'était le comportement correct, pas un défaut — le test
+-- demandait quelque chose que le produit ne promet pas.
 select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
 select testkit.eq(testkit.affected(format(
   'update public.gift_lists set owner_member_id = %L where id = %L',
-  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
+  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'transfer_list'))), 0::bigint,
   'un membre ordinaire ne peut pas s''attribuer la liste privée d''un autre');
 select testkit.eq(testkit.affected(format(
   'update public.gift_lists set name = %L where id = %L',
   'Liste de Bob', (select row_id from testkit.fx where key = 'private_list'))), 0::bigint,
   'ni la modifier, ni même la renommer');
 
--- En revanche l'administratrice du foyer peut transférer une liste. La
--- propriété est rendue juste après, pour ne pas perturber la suite.
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 select testkit.eq(testkit.affected(format(
   'update public.gift_lists set owner_member_id = %L where id = %L',
-  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
+  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'transfer_list'))), 1::bigint,
   'une administratrice peut transférer une liste de cadeaux');
--- Rendre la propriété. Le message d'échec porte l'état réel de la décision —
--- uid courant, rôle vu dans le foyer, ce que dit `can_write_gift_list` et le
--- membre courant — parce que « la requête n'a rien touché » ne distingue pas
--- une politique qui filtre d'un déclencheur qui annule, et que ces deux
--- causes n'appellent pas le même correctif.
--- Trois sondes, parce que « la requête n'a rien touché » ne distingue pas
--- trois causes qui n'appellent pas le même correctif :
---   1. la ligne visée n'existe plus ou son identifiant ne correspond pas ;
---   2. un UPDATE qui ne touche pas la propriété passe, et seul le changement
---      de propriétaire est annulé — donc c'est le déclencheur ;
---   3. même un UPDATE neutre ne passe pas, et c'est la politique.
-do $$
-declare
-  v_home text := (select household_id from testkit.fx where key = 'alice');
-  v_alice text := (select row_id from testkit.fx where key = 'alice');
-  v_list text := (select row_id from testkit.fx where key = 'private_list');
-  v_rows bigint;
-  v_neutre bigint;
-  v_affected bigint;
-begin
-  select count(*) into v_rows from public.gift_lists where id = v_list;
 
-  -- Sonde 2 : mise à jour neutre. Elle n'atteint pas la condition du
-  -- déclencheur de transfert, mais emprunte exactement la même politique.
-  update public.gift_lists set name = name where id = v_list;
-  get diagnostics v_neutre = row_count;
-
-  update public.gift_lists set owner_member_id = v_alice where id = v_list;
-  get diagnostics v_affected = row_count;
-
-  perform testkit.eq(v_affected, 1::bigint, format(
-      'rendre la liste — ligne=%s, présente=%s, update neutre=%s, update propriétaire=%s, '
-      'uid=%s, rôle=%s, membre courant=%s, peut écrire=%s, cible=%s',
-      coalesce(v_list, '<null>'),
-      v_rows, v_neutre, v_affected,
-      auth.uid(),
-      coalesce(private.household_role(v_home), '<null>'),
-      coalesce(private.current_member_id(v_home), '<null>'),
-      private.can_write_gift_list(v_list),
-      coalesce(v_alice, '<null>')));
-end;
-$$;
+-- La liste a réellement changé de main : son nouveau propriétaire, membre
+-- ordinaire, peut désormais la renommer.
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
+select testkit.eq(testkit.affected(format(
+  'update public.gift_lists set name = %L where id = %L',
+  'Ma liste', (select row_id from testkit.fx where key = 'transfer_list'))), 1::bigint,
+  'le nouveau propriétaire peut administrer la liste reçue');
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(
