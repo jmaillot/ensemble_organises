@@ -266,14 +266,6 @@ select testkit.expect_denied(format(
   ' values (%L, %L, %L, ''meteo'')',
   'widget_x', (select row_id from testkit.fx where key = 'bob'), (select household_id from testkit.fx where key = 'alice')));
 
--- --- Gestion des membres : le dernier administrateur est protégé --------------
-select testkit.eq(testkit.affected(format(
-  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'alice'))), 0::bigint,
-  'le dernier administrateur ne peut pas être supprimé');
-select testkit.eq(testkit.affected(format(
-  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
-  'un administrateur peut retirer un membre ordinaire');
-
 reset role;
 
 -- ===========================================================================
@@ -282,6 +274,13 @@ reset role;
 select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
+-- Ancre. Toute assertion négative vaut « l'autorisation a été refusée » — mais
+-- elle vaut aussi « cet acteur n'a aucun accès », ce qui est un résultat
+-- différent. Un ancien membre retiré du foyer raterait chacune d'elles pour la
+-- mauvaise raison. On prouve donc d'abord que Bob voit bien son foyer ; les
+-- refus qui suivent deviennent alors significatifs.
+select testkit.eq(testkit.count('select 1 from public.household_members'), 3::bigint,
+  'Bob est bien membre du foyer A au moment de ces vérifications');
 select testkit.eq(testkit.affected(format(
   'update public.household_members set role = %L where id = %L', 'admin', (select row_id from testkit.fx where key = 'bob'))), 0::bigint,
   'un membre ne peut pas s''attribuer le rôle admin');
@@ -402,6 +401,31 @@ select testkit.eq(testkit.count('select 1 from public.profiles'), 0::bigint, 'an
 select testkit.eq(testkit.count('select 1 from public.tasks'), 0::bigint, 'anon ne lit aucune tâche');
 select testkit.expect_denied('select 1 from public.household_invite_tokens');
 select testkit.expect_denied('select 1 from public.household_members');
+
+reset role;
+
+-- ===========================================================================
+-- Retrait d'un membre — en FIN de fichier, délibérément
+-- ===========================================================================
+-- Ce bloc retire Bob du foyer. Toute vérification placée après supposerait donc
+-- qu'il en fait encore partie, et ses assertions négatives passeraient pour la
+-- mauvaise raison : un membre retiré n'a plus accès à rien, ce qui satisfait
+-- aussi bien « l'opération est refusée » que « l'acteur est inconnu ». Seule
+-- une assertion positive — créer une note, ci-dessus — révèle la différence,
+-- et elle a mis trois campagnes à le signaler.
+--
+-- Il est donc ici, après les sections qui ont besoin de Bob, de Noé, de Carol
+-- et de Dave. Le compteur de profils visibles par Alice (3) en dépendait
+-- également : Bob retiré, elle n'en verrait plus que deux.
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'alice'))), 0::bigint,
+  'le dernier administrateur ne peut pas être supprimé');
+select testkit.eq(testkit.affected(format(
+  'delete from public.household_members where id = %L', (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
+  'un administrateur peut retirer un membre ordinaire');
 
 reset role;
 
