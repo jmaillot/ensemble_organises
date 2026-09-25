@@ -238,10 +238,30 @@ select testkit.eq(testkit.affected(format(
   'update public.gift_lists set owner_member_id = %L where id = %L',
   (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
   'une administratrice peut transférer une liste de cadeaux');
-select testkit.eq(testkit.affected(format(
-  'update public.gift_lists set owner_member_id = %L where id = %L',
-  (select row_id from testkit.fx where key = 'alice'), (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
-  'et la reprendre, la propriété n''étant pas figée');
+-- Rendre la propriété. Le message d'échec porte l'état réel de la décision —
+-- uid courant, rôle vu dans le foyer, ce que dit `can_write_gift_list` et le
+-- membre courant — parce que « la requête n'a rien touché » ne distingue pas
+-- une politique qui filtre d'un déclencheur qui annule, et que ces deux
+-- causes n'appellent pas le même correctif.
+do $$
+declare
+  v_home text := (select household_id from testkit.fx where key = 'alice');
+  v_alice text := (select row_id from testkit.fx where key = 'alice');
+  v_list text := (select row_id from testkit.fx where key = 'private_list');
+  v_affected bigint;
+begin
+  update public.gift_lists set owner_member_id = v_alice where id = v_list;
+  get diagnostics v_affected = row_count;
+
+  perform testkit.eq(v_affected, 1::bigint, format(
+      'rendre la liste : uid=%s, rôle=%s, membre courant=%s, peut écrire=%s, cible=%s',
+      auth.uid(),
+      coalesce(private.household_role(v_home), '<null>'),
+      coalesce(private.current_member_id(v_home), '<null>'),
+      private.can_write_gift_list(v_list),
+      v_alice));
+end;
+$$;
 
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(

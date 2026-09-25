@@ -364,6 +364,9 @@ do $$
 declare
   erin uuid := testkit.auth_user('bornes@example.fr', 'Erin Petit');
   home text := testkit.household(erin, 'Foyer Bornes');
+  -- `testkit.household` ne crée que la ligne `households` : sans ce membre
+  -- administrateur, `assert_household_admin` refuserait l'appel.
+  erin_m text := testkit.member(home, erin, 'Erin Petit', 'admin', 'accent');
   v_result jsonb;
 begin
   v_result := public.create_household_invite_token(
