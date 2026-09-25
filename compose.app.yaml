@@ -30,7 +30,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eo-app-rtr.entrypoints=https"
-      - "traefik.http.routers.eo-app-rtr.rule=Host(`app.votredomaine.fr`)"
+      # Hôte servi par le frontend. DOIT être identique à l'hôte de SITE_URL
+      # dans supabase-project/.env : c'est là que le backend renvoie après une
+      # confirmation de courriel ou une redirection OAuth. Voir
+      # scripts/check-hosts.sh, qui vérifie la correspondance.
+      - "traefik.http.routers.eo-app-rtr.rule=Host(`${EO_APP_HOST:-app.votredomaine.fr}`)"
       - "traefik.http.routers.eo-app-rtr.service=eo-app-svc"
       - "traefik.http.services.eo-app-svc.loadbalancer.server.port=8080"
       - "traefik.docker.network=frontend"

@@ -70,7 +70,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eo-api-rtr.entrypoints=https"
-      - "traefik.http.routers.eo-api-rtr.rule=Host(`api.votredomaine.fr`)"
+      - "traefik.http.routers.eo-api-rtr.rule=Host(`${EO_API_HOST:-api.votredomaine.fr}`)"
       - "traefik.http.routers.eo-api-rtr.service=eo-api-svc"
       - "traefik.http.services.eo-api-svc.loadbalancer.server.port=8000"
       - "traefik.docker.network=frontend"
@@ -87,7 +87,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.eo-studio-rtr.entrypoints=https"
-      - "traefik.http.routers.eo-studio-rtr.rule=Host(`studio.votredomaine.fr`)"
+      - "traefik.http.routers.eo-studio-rtr.rule=Host(`${EO_STUDIO_HOST:-studio.votredomaine.fr}`)"
       - "traefik.http.routers.eo-studio-rtr.service=eo-studio-svc"
       - "traefik.http.routers.eo-studio-rtr.middlewares=chain-authentik@file"
       - "traefik.http.services.eo-studio-svc.loadbalancer.server.port=3000"

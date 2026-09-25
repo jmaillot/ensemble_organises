@@ -178,6 +178,11 @@ sh run.sh config add traefik          # ajoute docker-compose.traefik.yml à COM
 # 2. Déployer les fonctions métier
 sh ../scripts/deploy-functions.sh
 
+# 2 bis. Les hôtes publiés doivent correspondre aux URL de la stack.
+#         Aucun déploiement n'échoue si elles divergent : l'échec apparaît à
+#         l'inscription, sur une page introuvable, sans cause visible.
+sh ../scripts/check-hosts.sh
+
 # 3. Base et stockage, aucune route publique.
 #    `storage` est indispensable : c'est lui qui crée le schéma
 #    `storage.buckets` utilisé par la migration 0010. `migrate.sh` le

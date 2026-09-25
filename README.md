@@ -210,6 +210,7 @@ sh run.sh start
 # 4. Frontend
 cd ..
 cp .env.app.example .env.app            # VITE_SUPABASE_URL + clé publiable
+sh scripts/check-hosts.sh            # hôtes Traefik == SITE_URL / API_EXTERNAL_URL
 docker compose --env-file .env.app -f compose.app.yaml config
 docker compose --env-file .env.app -f compose.app.yaml up -d --wait
 ```
