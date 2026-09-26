@@ -134,16 +134,28 @@ select testkit.expect_ok('select private.prune_expired_invite_tokens()');
 do $$
 declare
   v_jobs integer;
+  r text;
+  v_expected text[] := array[
+    'eo-routine-maintenance', 'eo-invite-token-prune', 'eo-birthday-alerts',
+    'eo-push-dispatch', 'eo-push-prune'
+  ];
 begin
   if to_regclass('cron.job') is null then
     raise notice 'pg_cron absent sur cette instance : assertions ignorées.';
     return;
   end if;
 
+  foreach r in array v_expected loop
+    perform testkit.ok(
+      exists (select 1 from cron.job where jobname = r),
+      'le job ' || r || ' doit être installé'
+    );
+  end loop;
+
   select count(*) into v_jobs
     from cron.job
-   where jobname in ('eo-routine-maintenance', 'eo-invite-token-prune');
-  perform testkit.eq(v_jobs, 2, 'les deux jobs planifiés sont installés');
+   where jobname = any(v_expected);
+  perform testkit.eq(v_jobs, cardinality(v_expected), 'tous les jobs planifiés sont installés');
 
   perform testkit.ok(
     not exists (select 1 from cron.job where database is distinct from current_database()),
@@ -154,12 +166,13 @@ begin
   perform testkit.ok(
     not exists (
       select 1 from cron.job
-       where command ~* '(secret|token_hash|password|passwd|api[_-]?key|sb_secret|service_role)'
+       where command ~* '(secret|token_hash|password|passwd|api[_-]?key|sb_secret|service_role|vapid)'
     ),
     'aucun secret ni valeur sensible dans cron.job.command'
   );
 
-  -- Les jobs n'appellent que des fonctions du schéma privé.
+  -- Les jobs n'appellent que des fonctions du schéma privé, sans paramètre :
+  -- c'est ce qui garantit qu'aucune valeur n'est recopiée dans le catalogue.
   perform testkit.ok(
     not exists (
       select 1 from cron.job
@@ -173,6 +186,14 @@ begin
     exists (select 1 from cron.job where jobname = 'eo-routine-maintenance' and schedule = '5 6 * * *'),
     'la maintenance quotidienne est planifiée à 06 h 05'
   );
+  perform testkit.ok(
+    exists (select 1 from cron.job where jobname = 'eo-push-dispatch' and schedule = '*/15 * * * *'),
+    'les rappels push sont tentés toutes les quinze minutes'
+  );
+  perform testkit.ok(
+    exists (select 1 from cron.job where jobname = 'eo-birthday-alerts' and schedule = '40 6 * * *'),
+    'les anniversaires du jour sont annoncés au matin'
+  );
 end;
 $$;
 
@@ -180,5 +201,20 @@ $$;
 select testkit.ok(
   pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) like '%vault.decrypted_secrets%',
   'le dispatch lit ses secrets dans Vault au moment de l''exécution');
+select testkit.ok(
+  pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) like '%vault.decrypted_secrets%',
+  'le dispatch des rappels push lit ses secrets dans Vault au moment de l''exécution');
+select testkit.ok(
+  pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%vault.decrypted_secrets%',
+  'le dispatch des anniversaires lit ses secrets dans Vault au moment de l''exécution');
+
+-- Le point d'entrée est unique : une seule Edge Function à déployer et à
+-- surveiller, et les deux jobs ne peuvent pas diverger d'un point d'entrée.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%/functions/v1/push-notify%',
+  'les deux dispatch pointent vers la fonction push-notify');
+select testkit.ok(
+  pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) not like '%daily-briefing%',
+  'plus aucun appel à la fonction daily-briefing, qui n''a jamais existé');
 
 rollback;

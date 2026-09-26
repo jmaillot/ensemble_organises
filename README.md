@@ -136,6 +136,7 @@ Toutes les versions sont **épinglées** (pas de plages) dans `app/package.json`
 │   │   ├── stores/            # session et foyer (Zustand)
 │   │   ├── hooks/             # hooks transverses (auth, calendrier, PWA, hors ligne)
 │   │   ├── styles/app.css     # jetons de design (@theme) + utilitaires
+│   │   ├── sw.ts              # service worker (précache + handlers push)
 │   │   └── types/             # lignes SQL typées (contrat avec le backend)
 │   ├── e2e/                   # parcours critiques Playwright
 │   ├── docs/                  # contrat de développement frontend
@@ -143,9 +144,10 @@ Toutes les versions sont **épinglées** (pas de plages) dans `app/package.json`
 │   └── package-lock.json
 │
 ├── supabase/
-│   ├── migrations/            # source de vérité du schéma (18 migrations)
-│   ├── functions/             # fonctions métier uniquement (3 Edge Functions)
-│   └── tests/                 # tests SQL : contrat, RLS, invitations, cron, ardoise
+│   ├── migrations/            # source de vérité du schéma (20 migrations)
+│   ├── functions/             # fonctions métier uniquement (5 Edge Functions)
+│   └── tests/                 # tests SQL : contrat, RLS, invitations, cron,
+│                              # ardoise, anniversaires, notifications push
 │
 ├── supabase-project/          # runtime Supabase épinglé + override Traefik versionné
 ├── scripts/                   # migrate, deploy-functions, test-db, backup, restore
@@ -200,20 +202,19 @@ sh run.sh config add traefik            # override Traefik, avant le 1er démarr
 
 # 2. Schéma : base et stockage, aucune route publique
 sh run.sh start db storage               # `storage` crée le schéma storage.buckets
-sh ../scripts/migrate.sh                # 18 migrations, journalisées
-sh ../scripts/test-db.sh                # contrat, RLS, invitations, cron, ardoise
+sh ../scripts/migrate.sh                # 20 migrations, journalisées
+sh ../scripts/test-db.sh                # contrat, RLS, invitations, cron, ardoise, anniversaires, push
 
 # 3. Fonctions métier, puis publication
-sh ../scripts/deploy-functions.sh
+sh ../scripts/deploy-functions.sh      # 5 fonctions métier
 sh run.sh start
 
 # 4. Frontend
 cd ..
-cp .env.app.example .env.app            # VITE_SUPABASE_URL + clé publiable
-sh ../scripts/test-db.sh               # 6 suites SQL, 244 assertions
-sh scripts/smoke-test.sh            # parcours réel : inscription → foyer → invitation
 sh scripts/init-app-env.sh          # écrit .env.app depuis le .env de la stack
 sh scripts/check-hosts.sh            # hôtes Traefik == SITE_URL / API_EXTERNAL_URL
+sh scripts/smoke-test.sh              # parcours réel : inscription → foyer → invitation
+sh scripts/generate-vapid-keys.sh     # clé VAPID → .env.vapid (à injecter dans `functions`)
 docker compose --env-file .env.app -f compose.app.yaml config
 docker compose --env-file .env.app -f compose.app.yaml up -d --wait
 ```
@@ -331,9 +332,17 @@ sont absentes, l'application démarre en mode démonstration.
 | `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` | authentification Basic du dashboard de la gateway |
 | `FUNCTIONS_VERIFY_JWT=false` | obligatoire ici : la stack mélange appels navigateur (`publishable`), session (`user`) et cron serveur (`secret`) ; chaque fonction déclare son mode |
 | `INVITE_TOKEN_HMAC_SECRET` | ≥ 256 bits (`openssl rand -base64 48`), stocké dans Vault, injecté **uniquement** dans l'Edge Function d'invitation ; sa rotation invalide tous les tokens actifs |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | signature des envois push, lues **uniquement** par `push-notify`. Générées par `sh scripts/generate-vapid-keys.sh` et injectées dans l'environnement du service `functions` — jamais dans le `.env` de la stack, qui est lu par tous les services |
+| `project_url` / `service_role_key` (dans **Vault**, pas dans le `.env`) | lues par les deux jobs de dispatch au moment de l'exécution ; sans elles, les rappels sont calculés et rien n'est envoyé |
 
-`SUPABASE_SECRET_KEY`, `POSTGRES_PASSWORD`, `INVITE_TOKEN_HMAC_SECRET`, les clés
-OAuth et SMTP ne doivent **jamais** passer comme arguments de build du frontend.
+`SUPABASE_SECRET_KEY`, `POSTGRES_PASSWORD`, `INVITE_TOKEN_HMAC_SECRET`,
+`VAPID_PRIVATE_KEY`, les clés OAuth et SMTP ne doivent **jamais** passer comme
+arguments de build du frontend.
+
+`VAPID_PUBLIC_KEY` n'est volontairement **pas** une variable de build : elle est
+lue par l'Edge Function `push-subscribe` et renvoyée au navigateur. Le bundle
+étant servi en cache pendant des mois, y placer la clé obligerait à reconstruire
+le frontend à chaque rotation.
 
 ---
 
@@ -370,6 +379,7 @@ sh scripts/deploy-functions.sh        # fonctions métier → runtime
 sh scripts/deploy-functions.sh --list
 sh scripts/backup.sh
 sh scripts/restore.sh <horodatage> --dry-run
+sh scripts/generate-vapid-keys.sh     # → .env.vapid (600), à ne pas versionner
 ```
 
 Dans `supabase-project/` : `sh run.sh start|stop|logs <service>|recreate <service>`.
@@ -378,7 +388,7 @@ Dans `supabase-project/` : `sh run.sh start|stop|logs <service>|recreate <servic
 
 ## 9. Modèle de données
 
-40 tables, toutes en `public`, toutes avec RLS activée dès leur migration. Les
+41 tables, toutes en `public`, toutes avec RLS activée dès leur migration. Les
 noms de tables et de colonnes correspondent **exactement** aux interfaces de
 `app/src/types/database.ts` ; `supabase/tests/0001_schema_contract.sql` le
 vérifie à chaque campagne.
@@ -388,6 +398,11 @@ vérifie à chaque campagne.
 | Identité | `profiles`, `households`, `household_members`, `household_invite_tokens`, `invitations` |
 | Vie quotidienne | `shopping_lists`, `shopping_list_items`, `events`, `event_reminders`, `notes`, `tasks`, `task_assignees`, `task_reminders`, `routines`, `routine_assignees`, `routine_reminders`, `routine_completions`, `recipes` |
 | Partage et mémoire | `expenses`, `expense_participants`, `external_participants`, `gift_lists`, `gift_items`, `gift_list_shares`, `birthdays`, `pets`, `pet_records`, `provider_types`, `providers`, `loyalty_cards`, `places`, `posts`, `post_media`, `post_comments`, `post_reactions`, `trips`, `conversations`, `conversation_members`, `messages`, `dashboard_widgets` |
+
+`push_subscriptions` est la seule table de `public` qui ne soit pas une table
+métier : elle porte les abonnements Web Push et reste **inatteignable du
+navigateur**, un `endpoint` de Push étant une capacité et non une donnée
+d'affichage. Voir [`docs/BACKEND.md`](docs/BACKEND.md) §6.4.
 
 Points de conception :
 
@@ -407,10 +422,16 @@ Points de conception :
 
 - **La RLS est la frontière d'autorisation finale.** Ne jamais faire confiance à
   l'état de session du frontend seul.
-- `household_invite_tokens` n'a **aucune politique RLS** et aucun privilège pour
-  `anon`/`authenticated` : création, régénération, révocation et utilisation
-  passent par des opérations serveur transactionnelles, avec expiration, nombre
-  maximal d'utilisations, limitation de débit et comparaison à temps constant.
+- `household_invite_tokens` et `push_subscriptions` n'ont **aucune politique
+  RLS** et aucun privilège pour `anon`/`authenticated` : création, régénération,
+  révocation et utilisation passent par des opérations serveur
+  transactionnelles, avec expiration, nombre maximal d'utilisations,
+  limitation de débit et comparaison à temps constant. Le `GRANT` par défaut posé
+  par la migration 0009 s'appliquant à toute table créée ensuite, ce verrou est
+  vérifié par le test de contrat, pas supposé.
+- Les clés de chiffrement d'un abonnement push (`p256dh`, secret
+  d'authentification) ne quittent jamais le serveur : le navigateur n'en a aucun
+  motif, et `list_push_subscriptions` ne les renvoie pas.
 - Aucun changement de rôle ni aucun secret depuis le client : un membre ne peut
   pas s'attribuer `admin`, un administrateur d'un foyer ne touche pas à un autre.
 - `profiles` n'expose **aucune liste globale d'e-mails** : lecture limitée à son
@@ -466,7 +487,8 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 | Composants et hooks | `npm test` (dans `app/`) | rendu, interactions, états vides/chargement/erreur, règles métier de chaque module |
 | Data layer | inclus | adaptateur local, file hors ligne, génération de token, formatage |
 | End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement |
-| SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires |
+| SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires, notifications push |
+| Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 145 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
 
 L'end-to-end se lance sur un build de production (`vite preview`) et joue les
 parcours en français (`fr-FR`, `Europe/Paris`).
@@ -475,13 +497,22 @@ parcours en français (`fr-FR`, `Europe/Paris`).
 
 ## 13. Limites connues et prochaines étapes
 
-- **Aucun SQL n'a encore été exécuté** dans ce dépôt : les migrations et les
-  tests SQL sont relus et vérifiés statiquement, mais la validation réelle
-  (`sh scripts/migrate.sh` puis `sh scripts/test-db.sh` sur une stack neuve)
-  reste à faire avant tout déploiement.
-- **Web Push non branché** : le calcul des rappels d'anniversaires et le job
-  `eo-birthday-alerts` existent ; il manque la table d'abonnements, l'Edge
-  Function d'envoi et la clé VAPID.
+- **Le schéma a été exécuté, pas le Web Push.** Les migrations 0001 à 0017 et
+  les six premières suites SQL ont tourné sur une vraie base le 25 septembre
+  2026 (244 assertions, voir [`docs/RETROSPECTIVE.md`](docs/RETROSPECTIVE.md)).
+  Les migrations **0018 et 0019** (abonnements push, dispatch) et la suite
+  `0007_push.sql` sont écrites et relues, mais **n'ont jamais été appliquées** :
+  aucune stack n'était disponible. Avant déploiement :
+  `sh scripts/migrate.sh && sh scripts/test-db.sh`.
+- **Web Push complet mais jamais exercé en conditions réelles** : table
+  d'abonnements, préférences, Edge Functions `push-subscribe` et `push-notify`,
+  chiffrement RFC 8291, signature VAPID, jobs `eo-push-dispatch` et
+  `eo-push-prune`. Le chiffrement est vérifié par 19 assertions contre les
+  vecteurs publiés de la RFC 8291 ; le reste exige une stack allumée. Voir
+  [`docs/BACKEND.md`](docs/BACKEND.md) §6.4, §6.5 et §13.
+- **`profiles.reminder_frequency` n'influence aucun envoi** : la cadence est
+  enregistrée et affichée, mais les rappels étant unitaires, donc immédiats.
+  L'interface le dit plutôt que de présenter un réglage sans effet.
 - **Recettes** est un placeholder (le schéma détaillé reste à définir, comme
   prévu par le référentiel).
 - **Accusés de lecture des messages** suivis côté client : il faudrait une
@@ -492,6 +523,9 @@ parcours en français (`fr-FR`, `Europe/Paris`).
 - **Colonnes suggérées par les modules** : `notes.visibility`
 (remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
 `pets.next_reminder_date`, `trips.status`.
+- **Le frontend n'a toujours jamais parlé à un vrai Supabase** : tout le
+  produit tourne sur l'adaptateur IndexedDB. C'est la réserve la plus lourde de
+  la rétrospective, et elle est entière.
 - **Compensation de l'Ardoise** : l'algorithme de référence est côté serveur
   (Edge Function `expense-settlement`) ; le frontend calcule encore ses soldes
   localement pour l'affichage immédiat.

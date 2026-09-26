@@ -11,6 +11,8 @@ export type IsoDateTime = string; // timestamptz
 
 export type Role = 'admin' | 'membre' | 'enfant';
 export type AuthProvider = 'google' | 'facebook' | 'email';
+/** Cadence choisie pour les rappels. Aucun envoi n'en dépend encore : voir §13 du runbook. */
+export type ReminderFrequency = 'immediat' | 'matin' | 'journée' | 'soir';
 
 export interface ProfileRow {
   id: Uuid; // = auth.users.id
@@ -18,8 +20,30 @@ export interface ProfileRow {
   display_name: string;
   avatar_url: string | null;
   provider: AuthProvider;
+  reminder_frequency: ReminderFrequency;
+  task_reminders_enabled: boolean;
+  event_reminders_enabled: boolean;
+  routine_reminders_enabled: boolean;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
+}
+
+/**
+ * Abonnement Web Push d'un appareil.
+ *
+ * Cette interface n'est PAS une ligne PostgREST : `push_subscriptions` est
+ * dépourvue de politique RLS et de privilège client (migration 0018), et n'est
+ * donc jamais lue depuis le navigateur. Elle décrit ce que renvoie l'Edge
+ * Function `push-subscribe` pour le compte connecté — sans les clés de
+ * chiffrement, que le client n'a aucun motif de connaître.
+ */
+export interface PushDevice {
+  id: string;
+  endpoint: string;
+  device: string;
+  created_at: IsoDateTime;
+  last_success_at: IsoDateTime | null;
+  failure_count: number;
 }
 
 export interface HouseholdRow {

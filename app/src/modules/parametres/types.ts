@@ -1,4 +1,6 @@
-import type { Role } from '@/types';
+import type { ReminderFrequency, Role } from '@/types';
+
+export type { ReminderFrequency };
 
 /** Onglets des préférences : la page n'a pas d'équivalent dans l'export. */
 export type SettingsTab = 'profil' | 'foyer' | 'invitations' | 'notifications' | 'application';
@@ -45,9 +47,18 @@ export const roleToneClass: Record<Role, string> = {
 /** Regroupement des rôles pour les listes denses. */
 export const roleOrder: Role[] = ['admin', 'membre', 'enfant'];
 
-/** Fréquence des rappels push (stockée localement, cf. `lib/push.ts`). */
-export type ReminderFrequency = 'immediat' | 'matin' | 'journée' | 'soir';
-
+/**
+ * Fréquence proposée dans l'interface.
+ *
+ * Le TYPE vient de `src/types/database.ts` : c'est la valeur réellement stockée
+ * dans `profiles.reminder_frequency`, et une contrainte SQL en refuse toute
+ * autre. Le définir ici en parallèle garantissait deux listes à tenir à jour.
+ *
+ * La LISTE, en revanche, reste locale : les valeurs possibles sont imposées par
+ * l'interface, pas par le serveur. Et aucune de ces cadences n'est encore
+ * appliquée à un envoi — les rappels sont unitaires, donc toujours immédiats.
+ * Le sélecteur annonce une préférence ; il ne gouverne pas un comportement.
+ */
 export const reminderFrequencies: { value: ReminderFrequency; label: string }[] = [
   { value: 'immediat', label: 'Immédiat' },
   { value: 'matin', label: 'Le matin (8 h)' },

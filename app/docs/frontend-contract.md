@@ -188,6 +188,12 @@ import type { TaskRow, EventRow, ... } from '@/types';   // lignes SQL, cf. §6
 `posts`, `post_media`, `post_comments`, `post_reactions`, `trips`,
 `conversations`, `conversation_members`, `messages`, `dashboard_widgets`.
 
+`push_subscriptions` en est volontairement **absente** : la table n'a ni politique
+RLS ni privilège pour `authenticated`, et le frontend ne lit ni n'écrit d'y. Le
+type `PushDevice` de `database.ts` décrit la réponse de l'Edge Function
+`push-subscribe`, pas une ligne PostgREST. Un module qui.mapperait un `select`
+sur cette table casserait à l'exécution, pas au type-check.
+
 Les clés sont en `snake_case`, identiques aux colonnes PostgreSQL. Chaque module
 expose dans son `types.ts` un type métier camelCase + une fonction de mapping
 (`toTask(row: TaskRow): Task`). Les libellés français de l'export
@@ -214,8 +220,13 @@ Photos : `/assets/<fichier>.jpg` (voir `src/lib/modules.ts` → `assetUrl`).
 8. Texte français : espaces insécables avant `: ; ! ? »`, apostrophes `’`,
    accents obligatoires. Jamais de contenu marketing générique : conserver les
    libellés de l'export.
-9. Aucune dépendance supplémentaire : tout est déjà installé.
-10. `tsc --noEmit` doit passer sans erreur ni avertissement.
+9. Aucune dépendance supplémentaire : tout est déjà installé. Les paquets
+   `workbox-*` sont des `devDependencies` épinglés, utilisés **uniquement** par
+   `src/sw.ts` : le service worker est en `injectManifest` parce que
+   `generateSW` ne permet d'ajouter aucun écouteur, et l'API Push en exige deux.
+10. `tsc --noEmit` doit passer sans erreur ni avertissement. `npm test` couvre
+    aussi `supabase/functions/**/*.test.ts` : le chiffrement Web Push n'utilise
+    que WebCrypto et se vérifie donc sans Deno ni stack.
 
 ## 9. Vérification attendue
 

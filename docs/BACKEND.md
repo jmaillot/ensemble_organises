@@ -433,7 +433,7 @@ de rôle, et contournent la RLS pour ne pas se récurser.
 
 ## 6. Edge Functions
 
-Trois fonctions métier, toutes versionnées dans `supabase/functions` et
+Cinq fonctions métier, toutes versionnées dans `supabase/functions` et
 déployées par `scripts/deploy-functions.sh` (qui copie le code métier dans le
 runtime épinglé, sans toucher aux répertoires fournisseurs `main` et `hello`).
 **Elles doivent être déployées avant leur premier usage** : la migration qui
@@ -445,6 +445,8 @@ répond 404 et la fonction renvoie `503` si la migration, elle, manque.
 | `household-invite` | `POST /functions/v1/household-invite` | `['publishable', 'user']` | cycle de vie des tokens d'invitation |
 | `expense-settlement` | `POST /functions/v1/expense-settlement` | `'user'` | soldes et compensation des dettes de l'Ardoise |
 | `generate-routine-occurrences` | `POST /functions/v1/generate-routine-occurrences` | `['secret', 'user']` | maintenance quotidienne des routines |
+| `push-subscribe` | `POST /functions/v1/push-subscribe` | `'user'` | abonnement, révocation et liste des appareils ; clé VAPID publique |
+| `push-notify` | `POST /functions/v1/push-notify` | `['secret', 'user']` | chiffrement et distribution des rappels (le mode `user` ne sert qu'au test) |
 
 Toutes :
 
@@ -613,6 +615,125 @@ appelle directement `private.run_daily_routine_maintenance()` en SQL, sans
 aller-retour HTTP. Cette Edge Function sert au déclenchement manuel et à la
 supervision, et renvoie le même résumé.
 
+### 6.4 `push-subscribe`
+
+```
+POST /functions/v1/push-subscribe
+Content-Type: application/json
+authorization: Bearer <JWT>        # session obligatoire
+```
+
+| Action | Corps | Réponse |
+|---|---|---|
+| `config` | `{}` | `{ vapid_public_key, push_configured }` |
+| `subscribe` | `{ endpoint, keys: { p256dh, auth }, expirationTime, userAgent }` | `{ id, endpoint, created_at, last_success_at }` |
+| `unsubscribe` | `{ endpoint }` | `{ removed }` |
+| `list` | `{}` | `[{ id, endpoint, device, created_at, last_success_at, failure_count }]` |
+
+Modes déclarés : `auth: 'user'`. Aucun mode `publishable` : un `endpoint` de
+Push est une **capacité** — quiconque le détient peut notifier cet appareil.
+Seul un appel authentifié obtient une configuration, et `config` ne touche à
+aucune donnée : il répond sur la seule présence d'une session.
+
+La table `public.push_subscriptions` n'a **ni politique RLS ni privilège** pour
+`anon`/`authenticated` (migration 0018). C'est nécessaire : le `GRANT` par
+défaut posé par la migration 0009 s'applique à toute table créée ensuite, et
+avait suffi à ouvrir sept tables de jointure lors de la première campagne
+(rétrospective §1.1). Les trois opérations passent donc par des fonctions
+`SECURITY DEFINER` réservées à `service_role`, qui revérifient l'acteur qu'on
+leur passe — `p_user_id` n'est jamais déduit de `auth.uid()`, qui serait nul
+puisque la fonction est appelée avec la clé secrète.
+
+`list` ne renvoie **jamais** `p256dh` ni le secret d'authentification : le
+navigateur n'a aucun motif de les connaître, et le serveur ne les partage pas.
+
+Erreurs attendues : `400` corps invalide ou clé mal formée, `401` session
+invalide, `405` méthode non `POST`, `429` au-delà de 20 appels par minute et
+par IP, `500` opération impossible.
+
+### 6.5 `push-notify`
+
+```
+POST /functions/v1/push-notify
+Content-Type: application/json
+apikey: <clé secrète>              # mode `secret` — job pg_cron
+authorization: Bearer <JWT>        # mode `user` — test uniquement
+```
+
+| `scope` | Effet |
+|---|---|
+| `rappels` | rappels de tâche, d'événement et de routine dus dans la fenêtre |
+| `anniversaires` | anniversaires du jour |
+| `test` | message de test, sur les seuls appareils du demandeur |
+
+Réponse `200` : `{ notifications, delivered, failed, dropped, consumed }`.
+
+Modes déclarés : `auth: ['secret', 'user']`. **En mode `user`, seul `test` est
+accepté** : distribuer les rappels réels depuis une session autoriserait
+n'importe quel membre à déclencher l'envoi de tout le foyer, à volonté. Le
+message de test est écrit par `public.due_push_notifications('test', …)`, pas
+reçu du client : celui-ci ne peut choisir ni le texte ni la cible, et ne voit
+toujours pas les clés de chiffrement.
+
+Variables d'environnement, lues par cette seule fonction :
+
+| Variable | Rôle |
+|---|---|
+| `VAPID_PUBLIC_KEY` | clé publique de la paire VAPID (87 caractères base64url) |
+| `VAPID_PRIVATE_KEY` | clé privée, format PKCS8 base64url (184 caractères) |
+| `VAPID_SUBJECT` | contact du service Push, `mailto:` ou `https:` |
+
+Elles ne sont lues par aucune autre fonction, ne sont écrites ni en base ni
+dans un fichier de configuration versionné, et ne sont pas nécessaires au job
+pg_cron : celui-ci n'appelle que l'URL de la fonction avec la clé secrète du
+projet, lue dans Vault.
+
+```bash
+sh scripts/generate-vapid-keys.sh          # écrit .env.vapid en 600
+```
+
+Puis injecter les trois variables dans l'environnement du service `functions`.
+Sur la stack auto-hébergée, l'override `supabase-project/docker-compose.traefik.yml`
+est l'endroit prévu :
+
+```yaml
+services:
+  functions:
+    environment:
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+```
+
+Sans ces variables, la fonction échoue explicitement en `500` — elle ne doit
+jamais laisser croire à un envoi réussi. La clé publique n'a **pas** à être
+ajoutée au frontend : `push-subscribe` la renvoie au navigateur via
+`action: 'config'`. C'est un choix, pas une commodité : le bundle est servi en
+cache pendant des mois, et une rotation de clé y obligerait à reconstruire et
+redéployer le frontend.
+
+**Rotation** : une nouvelle paire invalide les abonnements existants. Le
+navigateur conserve un abonnement pour l'ancienne clé, que le service Push
+refuse. `app/src/modules/parametres/lib/push.ts` le détecte — il compare
+`options.applicationServerKey` à la clé du serveur, résilie l'abonnement
+périmé et en crée un nouveau, ce qui évite l'`InvalidStateError` que
+`pushManager.subscribe()` lève sur un abonnement existant. Le bouton
+« Synchroniser cet appareil » suffit ; sans lui, l'activation resterait cassée
+sur tous les appareils ayant déjà activé les notifications.
+
+**Chiffrement** : `push-notify/web-push.ts` applique la RFC 8291 (ECDH P-256,
+HKDF, AES-128-GCM) et la RFC 8292 (jeton VAPID ES256). Ce fichier n'utilise que
+`globalThis.crypto` : il est donc vérifié par la suite Vitest du frontend
+(`npm test`) contre les **vecteurs publiés** de la RFC 8291 — le message
+complet de 145 octets, octet pour octet, plus chaque valeur intermédiaire de
+l'annexe A. Sans ces vecteurs, la suite ne prouverait que l'auto-cohérence
+d'un générateur.
+
+Erreurs attendues : `400` corps invalide, `401` session invalide en mode
+`user`, `403` portée réservée au serveur ou test demandé côté serveur, `409`
+aucun appareil enregistré, `500` configuration VAPID absente, `503` migration
+0019 non appliquée.
+
 ---
 
 ## 7. Tâches planifiées (pg_cron)
@@ -625,8 +746,10 @@ docker compose exec db psql -U postgres -c "select jobid, run_time, status, retu
 | Job | Horaire | Effet |
 |---|---|---|
 | `eo-routine-maintenance` | `5 6 * * *` | génère les occurrences dues (14 derniers jours → aujourd'hui) et escalade en `manque` celles de plus de 7 jours |
-| `eo-birthday-alerts` | `40 6 * * *` | calcule les anniversaires du mois et des 7 prochains jours de chaque foyer |
 | `eo-invite-token-prune` | `20 6 * * *` | désactive les tokens expirés ou épuisés |
+| `eo-birthday-alerts` | `40 6 * * *` | annonce les anniversaires **du jour** de chaque foyer |
+| `eo-push-dispatch` | `*/15 * * * *` | distribue les rappels de tâche, d'événement et de routine dus |
+| `eo-push-prune` | `30 6 * * *` | supprime les abonnements push sans envoi réussi depuis six mois |
 
 Points de conception :
 
@@ -640,14 +763,36 @@ Points de conception :
 * **Un job n'appelle qu'une fonction privée sans paramètre** : c'est une
   contrainte vérifiée par `supabase/tests/0004_cron.sql`. Toute logique,
   y compris la lecture de secrets, reste dans la fonction.
-* **Aucun secret en clair** dans `cron.job.command`. Le dispatch des
-  notifications (Web Push) lit `project_url` et `service_role_key` dans Vault au
-  moment de l'exécution, via `private.dispatch_daily_notifications()`. Cette
-  fonction **n'est pas encore planifiée** : elle attend l'endpoint
-  `functions/v1/daily-briefing` et la table d'abonnements Web Push, qui n'existe
-  pas. Le modèle est en place, l'activation est une décision produit.
+* **Aucun secret en clair** dans `cron.job.command`. Les deux dispatches Web
+  Push lisent `project_url` et `service_role_key` dans Vault **au moment de
+  l'exécution**, via `private.post_push_dispatch()`. Ils n'appellent la fonction
+  d'envoi que s'il y a des destinataires : sans cela, la stack se réveillerait
+  quatre fois par heure pour rien.
+* **Un seul point d'entrée d'envoi** : `functions/v1/push-notify`, avec un
+  `scope` (`rappels` ou `anniversaires`). Deux fonctions d'envoi, ce serait deux
+  déploiements à tenir alignés et deux jeux de secrets.
+* `private.dispatch_daily_notifications()` (migration 0011) pointait vers une
+  fonction `daily-briefing` qui n'a jamais existé. Elle est **conservée** — son
+  corps est inchangé, et `supabase/tests/0004_cron.sql` vérifie qu'elle ne
+  référence plus cet endpoint — mais plus aucun job ne l'appelle : `0011` avait
+  créé la fonction sans programmer le job.
 * Si `pg_cron` n'est pas installé sur l'image, la migration émet un `notice` et
   s'arrête proprement : le schéma reste déployable.
+
+### Une notification, une fois
+
+Un rappel est une ligne de `task_reminders`, `event_reminders` ou
+`routine_reminders`. Deux garde-fous, distincts, et tous deux nécessaires :
+
+* la **fenêtre** `(maintenant − 24 h, maintenant]` borne ce qui est encore
+  pertinent : au-delà, le rappel est caduc ; en deçà, un job raté est rattrapé.
+  Les fenêtres de deux passages consécutifs se recouvrent volontairement ;
+* l'**unicité** vient de la suppression de la ligne dès qu'un envoi a réussi
+  (`public.consume_push_reminders`). Un rappel dont aucun appareil n'a pu le
+  recevoir reste en place, et sera tenté au passage suivant.
+
+La fréquence du job (quinze minutes) et la granularité d'un rappel (de l'ordre
+de la minute) sont les deux seules constantes du dimensionnement.
 
 ### Sous-ensemble RRULE supporté
 
@@ -721,9 +866,11 @@ Aucun bucket média public n'est justifié, donc aucun n'existe.
 
 ## 10. Tests SQL
 
+Sept suites numérotées, exécutées dans l'ordre :
+
 ```bash
 sh scripts/test-db.sh            # tout
-sh scripts/test-db.sh 0003       # un fichier
+sh scripts/test-db.sh 0007       # un fichier
 ```
 
 `_setup.sql` installe un schéma `testkit` éphémère (fixtures `auth.users`,
@@ -742,16 +889,17 @@ RLS ne lève pas d'erreur : elle n'est simplement pas visible.
 
 | Fichier | Couverture |
 |---|---|
-| `0001_schema_contract.sql` | les 40 tables du contrat `database.ts` avec exactement leurs colonnes, RLS active partout, clé primaire ou unicité partout, déclencheurs d'alignement présents, `household_invite_tokens` inaccessible, fonctions serveur non exécutables par un client, profil créé par le trigger, buckets privés |
+| `0001_schema_contract.sql` | les 41 tables du contrat `database.ts` avec exactement leurs colonnes, RLS active partout, clé primaire ou unicité partout, déclencheurs d'alignement présents, tables inatteignables (`household_invite_tokens`, `push_subscriptions`) sans politique **ni privilège**, fonctions serveur non exécutables par un client, profil créé par le trigger et préférences de rappel lui appartenant, buckets privés |
 | `0002_rls_isolation.sql` | lecture et écriture inter-foyers, escalade de rôle, dernier administrateur, rôle `enfant` en lecture seule, accès dérivés du parent, intégrité des références de membre et des `household_id` dénormalisés, visibilité des listes privées et partagées, widgets personnels, profils sans liste globale, `anon` sans accès |
 | `0003_invites.sql` | cycle de vie complet des tokens : empreintes 64 hex, jamais de token brut en base, régénération, révocation, expiration, plafond 90 jours, `max_uses`, idempotence, rôle `admin` refusé, refus des non-administrateurs, comparaison à temps constant |
-| `0004_cron.sql` | prédicat RRULE, génération idempotente des occurrences, escalade en `manque`, protection des occurrences validées, présence des deux jobs historiques, `database_name` courant, absence de secret dans `cron.job.command`, job n'appelant qu'une fonction privée sans paramètre |
+| `0004_cron.sql` | prédicat RRULE, génération idempotente des occurrences, escalade en `manque`, protection des occurrences validées, présence des **cinq** jobs et de leurs horaires, `database_name` courant, absence de secret (y compris VAPID) dans `cron.job.command`, job n'appelant qu'une fonction privée sans paramètre, point d'entrée d'envoi unique |
 | `0005_ardoise.sql` | soldes par membre, somme des soldes nulle, compensation minimale des dettes, intégrité de la répartition (somme des parts, participant externe rattaché au même foyer), pont `public.expense_settlement` (contrat de réponse, acteur non membre refusé, privilèges `service_role` uniquement) |
-| `0006_birthdays.sql` | prochaine occurrence d'un anniversaire (29 février compris), périmètre « mois + 7 jours », isolation entre foyers, résumé du dispatch sans envoi tant que l'endpoint n'existe pas, job `eo-birthday-alerts` planifié sur la base courante sans secret, privilèges `service_role` uniquement |
+| `0006_birthdays.sql` | prochaine occurrence d'un anniversaire (29 février compris), périmètre « mois + 7 jours », isolation entre foyers, job `eo-birthday-alerts` planifié sur la base courante sans secret, privilèges `service_role` uniquement |
+| `0007_push.sql` | `push_subscriptions` inaccessible au client **et** aux fonctions serveur pour un client, enregistrement / renouvellement / transfert d'un endpoint, révocation par son seul propriétaire, clés de chiffrement absentes des réponses, fenêtre de 24 h, destinataires par type de rappel, préférences appliquées, message de test produit par la base, consommation sans doublon, `404`/`410` supprimant l'abonnement, seuil d'échecs, purge des inactifs, jobs inoffensifs sans destinataire |
 
-> Le job `eo-birthday-alerts` est également couvert par les contrôles
-> génériques de `0004_cron.sql` (`database_name` courant, commande sans secret,
-> appel d'une fonction privée sans paramètre).
+> Les jobs sont également couverts par les contrôles génériques de
+> `0004_cron.sql` (`database_name` courant, commande sans secret, appel d'une
+> fonction privée sans paramètre).
 
 ---
 
@@ -823,13 +971,28 @@ Functions, espace disque, expiration des certificats, résultat de
   appartient à plusieurs foyers, la fonction exige `householdId` dans le corps
   et répond `409` sinon. Le client (`app/src/lib/invites.ts`) ne l'envoie pas
   aujourd'hui : il faut ajouter `householdId` à ces trois appels côté frontend.
-* **Notifications Web Push** : `private.dispatch_daily_notifications()` est prête
-  mais non planifiée ; il manque la table d'abonnements et l'endpoint
-  `daily-briefing`. Les alertes d'anniversaires, elles, sont **calculées et
-  planifiées** (`eo-birthday-alerts`, migration 0012) mais rien n'est envoyé :
-  `private.dispatch_birthday_alerts()` ne distribue que si `push_endpoint` et
-  `service_role_key` sont présents dans Vault, ce qui suppose l'Edge Function
-  `birthday-alerts`, qui n'existe pas encore.
+* **Notifications Web Push** : la chaîne est complète (§6.4, §6.5) mais
+  **jamais exécutée sur un serveur** — les migrations 0018 et 0019 et la suite
+  `0007_push.sql` n'ont pas été appliquées, faute de stack disponible au moment
+  de leur écriture. Le chiffrement, lui, est vérifié : 19 assertions contre les
+  vecteurs publiés de la RFC 8291. Avant la mise en production :
+  * appliquer `sh scripts/migrate.sh` puis `sh scripts/test-db.sh` ;
+  * `sh scripts/deploy-functions.sh` — sans quoi `push-subscribe` répond 404 et
+    le panneau affiche « service de notifications indisponible » ;
+  * générer la paire VAPID (`sh scripts/generate-vapid-keys.sh`) et injecter les
+    trois variables dans le service `functions` ;
+  * déposer `project_url` et `service_role_key` dans Vault, sans quoi les deux
+    dispatch calculent les rappels et n'envoient rien, en émettant un `warning` ;
+  * activer les notifications depuis le panneau et utiliser « Envoyer un test »
+    pour valider la chaîne complète sur un seul appareil.
+* **Cadence des rappels** : `profiles.reminder_frequency` est enregistrée et
+  affichée, mais **aucun envoi ne s'y conforme**. Les rappels sont unitaires,
+  donc toujours immédiats ; la cadence ne pourra être appliquée qu'à un point de
+  synthèse quotidien, qui n'existe pas. L'interface le dit explicitement plutôt
+  que de présenter un réglage sans effet.
+* **Annonces d'anniversaire** : la push n'annonce un anniversaire que **le jour
+  même**. L'alerte « anniversaires du mois » demandée par `AGENTS.md` §6 reste
+  un état d'interface du module `/anniversaires`, pas une notification.
 * **Limitation de débit** de `redeem` : par instance, à remplacer par un
   compteur partagé si le service est répliqué.
 * **Solde de l'Ardoise** : calculé par `private.household_balances()` et

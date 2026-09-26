@@ -12,7 +12,12 @@
 #     d'exécutions.
 #
 # Fonctions métier attendues à ce jour :
-#   household-invite, expense-settlement, generate-routine-occurrences.
+#   household-invite, expense-settlement, generate-routine-occurrences,
+#   push-subscribe, push-notify.
+#
+# La liste n'est PAS figée ici : le script balaie `supabase/functions` et
+# n'exige que la présence d'un `index.ts` par répertoire. Cette liste est donc
+# documentaire — `sh scripts/deploy-functions.sh --list` fait foi.
 #
 #   sh scripts/deploy-functions.sh
 #   sh scripts/deploy-functions.sh --list
@@ -122,6 +127,11 @@ for dir in "$FUNCTIONS_DIR"/*; do
 done
 
 # --- Copie des fonctions métier ---------------------------------------------
+#
+# Les `*.test.ts` d'une fonction ne sont pas copiés. Ils sont exécutés par la
+# suite Vitest du frontend (`app/`, voir `vite.config.ts`) et n'ont rien à faire
+# dans un runtime de production : le coût est nul, mais un runtime qui contient
+# du code de test finit un jour par l'exécuter.
 copied=0
 for name in $SOURCE_FUNCTIONS; do
   if is_vendor "$name"; then
@@ -130,6 +140,7 @@ for name in $SOURCE_FUNCTIONS; do
   fi
   rm -rf "$FUNCTIONS_DIR/$name"
   cp -R "$SOURCE_DIR/$name" "$FUNCTIONS_DIR/$name"
+  find "$FUNCTIONS_DIR/$name" -name '*.test.ts' -delete
   echo "  → déploiement de $name"
   copied=$((copied + 1))
 done

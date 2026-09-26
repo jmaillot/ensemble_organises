@@ -6,7 +6,12 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Les 40 tables du contrat existent, avec exactement les colonnes attendues
+-- 1. Les 41 tables du contrat existent, avec exactement les colonnes attendues
+--
+-- L'inventaire est la seule chose qui rattrape un oubli de colonne : la RLS et
+-- les contraintes ne les voient pas. `push_subscriptions` y figure depuis la
+-- migration 0018, avec ses contraintes de longueur — c'est ce qui distingue une
+-- donnée d'abonnement valide d'une valeur tronquée.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -17,7 +22,7 @@ declare
 begin
   for r in
     select * from (values
-          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'created_at', 'updated_at']::text[]),
+          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'created_at', 'updated_at']::text[]),
           ('households', ARRAY['id', 'name', 'avatar_color', 'created_by', 'created_at', 'updated_at']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
@@ -56,7 +61,8 @@ begin
           ('conversations', ARRAY['id', 'household_id', 'type', 'title', 'created_at']::text[]),
           ('conversation_members', ARRAY['conversation_id', 'member_id']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
-          ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[])
+          ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
+          ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(
@@ -121,13 +127,17 @@ $$;
 -- écrit les politiques des tables filles de `expense_participants` en
 -- oubliant la mère.
 --
--- Deux exceptions, documentées l'une et l'autre :
+-- Trois exceptions, documentées l'une et l'autre :
 --   * `household_invite_tokens` ne doit avoir AUCUNE politique ni aucun GRANT,
 --     pour rester inatteignable ;
+--   * `push_subscriptions` de même, pour une raison plus forte encore : un
+--     `endpoint` de Push est une CAPACITÉ. Le laisser lire, même par son
+--     propriétaire, revient à exposer à toute fuite de jeton la possibilité de
+--     notifier cet appareil. Ses opérations passent par des fonctions serveur ;
 --   * `schema_migrations` est le journal de `scripts/migrate.sh`, une table
 --     d'outillage sans donnée personnelle. `migrate.sh` la crée sous RLS, sans
 --     politique : inaccessible à `anon` et `authenticated`, lisible par le rôle
---     propriétaire du script. Même état que la précédente, pour une raison
+--     propriétaire du script. Même état que les précédentes, pour une raison
 --     différente — c'est bien la seule table de `public` qui ne soit pas
 --     une table métier.
 do $$
@@ -140,7 +150,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'schema_migrations')
+     and c.relname not in ('household_invite_tokens', 'push_subscriptions', 'schema_migrations')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -153,6 +163,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''household_invite_tokens'''),
     0::bigint,
     'household_invite_tokens reste sans politique, donc inatteignable'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''push_subscriptions'''),
+    0::bigint,
+    'push_subscriptions reste sans politique : un endpoint Push est une capacité'
   );
 end;
 $$;
@@ -231,33 +246,54 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 6. household_invite_tokens : jamais accessible au client
+-- 6. Les tables inatteignables : ni politique, ni privilège client
+--
+-- La migration 0009 pose `alter default privileges … grant select, insert,
+-- update, delete on tables to authenticated` : TOUTE table créée ensuite
+-- reçoit ces privilèges, RLS ou non. C'est exactement le mécanisme qui rendait
+-- `task_assignees` et consorts lisibles par tout utilisateur connecté
+-- (rétrospective §1.1) — il suffisait d'oublier un `REVOKE`. Ce bloc vérifie
+-- donc le GRANT autant que l'absence de politique : une table sans politique
+-- mais avec le GRANT par défaut reste lisible par `authenticated`.
+--
+-- `push_subscriptions` est dans le même cas que `household_invite_tokens`, pour
+-- une raison plus forte : un `endpoint` de Push est une CAPACITÉ, et quiconque
+-- le détient peut notifier cet appareil.
 -- ---------------------------------------------------------------------------
 do $$
 declare
-  v_policies integer;
   r text;
   v_privilege text;
+  v_table text;
 begin
-  select count(*) into v_policies
-    from pg_policies
-   where schemaname = 'public' and tablename = 'household_invite_tokens';
-  perform testkit.eq(v_policies, 0, 'household_invite_tokens ne doit avoir aucune politique RLS');
+  foreach v_table in array array['household_invite_tokens', 'push_subscriptions'] loop
+    perform testkit.eq(
+      testkit.count(format('select 1 from pg_policies where schemaname = ''public'' and tablename = %L', v_table)),
+      0::bigint,
+      v_table || ' ne doit avoir aucune politique RLS'
+    );
 
-  foreach r in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
-    v_privilege := has_table_privilege('authenticated', 'public.household_invite_tokens', r)::text;
-    perform testkit.eq(v_privilege, 'false', 'authenticated ne doit pas avoir ' || r || ' sur household_invite_tokens');
-    v_privilege := has_table_privilege('anon', 'public.household_invite_tokens', r)::text;
-    perform testkit.eq(v_privilege, 'false', 'anon ne doit pas avoir ' || r || ' sur household_invite_tokens');
+    foreach r in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+      v_privilege := has_table_privilege('authenticated', 'public.' || v_table, r)::text;
+      perform testkit.eq(v_privilege, 'false', 'authenticated ne doit pas avoir ' || r || ' sur ' || v_table);
+      v_privilege := has_table_privilege('anon', 'public.' || v_table, r)::text;
+      perform testkit.eq(v_privilege, 'false', 'anon ne doit pas avoir ' || r || ' sur ' || v_table);
+    end loop;
+
+    v_privilege := has_table_privilege('service_role', 'public.' || v_table, 'SELECT')::text;
+    perform testkit.eq(v_privilege, 'true', 'service_role doit pouvoir lire ' || v_table);
   end loop;
-
-  v_privilege := has_table_privilege('service_role', 'public.household_invite_tokens', 'SELECT')::text;
-  perform testkit.eq(v_privilege, 'true', 'service_role doit pouvoir lire household_invite_tokens');
 end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 7. Les fonctions serveur sur les tokens ne sont pas exécutables par un client
+-- 7. Les fonctions serveur ne sont pas exécutables par un client
+--
+-- `FUNCTIONS_VERIFY_JWT=false` est nécessaire pour mélanger appels navigateur,
+-- utilisateur et cron serveur. Il rend aussi public tout nom de fonction de
+-- `public` : sans ce REVOKE, un client porteur d'un JWT utilisateur pourrait
+-- appeler `public.due_push_notifications` et lire les rappels de TOUS les
+-- foyers, ou `record_push_deliveries` et supprimer les abonnements d'autrui.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -266,7 +302,13 @@ declare
     'public.create_household_invite_token(uuid,text,text,timestamptz,integer)',
     'public.revoke_household_invite_tokens(uuid,text)',
     'public.household_invite_token_summary(uuid,text)',
-    'public.redeem_household_invite_token(text,uuid,text,text,text)'
+    'public.redeem_household_invite_token(text,uuid,text,text,text)',
+    'public.register_push_subscription(uuid,text,text,text,timestamptz,text)',
+    'public.remove_push_subscription(uuid,text)',
+    'public.list_push_subscriptions(uuid)',
+    'public.due_push_notifications(text,timestamptz,uuid)',
+    'public.consume_push_reminders(jsonb)',
+    'public.record_push_deliveries(jsonb,integer)'
   ];
 begin
   foreach r in array v_functions loop
@@ -295,6 +337,18 @@ begin
   perform testkit.eq(
     has_function_privilege('authenticated', 'private.parent_household_id(text,text)', 'EXECUTE')::text, 'false',
     'le résolveur de parent ne doit pas être appelable par un client'
+  );
+  perform testkit.eq(
+    has_function_privilege('authenticated', 'private.push_reminder_notifications(timestamptz)', 'EXECUTE')::text, 'false',
+    'la liste des rappels dus ne doit pas être appelable par un client'
+  );
+  perform testkit.eq(
+    has_function_privilege('authenticated', 'private.post_push_dispatch(text)', 'EXECUTE')::text, 'false',
+    'un client ne doit pas pouvoir déclencher l''envoi des notifications de tout le foyer'
+  );
+  perform testkit.eq(
+    has_function_privilege('anon', 'private.dispatch_push_notifications()', 'EXECUTE')::text, 'false',
+    'le dispatch des notifications ne doit pas être appelable sans clé secrète'
   );
 end;
 $$;
@@ -358,6 +412,22 @@ select testkit.eq(testkit.affected(format(
   'update public.profiles set display_name = %L where id = %L',
   'Bob M.', (select user_id from testkit.fx where key = 'bob'))), 1::bigint,
   'un client peut modifier son propre nom d''affichage');
+
+-- Les préférences de rappel appartiennent au profil : c'est le serveur qui les
+-- applique, pas une copie dans le navigateur. Le client les modifie donc, mais
+-- seulement les siennes, et seulement avec une valeur admise.
+select testkit.eq(testkit.affected(format(
+  'update public.profiles set task_reminders_enabled = false, reminder_frequency = %L where id = %L',
+  'matin', (select user_id from testkit.fx where key = 'bob'))), 1::bigint,
+  'un client peut régler ses propres préférences de rappel');
+select testkit.expect_denied(format(
+  'update public.profiles set reminder_frequency = %L where id = %L',
+  'quand-il-veux', (select user_id from testkit.fx where key = 'bob')),
+  'une cadence de rappel hors enumération doit être refusée par la contrainte');
+select testkit.eq(testkit.affected(format(
+  'update public.profiles set task_reminders_enabled = false where id <> %L',
+  (select user_id from testkit.fx where key = 'bob'))), 0::bigint,
+  'un client ne modifie les préférences d''autrui : les profiles lus sont les siens');
 
 reset role;
 
