@@ -71,9 +71,20 @@ services:
       # lignes dans le `.env` de la stack, comme `INVITE_TOKEN_HMAC_SECRET`.
       # Sans elles, `push-subscribe` répond `push_configured: false` et
       # `push-notify` échoue en 500 au lieu de laisser croire à un envoi.
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_SUBJECT: ${VAPID_SUBJECT}
+      #
+      # Le `:-` est indispensable, et pour une raison qui n'a rien à voir avec
+      # GoTrue : SANS lui, Compose émet trois `WARN … not set. Defaulting to a
+      # blank string` à CHAQUE invocation — `migrate.sh`, `test-db.sh`, un
+      # `run.sh logs` — donc sur des commandes qui n'ont aucun rapport avec les
+      # notifications. Le bruit ferait croire à une panne sur toute la stack, et
+      # masquerait le cas réel où la clé manque vraiment.
+      #
+      # Contrairement à `${GOOGLE_ENABLED}`, une valeur vide est ici un refus
+      # net : les deux fonctions testent la chaîne vide comme une absence
+      # (`!publicKey`), donc une clé oubliée ne peut pas passer pour valide.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       FUNCTIONS_VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-false}
       SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
