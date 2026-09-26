@@ -15,6 +15,7 @@ dist/
 build/
 .vite/
 *.tsbuildinfo
+__pycache__/
 
 # ── Secrets ──────────────────────────────────────────────────────────────────
 # Tout `.env*` est ignoré, puis deux exemples sont réadmis : ce sont des

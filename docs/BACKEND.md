@@ -948,6 +948,40 @@ RLS ne lève pas d'erreur : elle n'est simplement pas visible.
 > `0004_cron.sql` (`database_name` courant, commande sans secret, appel d'une
 > fonction privée sans paramètre).
 
+### 10.1 Contrôles statiques, avant la base
+
+```bash
+python3 scripts/check-sql-statique.py            # migrations et tests
+python3 scripts/check-sql-statique.py 0019       # un seul fichier
+```
+
+Cette campagne ne remplace pas `test-db.sh` : elle ne connaît pas le schéma, et
+ne remplacera jamais un test exécuté. Elle existe parce que quatre défauts de la
+même famille ont franchi la migration, le test de contrat **et** la relecture,
+pour n'échouer qu'à la première exécution :
+
+| Défaut | Ce que PostgreSQL disait |
+|---|---|
+| CTE nommé `window` | `syntax error at or near "window"` |
+| liste de colonnes sur un appel de fonction | `a column definition list is only allowed for functions returning record` |
+| tables non qualifiées sous `search_path = ''` | `relation "task_reminders" does not exist` |
+| CTE nommé comme la table qu'il sélectionne | `recursive reference to query "tasks" must not appear within a non-recursive CTE` |
+
+Aucun n'est visible à la création : `create function` enregistre le corps sans
+l'exécuter, et une migration appliquée n'est plus réécrite. Le contrôle vérifie
+donc la **définition effective** de chaque fonction — la dernière, celle que la
+base contient — et signale sans les condamner les définitions dépassées, qui
+restent au dépôt avec leur code fautif.
+
+Trois vérifications : aucun nom de table non qualifié sous un `search_path`
+vide, aucun CTE qui se rejoint lui-même, aucun littéral laissé ouvert en fin de
+ligne. Ce dernier point mérite un mot : un `$nom$` utilisé comme espace réservé
+dans une chaîne entre en collision avec la syntaxe de dollar-quoting de
+PostgreSQL, et un guillemet fermant mal placé produit une erreur qui désigne le
+`$` de la variable au lieu du guillemet qui manque. Le corpus de référence est
+la RFC 8291 pour le chiffrement ; ici, il n'y en a pas d'autre que la base
+elle-même.
+
 ---
 
 ## 11. Sauvegarde et restauration

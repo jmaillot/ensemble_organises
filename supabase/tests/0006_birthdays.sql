@@ -201,18 +201,16 @@ begin
   -- résumé, qui décide de ce qu'un membre recevra.
   if v_birthday_is_today then
     perform testkit.eq(
-      testkit.count(
-        'select 1 from private.push_birthday_notifications(null) n where n.reminder_id = ''$v_birthday$'''
-      ),
+      (select count(*)
+         from private.push_birthday_notifications(null) n
+        where n.reminder_id = v_birthday),
       1::bigint,
       'l''anniversaire du jour produit une notification, pour le membre lié'
     );
     perform testkit.eq(
-      (
-        select n.tag || '|' || n.url || '|' || n.title
-          from private.push_birthday_notifications(null) n
-         where n.reminder_id = ''$v_birthday$'''
-      ),
+      (select n.tag || '|' || n.url || '|' || n.title
+         from private.push_birthday_notifications(null) n
+        where n.reminder_id = v_birthday),
       'anniversaire-' || v_birthday || '|/anniversaires|Anniversaire',
       'la notification porte une balise qui regroupe les envois du même jour'
     );

@@ -131,6 +131,64 @@ Corollaire : `anon` se prouve par **privilège**, pas par un compte à zéro. Il
 n'a aucun droit sur les tables de `public` — le refus est antérieur à la RLS, ce
 qui est plus fort, et un `count(*) = 0` présupposerait le droit de lecture.
 
+### 2.5 Le SQL que rien n'exécute
+
+`create function` enregistre un corps sans l'exécuter. Une migration s'applique,
+le test de contrat passe, la relecture ne voit rien — et la fonction ne se
+révèle qu'à son premier appel, en production, tous les quarts d'heure.
+
+C'est arrivé quatre fois, pour quatre raisons sans rapport :
+
+| Défaut | Erreur à la première exécution |
+|---|---|
+| CTE nommé `window` | `syntax error at or near "window"` |
+| liste de colonnes sur un appel de fonction | `a column definition list is only allowed for functions returning record` |
+| tables non qualifiées sous `search_path = ''` | `relation "task_reminders" does not exist` |
+| CTE nommé comme la table qu'il sélectionne | `recursive reference to query "tasks" must not appear within a non-recursive CTE` |
+
+Le troisième est le plus grave, et le plus trompeur : `set search_path = ''` est
+la bonne pratique — c'est ce qui empêche un appelant de détourner la fonction via
+un objet placé dans un schéma de son choix. Mais un `search_path` vide ne résout
+**aucun** nom non qualifié. La fonction source des rappels aurait renvoyé une
+erreur quatre fois par heure depuis sa mise en production, et aucun rappel de
+tâche, d'événement ou de routine n'aurait été distribué.
+
+Le quatrième mérite une explication, parce qu'il est invisible à la relecture :
+dans un CTE, le nom du CTE est résolu **avant** la table du même nom. `join tasks
+t` à l'intérieur du CTE `tasks` ne joint pas la table, il joint le CTE à
+lui-même. Les deux défauts se sont révélés dans l'ordre — d'abord le nom non
+qualifié, ensuite l'auto-référence — ce qui donne le change : corriger le
+premier fait apparaître le second, et l'on peut croire à une régression.
+
+**Règle** : `search_path = ''` et nom de CTE sont deux décisions à prendre
+ensemble, et aucune n'est vérifiable en lisant. `scripts/check-sql-statique.py`
+les vérifie désormais sur la définition effective de chaque fonction.
+
+Corollaire, moins évident : une assertion peut aussi décrire un état que le
+code n'a jamais atteint. Deux fois, un test affirmait que le code était
+différent de ce qu'il est — une fonction « inchangée » qui ne l'était pas, un
+contrat de retour remplacé trois migrations plus tôt. Le test n'était pas
+faible, il était **faux**, et il échouait précisément parce qu'il était
+exigeant.
+
+### 2.6 Un contrôle qui passe à vide
+
+Écrire un vérificateur et le voir vert ne prouve rien. Le premier jet de
+`check-sql-statique.py` a annoncé « aucun défaut » sur un fichier qui en
+comportait un, pour trois raisons successives :
+
+* il **sautait** le corps `$$ … $$` sans l'analyser — or c'est du plpgsql, et
+  c'est là que se trouvait le défaut ;
+* il traitait `$$` comme un dollar-quote à tag nommé, si bien que le corps
+  n'était jamais ouvert et que le fichier entier passait en état « littéral
+  ouvert » ;
+* il détectait bien le cas, mais rapportait les **cent lignes** en aval de la
+  cause, ce qui revenait à noyer le signal.
+
+**Règle** : un contrôle se prouve sur un cas qui **doit** échouer. Ici, la
+version cassée du fichier, rejouée depuis Git. Un vérificateur qui n'a jamais
+refusé quelque chose n'a pas encore été exercé.
+
 ---
 
 ## 3. Les garde-fous désormais en place
@@ -146,6 +204,8 @@ Chacun existe parce qu'un défaut l'a rendu nécessaire.
 | `testkit.count()` encapsule et compte vraiment | `_setup.sql` | 2.2 |
 | Ancre positive avant les assertions négatives | `0002` § Bob | 2.4 |
 | `as_user` pose les deux GUC, comme PostgREST | `_setup.sql` | 2.1 |
+| Tables qualifiées, CTE sans auto-référence, littéraux fermés | `check-sql-statique.py` | 2.5 |
+| Un contrôle se prouve sur un cas qui doit échouer | idem, cas piégé | 2.6 |
 
 Deux exceptions documentées au contrôle « au moins une politique » :
 `household_invite_tokens`, inatteignable par conception, et
