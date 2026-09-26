@@ -792,7 +792,40 @@ Le chemin « Envoyer un test » ne prouve que lui-même : il signe, chiffre et
 envoie, mais ne consomme aucun rappel. Les deux chemins qui restent ne sont
 validés que par la **disparition de la ligne de rappel** après l'envoi.
 
+#### Le script, et ce qu'il ajoute à la marche manuelle
+
+```sh
+sh scripts/test-dispatch-push.sh
+```
+
+Il fait toute la marche ci-dessous, et il est **attribuable** : il note le
+dernier `net._http_response` *avant* d'appeler le dispatch, donc le rapport
+qu'il lit est nécessairement celui de son propre appel. La marche manuelle
+laisse la place pour qu'un job `pg_cron` consomme le rappel entre la semure et
+l'appel — et le rapport lu est alors celui du job, avec `due = 0` et sans aucune
+explication. C'est ce qui est arrivé lors de la première validation : un `200`
+portant `consumed: 1`, mais attribuable à personne.
+
+Trois faits sont vérifiés, et chacun échoue seul : `due ≥ 1`, la réponse `200`
+avec `consumed: 1`, et la disparition de la ligne. Le troisième est le seul qui
+distingue « distribué » de « distribué **et** consommé ».
+
+Il exige un **abonnement réel** : un endpoint de push ne se fabrique pas, et un
+endpoint factice serait `dropped` plutôt que `delivered` — un chiffre juste et
+une preuve fausse. Les endpoints des suites SQL, qui se terminent par une longue
+suite de `a`, sont exclus, et le script s'arrête si aucun abonnement réel
+n'existe.
+
+`ATTENTE` (45 s par défaut) borne l'attente de la réponse, pg_net étant
+asynchrone. Le script supprime la tâche qu'il a créée, et ne laisse rien
+derrière lui.
+
 #### Un rappel dû maintenant
+
+Le script ci-dessus sème son propre rappel et le supprime en sortie. La marche
+manuelle, pour un diagnostic ou pour un foyer sans abonnement réel, reste
+valable — mais elle n'attribue pas le rapport à son appel, et un job `pg_cron`
+peut consommer le rappel entre la semure et l'envoi.
 
 Le formulaire de tâche n'expose pas le champ de rappel, donc la ligne se crée en
 SQL. On la rattache à la tâche ouverte la plus récente, ce qui évite d'avoir à
@@ -848,15 +881,29 @@ elle ne peut venir que de l'Edge Function, donc elle prouve que toute la boucle
 s'est refermée. Un `dispatched = true` sans elle ne prouve que la moitié — que
 la base a su appeler sa propre fonction.
 
-Et la trace du rapport de livraison, qui vient du même endroit :
+Et le rapport de livraison se lit dans `net._http_response`, **pas dans les
+logs du conteneur** :
 
 ```sh
-cd supabase-project && docker compose logs --tail 40 functions && cd ..
+sh scripts/psql.sh -c "
+  select id, status_code, content
+    from net._http_response
+   order by id desc
+   limit 2;"
 ```
 
-`push-notify` journalise une ligne par envoi impossible ou par refus de rapport,
-et renvoie `{ notifications, delivered, failed, dropped, consumed }`. C'est ce
-`consumed` qui doit valoir 1.
+C'est une correction d'une consigne antérieure, qui renvoyait à
+`docker compose logs functions`. Ces logs ne contiennent que des lignes du
+runtime — `serving the request with …` — et la ligne journalisée par
+`push-notify` n'y apparaît pas. `net._http_response` conserve le **corps** de la
+réponse, rapport complet : c'est le seul endroit où `{ notifications, delivered,
+failed, dropped, consumed }` est lisible. C'est ce `consumed` qui doit valoir 1,
+et c'est aussi ce qui permet de voir un `401 UNUSABLE_CREDENTIAL` après coup,
+longtemps après que la cause a disparu des logs.
+
+Les `401` archivés dans cette table valent d'ailleurs de la documentation : le
+premier corps dit `received: {authorization: "api-key", apikey: "absent"}`, ce
+qui nomme la faute sans qu'on ait à la déduire.
 
 #### Le chemin anniversaires
 
@@ -1191,20 +1238,27 @@ Functions, espace disque, expiration des certificats, résultat de
 * **Notifications Web Push** : la chaîne est **exécutée pour de vrai** depuis le
   26 septembre 2026. Le chemin « Envoyer un test » a été validé sur un appareil
   réel, ce qui prouve la paire VAPID, l'abonnement, le chiffrement RFC 8291 et
-  l'acceptation de la signature par le service Push. Restent non validés par un
-  envoi réel, et vérifiés uniquement par `0007_push.sql` :
-  * le chemin des rappels (`eo-push-dispatch`, toutes les quinze minutes) ;
-  * le chemin des anniversaires (`eo-birthday-alerts`, chaque matin) ;
-  * la **consommation** d'un rappel après envoi — `consume_push_reminders` n'a
-    jamais rien supprimé en production, et c'est ce qui empêche un rappel
-    d'être renvoyé quatre fois par heure.
+  l'acceptation de la signature par le service Push. Le chemin des rappels
+  (`eo-push-dispatch`) est **validé par un envoi réel, consommation comprise**.
+  Le rapport conservé vaut `{ notifications: 1,
+  delivered: 1, failed: 0, dropped: 0, consumed: 1 }`, et la ligne de rappel a
+  disparu de `public.task_reminders`. C'est ce second fait qui établit que
+  `consume_push_reminders` supprime bien, donc qu'un rappel ne reviendra pas
+  quatre fois par heure. La validation est reproductible par
+  `sh scripts/test-dispatch-push.sh`, qui sème son propre rappel et attribue le
+  rapport à son appel (§6.6).
+
+  Reste non validé par un envoi réel, et vérifié uniquement par `0007_push.sql` :
+  * le chemin des anniversaires (`eo-birthday-alerts`, chaque matin) — et il ne
+    peut pas l'être par disparition de ligne, puisqu'un anniversaire n'a rien à
+    consommer (§6.6).
 
   Le formulaire de tâche n'expose pas encore le champ de rappel : `tasks` en
   affiche un (`reminderTime`), mais rien ne le saisit. Un rappel ne peut donc
   être créé que par SQL, et l'absence de ce champ est un manque du module
   Tâches, pas de la chaîne push.
 
-  Pour les trois chemins restants, la marche à suivre est en §6.6.
+  La marche à suivre pour le chemin restant est en §6.6.
 * **Cadence des rappels** : `profiles.reminder_frequency` est enregistrée et
   affichée, mais **aucun envoi ne s'y conforme**. Les rappels sont unitaires,
   donc toujours immédiats ; la cadence ne pourra être appliquée qu'à un point de

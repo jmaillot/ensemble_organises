@@ -114,12 +114,27 @@ cd app && npm run typecheck && npm test && npm run build
 cd app && npm run test:e2e
 python3 scripts/check-sql-statique.py
 sh scripts/test-db.sh          # sur une machine qui a Docker
+sh scripts/test-dispatch-push.sh   # en plus, et ce n'est pas équivalent
 ```
 
-Docker n'est pas toujours disponible. Les quatre premières étapes suffisent
-alors, et `test-db.sh` devient un **passage obligatoire** avant de considérer un
-changement SQL comme validé. Ne pas annoncer « le SQL est bon » parce que la
-migration s'est appliquée : c'est précisément le cas des défauts que cette
+`test-db.sh` vérifie que les fonctions sont **correctes**, et il s'arrête
+à la frontière HTTP : faute de pg_net, de Vault et d'un runtime
+`functions` dans la base. Un changement de migration, de Vault ou de la Edge
+Function ne peut donc pas être validé par lui seul. `test-dispatch-push.sh`
+comble exactement ce manque, et il est **attribuable** : il note le dernier
+`net._http_response` avant d'appeler le dispatch, donc le rapport qu'il lit est
+celui de son appel — ce que la marche manuelle ne garantit pas, un job
+`pg_cron` pouvant consommer le rappel entre la semure et l'envoi. Il exige un
+abonnement de push **réel** et s'arrange à le dire : un endpoint factice
+serait `dropped` et non `delivered`, donc un chiffre juste et une preuve
+fausse. Son absence sur une machine sans appareil abonné n'est pas un échec du
+changement, mais elle doit être **dite**, pas passée sous silence.
+
+Docker n'est pas toujours disponible. Les trois premières étapes suffisent
+alors — le typecheck, les tests, le build, les e2e et le contrôle statique ne le
+demandent pas — et `test-db.sh` devient un **passage obligatoire** avant de
+considérer un changement SQL comme validé. Ne pas annoncer « le SQL est bon »
+parce que la migration s'est appliquée : c'est précisément le cas des défauts que cette
 section existe pour attraper.
 
 #### A. Le SQL n'est vérifié qu'à l'exécution
