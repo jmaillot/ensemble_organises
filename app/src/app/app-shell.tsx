@@ -112,7 +112,10 @@ export function AppShell() {
           <ModuleCatalogueNav />
         </div>
 
-        <div>
+        {/* `w-full` : la barre centre ses enfants sous 920 px, et un conteneur
+            qui se réduit à son contenu ne donne aucune largeur au lien
+            « Préférences » en dessous de la sienne. */}
+        <div className="w-full">
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Votre espace</p>
           <div className="mx-0.5 mb-3 rounded-[16px] border border-border bg-bg p-3.5 max-[920px]:hidden">
             <div className="flex items-center gap-2.5">
@@ -133,7 +136,14 @@ export function AppShell() {
               to="/parametres"
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2.5 px-2.5 text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
+                  // `min-h-11 w-full` comme tous les autres liens de la barre :
+                  // sous 920 px le libellé passe en `sr-only`, et sans ces deux
+                  // règles ce lien se réduisait à son icône — 15×15 px, sous les
+                  // 44 px qu'AGENTS.md §6 exige. C'était le seul lien du pied à
+                  // ne pas les porter, et le seul dont le conteneur ne prenait
+                  // pas toute la largeur : il était donc invisible au balayage
+                  // « surface nulle » et introuvable à la revue.
+                  'flex min-h-11 w-full items-center gap-2.5 px-2.5 text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
                   isActive && 'font-[750] text-accent-strong',
                 )
               }

@@ -157,6 +157,31 @@ test.describe('Mises en page', () => {
     }
   });
 
+  test('les cibles de la barre latérale respectent 44 px, même repliées', async ({ page }) => {
+    // 820 px est la largeur où la barre latérale se réduit à ses icônes : le
+    // libellé passe en `sr-only` et un lien sans hauteur minimale se réduit à
+    // son icône. C'est là que « Préférences » tombait à 15×15.
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await openDemoSession(page);
+
+    const targets = page.locator('aside a[href]');
+    const boxes = await targets.evaluateAll((links) =>
+      links
+        .filter((link) => link.checkVisibility({ visibilityProperty: true, opacityProperty: true }))
+        .map((link) => ({
+          name: (link.textContent || link.getAttribute('aria-label') || '').trim(),
+          width: Math.round(link.getBoundingClientRect().width),
+          height: Math.round(link.getBoundingClientRect().height),
+        })),
+    );
+
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) {
+      expect(box.height, `« ${box.name} » : ${box.width}×${box.height}, sous 44 px de haut`).toBeGreaterThanOrEqual(44);
+      expect(box.width, `« ${box.name} » : ${box.width}×${box.height}, sous 44 px de large`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test('le catalogue mobile montre ses seize tuiles', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'le dialogue n’existe que sous 650 px');
 

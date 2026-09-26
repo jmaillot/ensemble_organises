@@ -486,7 +486,9 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
   vérifiées comme telles par les tests unitaires, tout en s'affichant sur une
   bande vide. Les dimensions n'existent que dans un navigateur : le contrôle
   est donc dans `e2e/critical-paths.spec.ts` (« Mises en page »), et non dans
-  `npm test`.
+  `npm test`. La même section vérifie les 44 px des cibles de la barre latérale
+  à 820 px, largeur où elle se réduit à ses icônes — un lien dont le libellé
+  devient `sr-only` perd sa surface si personne ne lui impose de hauteur.
 - **Matrice de contrôle** : 360, 390, 430, 600, 820, 1024, 1366, 1440 et
   1920 px de large — aucun débordement horizontal toléré.
 - **Accessibilité** : cibles ≥ 44 px, `focus-visible` visible partout, libellés
@@ -504,7 +506,7 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 |---|---|---|
 | Composants et hooks | `npm test` (dans `app/`) | rendu, interactions, états vides/chargement/erreur, règles métier de chaque module |
 | Data layer | inclus | adaptateur local, file hors ligne, génération de token, formatage |
-| End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement, largeur réelle des tuiles |
+| End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement, largeur réelle des tuiles, cibles tactiles de 44 px |
 | SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires, notifications push |
 | Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 145 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
 
@@ -541,12 +543,14 @@ parcours en français (`fr-FR`, `Europe/Paris`).
 - **Colonnes suggérées par les modules** : `notes.visibility`
 (remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
 `pets.next_reminder_date`, `trips.status`.
-- **Les tuiles n'étaient pas encore vérifiées dans un navigateur** : la
-  navigation a été validée par Playwright (chromium, 1440 px et Pixel 7), mais
-  la grille de l'accueil n'avait jamais été rendue dans un vrai moteur avant
-  que la largeur nulle ne soit trouvé. Le contrôle existe désormais dans la
-  suite e2e ; les autres modules, dont les grilles de cartes n'ont pas été
-  passées au même crible, restent à vérifier de la même façon.
+- **Les grilles de cartes ont été balayées, pas seulement la Home.** Les dix-huit
+  routes ont été rendues dans un vrai moteur (chromium, 1440 px, 820 px et
+  Pixel 7), à la recherche d'éléments présents au DOM mais sans surface : zéro
+  aujourd'hui. Le balayage a trouvé un lien de barre latérale de 15×15 px sous
+  920 px, où le libellé passe en `sr-only` — c'est ce contrôle de 44 px, dans
+  la suite e2e, qui tient désormais la règle. Un balayage ne remplace pas une
+  relecture : il ne voit ni un contraste insuffisant, ni un ordre de tabulation
+  faux, ni une étiquette qui ment.
 - **Le frontend n'a toujours jamais parlé à un vrai Supabase** : tout le
   produit tourne sur l'adaptateur IndexedDB. C'est la réserve la plus lourde de
   la rétrospective, et elle est entière.
