@@ -130,3 +130,45 @@ test.describe('Accessibilité et responsive', () => {
     await expect(page.getByRole('link', { name: 'Aller au contenu principal' })).toBeFocused();
   });
 });
+
+/**
+ * Une tuile sans largeur est invisible sans être absente du DOM : Vitest la
+ * comptait, et la grille de l'accueil s'affichait pourtant vide. Seul un
+ * navigateur qui calcule la mise en page peut le voir, d'où ce test ici.
+ */
+test.describe('Mises en page', () => {
+  test('les tuiles de la grille de l’accueil occupent une largeur réelle', async ({ page }) => {
+    await openDemoSession(page);
+    const grid = page.locator('main').getByRole('list', { name: 'Espaces du foyer' });
+    await expect(grid).toBeVisible();
+
+    const widths = await grid.locator('button[aria-label^="Ouvrir"]').evaluateAll((tiles) =>
+      tiles.map((tile) => ({
+        label: tile.getAttribute('aria-label'),
+        width: Math.round(tile.getBoundingClientRect().width),
+      })),
+    );
+
+    expect(widths.length).toBeGreaterThan(0);
+    for (const tile of widths) {
+      // Un bouton dont tout le contenu est positionné en absolu se réduit à
+      // zéro s'il n'occupe pas la largeur de sa colonne.
+      expect(tile.width, `${tile.label} est invisible : largeur nulle`).toBeGreaterThan(40);
+    }
+  });
+
+  test('le catalogue mobile montre ses seize tuiles', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'le dialogue n’existe que sous 650 px');
+
+    await openDemoSession(page);
+    await page.getByRole('button', { name: 'Espaces' }).click();
+
+    const tiles = page.getByRole('dialog').locator('button[aria-label^="Ouvrir"]');
+    await expect(tiles).toHaveCount(16);
+
+    const widths = await tiles.evaluateAll((list) => list.map((tile) => Math.round(tile.getBoundingClientRect().width)));
+    for (const width of widths) {
+      expect(width, 'une tuile du dialogue est invisible').toBeGreaterThan(40);
+    }
+  });
+});

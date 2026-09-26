@@ -477,6 +477,14 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
   n'est pas absent de la navigation. `src/lib/modules.test.ts` et
   `src/app/router.test.tsx` verrouillent l'invariant — le second rend chaque
   route du catalogue pour vérifier qu'elle aboutit à son écran et non à un 404.
+- **Ce que Vitest ne peut pas voir** : une tuile peut être dans le DOM sans
+  occupy de place. `ModuleTile` est un `<button>` dont tout le contenu est en
+  `position: absolute` ; sans largeur explicite, un bouton `inline-block` se
+  réduit à zéro — les seize tuiles de l'accueil étaient présentes au DOM, et
+  vérifiées comme telles par les tests unitaires, tout en s'affichant sur une
+  bande vide. Les dimensions n'existent que dans un navigateur : le contrôle
+  est donc dans `e2e/critical-paths.spec.ts` (« Mises en page »), et non dans
+  `npm test`.
 - **Matrice de contrôle** : 360, 390, 430, 600, 820, 1024, 1366, 1440 et
   1920 px de large — aucun débordement horizontal toléré.
 - **Accessibilité** : cibles ≥ 44 px, `focus-visible` visible partout, libellés
@@ -494,7 +502,7 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 |---|---|---|
 | Composants et hooks | `npm test` (dans `app/`) | rendu, interactions, états vides/chargement/erreur, règles métier de chaque module |
 | Data layer | inclus | adaptateur local, file hors ligne, génération de token, formatage |
-| End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement |
+| End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement, largeur réelle des tuiles |
 | SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires, notifications push |
 | Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 145 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
 
@@ -531,6 +539,12 @@ parcours en français (`fr-FR`, `Europe/Paris`).
 - **Colonnes suggérées par les modules** : `notes.visibility`
 (remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
 `pets.next_reminder_date`, `trips.status`.
+- **Les tuiles n'étaient pas encore vérifiées dans un navigateur** : la
+  navigation a été validée par Playwright (chromium, 1440 px et Pixel 7), mais
+  la grille de l'accueil n'avait jamais été rendue dans un vrai moteur avant
+  que la largeur nulle ne soit trouvé. Le contrôle existe désormais dans la
+  suite e2e ; les autres modules, dont les grilles de cartes n'ont pas été
+  passées au même crible, restent à vérifier de la même façon.
 - **Le frontend n'a toujours jamais parlé à un vrai Supabase** : tout le
   produit tourne sur l'adaptateur IndexedDB. C'est la réserve la plus lourde de
   la rétrospective, et elle est entière.
