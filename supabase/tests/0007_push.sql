@@ -50,6 +50,30 @@ $$;
 -- poste de recette : six assertions comptaient la table entière et voyaient 2
 -- au lieu de 1. Elles ne testaient rien de faux — elles testaient l'absence de
 -- données, ce qui revient à ne rien tester.
+-- Les rappels dus pour un ensemble de membres, et rien d'autre.
+--
+-- `public.due_push_notifications` est GLOBALE par nature : le job pg_cron doit
+-- couvrir tous les foyers. Son paramètre `p_user_id` n'a d'effet que sur la
+-- portée `test`. Un test ne peut donc pas choisir ce que la fonction renvoie,
+-- et doit revendiquer les notifications adressées à ses propres membres.
+--
+-- Sans ce filtre, deux choses cassent sur une base qui contient des données
+-- réelles : un décompte gonfle, et — plus insidieux — un `exists` peut être
+-- satisfait par la notification de quelqu'un d'autre. C'est le « faux vert » de
+-- RETROSPECTIVE.md §2.4, et cette suite en a payé un sur la base de recette.
+create or replace function testkit.due_rappels(p_users uuid[])
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce((
+    select jsonb_agg(n.value order by n.value ->> 'title')
+      from jsonb_array_elements(
+             public.due_push_notifications('rappels', now(), null)) n
+     where (n.value ->> 'user_id')::uuid = any (p_users)
+  ), '[]'::jsonb);
+$$;
+
 create or replace function testkit.push_endpoint_owns(p_endpoint text)
 returns boolean
 language sql
@@ -124,8 +148,7 @@ begin
     v_camille, testkit.push_endpoint('c1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.ok(v_result ->> 'id' is not null, 'l''abonnement renvoie son identifiant');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'un abonnement enregistré existe en base'
   );
@@ -135,8 +158,7 @@ begin
   v_result := public.register_push_subscription(
     v_camille, testkit.push_endpoint('c1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'une réinscription identique ne duplique pas l''abonnement'
   );
@@ -145,8 +167,7 @@ begin
   perform public.register_push_subscription(
     v_camille, testkit.push_endpoint('c1'), 'E' || repeat('f', 86), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'un renouvellement de clés met à jour l''abonnement existant'
   );
@@ -183,16 +204,14 @@ begin
   perform testkit.eq(public.remove_push_subscription(v_camille, testkit.push_endpoint('c1')), false,
     'on ne révoque pas l''appareil d''un autre membre');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'l''appareil du membre est intact après une révocation étrangère'
   );
   perform testkit.eq(public.remove_push_subscription(v_thomas, testkit.push_endpoint('c1')), true,
     'le propriétaire révoque son appareil');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     0::bigint,
     'l''abonnement révoqué a disparu'
   );
@@ -224,8 +243,7 @@ begin
     testkit.push_endpoint('x1'), testkit.push_p256dh(), testkit.push_auth_secret()),
     'un appel sans acteur est refusé : l''identifiant ne se devine pas');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions
-      where testkit.push_endpoint_owns(endpoint)'),
+    testkit.count('select 1 from public.push_subscriptions where testkit.push_endpoint_owns(endpoint)'),
     0::bigint,
     'aucun des appels refusés n''a laissé de trace'
   );
@@ -254,6 +272,12 @@ declare
   v_routine_id text;
   v_due jsonb;
   v_recipients uuid[];
+  -- Les membres dont le test revendique les notifications.
+  -- `due_push_notifications` est GLOBALE par nature — le job doit couvrir
+  -- tous les foyers — et `p_user_id` n'a d'effet que sur la portée `test`.
+  -- Le test ne peut donc pas choisir ce que la fonction renvoie : il
+  -- revendique celles qui sont adressées à ses propres membres.
+  v_membres uuid[] := array[v_alice, v_bob, v_kid];
 begin
   insert into public.tasks (id, household_id, name, description, due_date, status, created_by)
   values (v_task, v_home, 'Sortir le chien', 'Avant 20 h', current_date, 'a_faire', v_alice_m);
@@ -281,7 +305,7 @@ begin
   insert into public.task_reminders (id, task_id, remind_at)
   values (private.new_id('task-reminder'), v_task_id, now() + interval '3 hours');
 
-  v_due := public.due_push_notifications('rappels', now(), null);
+  v_due := testkit.due_rappels(v_membres);
   perform testkit.eq(jsonb_array_length(v_due), 3, 'trois rappels sont dus, les autres sont hors fenêtre ou futurs');
 
   perform testkit.ok(
@@ -320,7 +344,8 @@ begin
   -- Une tâche terminée n'a plus rien à annoncer.
   update public.tasks set status = 'fait' where id = v_task_id;
   perform testkit.eq(
-    testkit.count('select 1 from private.push_reminder_notifications(now()) where url = ''/taches'''),
+    (select count(*) from private.push_reminder_notifications(now())
+      where url = '/taches' and user_id = any (v_membres)),
     0::bigint,
     'une tâche terminée n''est plus rappelée'
   );
@@ -329,7 +354,8 @@ begin
   -- Un événement déjà commencé non plus.
   update public.events set start_at = now() - interval '1 hour' where id = v_event_id;
   perform testkit.eq(
-    testkit.count('select 1 from private.push_reminder_notifications(now()) where url = ''/calendrier'''),
+    (select count(*) from private.push_reminder_notifications(now())
+      where url = '/calendrier' and user_id = any (v_membres)),
     0::bigint,
     'un événement déjà commencé n''est plus rappelé'
   );
@@ -339,12 +365,14 @@ begin
   -- seconde fois pour la même tâche.
   insert into public.task_assignees (task_id, member_id) values (v_task_id, v_bob_m);
   perform testkit.eq(
-    testkit.count('select 1 from private.push_reminder_notifications(now()) where url = ''/taches'''),
+    (select count(*) from private.push_reminder_notifications(now())
+      where url = '/taches' and user_id = any (v_membres)),
     1::bigint,
     'l''assignataire reçoit le rappel de sa tâche'
   );
   perform testkit.eq(
-    (select user_id from private.push_reminder_notifications(now()) where url = '/taches'),
+    (select user_id from private.push_reminder_notifications(now())
+      where url = '/taches' and user_id = any (v_membres)),
     v_bob,
     'le rappel de tâche va à l''assignataire, pas au créateur'
   );
@@ -365,7 +393,7 @@ begin
     'un membre qui a coupé les rappels de tâches n''en reçoit plus'
   );
   perform testkit.ok(
-    exists (select 1 from jsonb_array_elements(public.due_push_notifications('rappels', now(), null)) n where n.value ->> 'url' = '/routines'),
+    exists (select 1 from jsonb_array_elements(testkit.due_rappels(v_membres)) n where n.value ->> 'url' = '/routines'),
     'couper les rappels de tâches ne coupe pas ceux de routines'
   );
   update public.profiles set task_reminders_enabled = true where id = v_alice;
@@ -373,7 +401,7 @@ begin
   -- L'échéance seule ne suffit pas : quelqu'un doit être abonné.
   perform testkit.ok(
     exists (
-      select 1 from jsonb_array_elements(public.due_push_notifications('rappels', now(), null)) n
+      select 1 from jsonb_array_elements(testkit.due_rappels(v_membres)) n
        where jsonb_array_length(n.value -> 'subscriptions') = 0
     ),
     'sans abonnement, la notification est préparée mais n''a aucun appareil'
@@ -383,7 +411,7 @@ begin
     v_alice, testkit.push_endpoint('a1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Chrome');
   perform testkit.ok(
     exists (
-      select 1 from jsonb_array_elements(public.due_push_notifications('rappels', now(), null)) n
+      select 1 from jsonb_array_elements(testkit.due_rappels(v_membres)) n
        where jsonb_array_length(n.value -> 'subscriptions') = 1
     ),
     'un abonné reçoit ses appareils dans la notification à envoyer'
@@ -393,7 +421,7 @@ begin
   perform testkit.ok(
     exists (
       select 1
-        from jsonb_array_elements(public.due_push_notifications('rappels', now(), null)) n,
+        from jsonb_array_elements(testkit.due_rappels(v_membres)) n,
              jsonb_array_elements(n.value -> 'subscriptions') s
        where s.value ->> 'p256dh' = testkit.push_p256dh()
     ),
