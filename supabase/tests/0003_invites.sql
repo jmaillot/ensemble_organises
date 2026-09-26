@@ -155,7 +155,23 @@ select testkit.expect_denied(format(
 
 -- ===========================================================================
 -- 4. Régénération : le token précédent est immédiatement invalidé
+--
+-- Et elle ne sort pas du foyer. Carol, administratrice du Foyer B, a son propre
+-- token actif, et il doit survivre à ce qui suit.
+--
+-- C'est aussi ce qui manquait à cette section. L'assertion du token actif
+-- comptait les tokens de TOUTE la base, et échouait donc dès qu'un autre foyer
+-- en possédait un — y compris un token légitime d'un foyer réel, créé la veille.
+-- Le produit désactivait bien le sien, et l'assertion suivante le confirmait :
+-- c'est la mesure qui était trop large, pas le code.
 -- ===========================================================================
+select public.create_household_invite_token(
+  p_actor_id => (select user_id from testkit.fx where key = 'carol'),
+  p_household_id => (select household_id from testkit.fx where key = 'carol'),
+  -- `token_hash` est unique et h1..h6 servent plus bas : empreinte hors jeu.
+  p_token_hash => repeat('7', 64)
+);
+
 select public.create_household_invite_token(
   p_actor_id => (select user_id from testkit.fx where key = 'alice'),
   p_household_id => (select household_id from testkit.fx where key = 'alice'),
@@ -163,9 +179,17 @@ select public.create_household_invite_token(
   p_max_uses => 5
 );
 
+-- La règle est « un FOYER n'a qu'un token actif à la fois », pas « un seul
+-- token actif dans toute la base ». La forme est celle de la section 7.
 select testkit.eq(
-  (select count(*) from public.household_invite_tokens where is_active), 1::bigint,
-  'un seul token actif à la fois');
+  (select count(*) from public.household_invite_tokens
+    where household_id = (select household_id from testkit.fx where key = 'alice')
+      and is_active), 1::bigint,
+  'un seul token actif à la fois, pour ce foyer');
+select testkit.eq(
+  (select is_active from public.household_invite_tokens
+    where token_hash = repeat('7', 64)), true,
+  'la régénération d''un foyer laisse intact le token d''un autre foyer');
 select testkit.eq(
   (select is_active from public.household_invite_tokens where token_hash = (select h1 from testkit.hashes)), false,
   'le token précédent est désactivé');
