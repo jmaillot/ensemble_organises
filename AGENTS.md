@@ -284,6 +284,30 @@ variables du dépôt ne portent que des **noms** ; les valeurs vivent dans le
 `.env` de la stack, dans Vault, ou dans le gestionnaire de secrets de
 l'exploitant. Voir §2.6 et `docs/BACKEND.md` §6.4.
 
+#### I. Une absence affirmée est une affirmation
+
+Une documentation qui dit « ce n'est pas fait » est une **affirmation**, et
+elle se vérifie comme une autre. Trois fois dans cette campagne,
+`docs/BACKEND.md` a affirmé que le formulaire de tâche n'exposait pas le champ
+de rappel, et trois fois l'affirmation était fausse : `reminderAt` est au
+schéma Zod, saisi en `datetime-local`, et `saveTask` appelle `setTaskReminder`.
+Je l'ai recopiée dans §6.6, dans §13, et dans des messages de commit, sans
+ouvrir le fichier.
+
+Le pire n'est pas l'erreur : c'est qu'elle **dissuade**. Un lecteur qui croit
+le champ absent ne le cherche pas, et si le projet rouvre ce chantier il
+construira un champ déjà là. Une limite périmée coûte plus cher qu'une limite
+absente.
+
+La règle est donc la même que pour une assertion : ce que la prose affirme sans
+preuve, il faut l'ouvrir. Un `grep` sur le symbole — le nom du champ, le nom de
+la table, le nom de l'export — suffit, et prend dix secondes. Corriger ensuite
+dans **toutes** les copies, pas seulement dans celle qu'on a ouverte.
+
+Et l'inverse vaut autant : une affirmation que l'on **n'a pas** vérifiée ne
+s'écrit pas. « Non validé » et « absent » sont deux mots différents, et le
+second demande une preuve d'absence, ce qui est plus dur que l'inverse.
+
 ---
 
 ## 3. Architecture du projet

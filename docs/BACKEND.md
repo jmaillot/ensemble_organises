@@ -835,13 +835,16 @@ apprend à l'ignorer.
 #### Un rappel dû maintenant
 
 Le script ci-dessus sème son propre rappel et le supprime en sortie. La marche
-manuelle, pour un diagnostic ou pour un foyer sans abonnement réel, reste
-valable — mais elle n'attribue pas le rapport à son appel, et un job `pg_cron`
-peut consommer le rappel entre la semure et l'envoi.
+manuelle qui suit ne sert qu'au **diagnostic** : quand aucun appareil n'est
+abonné, donc quand le script refuse de s'exécuter. Elle est moins bonne que lui
+sur un point qui compte : elle n'attribue pas le rapport à son appel, et un job
+`pg_cron` peut consommer le rappel entre la semure et l'envoi.
 
-Le formulaire de tâche n'expose pas le champ de rappel, donc la ligne se crée en
-SQL. On la rattache à la tâche ouverte la plus récente, ce qui évite d'avoir à
-connaître un identifiant d'utilisateur :
+Le formulaire de tâche expose le champ de rappel — `reminderAt` est au schéma
+Zod, saisi en `datetime-local`, et `saveTask` appelle `setTaskReminder`. La ligne
+ne se crée donc **plus** par SQL en usage normal. La sémure ci-dessous est le
+moyen de la créer sans navigateur, en rattachant le rappel à la tâche ouverte la
+plus récente pour éviter d'avoir à connaître un identifiant d'utilisateur :
 
 ```sh
 sh scripts/psql.sh -c "
@@ -1252,9 +1255,9 @@ Functions, espace disque, expiration des certificats, résultat de
   réel, ce qui prouve la paire VAPID, l'abonnement, le chiffrement RFC 8291 et
   l'acceptation de la signature par le service Push. Le chemin des rappels
   (`eo-push-dispatch`) est **validé par un envoi réel, consommation comprise**.
-  Le rapport conservé vaut `{ notifications: 1,
-  delivered: 1, failed: 0, dropped: 0, consumed: 1 }`, et la ligne de rappel a
-  disparu de `public.task_reminders`. C'est ce second fait qui établit que
+  Le rapport conservé vaut
+  `{ notifications: 1, delivered: 1, failed: 0, dropped: 0, consumed: 1 }`, et la
+  ligne de rappel a disparu de `public.task_reminders`. C'est ce second fait qui établit que
   `consume_push_reminders` supprime bien, donc qu'un rappel ne reviendra pas
   quatre fois par heure. La validation est reproductible par
   `sh scripts/test-dispatch-push.sh`, qui sème son propre rappel et attribue le
@@ -1265,12 +1268,18 @@ Functions, espace disque, expiration des certificats, résultat de
     peut pas l'être par disparition de ligne, puisqu'un anniversaire n'a rien à
     consommer (§6.6).
 
-  Le formulaire de tâche n'expose pas encore le champ de rappel : `tasks` en
-  affiche un (`reminderTime`), mais rien ne le saisit. Un rappel ne peut donc
-  être créé que par SQL, et l'absence de ce champ est un manque du module
-  Tâches, pas de la chaîne push.
-
   La marche à suivre pour le chemin restant est en §6.6.
+
+* **Ce qui n'a jamais été exercé par un humain** : la chaîne est vérifiée de bout
+  en bout par le code et par `test-dispatch-push.sh`, et le formulaire de tâche
+  expose bien le champ de rappel — `reminderAt` au schéma Zod, saisie en
+  `datetime-local`, `saveTask` appelant `setTaskReminder`, et
+  `removeTask` nettoyant au passage. Ce qui n'a jamais eu lieu, c'est une
+  personne qui crée un rappel dans l'interface, reçoit la notification et clique
+  dessus. Le `notificationclick` du service worker est écrit et relu, jamais
+  exécuté. Un chemin dont chaque maillon est vérifié peut encore ne pas
+  s'emboîter : c'est le genre de fait que seule une main sur la souris établit,
+  et il ne se déduit pas des tests.
 * **Cadence des rappels** : `profiles.reminder_frequency` est enregistrée et
   affichée, mais **aucun envoi ne s'y conforme**. Les rappels sont unitaires,
   donc toujours immédiats ; la cadence ne pourra être appliquée qu'à un point de
