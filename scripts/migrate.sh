@@ -16,6 +16,11 @@
 #   sh scripts/migrate.sh               # depuis la racine du dépôt
 #   sh ../scripts/migrate.sh --status   # journal des migrations appliquées
 #
+# Les deux emplacements fonctionnent : les appels à `docker compose` passent par
+# `db_compose`, qui se place dans `supabase-project/`. Sans cela, un lancement
+# depuis la racine ne trouvait aucun fichier Compose et se concluait à tort que
+# le service `db` était arrêté.
+#
 # Prérequis : le service `db` démarré (sh run.sh start db). Les migrations qui
 # touchent au schéma `storage` exigent en plus le service `storage` démarré
 # (sh run.sh start db storage) : c'est lui qui crée ce schéma, pas nous.
@@ -33,14 +38,23 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
   exit 1
 fi
 
-if ! docker compose ps --status running --services 2>/dev/null | grep -qx "$DB_CONTAINER"; then
+# La connexion (utilisateur unix, rôle, base) et l'accès à la stack sont
+# centralisés : voir lib-db.sh. Le fichier ne fait qu'y DÉFINIR des fonctions,
+# il n'exécute rien — le sourcer avant le contrôle est donc sans effet de bord,
+# et c'est ce qui permet à `db_compose` d'être utilisé dans le contrôle.
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+
+# Deux échecs distincts, deux corrections distinctes : un runtime absent se
+# bootstrappe, un service arrêté se démarre. Les confondre envoyait démarrer
+# un conteneur déjà lancé.
+db_require_runtime || exit 1
+
+if ! db_compose ps --status running --services 2>/dev/null | grep -qx "$DB_CONTAINER"; then
   echo "migrate.sh: le service '$DB_CONTAINER' n'est pas démarré." >&2
   echo "           cd supabase-project && sh run.sh start $DB_CONTAINER" >&2
+  echo "           (ou 'sh run.sh start db storage' : 0010 a besoin du schéma storage)" >&2
   exit 1
 fi
-
-# La connexion (utilisateur unix, rôle, base) est centralisée : voir lib-db.sh.
-. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
 
 db_resolve
 

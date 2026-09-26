@@ -225,6 +225,19 @@ Ne jamais maintenir une seconde liste manuelle de fichiers Compose :
 
 ## 4. Migrations
 
+`scripts/migrate.sh` s'exécute depuis la racine du dépôt **ou** depuis
+`supabase-project/`. Tous les scripts d'exploitation passent par `db_compose`
+(`scripts/lib-db.sh`), qui se place dans le répertoire de la stack : sans cela,
+`docker compose` lancé depuis la racine ne trouve aucun fichier Compose — il n'y
+a que `compose.app.yaml`, que Docker ne reconnaît pas — et `ps --services` ne
+rend aucun nom. Le message affichait alors « le service db n'est pas démarré »
+alors que le conteneur tournait, ce qui envoyait démarrer un service déjà lancé.
+
+Un runtime absent et un service arrêté donnent désormais deux messages
+distincts, parce que les corrections ne sont pas les mêmes : `db_require_runtime`
+renvoie à `docs/BACKEND.md` §2, le second à `sh run.sh start db storage`.
+
+
 `supabase/migrations` est la source de vérité du schéma. Les fichiers sont
 appliqués dans l'ordre lexicographique, chacun dans sa propre transaction, puis
 journalisés dans `public.schema_migrations`.

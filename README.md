@@ -370,6 +370,12 @@ node scripts/screenshots.mjs http://127.0.0.1:4173 /accueil /taches
 
 ### Backend
 
+Ces scripts fonctionnent **depuis la racine du dépôt comme depuis
+`supabase-project/`** : leurs appels à `docker compose` passent par `db_compose`,
+qui se place dans le répertoire de la stack. L'inverse renvoyait « le service db
+n'est pas démarré » alors qu'il tournait, parce que `docker compose` ne cherche
+ses fichiers que dans le répertoire courant.
+
 ```bash
 sh scripts/migrate.sh --status        # migrations appliquées
 sh scripts/migrate.sh                 # appliquer

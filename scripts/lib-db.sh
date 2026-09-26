@@ -5,7 +5,7 @@
 # restore.sh). Elle n'exécute rien : elle définit `db_resolve`, `db_exec` et
 # `db_exec_as`.
 #
-# Trois pièges corrigés ici, rencontrés lors de la première exécution réelle :
+# Cinq pièges corrigés ici, rencontrés lors des premières exécutions réelles :
 #
 #   1. `docker compose exec` sans `-u` se connecte avec l'utilisateur système
 #      root, que l'authentification « peer » de PostgreSQL rejette. On exécute
@@ -17,15 +17,49 @@
 #      associée, et PostgREST/GoTrue s'y connectent. Migrer `-d postgres`
 #      créerait une base que personne n'utilise. On lit donc les valeurs
 #      réelles dans le conteneur, l'environnement de l'hôte restant prioritaire.
+#   4. `docker compose` sans `-f` ne cherche que dans le RÉPERTOIRE COURANT.
+#      Lancé depuis la racine du dépôt, il ne trouve aucun fichier Compose —
+#      il n'y a que `compose.app.yaml`, que Docker ne reconnaît pas — et
+#      `ps --services` ne rend aucun nom. Le message devenait alors « le
+#      service db n'est pas démarré », alors que le service tournait et que
+#      l'erreur venait du répertoire. Or `migrate.sh` docrait précisément
+#      l'inverse de ce qu'il fallait faire. Tous les appels passent donc par
+#      `db_compose`, qui se place dans `supabase-project/` : c'est là que
+#      vivent `docker-compose.yml` et le `.env` qui porte le `COMPOSE_FILE`
+#      enregistré par `sh run.sh config add traefik`.
+#   5. Un runtime absent et un service arrêté doivent être deux messages
+#      distincts : le premier se corrige en bootstrapant, le second en
+#      démarrant. `db_require_runtime` sépare les deux.
 #
 # Variables d'environnement reconnues :
-#   DB_CONTAINER  nom du service Compose (défaut : db)
-#   POSTGRES_USER rôle à utiliser (défaut : valeur du conteneur, sinon postgres)
-#   POSTGRES_DB   base à utiliser (défaut : valeur du conteneur, sinon postgres)
+#   DB_CONTAINER    nom du service Compose (défaut : db)
+#   EO_PROJECT_DIR  répertoire de la stack (défaut : supabase-project/)
+#   POSTGRES_USER   rôle à utiliser (défaut : valeur du conteneur, sinon postgres)
+#   POSTGRES_DB     base à utiliser (défaut : valeur du conteneur, sinon postgres)
+
+EO_PROJECT_DIR="${EO_PROJECT_DIR:-$(CDPATH='' cd -- "$(dirname -- "$0")/../supabase-project" 2>/dev/null && pwd || echo '')}"
+
+# `docker compose` dans le répertoire de la stack, quel que soit l'endroit
+# d'où le script est appelé. Un sous-shell : le répertoire courant de
+# l'appelant est restauré à la sortie, et rien ne dérive ensuite.
+db_compose() {
+  (cd "$EO_PROJECT_DIR" && docker compose "$@")
+}
+
+# Le runtime est-il présent ? Message distinct de « service arrêté ».
+db_require_runtime() {
+  if [ -z "$EO_PROJECT_DIR" ] || [ ! -f "$EO_PROJECT_DIR/docker-compose.yml" ]; then
+    echo "runtime absent : ${EO_PROJECT_DIR:-supabase-project}/docker-compose.yml est introuvable." >&2
+    echo "  La stack auto-hébergée doit être bootstrapée avant toute migration." >&2
+    echo "  Voir docs/BACKEND.md §2, ou le README §5.2." >&2
+    return 1
+  fi
+  return 0
+}
 
 # Valeur d'une variable d'environnement du conteneur, sans échouer si absente.
 db_printenv() {
-  docker compose exec -T "$DB_CONTAINER" printenv "$1" 2>/dev/null | tr -d '\r' | head -n 1 || true
+  db_compose exec -T "$DB_CONTAINER" printenv "$1" 2>/dev/null | tr -d '\r' | head -n 1 || true
 }
 
 # Résout le rôle et la base à utiliser, une seule fois, avant tout psql.
@@ -48,7 +82,7 @@ db_resolve() {
 
 # db_exec <args psql…> : psql dans le conteneur, sur le bon rôle et la bonne base.
 db_exec() {
-  docker compose exec -T -u postgres -e ON_ERROR_STOP=1 "$DB_CONTAINER" \
+  db_compose exec -T -u postgres -e ON_ERROR_STOP=1 "$DB_CONTAINER" \
     psql -v ON_ERROR_STOP=1 -X -U "$DB_USER_RESOLVED" -d "$DB_NAME_RESOLVED" "$@"
 }
 
@@ -56,5 +90,5 @@ db_exec() {
 db_exec_as() {
   run_as="$1"
   shift
-  docker compose exec -T -u "$run_as" -e ON_ERROR_STOP=1 "$DB_CONTAINER" "$@"
+  db_compose exec -T -u "$run_as" -e ON_ERROR_STOP=1 "$DB_CONTAINER" "$@"
 }

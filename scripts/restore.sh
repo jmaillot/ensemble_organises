@@ -55,7 +55,7 @@ if [ "$confirm" != "--confirm" ]; then
 fi
 
 echo "Arrêt des services dépendants (PostgREST, Realtime, Functions, Auth)…"
-docker compose stop rest realtime functions auth analytics 2>/dev/null || true
+db_compose stop rest realtime functions auth analytics 2>/dev/null || true
 
 echo "  · base de données"
 . "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"

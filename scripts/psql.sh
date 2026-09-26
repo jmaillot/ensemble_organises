@@ -24,13 +24,15 @@ set -eu
 
 DB_CONTAINER="${DB_CONTAINER:-db}"
 
-if ! docker compose ps --status running --services 2>/dev/null | grep -qx "$DB_CONTAINER"; then
+. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
+
+db_require_runtime || exit 1
+
+if ! db_compose ps --status running --services 2>/dev/null | grep -qx "$DB_CONTAINER"; then
   echo "psql.sh: le service '$DB_CONTAINER' n'est pas démarré." >&2
   echo "         cd supabase-project && sh run.sh start $DB_CONTAINER" >&2
   exit 1
 fi
-
-. "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
 
 db_resolve
 
