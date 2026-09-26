@@ -317,7 +317,28 @@ async function send(
     else consumedCount = Number(data ?? 0);
   }
 
-  return { notifications: notifications.length, delivered, failed, dropped, consumed: consumedCount };
+  const report = {
+    notifications: notifications.length,
+    delivered,
+    failed,
+    dropped,
+    consumed: consumedCount,
+  };
+
+  // Le RAPPORT EST JOURNALISÉ, y compris quand tout va bien.
+  //
+  // Sans cette ligne, un envoi réussi ne laissait AUCUNE trace : la fonction ne
+  // journalisait que les erreurs, et son retour partait vers pg_net, qui jette
+  // le corps de la réponse. La seule preuve d'une distribution restait alors
+  // dans `push_subscriptions` — invisible tant qu'on ne sait pas qu'il faut
+  // aller la chercher, et impossible à relier à un envoi précis quand plusieurs
+  // tournent en parallèle.
+  //
+  // Ce sont des compteurs, jamais un endpoint ni un message : la règle de
+  // non-divulgation ci-dessus vaut aussi pour les lignes de journalisation.
+  console.log('push-notify: rapport', report);
+
+  return report;
 }
 
 async function readDue(admin: SupabaseClient, scope: string, userId?: string) {
