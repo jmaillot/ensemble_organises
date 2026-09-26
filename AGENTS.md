@@ -159,11 +159,36 @@ révèle qu'à son premier appel, en production, quatre fois par heure.
 
 #### B. Le contrôle statique SQL
 
-`python3 scripts/check-sql-statique.py` — vert avant tout commit. Six
+`python3 scripts/check-sql-statique.py` — vert avant tout commit. Sept
 vérifications : nom de table non qualifié sous un `search_path` vide, CTE qui se
 rejoint lui-même, littéral laissé ouvert en fin de ligne, référence non qualifiée
 à une colonne de `returns table`, types des deux arguments de `testkit.eq`,
-variable plpgsql dans une chaîne SQL exécutée par `testkit.count()`.
+variable plpgsql dans une chaîne SQL exécutée par `testkit.count()`, et CTE
+récursif sous un `with` qui n'est pas `recursive`.
+
+Un mode de défaillance plus insidieux que les sept autres : **un contrôle qui
+ne regarde rien**. Il est vert, il ne fait aucun bruit, et il ne peut rien
+voir. Trois motifs en étaient responsables, tous de la même famille — une
+forme **légitime** que le patron ne couvrait pas, et dont l'absence ne se
+signale par aucune erreur :
+* le découpage des CTE s'arrêtait au premier `(`, donc un CTE portant une
+  **liste de colonnes** — `fermeture (nom) as (…)` — n'était pas reconnu ;
+* il ne reconnaissait pas le mot `recursive`, donc un CTE récursif
+  disparaissait de la carte ;
+* et le plus grave : il comptait les parenthèses **à l'intérieur des
+  littéraux**. Un motif de regex en contient presque toujours, et deux
+  d'entre elles ne s'annulent pas. La profondeur ne redescendait plus, le
+  scanner avalait tout le fichier dans un seul CTE, et le contrôle 2
+  cherchait une auto-référence dans une structure jamais vue.
+
+Le repère tient en une question : *ce contrôle visait-il un défaut que
+j'ai réellement commis, et ne l'a-t-il pas vu ?* Un contrôle se prouve sur
+un cas qui doit échouer — et sur **le cas qu'on a soi-même écrit**.
+
+Le même raisonnement vaut pour un shell : une fonction faisait
+`db_exec | tr | head`, et comme `sh` n'a pas de `pipefail`, un `psql` en échec
+donnait une chaîne vide et un succès. Le pipeline entoure une chaîne déjà
+obtenue, jamais la commande.
 
 Trois règles qui rendent le contrôle digne de confiance :
 

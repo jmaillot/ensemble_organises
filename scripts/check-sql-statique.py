@@ -213,52 +213,180 @@ def _sans_commentes(texte: str) -> str:
     return "".join(out)
 
 
-def _decouper_ctes(corps: str) -> dict[str, str]:
-    """Renvoie {nom de CTE: corps du CTE} pour la clause `with` de premier niveau.
+def _masque_litteraux(texte: str) -> str:
+    r"""Remplace le CONTENU des littéraux simples par des espaces.
+
+    Longueur CONSERVÉE, sauts de ligne conservés : le masque sert à compter des
+    parenthèses, et il faut que les offsets et les numéros de ligne restent
+    valides.
+
+    Les dollar-quotes ne sont PAS masqués, et c'est délibéré
+    ------------------------------------------------------
+    Un corps `$$ … $$` est du SQL qu'on veut justement inspecter : les CTE des
+    tests vivent là. Le masquer viderait la recherche, et le contrôle
+    retournerait zéro défaut sur un fichier qui en compte un — exactement ce que
+    la docstring de `_litteraux_ouverts` reproche à un contrôleur qui saute le
+    corps. Le premier jet masquait les deux, et la carte de CTE ressortait vide.
+
+    Pourquoi masquer les littéraux simples, quand même
+    ---------------------------------------------------
+    Le découpage des CTE compte les parenthèses caractère par caractère, et un
+    littéral peut en contenir sans qu'elles s'annulent. Un motif de regex en
+    contient presque toujours :
+
+        'private\.(\w+)\s*\(', 'g'
+
+    Le `(` de `(\w+)` et le `\(` augmentent la profondeur, et rien ne la
+    redescend. Le scanner perd le fil, ne referme plus la parenthèse du CTE, et
+    engloutit le reste du fichier dans le dernier CTE reconnu. C'est un trou
+    ANCIEN et silencieux : le contrôle 2 cherche bien une auto-référence, et il
+    n'en trouvait aucune, parce que le CTE qui la contient n'avait jamais été
+    reconnu. Les contrôles suivants n'existaient pas encore.
+    """
+    out = list(texte)
+    i, n = 0, len(texte)
+    while i < n:
+        if texte[i] != "'":
+            i += 1
+            continue
+        i += 1                                   # guillemet ouvrant
+        while i < n:
+            if texte[i] == "'":
+                if i + 1 < n and texte[i + 1] == "'":   # '' échappé
+                    out[i] = " "
+                    out[i + 1] = " "
+                    i += 2
+                    continue
+                i += 1                           # guillemet fermant
+                break
+            if texte[i] == "\n":                 # SQL interdit un littéral multiligne
+                break
+            out[i] = " "
+            i += 1
+    return "".join(out)
+
+
+def _decouper_ctes(corps: str) -> tuple[dict[str, str], bool]:
+    """Renvoie ({nom de CTE: corps du CTE}, clause récursive) pour le `with`.
 
     Le découpage se fait sur les virgules de profondeur 0, chaque parenthèse
     étant consommée par comptage. C'est suffisant pour les requêtes de ces
     migrations, où une virgule entre CTE n'apparaît jamais dans un littéral.
     """
-    m = re.search(r"\bwith\b", corps, re.I)
+    # Le comptage des parentheses se fait sur le masque : un littereal peut
+    # contenir des parentheses non appariees, et sans cela le scanner perd le fil
+    # et engloutit le reste du fichier dans un seul CTE. Les NOMS et les CORPS
+    # sont ensuite repris du texte d'origine.
+    masque = _masque_litteraux(corps)
+
+    m = re.search(r"\bwith\b", masque, re.I)
     if not m:
-        return {}
+        return {}, False
+
+    # `with recursive a as (…), b as (…)`. Le mot `recursive` se glisse entre
+    # `with` et le premier nom, et il fait echouer le découpage : la regex de
+    # nom attend `nom as (`, donc `recursive visees as (` ne matche pas, le CTE
+    # est silencieusement perdu, et un CTE recursif devient invisible aux
+    # controles. C'est ce qui laissait passer l'oubli du mot-cle.
+    debut = m.end()                       # début du nom du premier CTE
+    while debut < len(masque) and masque[debut].isspace():
+        debut += 1
+    recursif = masque[debut:debut + 9].lower() == "recursive"
+    if recursif:
+        debut += len("recursive")
+        while debut < len(masque) and masque[debut].isspace():
+            debut += 1
 
     ctes: dict[str, str] = {}
-    debut = m.end()                       # début du nom du premier CTE
+    n = len(masque)
     i = debut
-    n = len(corps)
+
+    # Le nom et la parenthèse DU CORPS sont reconnus d'un bloc, et non en
+    # cherchant le premier `(` du texte. Avec une liste de colonnes — `fermeture
+    # (nom) as (…)` — le premier `(` est celui de la liste, la coupe s'arrêtait
+    # là, et le CTE était perdu sans un bruit. C'est le meme piege que le mot
+    # `recursive` et que les parentheses dans un littereal : une forme
+    # legitime que le patron ne couvrait pas, et dont l'absence ne se signale
+    # par aucune erreur.
+    RE_TETE_CTE = re.compile(
+        r"\s*([\w]+)\s*(?:\([^)]*\)\s*)?as\s*\(", re.I | re.S)
+
     while i < n:
-        while i < n and corps[i] != "(":
-            if corps[i] == ";":
-                return ctes
-            i += 1
-        if i >= n:
+        tete = RE_TETE_CTE.match(corps, i)
+        if not tete:
+            # Plus de CTE a cet endroit : soit la clause est finie, soit le
+            # decoupage a perdu le fil. Dans les deux cas, on s'arrete.
             break
+        nom = tete.group(1).lower()
+        ouverture = tete.end() - 1           # le `(` du corps du CTE
         profondeur = 0
-        while i < n:
-            if corps[i] == "(":
+        j = ouverture
+        while j < n:
+            if masque[j] == "(":
                 profondeur += 1
-            elif corps[i] == ")":
+            elif masque[j] == ")":
                 profondeur -= 1
                 if profondeur == 0:
                     break
+            j += 1
+        ctes[nom] = corps[ouverture + 1 : j]
+        i = j + 1
+        while i < n and masque[i] in " \t\n":
             i += 1
-        i += 1                             # juste après la parenthèse fermante
-        tete = corps[debut:i]              # « bounds as ( … ) »
-        nom = re.match(r"\s*([\w]+)\s+as\s*\(", tete, re.I | re.S)
-        if nom:
-            ctes[nom.group(1).lower()] = tete[tete.index("(") + 1 : -1]
-        while i < n and corps[i] in " \t\n":
+        if i < n and masque[i] == ",":
             i += 1
-        if i < n and corps[i] == ",":
-            i += 1
-            while i < n and corps[i] in " \t\n":
+            while i < n and masque[i] in " \t\n":
                 i += 1
             debut = i
             continue
         break
-    return ctes
+    return ctes, recursif
+
+
+def _clauses_with(texte: str) -> list[dict[str, str]]:
+    """Tous les CTE de TOUTES les clauses `with` d'un texte, avec leur drapeau.
+
+    `_decouper_ctes` ne traite que la PREMIÈRE clause, parce qu'elle reçoit le
+    corps d'une seule fonction. Un fichier de test en contient plusieurs, et
+    n'analyser que la première serait un contrôle qui saute en silence — le même
+    défaut que celui qu'il est censé voir.
+
+    Chaque clause est donc analysée depuis sa propre position. C'est inefface,
+    et ce n'est pas un critère ici : un fichier de test fait quelques centaines
+    de lignes, et la lisibilité vaut mieux qu'un index de parenthèses.
+    """
+    sans = _sans_commentes(texte)
+    clauses = []
+    for m in re.finditer(r"\bwith\b", sans, re.I):
+        ctes, recursif = _decouper_ctes(sans[m.start():])
+        if ctes:
+            clauses.append({"ctes": ctes, "recursif": recursif})
+    return clauses
+
+
+def _cte_recursif_illegal(texte: str) -> list[str]:
+    """CTE qui se cite lui-même sous un `with` qui n'est pas `recursive`.
+
+    PostgreSQL répond alors :
+
+        There is a WITH item named "x", but it cannot be referenced from this
+        part of the query.
+        HINT: Use WITH RECURSIVE, or re-order the WITH items to remove forward
+              references.
+
+    et seulement à l'exécution — la migration s'applique, le reste de la suite
+    passe. Les deux causes sont le même défaut SQL, et le message doit nommer les
+    deux : un CTE qui masque une table du même nom (AGENTS.md §2.7 A.4), et un
+    CTE réellement récursif dont on a oublié le mot-clé.
+    """
+    trouves: list[str] = []
+    for clause in _clauses_with(texte):
+        if clause["recursif"]:
+            continue
+        for nom, corps_cte in clause["ctes"].items():
+            if re.search(rf"\b(?:from|join)\s+{re.escape(nom)}\b", corps_cte, re.I):
+                trouves.append(nom)
+    return sorted(set(trouves))
 
 
 def _controler(corps: str) -> tuple[list[str], list[str]]:
@@ -269,12 +397,17 @@ def _controler(corps: str) -> tuple[list[str], list[str]]:
     sinon analysée comme si c'était du SQL.
     """
     corps = _sans_commentes(corps)
-    ctes = _decouper_ctes(corps)
+    ctes, recursif = _decouper_ctes(corps)
 
+    # Un CTE qui se cite LUI-MÊME n'est un défaut que si la clause n'est pas
+    # `recursive`. Sous `with recursive`, c'est la façon normale d'écrire une
+    # fermeture transitive — et le condamner reviendrait à interdire le motif
+    # legitime pour attraper le motif fautif.
     auto_refs: list[str] = []
-    for nom, corps_cte in ctes.items():
-        if re.search(rf"\b(?:from|join)\s+{re.escape(nom)}\b", corps_cte, re.I):
-            auto_refs.append(nom)
+    if not recursif:
+        for nom, corps_cte in ctes.items():
+            if re.search(rf"\b(?:from|join)\s+{re.escape(nom)}\b", corps_cte, re.I):
+                auto_refs.append(nom)
 
     non_qualifies: list[str] = []
     for m in RE_TABLE.finditer(corps):
@@ -679,36 +812,6 @@ def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, 
         dernier[d[4]] = i
 
     return [(*d[:4], dernier[d[4]] == i) for i, d in enumerate(toutes)]
-
-
-def _controler(corps: str) -> tuple[list[str], list[str]]:
-    """Renvoie (noms non qualifiés, auto-références de CTE) pour un corps."""
-    corps = _sans_commentes(corps)
-    ctes = _decouper_ctes(corps)
-
-    auto_refs: list[str] = []
-    for nom, corps_cte in ctes.items():
-        if re.search(rf"\b(?:from|join)\s+{re.escape(nom)}\b", corps_cte, re.I):
-            auto_refs.append(nom)
-
-    non_qualifies: list[str] = []
-    for m in RE_TABLE.finditer(corps):
-        nom, parenthesis = m.group(1), m.group(2)
-        if "." in nom:                       # déjà qualifié
-            continue
-        if nom.lower() in CONNECTEURS:       # `from lateral (…)`, `from unnest(…)`
-            continue
-        if nom.lower() in ctes:             # un CTE de la clause `with`
-            continue
-        if RE_VARIABLE.match(nom):           # `extract(dow from p_day)`
-            continue
-        if parenthesis:                      # `from une_fonction(…)`
-            continue
-        non_qualifies.append(f"{nom} (ligne {corps[: m.start()].count(chr(10)) + 1})")
-
-    return non_qualifies, sorted(auto_refs)
-
-
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     migrations = sorted(MIGRATIONS.glob(f"*{args[0]}*.sql")) if args else sorted(MIGRATIONS.glob("*.sql"))
@@ -786,6 +889,18 @@ def main() -> int:
         defauts.extend(_conflits_de_types(f.read_text(), f.name))
         defauts.extend(_variables_dans_sql_dynamique(f.read_text(), f.name))
         defauts.extend(_appels_globaux_dans_un_bloc(f.read_text(), f.name))
+        illegaux = _cte_recursif_illegal(f.read_text())
+        if illegaux:
+            defauts.append(
+                f"{f.name}\n"
+                f"      CTE qui se cite lui-même sous un `with` non récursif : "
+                f"{', '.join(illegaux)}\n"
+                f"      → PostgreSQL refuse un « recursive reference to query », et"
+                f" seulement\n        à l'exécution : le fichier s'applique, puis la"
+                f" première suite\n        qui l'exécute échoue. Soit le CTE masque"
+                f" une table du même\n        nom, soit il est récursif et il manque"
+                f" `recursive` après `with`."
+            )
 
     if obsolete:
         print("Définitions dépassées, sans effet sur la base (corrigées plus loin) :")

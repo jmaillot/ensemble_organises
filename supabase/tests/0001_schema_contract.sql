@@ -408,7 +408,7 @@ $$;
   declare
     v_injustifiees text[];
   begin
-    with visees as (
+    with recursive visees as (
       select p.proname,
              p.prorettype,
              p.prosrc,
