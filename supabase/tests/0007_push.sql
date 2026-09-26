@@ -326,8 +326,15 @@ begin
 
   -- Les préférences coupent l'envoi, et une seule catégorie à la fois.
   update public.profiles set task_reminders_enabled = false where id = v_alice;
+  -- `format(…, %L)` et non une chaîne littérale. Une comparaison sur une
+  -- colonne `jsonb` demande elle-même des apostrophes ; une seule non doublée
+  -- ne ferme pas la chaîne, elle crée un TROISIÈME argument à `count()`, et
+  -- l'échec porte alors sur une ARITÉ — très loin de la cause réelle. C'est la
+  -- forme déjà employée par `0001_schema_contract.sql` et `0002_rls_isolation.sql`.
   perform testkit.eq(
-    testkit.count('select 1 from jsonb_array_elements(public.due_push_notifications('rappels', now(), null)) n where n.value ->> 'url' = '/taches'),
+    testkit.count(format(
+      'select 1 from jsonb_array_elements(public.due_push_notifications(%L, now(), null)) n where n.value ->> %L = %L',
+      'rappels', 'url', '/taches')),
     0::bigint,
     'un membre qui a coupé les rappels de tâches n''en reçoit plus'
   );
@@ -400,6 +407,16 @@ declare
 begin
   select user_id into v_alice from testkit.fx where key = 'camille';
 
+  -- La section 2 a terminé sur ZERO abonnement : le seul endpoint créé a été
+  -- transféré à Thomas puis révoqué. Toute la suite ci-dessous porte sur « un
+  -- appareil enregistré pour Camille », donc cet appareil est créé ICI, et pas
+  -- laissé pour compte. Sans cette ligne, les identifiants lus plus bas
+  -- vaudraient NULL, le rapport ne compterait rien, et la première assertion de
+  -- cette section échouerait — pour une raison qui n'a rien à voir avec ce
+  -- qu'elle vérifie.
+  perform public.register_push_subscription(
+    v_alice, testkit.push_endpoint('a1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Chrome');
+
   v_before := testkit.count('select 1 from public.task_reminders');
   perform testkit.eq(public.consume_push_reminders('[]'::jsonb), 0, 'une liste vide ne consomme rien');
   perform testkit.eq(public.consume_push_reminders(null), 0, 'une absence de liste ne consomme rien');
@@ -447,7 +464,8 @@ begin
   ));
   perform testkit.eq(v_report ->> 'dropped', '1', 'un 410 supprime l''abonnement');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice), 0::bigint',
+    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    0::bigint,
     'l''abonnement mort a bien disparu'
   );
 
@@ -459,23 +477,33 @@ begin
   ));
   perform testkit.eq(v_report ->> 'failed', '1', 'une erreur passagère est comptée comme échec');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice), 1::bigint',
+    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    1::bigint,
     'une erreur passagère conserve l''abonnement'
   );
 
-  -- Au dixième échec, l'appareil deserté est retiré.
+  -- Au dixième échec, l'appareil deserté est retiré. Il y en a UN au compteur
+  -- depuis le 503 ci-dessus : il en faut donc NEUF de plus, pas un seul. Un
+  -- appel unique n'aurait porté le compteur qu'à 2 et l'abonnement aurait
+  -- survécu — l'assertion aurait échoué en donnant à croire à un seuil faux.
   perform public.record_push_deliveries(
-    (select jsonb_agg(jsonb_build_object('id', id, 'delivered', false, 'status', 503))
-       from public.push_subscriptions where user_id = v_alice),
+    (select jsonb_agg(jsonb_build_object('id', s.id, 'delivered', false, 'status', 503) order by g.n)
+       from generate_series(1, 9) as g(n)
+       cross join (select id from public.push_subscriptions where user_id = v_alice) as s),
     10);
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice), 0::bigint',
+    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    0::bigint,
     'un appareil qui échoue dix fois de suite est retiré'
   );
 
-  -- Un identifiant inconnu ne fait pas échouer le rapport.
+  -- Un identifiant inconnu ne fait pas échouer le rapport. Il est TOUT DE
+  -- MÊME compté comme distribué : le rapport décrit les envois tentés, et la
+  -- ligne disparue n'a plus personne à qui l'annoncer. C'est vérifié ici pour
+  -- que le comportement soit au moins connu, pas parce qu'il serait souhaitable.
   v_report := public.record_push_deliveries('[{"id":"push_inexistant","delivered":true,"status":201}]'::jsonb);
-  perform testkit.eq(v_report ->> 'delivered', '1', 'un rapport sur un abonnement déjà supprimé reste sans erreur');
+  perform testkit.eq(v_report ->> 'delivered', '1',
+    'un rapport sur un abonnement déjà supprimé reste sans erreur, et compte la tentative');
 
   -- Le seuil est paramétrable, et un seuil nul ne devient pas « zéro échec ».
   perform public.register_push_subscription(
@@ -484,7 +512,8 @@ begin
     jsonb_build_object('id', (select id from public.push_subscriptions where user_id = v_alice), 'delivered', false, 'status', 503)
   ), 0);
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice), 0::bigint,
+    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    0::bigint,
     'un seuil nul signifie « au premier échec », pas « jamais »'
   );
 end;
@@ -512,7 +541,8 @@ begin
   perform testkit.eq(private.prune_inactive_push_subscriptions(), 1,
     'un abonnement sans succès depuis six mois est purgé');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where endpoint = testkit.push_endpoint('recent')), 1::bigint,
+    testkit.count(format('select 1 from public.push_subscriptions where endpoint = %L', testkit.push_endpoint('recent'))),
+    1::bigint,
     'un abonnement récent est conservé'
   );
 end;
