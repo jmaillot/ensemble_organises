@@ -39,6 +39,24 @@
 
 EO_PROJECT_DIR="${EO_PROJECT_DIR:-$(CDPATH='' cd -- "$(dirname -- "$0")/../supabase-project" 2>/dev/null && pwd || echo '')}"
 
+# Le défaut documenté PLUS HAUT, appliqué ici.
+#
+# Six scripts définissent eux-mêmes `DB_CONTAINER="${DB_CONTAINER:-db}"` avant
+# de sourcer ce fichier, et ce défaut n'était donc jamais exercé par la
+# bibliothèque. Le septième l'a omis : son en-tête documentait la variable, la
+# ligne d'initialisation manquait, et le script est mort sur
+# `DB_CONTAINER: parameter not set` — à la ligne 44, avant tout le reste.
+#
+# Le défaut est donc ici, et pas chez l'appelant. Une bibliothèque qui annonce
+# un défaut dans son en-tête doit l'appliquer : sinon chaque nouveau script
+# porte à recopier une ligne, et l'oubli ne se voit qu'à l'exécution.
+#
+# Idem pour `DB_USER_RESOLVED` et `DB_NAME_RESOLVED` : ils ne sont pas définis
+# ici, mais `db_resolve` les exporte avant tout `db_exec`, et il est appelé par
+# chaque script. Un appelant qui n'appelle pas `db_resolve` n'a rien à
+# exécuter de toute façon.
+DB_CONTAINER="${DB_CONTAINER:-db}"
+
 # `docker compose` dans le répertoire de la stack, quel que soit l'endroit
 # d'où le script est appelé. Un sous-shell : le répertoire courant de
 # l'appelant est restauré à la sortie, et rien ne dérive ensuite.
