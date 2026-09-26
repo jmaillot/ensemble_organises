@@ -209,6 +209,28 @@ l'appelant. C'est le cas de `db_printenv`.
    doivent être du même type. Et `testkit.count('…')` exécute dans une fonction
    séparée : une variable du bloc appelant n'y existe pas.
 
+6. **Une assertion qui lit le CODE comme du texte est un instrument
+   faible.** `pg_get_functiondef(…) like '%…%'` est le moyen de vérifier un
+   contrat qu'aucune assertion comportementale ne couvre — mais le `%` franchit
+   les instructions. Un motif trop lâche est satisfait par du code correct, ou
+   échoue à raison ; dans les deux cas c'est du bruit, et du bruit dans une
+   suite de tests s'apprend à être ignoré.
+
+   Trois règles, apprises de quatre faux positifs :
+
+   * **ancre sur le littéral, pas sur un identifiant.** `like '%''apikey'', v_key%'`
+     vérifie une présence précise ; `not like '%v_key%||%functions/v1%'`
+     matchait le `v_key` d'une déclaration de variable et le `||` d'une autre
+     instruction, donc à cheval sur les deux ;
+   * **quand il faut viser une ligne, utilise un regex** —
+     `!~ '(?s)url := [^\n]*v_key'` ancre sur la seule ligne qui porte
+     l'instruction, ce qui est la propriété recherchée ;
+   * **si la propriété ne s'exprime pas ainsi, supprime l'assertion.** Elle
+     serait alors incapable d'échouer, donc incapable de servir.
+
+   Un test qui ne peut pas échouer n'est pas un test : c'est un commentaire
+   qui coûte une exécution.
+
 #### E. Corriger la classe, pas l'instance
 
 Devant un défaut, poser deux questions : « comment corriger celui-ci » **et**

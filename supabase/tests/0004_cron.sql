@@ -276,9 +276,19 @@ select testkit.ok(
 
 -- Et le secret ne doit se trouver ni dans l'URL, ni dans un corps de message :
 -- les deux sont journalisés par pg_net, et conservés en base.
+--
+-- Un REGEX, et non un `like`. Le premier jet utilisait
+-- `not like '%v_key%||%functions/v1%'`, qui matchait à cheval sur deux
+-- instructions : le `v_key` de la DÉCLARATION de variable, puis le `||` de
+-- l'URL, plus loin. Le motif était donc satisfaite par le code correct, et
+-- l'assertion échouait à raison. `[^
+]*` ancre le motif sur la seule ligne
+-- qui porte l'instruction — c'est la propriété qu'on veut vérifier.
 select testkit.ok(
-  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%v_key%||%functions/v1%'
-  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%body := %v_key%',
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
+      !~ '(?s)url := [^\n]*v_key'
+  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
+      !~ '(?s)body := [^\n]*v_key',
   'le secret ne transite ni par l''URL ni par le corps de la requête');
 
 -- Sur une instance qui a pg_net, le dispatch ne doit plus être inerte. La suite
