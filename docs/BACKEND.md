@@ -825,30 +825,38 @@ Trois lectures, et une seule compte :
 | Résultat | Lecture |
 |---|---|
 | `due = 0` | aucune notification n'a d'abonné, ou aucun rappel n'est dans la fenêtre de 24 h |
-| `due = 1`, `dispatched = true`, et **la ligne de rappel a disparu** | le chemin est validé, consommation comprise |
-| `due = 1`, `dispatched = true`, et la ligne est **toujours là** | l'envoi est passé mais la consommation non : `consume_push_reminders` n'a rien supprimé, et le même rappel reviendra au prochain passage |
+| `due = 1`, `dispatched = true`, **la ligne a disparu** | le chemin est validé, consommation comprise |
+| `due = 1`, `dispatched = true`, **la ligne est toujours là** | l'envoi est passé mais la consommation non : `consume_push_reminders` n'a rien supprimé, et le même rappel reviendra au prochain passage |
 | `due = 1`, `dispatched = false` | un secret manque dans Vault, ou l'Edge Function est injoignable — `sh scripts/set-push-secrets.sh --check` |
 
-Vérifier la disparition :
+**`dispatched = true` ne veut pas dire « distribué ».** La valeur signifie que
+`net.http_post` a été **mis en file d'attente** par pg_net, et rien de plus.
+L'envoi se fait ensuite, dans un tour de boucle : la base ne fait qu'appeler
+`push-notify`, et c'est l'Edge Function qui chiffre, envoie, puis appelle
+`consume_push_reminders`. La ligne de rappel disparaît donc **après** la
+commande, pas pendant.
+
+Vérifier trop tôt lit donc un faux échec. Attendre, puis vérifier :
 
 ```sh
+sleep 20
 sh scripts/psql.sh -c "select count(*) from public.task_reminders;"
 ```
 
-C'est le seul contrôle qui distingue les deux derniers cas du tableau. Sans
-lui, un envoi réussi et un rappel qui revient se ressemblent.
+C'est aussi pour cela que la **disparition** est le seul contrôle qui compte :
+elle ne peut venir que de l'Edge Function, donc elle prouve que toute la boucle
+s'est refermée. Un `dispatched = true` sans elle ne prouve que la moitié — que
+la base a su appeler sa propre fonction.
 
-#### Le compteur d'échecs suit-il ?
+Et la trace du rapport de livraison, qui vient du même endroit :
 
 ```sh
-sh scripts/psql.sh -c "
-  select last_status, failure_count, last_success_at is not null as a_reussi
-    from public.push_subscriptions;"
+cd supabase-project && docker compose logs --tail 40 functions && cd ..
 ```
 
-`last_status = 201` et `failure_count = 0` après un envoi réussi : c'est la
-décision de suppression qui se prend sur ces deux colonnes, pas sur le journal de
-la fonction.
+`push-notify` journalise une ligne par envoi impossible ou par refus de rapport,
+et renvoie `{ notifications, delivered, failed, dropped, consumed }`. C'est ce
+`consumed` qui doit valoir 1.
 
 #### Le chemin anniversaires
 
