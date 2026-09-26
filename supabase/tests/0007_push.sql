@@ -38,6 +38,26 @@ as $$
   select 'D' || repeat('e', 21);
 $$;
 
+-- Les endpoints de ce fichier sont reconnaissables, et il le faut.
+--
+-- `testkit.push_endpoint()` termine l'URL par `repeat('a', 100 - length(suffix))`
+-- — donc par au moins 95 « a », les suffixes du fichier ayant de 2 à 5
+-- caractères. Aucun endpoint réel n'a cette forme : ceux de FCM, d'Autopush ou
+-- d'Apple sont des chemins opaques.
+--
+-- C'est ce qui permet de compter les lignes du test SANS supposer que la base
+-- est vide. La suite a échoué sur une base qui contenait l'abonnement réel du
+-- poste de recette : six assertions comptaient la table entière et voyaient 2
+-- au lieu de 1. Elles ne testaient rien de faux — elles testaient l'absence de
+-- données, ce qui revient à ne rien tester.
+create or replace function testkit.push_endpoint_owns(p_endpoint text)
+returns boolean
+language sql
+immutable
+as $$
+  select p_endpoint ~ 'a{50,}$';
+$$;
+
 -- ===========================================================================
 -- 1. La table est inaccessible au client
 -- ===========================================================================
@@ -104,7 +124,8 @@ begin
     v_camille, testkit.push_endpoint('c1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.ok(v_result ->> 'id' is not null, 'l''abonnement renvoie son identifiant');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'un abonnement enregistré existe en base'
   );
@@ -114,7 +135,8 @@ begin
   v_result := public.register_push_subscription(
     v_camille, testkit.push_endpoint('c1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'une réinscription identique ne duplique pas l''abonnement'
   );
@@ -123,7 +145,8 @@ begin
   perform public.register_push_subscription(
     v_camille, testkit.push_endpoint('c1'), 'E' || repeat('f', 86), testkit.push_auth_secret(), null, 'Firefox sur Linux');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'un renouvellement de clés met à jour l''abonnement existant'
   );
@@ -160,14 +183,16 @@ begin
   perform testkit.eq(public.remove_push_subscription(v_camille, testkit.push_endpoint('c1')), false,
     'on ne révoque pas l''appareil d''un autre membre');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     1::bigint,
     'l''appareil du membre est intact après une révocation étrangère'
   );
   perform testkit.eq(public.remove_push_subscription(v_thomas, testkit.push_endpoint('c1')), true,
     'le propriétaire révoque son appareil');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     0::bigint,
     'l''abonnement révoqué a disparu'
   );
@@ -199,7 +224,8 @@ begin
     testkit.push_endpoint('x1'), testkit.push_p256dh(), testkit.push_auth_secret()),
     'un appel sans acteur est refusé : l''identifiant ne se devine pas');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions'),
+    testkit.count('select 1 from public.push_subscriptions
+      where testkit.push_endpoint_owns(endpoint)'),
     0::bigint,
     'aucun des appels refusés n''a laissé de trace'
   );

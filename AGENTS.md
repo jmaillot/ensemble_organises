@@ -187,6 +187,19 @@ l'appelant. C'est le cas de `db_printenv`.
    une base vide ; la règle est presque toujours *par foyer*. Sur une base
    contenant des données réelles, une assertion non bornée échoue pour une
    raison qui n'a rien à voir avec ce qu'elle vérifie.
+
+   Le mécanisme mérite d'être connu, parce qu'il distingue une assertion
+   fragile d'une assertion correcte qui lui ressemble : **le rôle courant**. En
+   `authenticated`, la RLS borne déjà la requête au foyer de l'acteur, et les
+   données d'un autre foyer sont invisibles — un comptage non borné y est donc
+   correct. En `postgres`, la RLS est court-circuitée : la table entière est
+   visible, et le comptage doit être borné à la main. `0002` et `0003` comptent
+   en `authenticated` et peuvent se permettre des totaux ; `0007` compte en
+   `postgres` et doit borner chaque assertion.
+
+   L'appartenance se prouve par une marque reconnaissable dans les données
+   d'essai — ici, un endpoint qui se termine par un long bloc de `a` — plutôt
+   que par un identifiant d'objet, que le test ne connaît pas à l'avance.
 3. **Aucune tautologie.** `count(*) >= 0`, `x is not null` sur une colonne
    `not null`, `expect_true(true)` : vertes sans rien vérifier. Une assertion
    fausse n'est pas moins fausse qu'une assertion absente.
