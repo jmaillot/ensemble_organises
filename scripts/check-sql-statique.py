@@ -40,6 +40,12 @@ Les vérifications
    correction est un sous-requête paramétré, pas une interpolation.
    `format(… %L …)` est en revanche légitime : il produit un littéral, et c'est
    exactement ce que ces tests veulent.
+7. APPEL NON BORNÉ À UNE NOTIFICATION GLOBALE — `due_push_notifications` couvre
+   tous les foyers, par conception : c'est ce qu'un job pg_cron doit faire. Son
+   paramètre `p_user_id` n'a d'effet que sur la portée `test`. Un appel direct
+   depuis un bloc `do` avec une portée globale lit donc les données de la base
+   entière, et l'assertion échoue — ou pire, passe pour la mauvaise raison —
+   dès qu'un foyer réel a une notification due.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -590,6 +596,58 @@ def _arguments_de_primer_niveau(s: str) -> list[str]:
     return [a.strip() for a in out]
 
 
+RE_APPEL_GLOBAL = re.compile(
+    # `[^;]{0,80}?` et NON `[^)]*` : ce dernier ne peut pas franchir le `)` de
+    # `now()`, et le motif ne trouvait donc rien. Le motif littéral est le lieu
+    # du correctif que ce contrôle doit empêcher.
+    r"due_push_notifications\s*\(\s*'(rappels|anniversaires)'[^;]{0,80}?null",
+    re.I,
+)
+
+
+def _appels_globaux_dans_un_bloc(texte: str, nom_fichier: str) -> list[str]:
+    """Appels à une portée globale faits depuis un bloc `do`, donc non bornés.
+
+    `public.due_push_notifications` est GLOBALE pour les portées `rappels` et
+    `anniversaires` : c'est ce qu'un job pg_cron doit faire, et son paramètre
+    `p_user_id` n'a d'effet que sur la portée `test`. Un test qui l'appelle
+    directement lit donc les notifications de tous les foyers.
+
+    Ce n'est pas une fragilité hypotheticale : la suite `0007_push.sql` a échoué
+    deux fois de la sorte sur la base de recette, dont une fois sur une
+    assertion `exists` déjà satisfaite par une notification réelle — donc verte
+    pour la mauvaise raison.
+
+    Seuls les appels faits depuis un bloc `do $$ … $$` sont signalés. Le filtrage
+    passe par un helper — lui-même une `create function` — reste permis, et c'est
+    la forme à laquelle les assertions doivent passer.
+
+    CE QUE CE CONTRÔLE NE COUVRE PAS, et qu'il faut savoir : la forme
+    `testkit.count(format('… due_push_notifications(%L, now(), null) …', 'rappels', …))`,
+    où la portée est un `%L` et non un littéral. Elle est réelle — c'est par elle
+    que `0007_push.sql` a échoué une seconde fois — et elle n'est pas vue ici :
+    résoudre les arguments d'un `format` demanderait de l'évaluer, donc le
+    moteur. Un contrôle qui prétendrait le contraire mentirait sur sa portée.
+    """
+    findings: list[str] = []
+    for bloc in RE_BLOC_DO.finditer(texte):
+        corps = bloc.group(1)
+        depart = texte[: bloc.start()].count("\n") + 1
+        for m in RE_APPEL_GLOBAL.finditer(corps):
+            portee = m.group(1)
+            ligne = depart + corps[: m.start()].count("\n")
+            findings.append(
+                f"{nom_fichier}:{ligne}  appel direct à la portée `{portee}`, qui est globale\n"
+                f"      | {corps[m.start():m.start() + 78].strip()}\n"
+                f"      → `due_push_notifications` couvre tous les foyers, et `p_user_id`\n"
+                f"        n'a d'effet que sur la portée `test`. L'assertion lit donc les\n"
+                f"        notifications des foyers réels : elle échoue quand un rappel\n"
+                f"        d'ailleurs est dû, et peut passer pour la mauvaise raison.\n"
+                f"        Passez par un helper qui filtre sur les membres du test."
+            )
+    return findings
+
+
 def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, str, str, bool]]:
     """(fichier, signature, corps, langage, est_effective) pour chaque fonction.
 
@@ -727,6 +785,7 @@ def main() -> int:
     for f in tests:
         defauts.extend(_conflits_de_types(f.read_text(), f.name))
         defauts.extend(_variables_dans_sql_dynamique(f.read_text(), f.name))
+        defauts.extend(_appels_globaux_dans_un_bloc(f.read_text(), f.name))
 
     if obsolete:
         print("Définitions dépassées, sans effet sur la base (corrigées plus loin) :")

@@ -380,15 +380,16 @@ begin
 
   -- Les préférences coupent l'envoi, et une seule catégorie à la fois.
   update public.profiles set task_reminders_enabled = false where id = v_alice;
-  -- `format(…, %L)` et non une chaîne littérale. Une comparaison sur une
-  -- colonne `jsonb` demande elle-même des apostrophes ; une seule non doublée
-  -- ne ferme pas la chaîne, elle crée un TROISIÈME argument à `count()`, et
-  -- l'échec porte alors sur une ARITÉ — très loin de la cause réelle. C'est la
-  -- forme déjà employée par `0001_schema_contract.sql` et `0002_rls_isolation.sql`.
+  -- Une sous-requête paramétrée, et non `testkit.count(format(…))`. La forme
+  -- `format(…, %L)` était là pour une raison réelle — une comparaison sur une
+  -- colonne `jsonb` demande des apostrophes, et une seule non doublée crée un
+  -- TROISIÈME argument à `count()`, dont l'échec porte alors sur une ARITÉ,
+  -- très loin de la cause. Mais il n'y a plus d'apostrophe à doubler ici : la
+  -- requête est écrite en SQL ordinaire, donc plpgsql résout `v_membres` et la
+  -- comparaison est un littéral banal.
   perform testkit.eq(
-    testkit.count(format(
-      'select 1 from jsonb_array_elements(public.due_push_notifications(%L, now(), null)) n where n.value ->> %L = %L',
-      'rappels', 'url', '/taches')),
+    (select count(*) from jsonb_array_elements(testkit.due_rappels(v_membres)) n
+      where n.value ->> 'url' = '/taches'),
     0::bigint,
     'un membre qui a coupé les rappels de tâches n''en reçoit plus'
   );
