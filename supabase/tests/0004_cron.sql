@@ -198,15 +198,31 @@ end;
 $$;
 
 -- Le dispatch des notifications lit ses secrets dans Vault, pas en clair.
+--
+-- L'assertion porte sur `post_push_dispatch`, et NON sur les deux dispatchs :
+-- depuis 0019, ceux-ci ne lisent plus Vault eux-mêmes, ils délèguent. Les
+-- interroger sur `vault.decrypted_secrets` revenait à leur demander un code
+-- qu'ils ne contiennent pas — l'assertion échouait en donnant à croire à une
+-- fuite de secret, alors que la lecture y est centralisée exactement comme
+-- prévu. C'est la fonction de dispatch qui doit porter la preuve.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%vault.decrypted_secrets%',
+  'la fonction de dispatch lit ses secrets dans Vault au moment de l''exécution');
 select testkit.ok(
   pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) like '%vault.decrypted_secrets%',
-  'le dispatch lit ses secrets dans Vault au moment de l''exécution');
+  'le dispatch historique lit ses secrets dans Vault au moment de l''exécution');
+
+-- Et les deux dispatchs push délèguent bien à cette fonction unique, sans
+-- jamais lire Vault eux-mêmes : deux points de lecture seraient deux endroits
+-- où un secret pourrait se glisser.
 select testkit.ok(
-  pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) like '%vault.decrypted_secrets%',
-  'le dispatch des rappels push lit ses secrets dans Vault au moment de l''exécution');
+  pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) like '%post_push_dispatch(''rappels'')%'
+  and pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) not like '%vault.%',
+  'le dispatch des rappels délègue la lecture des secrets');
 select testkit.ok(
-  pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%vault.decrypted_secrets%',
-  'le dispatch des anniversaires lit ses secrets dans Vault au moment de l''exécution');
+  pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%post_push_dispatch(''anniversaires'')%'
+  and pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) not like '%vault.%',
+  'le dispatch des anniversaires délègue la lecture des secrets');
 
 -- Le point d'entrée est unique : une seule Edge Function à déployer et à
 -- surveiller, et les deux jobs ne peuvent pas diverger d'un point d'entrée.
