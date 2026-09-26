@@ -353,6 +353,123 @@ begin
 end;
 $$;
 
+  -- ---------------------------------------------------------------------------
+  -- 7 bis. Le même contrôle, mais EXHAUSTIF
+  --
+  -- Les assertions ci-dessus nomment ce qu'elles vérifient : elles confirment
+  -- les signatures qu'on leur a données, et ne verront jamais une septième. Un
+  -- test de privilèges qui énumère ne peut répondre que « oui » à ce qu'il
+  -- a déjà lu. Et les privilèges se posent par défaut et par héritage :
+  -- `0009` accorde en bloc ce qui existe à ce moment-là ; une
+  -- fonction ajoutée demain dans `private`, ou une surcharge d'une fonction
+  -- existante, reçoit un droit sans qu'aucune assertion ne le regarde.
+  --
+  -- Le contrôle ci-dessous inverse la direction. Il ne part pas d'une liste :
+  -- il PARCOURT `pg_proc`, et vérifie que toute fonction de `private`
+  -- exécutable par `anon` ou `authenticated` a une raison d'être. Une raison
+  -- s'établit par RÉFÉRENCE, jamais par nom — c'est ce qui rend le contrôle
+  -- incapable de pourrir :
+  --
+  --   (a) `returns trigger` : un déclencheur, non appelable directement ;
+  --   (b) citée dans une contrainte CHECK (`pg_constraint`) : elle s'évalue
+  --       avec le rôle qui écrit la ligne, donc sans EXECUTE l'écriture
+  --       échoue ;
+  --   (c) utilisée comme valeur par défaut d'une colonne (`pg_attrdef`) ;
+  --   (d) citée dans une politique RLS (`pg_policies`) : une politique est
+  --       évaluée avec le rôle de l'appelant, donc sans EXECUTE la requête
+  --       entière échouerait — c'est le cas de `can_read_event`, appelée par
+  --       les politiques des tables enfants ;
+  --   (e) ou atteignable depuis l'une de celles-là par une autre fonction
+  --       `SECURITY DEFINER`, qui s'exécute avec les droits de son
+  --       propriétaire. C'est ce qui justifie `household_role`, appelée par
+  --       `is_household_admin` sans l'être par une politique.
+  --
+  -- La fermeture (e) est un CTE récursif : sans elle, la catégorie justifiable
+  -- s'arrête à `is_household_admin` et le test échouerait à raison sur une
+  -- fonction parfaitement légitime.
+  --
+  -- `anon` n'a pas de cas particulier : une fonction qui lui serait
+  -- exécutable serait par définition injustifiée, donc refusée ici. C'était
+  -- l'invariant le plus grave, et il n'a pas besoin d'une assertion à part.
+  --
+  -- Une fonction non justifiée fait échouer le test en nommant sa signature.
+  -- C'est une demande de justification, pas un obstacle : ajouter une ligne
+  -- dans les catégories ci-dessus suffit, si la raison est réelle.
+  --
+  -- La limite de ce contrôle, énoncée pour qu'on ne le croie pas plus fort
+  -- qu'il n'est : la catégorie (e) rend justifiable TOUT ce qui est
+  -- atteignable depuis une entrée légitime. Un helper mort, appelé par un
+  -- helper de politique, reste donc justifié. C'est la bonne sémantique —
+  -- une chaîne `SECURITY DEFINER` a de toute façon le droit, puisque c'est
+  -- le propriétaire qui l'exerce — mais ce test ne prouve pas qu'un helper
+  -- est encore *nécessaire*. Il prouve qu'aucun droit n'a été accordé sans
+  -- chemin utilisé.
+  do $$
+  declare
+    v_injustifiees text[];
+  begin
+    with visees as (
+      select p.proname,
+             p.prorettype,
+             p.prosrc,
+             format('%I.%I(%s)', n.nspname, p.proname,
+                    pg_get_function_identity_arguments(p.oid)) as signature
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'private'
+         and (has_function_privilege('anon', p.oid, 'EXECUTE')
+           or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+    ), directes as (
+      -- (a) déclencheur
+      select proname as nom
+        from visees
+       where prorettype = 'trigger'::regtype
+      union
+      -- (b) contrainte CHECK
+      select m[1]
+        from pg_constraint c,
+             lateral regexp_matches(pg_get_constraintdef(c.oid),
+                                   'private\.(\w+)\s*\(', 'g') as m
+       where c.contype = 'c'
+      union
+      -- (c) valeur par défaut de colonne
+      select m[1]
+        from pg_attrdef d,
+             lateral regexp_matches(pg_get_expr(d.adbin, d.adrelid),
+                                   'private\.(\w+)\s*\(', 'g') as m
+      union
+      -- (d) politique RLS
+      select m[1]
+        from pg_policies pol,
+             lateral regexp_matches(concat_ws(' ', pol.qual, pol.with_check),
+                                   'private\.(\w+)\s*\(', 'g') as m
+    ), arcs as (
+      -- (e) ce qu'une fonction appelle, pour la fermeture transitive
+      select v.proname as appelant, m[1] as appele
+        from visees v,
+             lateral regexp_matches(v.prosrc, 'private\.(\w+)\s*\(', 'g') as m
+    ), fermeture (nom) as (
+      select nom from directes
+      union
+      select a.appele
+        from fermeture f
+        join arcs a on a.appelant = f.nom
+    )
+    select coalesce(array_agg(v.signature order by v.signature), '{}')
+      into v_injustifiees
+      from visees v
+     where not exists (select 1 from fermeture f where f.nom = v.proname);
+
+    perform testkit.ok(
+      array_length(v_injustifiees, 1) is null,
+      format(
+        'exécutables par un client, sans raison déclarée : %s',
+        array_to_string(v_injustifiees, ', ')
+      )
+    );
+  end;
+  $$;
+
 -- ---------------------------------------------------------------------------
 -- 8. Le schéma privé n'est pas accessible à anon
 -- ---------------------------------------------------------------------------
