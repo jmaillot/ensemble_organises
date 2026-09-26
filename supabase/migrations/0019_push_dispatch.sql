@@ -138,7 +138,12 @@ set search_path = ''
 as $$
 begin
   return query
-  with window as (
+  -- Le CTE s'appelle `bounds` et non `window` : `window` est un MOT RÉSERVÉ de
+  -- PostgreSQL (la clause des fonctions fenêtrées), et `with window as (…)`
+  -- est refusé à l'analyse. Le premier jet employait ce nom, et l'erreur
+  -- n'apparaissait qu'à l'exécution — 0018 étant déjà appliquée et 0019 seule
+  -- en échec, la reprise ne rejoue que 0019.
+  with bounds as (
     select private.push_reminder_window(p_now) as slot
   ), tasks as (
     select
@@ -158,7 +163,7 @@ begin
       'task'::text as preference
     from task_reminders tr
     join tasks t on t.id = tr.task_id
-    cross join window w
+    cross join bounds w
     -- `lateral … on true` : zéro ligne si la tâche n'a aucun assignataire
     -- doté d'un compte, et le `coalesce` bascule alors sur le créateur.
     left join lateral (
@@ -193,7 +198,7 @@ begin
       'event'::text as preference
     from event_reminders er
     join events e on e.id = er.event_id
-    cross join window w
+    cross join bounds w
     join household_members m on m.household_id = e.household_id and m.user_id is not null
     where er.remind_at <@ w.slot
       -- Un événement déjà commencé n'a plus rien à annoncer.
@@ -211,7 +216,7 @@ begin
       'routine'::text as preference
     from routine_reminders rr
     join routines r on r.id = rr.routine_id
-    cross join window w
+    cross join bounds w
     join household_members m on m.household_id = r.household_id and m.user_id is not null
     where rr.remind_at <@ w.slot
       and (r.created_by is null or m.id = r.created_by)
