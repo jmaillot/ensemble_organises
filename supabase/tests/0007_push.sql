@@ -497,7 +497,7 @@ begin
   ));
   perform testkit.eq(v_report ->> 'dropped', '1', 'un 410 supprime l''abonnement');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    (select count(*) from public.push_subscriptions where user_id = v_alice),
     0::bigint,
     'l''abonnement mort a bien disparu'
   );
@@ -510,7 +510,7 @@ begin
   ));
   perform testkit.eq(v_report ->> 'failed', '1', 'une erreur passagère est comptée comme échec');
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    (select count(*) from public.push_subscriptions where user_id = v_alice),
     1::bigint,
     'une erreur passagère conserve l''abonnement'
   );
@@ -525,7 +525,7 @@ begin
        cross join (select id from public.push_subscriptions where user_id = v_alice) as s),
     10);
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    (select count(*) from public.push_subscriptions where user_id = v_alice),
     0::bigint,
     'un appareil qui échoue dix fois de suite est retiré'
   );
@@ -545,7 +545,7 @@ begin
     jsonb_build_object('id', (select id from public.push_subscriptions where user_id = v_alice), 'delivered', false, 'status', 503)
   ), 0);
   perform testkit.eq(
-    testkit.count('select 1 from public.push_subscriptions where user_id = v_alice'),
+    (select count(*) from public.push_subscriptions where user_id = v_alice),
     0::bigint,
     'un seuil nul signifie « au premier échec », pas « jamais »'
   );

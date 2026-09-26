@@ -983,11 +983,12 @@ une fonction renvoyant un ensemble. Le second cas ne lève aucune erreur et
 renvoie des lignes vides : seule une assertion sur le **contenu** des lignes peut
 le voir.
 
-Quatre vérifications sur les migrations, une sur les tests : aucun nom de table
+Quatre vérifications sur les migrations, deux sur les tests : aucun nom de table
 non qualifié sous un `search_path` vide, aucun CTE qui se rejoint lui-même,
 aucun littéral laissé ouvert en fin de ligne, aucune référence non qualifiée à
-une colonne de `returns table`, et les deux valeurs comparées par `testkit.eq`
-du même type — c'est le cinquième contrôle, et il ne porte que sur `supabase/tests`.
+une colonne de `returns table`, les deux valeurs comparées par `testkit.eq` du
+même type, et aucune variable plpgsql dans une chaîne SQL exécutée par
+`testkit.count()` ou ses voisins.
 
 Les deux derniers méritent d'être lus. `returns table` ne décrit pas
 seulement le résultat : en PL/pgSQL, ses colonnes sont des **variables** (voir
@@ -1011,6 +1012,16 @@ Un mot sur le dernier piège, rencontré en chemin : un `$nom$` utilisé comme
 espace réservé dans une chaîne entre en collision avec la syntaxe de
 dollar-quoting de PostgreSQL, et un guillemet fermant mal placé produit une
 erreur qui désigne le `$` de la variable au lieu du guillemet qui manque.
+
+Reste le sixième contrôle, qui a valu quatre corrections d'un coup :
+`testkit.count('select … where user_id = v_alice')` se lit comme du SQL
+ordinaire — le texte est sur une seule ligne — mais `testkit.count` l'exécute
+par `execute` **dans son propre corps**, et `v_alice` n'y est pas déclaré.
+PostgreSQL répond « column "v_alice" does not exist », en nommant une variable
+déclarée trois lignes plus haut. La forme correcte est un sous-requête
+paramétré, `(select count(*) from … where col = v_x)`, qui laisse plpgsql
+résoudre la variable. `format('… %L …', v_x)` est en revanche la bonne façon de
+faire : il produit un littéral, et c'est précisément ce que ces tests veulent.
 
 ---
 

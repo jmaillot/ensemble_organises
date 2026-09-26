@@ -33,6 +33,13 @@ Les vérifications
    qu'à la comparaison, sous la forme « function testkit.eq(bigint, integer,
    unknown) does not exist ». Un message qui ne parle ni de la assertion ni de
    ce qu'elle vérifie.
+6. VARIABLE PLPGSQL DANS UN SQL DYNAMIQUE — `testkit.count('…')` et ses voisins
+   exécutent le texte dans une AUTRE fonction, par `execute`. Une variable du
+   bloc appelant n'y existe pas : PostgreSQL répond « column "v_alice" does not
+   exist », en nommant une variable déclarée trois lignes plus haut. La
+   correction est un sous-requête paramétré, pas une interpolation.
+   `format(… %L …)` est en revanche légitime : il produit un littéral, et c'est
+   exactement ce que ces tests veulent.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -382,6 +389,94 @@ ALIAS_TYPES = {
 RE_BLOC_DO = re.compile(r"do\s+\$\$(.*?)\$\$;", re.S)
 RE_DECLARE = re.compile(r"\bdeclare\b(.*?)\bbegin\b", re.S | re.I)
 RE_DECLARATION = re.compile(r"^\s*(\w+)\s+(\w+)", re.M)
+# Les helpers de testkit dont le PREMIER argument est du SQL exécuté par
+# `execute`, dans une fonction séparée de celle qui appelle.
+RE_SQL_DYNAMIQUE = re.compile(
+    r"\btestkit\.(count|affected|expect_ok|expect_denied|expect_denied_at_commit)\s*\(",
+    re.I,
+)
+
+
+def _variables_du_bloc(corps: str) -> set[str]:
+    d = RE_DECLARE.search(corps)
+    if not d:
+        return set()
+    return {v.group(1) for v in RE_DECLARATION.finditer(d.group(1))}
+
+
+def _premier_argument(s: str) -> str:
+    """Premier argument d'un appel, jusqu'à la virgule de premier niveau."""
+    i, prof, dansch = 0, 0, False
+    while i < len(s):
+        ch = s[i]
+        if dansch:
+            if ch == "'":
+                if s[i + 1:i + 2] == "'":
+                    i += 2
+                    continue
+                dansch = False
+        elif ch == "'":
+            dansch = True
+        elif ch in "([":
+            prof += 1
+        elif ch in ")]":
+            prof -= 1
+        elif ch == "," and prof == 0:
+            break
+        i += 1
+    return s[:i].strip()
+
+
+def _variables_dans_sql_dynamique(texte: str, nom_fichier: str) -> list[str]:
+    """Variables plpgsql référencées dans une chaîne SQL exécutée ailleurs.
+
+    `testkit.count('select … where user_id = v_alice')` semble naturel : le
+    texte est sur une seule ligne, il se lit comme du SQL ordinaire. Il ne
+    l'est pas. `testkit.count` fait `execute 'select count(*) from (' || p_sql
+    || ')'`, et cette exécution a lieu dans le corps de la fonction — un autre
+    contexte, où `v_alice` n'est pas déclaré.
+
+    Seuls les littéraux simples sont visés. Un `format('… %L …', v_x)` produit
+    une valeur, pas une référence : c'est le mécanisme correct, et c'est
+    exactement ce que ces tests exerce.
+    """
+    findings: list[str] = []
+    for bloc in RE_BLOC_DO.finditer(texte):
+        corps = bloc.group(1)
+        depart = texte[: bloc.start()].count("\n") + 1
+        variables = _variables_du_bloc(corps)
+        if not variables:
+            continue
+        for appel in RE_SQL_DYNAMIQUE.finditer(corps):
+            prof, i = 1, appel.end()
+            while i < len(corps) and prof:
+                if corps[i] == "(":
+                    prof += 1
+                elif corps[i] == ")":
+                    prof -= 1
+                    if prof == 0:
+                        break
+                i += 1
+            argument = _premier_argument(corps[appel.end(): i])
+            if not argument.startswith("'"):
+                continue                      # format(…) : interpolation légitime
+            for litteral in re.finditer(r"'([^']*(?:''[^']*)*)'", argument, re.S):
+                sql = litteral.group(1).replace("''", "'")
+                trouvees = sorted(
+                    v for v in variables if re.search(rf"(?<!\w){re.escape(v)}\b", sql)
+                )
+                if trouvees:
+                    ligne = depart + corps[: appel.start()].count("\n")
+                    findings.append(
+                        f"{nom_fichier}:{ligne}  variable plpgsql dans du SQL dynamique "
+                        f"({', '.join(trouvees)})\n"
+                        f"      | {sql.strip()[:72]}\n"
+                        f"      → le texte est exécuté par `execute` dans une fonction\n"
+                        f"        SÉPARÉE : la variable n'y est pas déclarée, et PostgreSQL\n"
+                        f"        la signale comme une colonne inconnue. Passez-la en\n"
+                        f"        paramètre : (select count(*) from … where col = v_x)."
+                    )
+    return findings
 
 
 def _type_connu(arg: str, variables: dict[str, str]) -> str | None:
@@ -631,6 +726,7 @@ def main() -> int:
 
     for f in tests:
         defauts.extend(_conflits_de_types(f.read_text(), f.name))
+        defauts.extend(_variables_dans_sql_dynamique(f.read_text(), f.name))
 
     if obsolete:
         print("Définitions dépassées, sans effet sur la base (corrigées plus loin) :")

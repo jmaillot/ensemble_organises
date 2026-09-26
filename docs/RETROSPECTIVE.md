@@ -232,17 +232,49 @@ assertion de comportement.
   bigint → integer sans bruit : **le défaut n'existait qu'à la comparaison** ;
 * une expression `n.value ->> 'title' || '|' || n.value ->> 'url'` se lisait
   `(((… ->> 'title') || '|') || n.value) ->> 'url'`, parce que `->>` et `||` ont
-  la même priorité en PostgreSQL et que l'associativité est à gauche.
+  la même priorité en PostgreSQL et que l'associativité est à gauche ;
+* quatre assertions appelaient `testkit.count('select 1 from … where user_id =
+  v_alice')`. Le texte est sur une seule ligne et se lit comme du SQL
+  ordinaire, mais `testkit.count` l'exécute par `execute` dans son **propre**
+  corps : `v_alice` n'y est pas déclaré, et PostgreSQL répond « column
+  "v_alice" does not exist » en nommant une variable déclarée trois lignes plus
+  haut. La forme correcte est un sous-requête paramétré,
+  `(select count(*) from … where col = v_x)`.
 
 Le premier est le plus grave, et il ne se voyait pas : **l'assertion suivante,
 à deux lignes de distance, passait déjà le bon argument.** Les deux disaient la
 même chose, dont une version fausse. Une assertion fausse n'est pas moins
-fauxe qu'une assertion absente.
+fausse qu'une assertion absente.
+
+Le dernier est le plus coûteux, et il ne s'arrête pas à un : le serveur
+s'arrête au premier échec, il aurait donc fallu quatre allers-retours pour les
+découvrir. C'est ce qui a changé la méthode — voir 2.8.
 
 **Règle** : avant d'écrire une assertion, lire l'implémentation qu'elle vérifie.
-Une assertion écrit de mémoire teste l'idée qu'on se fait du code, pas le code.
+Une assertion écrite de mémoire teste l'idée qu'on se fait du code, pas le code.
 Et « le test échoue, ce qui est rare » n'est pas un signal : sur un fichier
 nouveau, c'est la norme.
+
+### 2.8 Corriger la classe, pas l'instance
+
+Le serveur s'arrête au premier échec d'un fichier. Un défaut par aller-retour,
+donc, pour un fichier dont la logique n'avait jamais été exécutée.
+
+Les quatre derniers défauts de `0007_push.sql` étaient la même famille : le test
+s'adressait à une fonction en lui passant un contexte qui n'était pas le sien.
+Une assertion qui appelle `due_push_notifications('test', …, null)`, une
+comparaison `bigint` contre `integer`, une interpolation d'une variable plpgsql
+dans une chaîne exécutée ailleurs — trois formulations, un seul soupçon : *le
+test suppose un contrat qu'il n'a pas vérifié*.
+
+Les corriger une à une aurait coûté quatre tours. Les chercher toutes d'un coup
+en a coûté un : le premier tour a révélé la première, le deuxième en a révélé
+trois autres, et le contrôle automatisé les a trouvées avant même le serveur.
+
+**Règle** : devant un défaut, demander non seulement « comment corriger celui-ci »
+mais « quelles autres occurrences de la même cause restent dans le dépôt ». La
+première question répare, la deuxième évite les quatre tours suivants — et c'est
+la seule des deux qui passe à l'échelle.
 
 ---
 
@@ -259,8 +291,9 @@ Chacun existe parce qu'un défaut l'a rendu nécessaire.
 | `testkit.count()` encapsule et compte vraiment | `_setup.sql` | 2.2 |
 | Ancre positive avant les assertions négatives | `0002` § Bob | 2.4 |
 | `as_user` pose les deux GUC, comme PostgREST | `_setup.sql` | 2.1 |
-| Tables qualifiées, CTE sans auto-référence, littéraux fermés, `returns table` sans référence nue, `testkit.eq` à types égaux | `check-sql-statique.py` | 2.5, 2.7 |
+| Tables qualifiées, CTE sans auto-référence, littéraux fermés, `returns table` sans référence nue, `testkit.eq` à types égaux, pas de variable plpgsql en SQL dynamique | `check-sql-statique.py` | 2.5, 2.7 |
 | Un contrôle se prouve sur un cas qui doit échouer | idem, cas piégés | 2.6 |
+| Chercher la **classe** du défaut, pas l'instance | idem | 2.8 |
 
 Deux exceptions documentées au contrôle « au moins une politique » :
 `household_invite_tokens`, inatteignable par conception, et
