@@ -58,8 +58,21 @@ db_require_runtime() {
 }
 
 # Valeur d'une variable d'environnement du conteneur, sans échouer si absente.
+#
+# Le `< /dev/null` est indispensable, et son absence est un bug qui a coûté un
+# tour de diagnostic. `docker compose exec` attache l'ENTRÉE STANDARD de l'hôte
+# au processus du conteneur : même si la commande ne lit rien, le client Docker
+# consomme et jette ce qu'il trouve. Or `db_resolve` appelle `db_printenv` au
+# démarrage de `psql.sh` — donc `cat fichier.sql | sh scripts/psql.sh` perdait
+# le fichier avant que `psql` ne le lise, sans message d'erreur : la commande
+# sans le moindre message d'erreur : la commande semblait avoir réussi.
+#
+# `test-db.sh` n'était pas concerné, et c'est ce qui a masqué le défaut : il
+# appelle `db_resolve` une fois en tête de script, puis redirige le fichier au
+# moment de chaque `psql_exec`. Un `psql.sh` mono-usage ne peut pas faire les
+# deux dans cet ordre.
 db_printenv() {
-  db_compose exec -T "$DB_CONTAINER" printenv "$1" 2>/dev/null | tr -d '\r' | head -n 1 || true
+  db_compose exec -T "$DB_CONTAINER" printenv "$1" 2>/dev/null </dev/null | tr -d '\r' | head -n 1 || true
 }
 
 # Résout le rôle et la base à utiliser, une seule fois, avant tout psql.

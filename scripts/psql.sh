@@ -4,8 +4,15 @@
 # le bon rôle et la bonne base (voir scripts/lib-db.sh).
 #
 #   sh scripts/psql.sh -c "select count(*) from public.households"
-#   sh scripts/psql.sh -f /tmp/verif.sql
 #   cat verif.sql | sh scripts/psql.sh
+#
+# ATTENTION : `-f` n'accepte qu'un chemin EXISTANT DANS LE CONTENEUR. Le dépôt
+# n'est pas monté dans `db`, donc `psql.sh -f supabase/tests/_setup.sql` échoue
+# sur « No such file or directory » : le chemin est résolu côté conteneur. Pour
+# un fichier de la machine hôte, passez-le par l'entrée standard :
+#
+#   sh scripts/psql.sh < supabase/tests/_setup.sql
+#   sh scripts/psql.sh -c "$(cat supabase/tests/_setup.sql)"
 #
 # La session n'est pas interactive : `docker compose exec -T` n'alloue pas de
 # terminal, ce qui évite tout blocage sur une invite. On passe donc une

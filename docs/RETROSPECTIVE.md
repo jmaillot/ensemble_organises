@@ -276,6 +276,28 @@ mais « quelles autres occurrences de la même cause restent dans le dépôt ».
 première question répare, la deuxième évite les quatre tours suivants — et c'est
 la seule des deux qui passe à l'échelle.
 
+### 2.9 Un script qui perdait son entrée standard en silence
+
+`sh scripts/psql.sh < un_fichier.sql` n'exécutait rien, sans aucun message.
+
+La cause : `psql.sh` appelle `db_resolve` au démarrage, et `db_resolve` lit
+l'environnement du conteneur via `docker compose exec … printenv`. Or
+`docker compose exec` attache l'entrée standard de l'hôte au processus du
+conteneur : même si `printenv` ne lit rien, le client Docker consomme et jette
+ce qu'il trouve. Le fichier disparaissait avant que `psql` ne le voie.
+
+Ce qui a masqué le défaut : `test-db.sh` appelle `db_resolve` une fois en tête de
+script, puis redirige le fichier au moment de chaque appel. Il ne pouvait pas être
+touché. `psql.sh` est mono-usage — il résout, puis exécute — donc tout ce qui
+lui est redirigé avant le `psql` est perdu. C'est aussi pour cela que `-f` ne
+fonctionne qu'avec un chemin présent dans le conteneur : le dépôt n'y est pas
+monté.
+
+**Règle** : un utilitaire qui résout un contexte avant d'agir doit détourner
+explicitement l'entrée standard de cette phase (`< /dev/null`), sous peine de
+manger celle de l'appelant. Et « ça n'a rien fait, sans erreur » n'est pas « ça a
+marché » : un succès muet se traite comme un échec tant qu'il n'est pas expliqué.
+
 ---
 
 ## 3. Les garde-fous désormais en place
@@ -294,6 +316,7 @@ Chacun existe parce qu'un défaut l'a rendu nécessaire.
 | Tables qualifiées, CTE sans auto-référence, littéraux fermés, `returns table` sans référence nue, `testkit.eq` à types égaux, pas de variable plpgsql en SQL dynamique | `check-sql-statique.py` | 2.5, 2.7 |
 | Un contrôle se prouve sur un cas qui doit échouer | idem, cas piégés | 2.6 |
 | Chercher la **classe** du défaut, pas l'instance | idem | 2.8 |
+| La résolution de contexte ne vole pas l'entrée standard | `lib-db.sh` | 2.9 |
 
 Deux exceptions documentées au contrôle « au moins une politique » :
 `household_invite_tokens`, inatteignable par conception, et
