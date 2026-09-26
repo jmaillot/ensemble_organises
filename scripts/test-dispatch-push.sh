@@ -128,15 +128,26 @@ Appareil="${reste#*|}"
 echo "  Abonnement    $Appareil"
 echo "  Membre        $Membre  (foyer $Foyer)"
 
-# --- Sémure -----------------------------------------------------------------
+# --- Sémure, et nettoyage vérifié ---------------------------------------------
 #
-# La tâche est supprimée en sortie : le script ne laisse pas de donnée de test
-# dans la base de l'utilisateur. Le rappel part avec, par construction, puisque
-# `task_reminders.task_id` est `on delete cascade`.
+# Le script ne doit rien laisser dans la base de l'utilisateur. Une suppression
+# qui échoue en silence est un ÉCHEC MUET : le script a fait ce qu'il avait à
+# faire, annonce « OK », et la tâche « Rappel de test push » s'accumule à
+# chaque passage, dans la liste de tâches de quelqu'un.
+#
+# Le nettoyage est donc DÉCLARÉ et VÉRIFIÉ par un comptage, et non délégué à un
+# trap que personne ne voit. Le trap reste, pour une sortie en erreur, et il
+# prévient alors lui aussi.
 TacheCreee=0
 Tache=""
 Rappel=""
+NettoyerVerifie=0
+
 nettoyer() {
+  # Le rappel a déjà été consommé par l'Edge Function dans le cas normal : sa
+  # suppression est sans objet, et `|| true` évite qu'un DELETE sans ligne
+  # affected ne soit pris pour un échec. Ce qui compte n'est pas le statut du
+  # DELETE, c'est le comptage qui suit.
   if [ -n "$Rappel" ]; then
     db_exec -q -c "delete from public.task_reminders where id = '$Rappel'" >/dev/null 2>&1 || true
   fi
@@ -144,7 +155,27 @@ nettoyer() {
     db_exec -q -c "delete from public.tasks where id = '$Tache'" >/dev/null 2>&1 || true
   fi
 }
-trap nettoyer EXIT
+
+# Un comptage, pas le statut du DELETE : c'est l'etat de la table qui compte.
+reste_a_nettoyer() {
+  un "select ((select count(*) from public.tasks where id = '$Tache')
+               + (select count(*) from public.task_reminders where id = '$Rappel'))::text"
+}
+
+signaler_reste() {
+  r="$(reste_a_nettoyer)"
+  if [ "$r" = "0" ]; then
+    return 0
+  fi
+  echo "  ÉCHEC         $r ligne(s) de test subsiste(nt) après nettoyage." >&2
+  echo "                Tâche $Tache, rappel $Rappel. À supprimer à la main :" >&2
+  echo "                  sh scripts/psql.sh -c \"delete from public.tasks" >&2
+  echo "                    where id = '$Tache';\"" >&2
+  return 1
+}
+
+# Sortie en erreur : on nettoie, et on prévient si le nettoyage échoue.
+trap 'nettoyer; signaler_reste >&2 || true' EXIT
 
 # `remind_at` est placé une minute dans le passé : la fenêtre de
 # `private.push_reminder_window()` est `(now() - 24h, now()]`, et une échéance à
@@ -266,6 +297,21 @@ if [ "$Restant" != "0" ]; then
   echo "  ÉCHEC         la ligne de rappel est toujours là. Le rappel sera renvoyé" >&2
   echo "                à chaque dispatch, indéfiniment." >&2
   echec=1
+fi
+
+# --- Nettoyage ----------------------------------------------------------------
+#
+# Déclaré, donc vérifié. Une tâche de test laissée derrière n'est pas un détail :
+# elle apparaît dans la liste de tâches de l'utilisateur, et le script s'exécute
+# à chaque nouveau diagnostic.
+nettoyer
+NettoyerVerifie=1
+if ! signaler_reste; then
+  # Un test qui salit l'état n'est pas un test réussi. Le code de sortie le dit,
+  # pour qu'un enchaînement de scripts ne l'ignore pas.
+  echec=1
+else
+  echo "  Nettoyage     tâche et rappel supprimés."
 fi
 
 echo

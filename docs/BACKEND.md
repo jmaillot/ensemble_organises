@@ -817,8 +817,20 @@ suite de `a`, sont exclus, et le script s'arrête si aucun abonnement réel
 n'existe.
 
 `ATTENTE` (45 s par défaut) borne l'attente de la réponse, pg_net étant
-asynchrone. Le script supprime la tâche qu'il a créée, et ne laisse rien
-derrière lui.
+asynchrone.
+
+Le script supprime la tâche qu'il a créée, et il le **vérifie par un comptage** :
+une suppression dont on ignore le sort est un succès muet — le script annonce
+`OK` et la tâche « Rappel de test push » s'accumule dans la liste de tâches de
+quelqu'un, à chaque passage. Le compte fait partie du verdict, donc un nettoyage
+raté sort en ÉCHEC et non en silence. En cas de sortie en erreur, le `trap`
+nettoie lui aussi et prévient.
+
+Le contrôle de ce nouveau chemin en a été un, et il a refusé le code correct
+avant d'être juste : un numéro de ligne employé comme indice de liste, alors
+que la liste avait ses commentaires retirés. Un contrôle qui signale un défaut
+inexistant n'est pas plus utile qu'un contrôle absent — c'est pire, parce qu'on
+apprend à l'ignorer.
 
 #### Un rappel dû maintenant
 
