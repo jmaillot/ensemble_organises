@@ -26,6 +26,13 @@ Les vérifications
    colonne entrent en jeu. Le second cas est pire : une seule table la fournit,
    plpgsql lui substitue la variable — NULL dans une fonction renvoyant un
    ensemble — et la requête renvoie des lignes vides SANS lever d'erreur.
+5. ARGUMENTS DE `testkit.eq` DE TYPES DIFFÉRENTS — `testkit.eq` est
+   `eq(anyelement, anyelement, text)` : les deux valeurs comparées doivent être
+   du MÊME type. `testkit.count()` renvoie `bigint`, une variable déclarée
+   `integer` est acceptée à l'affectation sans bruit, et le mismatch n'apparaît
+   qu'à la comparaison, sous la forme « function testkit.eq(bigint, integer,
+   unknown) does not exist ». Un message qui ne parle ni de la assertion ni de
+   ce qu'elle vérifie.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -354,8 +361,142 @@ def _colonnes_de_sortie_ambiguës(corps: str) -> list[str]:
     return findings
 
 
+# ---------------------------------------------------------------------------
+# Contrôle 5 : types des arguments de `testkit.eq`
+# ---------------------------------------------------------------------------
+
+# Type produit par un appel de fonction, quand il est déterminable sans le moteur.
+PRODUCTEURS = {
+    "testkit.count": "bigint",
+    "testkit.affected": "bigint",
+    "jsonb_array_length": "integer",
+    "array_length": "integer",
+    "length": "integer",
+    "cardinality": "integer",
+    "octet_length": "integer",
+}
+ALIAS_TYPES = {
+    "int": "integer", "int4": "integer", "int8": "bigint",
+    "bool": "boolean", "varchar": "text", "char": "text",
+}
+RE_BLOC_DO = re.compile(r"do\s+\$\$(.*?)\$\$;", re.S)
+RE_DECLARE = re.compile(r"\bdeclare\b(.*?)\bbegin\b", re.S | re.I)
+RE_DECLARATION = re.compile(r"^\s*(\w+)\s+(\w+)", re.M)
+
+
+def _type_connu(arg: str, variables: dict[str, str]) -> str | None:
+    """Type déductible d'un argument de `testkit.eq`, ou None si on ne sait pas.
+
+    On ne conclut que sur ce qui est certain : un littéral s'accorde sur
+    l'autre argument, donc il ne peut pas être la cause d'un conflit. Le silence
+    vaut mieux qu'une devinette — un contrôle qui signale un faux conflit se
+    fait ignorer.
+    """
+    arg = arg.strip()
+    if not arg:
+        return None
+
+    m = re.search(r"::(\w+)$", arg)
+    if m and m.group(1).lower() not in ("jsonb", "json"):
+        return ALIAS_TYPES.get(m.group(1).lower(), m.group(1).lower())
+
+    if re.fullmatch(r"[-+]?\d+(\.\d+)?|'[^']*'|true|false|null", arg, re.I):
+        return None                                  # littéral : accord automatique
+
+    m = re.fullmatch(r"([\w.]+)\s*\(.*\)", arg, re.S)
+    if m:
+        produit = PRODUCTEURS.get(m.group(1).lower())
+        return ALIAS_TYPES.get(produit, produit) if produit else None
+
+    if arg.lower() in variables:
+        return variables[arg.lower()]
+    return None
+
+
+def _conflits_de_types(texte: str, nom_fichier: str) -> list[str]:
+    """Lignes où `testkit.eq` compare deux valeurs de types différents."""
+    findings: list[str] = []
+    for bloc in RE_BLOC_DO.finditer(texte):
+        corps = bloc.group(1)
+        depart = texte[: bloc.start()].count("\n") + 1
+
+        variables: dict[str, str] = {}
+        d = RE_DECLARE.search(corps)
+        if d:
+            for v in RE_DECLARATION.finditer(d.group(1)):
+                variables[v.group(1).lower()] = ALIAS_TYPES.get(
+                    v.group(2).lower(), v.group(2).lower()
+                )
+
+        corps_sans = _sans_commentes(corps)
+        corps_sans = re.sub(r"'(?:[^']|'')*'", " '' ", corps_sans)
+
+        for appel in re.finditer(r"\btestkit\.eq\s*\(", corps_sans):
+            prof, i = 1, appel.end()
+            while i < len(corps_sans) and prof:
+                if corps_sans[i] == "(":
+                    prof += 1
+                elif corps_sans[i] == ")":
+                    prof -= 1
+                    if prof == 0:
+                        break
+                i += 1
+            arguments = _arguments_de_primer_niveau(corps_sans[appel.end(): i])
+            if len(arguments) != 3:
+                continue
+            ta = _type_connu(arguments[0], variables)
+            tb = _type_connu(arguments[1], variables)
+            if ta and tb and ta != tb:
+                ligne = depart + corps_sans[: appel.start()].count("\n")
+                findings.append(
+                    f"{nom_fichier}:{ligne}  testkit.eq({ta}, {tb}) — aucun type ne correspond\n"
+                    f"      a = {arguments[0][:72]}\n"
+                    f"      b = {arguments[1][:72]}\n"
+                    f"      → testkit.eq est eq(anyelement, anyelement, text) : les deux\n"
+                    f"        arguments DOIVENT être du même type. L'affectation, elle,\n"
+                    f"        accepte bigint → integer sans bruit : le défaut n'apparaît\n"
+                    f"        qu'à la comparaison, et le message d'erreur ne parle ni de\n"
+                    f"        l'assertion ni de ce qu'elle vérifie."
+                )
+    return findings
+
+
+def _arguments_de_primer_niveau(s: str) -> list[str]:
+    out, prof, courant, dansch = [], 0, "", False
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if dansch:
+            if ch == "'":
+                if s[i + 1:i + 2] == "'":
+                    i += 2
+                    courant += "''"
+                    continue
+                dansch = False
+            courant += ch
+            i += 1
+            continue
+        if ch == "'":
+            dansch = True
+            courant += ch
+            i += 1
+            continue
+        if ch == "(":
+            prof += 1
+        elif ch == ")":
+            prof -= 1
+        if ch == "," and prof == 0:
+            out.append(courant)
+            courant = ""
+        else:
+            courant += ch
+        i += 1
+    out.append(courant)
+    return [a.strip() for a in out]
+
+
 def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, str, str, bool]]:
-    """(fichier, nom, corps, langage, est_effective) pour chaque fonction définie.
+    """(fichier, signature, corps, langage, est_effective) pour chaque fonction.
 
     Seule la DERNIÈRE définition d'un nom de fonction est effective : c'est
     celle que la base contient, donc la seule dont l'exécution peut échouer.
@@ -476,19 +617,20 @@ def main() -> int:
 
     # Le troisième contrôle ne porte pas sur les fonctions mais sur les
     # fichiers entiers : un littéral mal fermé dans un test est aussi invisible
-    # à la migration, puisque le test n'est pas rejoué avant la recette.
-    n_litteraux = 0
+    # à la migration, puisque le test n'est pas rejoué avant la recette. Le
+    # cinquième ne concerne que les tests.
     for f in [*migrations, *tests]:
         for ligne, colonne, texte in _litteraux_ouverts(f.read_text()):
-            n_litteraux += 1
-            ou = f"colonne {colonne + 1}" if colonne >= 0 else "fin de fichier"
             defauts.append(
-                f"{f.name}:{ligne}  littéral `'` non fermé ({ou})\n"
+                f"{f.name}:{ligne}  littéral `'` non fermé ({'colonne ' + str(colonne + 1) if colonne >= 0 else 'fin de fichier'})\n"
                 f"      | {texte.strip()}\n"
                 f"      → SQL n'autorise pas un littéral sur plusieurs lignes. Si le\n"
                 f"        guillemet fermant est mal placé, PostgreSQL complain d'un\n"
                 f"        dollar-quoting et désigne le `$` d'une variable interpolée."
             )
+
+    for f in tests:
+        defauts.extend(_conflits_de_types(f.read_text(), f.name))
 
     if obsolete:
         print("Définitions dépassées, sans effet sur la base (corrigées plus loin) :")

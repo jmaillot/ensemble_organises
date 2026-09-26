@@ -430,7 +430,13 @@ declare
   v_alice uuid;
   v_consumed integer;
   v_report jsonb;
-  v_before integer;
+  -- `bigint`, et non `integer` : `testkit.count()` renvoie un bigint, et
+  -- `testkit.eq` est `eq(anyelement, anyelement, text)` — les deux arguments
+  -- doivent être du MÊME type, sinon PostgreSQL ne trouve aucune surcharge et
+  -- répond « function testkit.eq(bigint, integer, unknown) does not exist ».
+  -- L'affectation, elle, accepte bigint → integer sans bruit : le défaut
+  -- n'apparaissait qu'à la comparaison.
+  v_before bigint;
 begin
   select user_id into v_alice from testkit.fx where key = 'camille';
 

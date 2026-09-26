@@ -983,13 +983,29 @@ une fonction renvoyant un ensemble. Le second cas ne lève aucune erreur et
 renvoie des lignes vides : seule une assertion sur le **contenu** des lignes peut
 le voir.
 
-Quatre vérifications : aucun nom de table non qualifié sous un `search_path`
-vide, aucun CTE qui se rejoint lui-même, aucun littéral laissé ouvert en fin de
-ligne, aucune référence non qualifiée à une colonne de `returns table`. Ce
-dernier point ne vise que `language plpgsql` : en `language sql`, `returns table`
-ne déclare que des noms de colonnes, il n'y a pas de variable et donc pas de
-risque. Un contrôle qui condamne du code qui fonctionne vaut moins que pas de
-contrôle du tout — on apprend à l'ignorer.
+Quatre vérifications sur les migrations, une sur les tests : aucun nom de table
+non qualifié sous un `search_path` vide, aucun CTE qui se rejoint lui-même,
+aucun littéral laissé ouvert en fin de ligne, aucune référence non qualifiée à
+une colonne de `returns table`, et les deux valeurs comparées par `testkit.eq`
+du même type — c'est le cinquième contrôle, et il ne porte que sur `supabase/tests`.
+
+Les deux derniers méritent d'être lus. `returns table` ne décrit pas
+seulement le résultat : en PL/pgSQL, ses colonnes sont des **variables** (voir
+plus haut). Et `testkit.eq` est `eq(anyelement, anyelement, text)` : les deux
+valeurs doivent être du même type, or `testkit.count()` renvoie `bigint` et une
+variable déclarée `integer` est acceptée **à l'affectation** sans bruit. Le
+défaut n'apparaît qu'à la comparaison, sous la forme « function
+testkit.eq(bigint, integer, unknown) does not exist » — un message qui ne parle
+ni de l'assertion ni de ce qu'elle vérifie.
+
+Deux points de méthode, appris à l'usage. Le contrôle sur `returns table` ne
+vise que `language plpgsql` : en `language sql`, ces colonnes ne sont que des
+noms, il n'y a pas de variable, donc pas de risque. Signaler là-dessus
+condamnerait du code qui fonctionne — et un contrôle qui condamne du code testé
+vaut moins que pas de contrôle, parce qu'on apprend à l'ignorer. Et pour le même
+motif, le contrôleur ne conclut que sur les types qu'il peut déterminer avec
+certitude : un littéral s'accorde sur l'autre argument, donc il ne peut pas être
+la cause d'un conflit, et le silence vaut mieux qu'une devinette.
 
 Un mot sur le dernier piège, rencontré en chemin : un `$nom$` utilisé comme
 espace réservé dans une chaîne entre en collision avec la syntaxe de

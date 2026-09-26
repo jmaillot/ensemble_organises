@@ -216,6 +216,34 @@ version cassée du fichier rejouée depuis Git, et une fonction piégée. Un
 vérificateur qui n'a jamais refusé quelque chose n'a pas encore été exercé ; et
 un vérificateur qui refuse du code que les tests couvrent, non plus.
 
+### 2.7 Le test lui-même était le défaut
+
+Les quatre premiers défauts de cette famille étaient dans le schéma. Les trois
+suivants étaient dans `0007_push.sql`, qui n'avait encore atteint aucune
+assertion de comportement.
+
+* une assertion appelait `due_push_notifications('test', now(), null)` et
+  attendait une notification, alors que la fonction refuse un test sans
+  destinataire — délibérément, pour que la fonction d'envoi ne devienne pas un
+  service de messagerie ;
+* une autre comparait `testkit.count(...)` — un `bigint` — à une variable
+  déclarée `integer`. `testkit.eq` étant `eq(anyelement, anyelement, text)`,
+  PostgreSQL ne trouvait aucune surcharge. L'affectation, elle, accepte
+  bigint → integer sans bruit : **le défaut n'existait qu'à la comparaison** ;
+* une expression `n.value ->> 'title' || '|' || n.value ->> 'url'` se lisait
+  `(((… ->> 'title') || '|') || n.value) ->> 'url'`, parce que `->>` et `||` ont
+  la même priorité en PostgreSQL et que l'associativité est à gauche.
+
+Le premier est le plus grave, et il ne se voyait pas : **l'assertion suivante,
+à deux lignes de distance, passait déjà le bon argument.** Les deux disaient la
+même chose, dont une version fausse. Une assertion fausse n'est pas moins
+fauxe qu'une assertion absente.
+
+**Règle** : avant d'écrire une assertion, lire l'implémentation qu'elle vérifie.
+Une assertion écrit de mémoire teste l'idée qu'on se fait du code, pas le code.
+Et « le test échoue, ce qui est rare » n'est pas un signal : sur un fichier
+nouveau, c'est la norme.
+
 ---
 
 ## 3. Les garde-fous désormais en place
@@ -231,8 +259,8 @@ Chacun existe parce qu'un défaut l'a rendu nécessaire.
 | `testkit.count()` encapsule et compte vraiment | `_setup.sql` | 2.2 |
 | Ancre positive avant les assertions négatives | `0002` § Bob | 2.4 |
 | `as_user` pose les deux GUC, comme PostgREST | `_setup.sql` | 2.1 |
-| Tables qualifiées, CTE sans auto-référence, littéraux fermés | `check-sql-statique.py` | 2.5 |
-| Un contrôle se prouve sur un cas qui doit échouer | idem, cas piégé | 2.6 |
+| Tables qualifiées, CTE sans auto-référence, littéraux fermés, `returns table` sans référence nue, `testkit.eq` à types égaux | `check-sql-statique.py` | 2.5, 2.7 |
+| Un contrôle se prouve sur un cas qui doit échouer | idem, cas piégés | 2.6 |
 
 Deux exceptions documentées au contrôle « au moins une politique » :
 `household_invite_tokens`, inatteignable par conception, et
