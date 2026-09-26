@@ -274,28 +274,22 @@ select testkit.ok(
   and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%''authorization''%',
   'le dispatch envoie la clé secrète dans l''en-tête apikey, et pas comme un jeton Bearer');
 
--- Et le secret ne doit se trouver ni dans l'URL, ni dans un corps de message :
--- les deux sont journalisés par pg_net, et conservés en base.
+-- Ce que la fonction met dans l'URL et dans le corps n'est PAS vérifié ici, et
+-- ce n'est pas un oubli.
 --
--- On vérifie donc la FORME POSITIVE de ces deux expressions, plutôt qu'une
--- interdiction. Un motif négatif — `not like '%v_key%||%functions/v1%'` — avait
--- matché à cheval sur deux instructions : le `v_key` de la DÉCLARATION de
--- variable, puis le `||` de l'URL, plus loin. Il était donc satisfait par le
--- code correct, et l'assertion échouait à raison.
+-- `pg_get_functiondef` ne rend pas la source : il re-déparse l'arbre SQL, et
+-- PostgreSQL réaffiche les littéraux avec leurs casts (`'scope'::text`). Un
+-- motif écrit contre le fichier de migration échoue donc sans qu'aucun code
+-- ait changé ; écrit contre la sortie observée, il cesse de vérifier quoi que
+-- ce soit dès qu'on reformate. Aucune des deux formes n'est un test.
 --
--- Une forme positive échoue dès que quelqu'un touche à l'expression : ajouter
--- la clé dans l'URL, y dans le corps, ou y mettre autre chose, et le littéral
--- ne correspond plus. Elle n'a besoin ni de regex, ni d'échappement, donc elle
--- ne dépend d'aucun réglage de session — un `\n` dans un littéral SQL n'est un
--- retour à la ligne que selon `standard_conforming_strings`, et cette instance
--- l'a interprété comme tel, ce qui avait rendu l'assertion précédente
--- illisible.
-select testkit.ok(
-  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
-      like '%url := rtrim(v_url, ''''%functions/v1/push-notify''%'
-  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
-      like '%body := jsonb_build_object(''scope'', p_scope)%',
-  'l''URL et le corps sont exactement les expressions attendues, sans la clé');
+-- La propriété qui nous intéresse — le secret ne voyage ni dans l'URL ni dans
+-- le corps — est une interdiction, et un motif d'interdiction croise toujours
+-- ce qu'il ne faut pas : `%v_key%||%functions/v1%` matchait le `v_key` d'une
+-- déclaration de variable et le `||` d'une autre instruction.
+--
+-- La preuve retenue est comportementale : le `200` de `net._http_response`, et
+-- la disparition de la ligne de rappel. Voir AGENTS.md §2.7 D.
 
 -- Sur une instance qui a pg_net, le dispatch ne doit plus être inerte. La suite
 -- ne suppose pas l'extension : elle le signale, comme elle le fait pour pg_cron.

@@ -210,23 +210,35 @@ l'appelant. C'est le cas de `db_printenv`.
    séparée : une variable du bloc appelant n'y existe pas.
 
 6. **Une assertion qui lit le CODE comme du texte est un instrument
-   faible.** `pg_get_functiondef(…) like '%…%'` est le moyen de vérifier un
-   contrat qu'aucune assertion comportementale ne couvre — mais le `%` franchit
-   les instructions. Un motif trop lâche est satisfait par du code correct, ou
-   échoue à raison ; dans les deux cas c'est du bruit, et du bruit dans une
-   suite de tests s'apprend à être ignoré.
+   faible**, et elle a une limite que rien ne signale à l'écran :
+   `pg_get_functiondef(…)` ne rend pas la source, il **re-déparse l'arbre SQL**.
+   PostgreSQL réaffiche les littéraux avec leurs casts (`'scope'::text`), et la
+   forme affichée dépend de sa version. Un motif écrit contre le fichier de
+   migration échoue donc sans qu'aucun code ait changé ; écrit contre la sortie
+   observée, il cesse de vérifier quoi que ce soit dès qu'on reformate. Vérifier
+   un motif avec un simulateur maison n'aide pas : le simulateur lit la source,
+   la base lit la déparse.
 
-   Trois règles, apprises de quatre faux positifs :
+   Quatre règles, apprises de cinq faux positifs :
 
    * **ancre sur le littéral, pas sur un identifiant.** `like '%''apikey'', v_key%'`
      vérifie une présence précise ; `not like '%v_key%||%functions/v1%'`
      matchait le `v_key` d'une déclaration de variable et le `||` d'une autre
      instruction, donc à cheval sur les deux ;
-   * **quand il faut viser une ligne, utilise un regex** —
-     `!~ '(?s)url := [^\n]*v_key'` ancre sur la seule ligne qui porte
-     l'instruction, ce qui est la propriété recherchée ;
-   * **si la propriété ne s'exprime pas ainsi, supprime l'assertion.** Elle
-     serait alors incapable d'échouer, donc incapable de servir.
+   * **préfère une forme positive à une interdiction.** `like '%scope%'` dit ce
+     qui doit être là ; `not like '%v_key%'` dit ce qui ne doit pas y être, et
+     son motif finit par croiser ce qu'il ne faut pas. Réserve cette seconde
+     forme au cas où un littéral positif n'exprime pas la propriété ;
+   * **ne raffine pas un motif pour le faire passer.** Le regex ancré sur une
+     ligne, `!~ '(?s)url := [^\n]*v_key'`, a coûté trois jetons et n'a jamais
+     fonctionné : le `\n` d'un littéral SQL ne vaut que selon
+     `standard_conforming_strings`, et la classe de remplacement n'était pas
+     lisible par le seul vérificateur disponible ;
+   * **si la propriété ne s'exprime pas ainsi, supprime l'assertion** et
+     confie-la à une preuve comportementale. Elle serait alors incapable
+     d'échouer, donc incapable de servir. Mieux vaut une assertion absente,
+     dont le commentaire explique le renoncement, qu'une assertion dont on
+     retoucherait le motif jusqu'au vert.
 
    Un test qui ne peut pas échouer n'est pas un test : c'est un commentaire
    qui coûte une exécution.
