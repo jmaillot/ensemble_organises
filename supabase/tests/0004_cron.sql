@@ -257,6 +257,30 @@ select testkit.ok(
   and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%Vault absent%',
   'le dispatch nomme la cause qu''il a constatée, extension ou coffre');
 
+-- L'EN-TÊTE DE LA CLÉ SECRÈTE.
+--
+-- Le mode d'authentification d'une Edge Function est décidé par l'EN-TÊTE, pas
+-- par la forme de la valeur : `secret` attend la clé sb_* dans `apikey`, et
+-- `user` attend un JWT dans `Authorization`. Une clé secrète présentée comme
+-- Bearer est donc un JWT qui n'en est pas un, et le framework répond
+-- `401 UNUSABLE_CREDENTIAL` AVANT d'atteindre le corps de la fonction — donc
+-- sans un seul log de la fonction, et sans rien consommé.
+--
+-- Le chemin est resté inerte de bout en bout, et le bouton « Envoyer un test »
+-- le masquait : lui appelle `push-notify` depuis le navigateur, avec un JWT
+-- d'utilisateur, donc par le bon mode depuis le début.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%''apikey'', v_key%'
+  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%''authorization''%',
+  'le dispatch envoie la clé secrète dans l''en-tête apikey, et pas comme un jeton Bearer');
+
+-- Et le secret ne doit se trouver ni dans l'URL, ni dans un corps de message :
+-- les deux sont journalisés par pg_net, et conservés en base.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%v_key%||%functions/v1%'
+  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) not like '%body := %v_key%',
+  'le secret ne transite ni par l''URL ni par le corps de la requête');
+
 -- Sur une instance qui a pg_net, le dispatch ne doit plus être inerte. La suite
 -- ne suppose pas l'extension : elle le signale, comme elle le fait pour pg_cron.
 do $$
