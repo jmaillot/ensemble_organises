@@ -148,6 +148,20 @@ comment on table testkit.fx is
 -- liste rendait la fixture dépendante d'un instantané précis : on n'alimente
 -- donc que les colonnes réellement présentes, et la fixture reste valable après
 -- une mise à jour de la stack.
+--
+-- « Présente » ne suffit pourtant pas, et c'est un second axe. Une colonne
+-- GÉNÉRÉE est bien listée dans `pg_attribute` : le filtre d'existence la laisse
+-- passer, et PostgreSQL refuse ensuite toute valeur fournie pour elle. Sur
+-- certaines versions de GoTrue, `confirmed_at` est exactement ce cas — et
+-- l'échec tombait sur les SEPT suites, pour une raison étrangère à leur
+-- contenu : sept fichiers rouges, un seul défaut, qui n'avait rien à voir avec
+-- ce qu'ils vérifient.
+--
+-- Les colonnes d'IDENTITÉ sont volontairement exclues du même filtre. Les
+-- écarter toutes casserait `id`, que la fixture fournit pour connaître
+-- l'identifiant du compte : la ligne créée serait muette et la fonction
+-- renverrait un uuid qui n'appartiendrait à personne. Il faut que cet échec
+-- reste bruyant, pas qu'il devienne silencieux.
 create or replace function testkit.auth_user(p_email text, p_display_name text default 'Utilisateur test')
 returns uuid
 language plpgsql
@@ -185,6 +199,9 @@ begin
         and a.attname::text = s.column_name
         and a.attnum > 0
         and not a.attisdropped
+        -- Colonne générée : présente au catalogue, mais sa valeur est calculée.
+        -- Voir la note ci-dessus.
+        and a.attgenerated = ''
    );
 
   if v_columns is null then
