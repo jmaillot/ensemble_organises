@@ -684,26 +684,39 @@ Variables d'environnement, lues par cette seule fonction :
 | `VAPID_SUBJECT` | contact du service Push, `mailto:` ou `https:` |
 
 Elles ne sont lues par aucune autre fonction, ne sont écrites ni en base ni
-dans un fichier de configuration versionné, et ne sont pas nécessaires au job
-pg_cron : celui-ci n'appelle que l'URL de la fonction avec la clé secrète du
-projet, lue dans Vault.
+dans un fichier versionné, et ne sont pas nécessaires au job pg_cron : celui-ci
+n'appelle que l'URL de la fonction avec la clé secrète du projet, lue dans
+Vault. Elles voyagent par le même chemin que `INVITE_TOKEN_HMAC_SECRET` : les
+trois lignes de `.env.vapid` sont recopiées dans le `.env` de la stack, et
+l'override `docker-compose.traefik.yml` ne les déclare que pour le service
+`functions`. Le `.env` n'est jamais versionné et n'est lu que par Compose.
 
 ```bash
 sh scripts/generate-vapid-keys.sh          # écrit .env.vapid en 600
 ```
 
-Puis injecter les trois variables dans l'environnement du service `functions`.
-Sur la stack auto-hébergée, l'override `supabase-project/docker-compose.traefik.yml`
-est l'endroit prévu :
+L'override versionné `supabase-project/docker-compose.traefik.yml` déclare déjà
+ces trois variables, et **uniquement** pour le service `functions`. Il reste donc
+à reporter les trois lignes de `.env.vapid` dans `supabase-project/.env`, puis à
+reconstruire le service :
 
-```yaml
-services:
-  functions:
-    environment:
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_SUBJECT: ${VAPID_SUBJECT}
+```sh
+grep '^VAPID_' .env.vapid >> supabase-project/.env    # jamais versionné
+cd supabase-project && sh run.sh recreate functions
 ```
+
+Les deux secrets des jobs, eux, vont dans **Vault** — pas dans le `.env`, qui
+est lu par tous les services :
+
+```sh
+sh scripts/set-push-secrets.sh            # lit le .env, n'affiche rien
+sh scripts/set-push-secrets.sh --check    # noms, états, dates
+```
+
+`post_push_dispatch()` se contente d'un `warning` si l'un manque : aucun job
+n'échoue, le calcul des rappels continue, et rien ne part. Un secret absent se
+remarque donc au bout de plusieurs jours, en croyant que le foyer a coupé ses
+notifications. D'où le `--check`.
 
 Sans ces variables, la fonction échoue explicitement en `500` — elle ne doit
 jamais laisser croire à un envoi réussi. La clé publique n'a **pas** à être

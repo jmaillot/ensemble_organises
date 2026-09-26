@@ -65,6 +65,15 @@ services:
   functions:
     environment:
       INVITE_TOKEN_HMAC_SECRET: ${INVITE_TOKEN_HMAC_SECRET}
+      # Signature des envois Web Push (RFC 8292), lue par `push-notify` seule.
+      # Générées par `sh scripts/generate-vapid-keys.sh`, qui écrit `.env.vapid`
+      # sans jamais afficher la clé privée : il reste à reporter les trois
+      # lignes dans le `.env` de la stack, comme `INVITE_TOKEN_HMAC_SECRET`.
+      # Sans elles, `push-subscribe` répond `push_configured: false` et
+      # `push-notify` échoue en 500 au lieu de laisser croire à un envoi.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
       FUNCTIONS_VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-false}
       SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}

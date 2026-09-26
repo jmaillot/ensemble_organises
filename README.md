@@ -332,7 +332,7 @@ sont absentes, l'application démarre en mode démonstration.
 | `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` | authentification Basic du dashboard de la gateway |
 | `FUNCTIONS_VERIFY_JWT=false` | obligatoire ici : la stack mélange appels navigateur (`publishable`), session (`user`) et cron serveur (`secret`) ; chaque fonction déclare son mode |
 | `INVITE_TOKEN_HMAC_SECRET` | ≥ 256 bits (`openssl rand -base64 48`), stocké dans Vault, injecté **uniquement** dans l'Edge Function d'invitation ; sa rotation invalide tous les tokens actifs |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | signature des envois push, lues **uniquement** par `push-notify`. Générées par `sh scripts/generate-vapid-keys.sh` et injectées dans l'environnement du service `functions` — jamais dans le `.env` de la stack, qui est lu par tous les services |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | signature des envois push, lues **uniquement** par `push-notify`. Générées par `sh scripts/generate-vapid-keys.sh`, dont les trois lignes sont à reporter dans le `.env` de la stack ; l'override `docker-compose.traefik.yml` ne les déclare que pour le service `functions` — même chemin que `INVITE_TOKEN_HMAC_SECRET` |
 | `project_url` / `service_role_key` (dans **Vault**, pas dans le `.env`) | lues par les deux jobs de dispatch au moment de l'exécution ; sans elles, les rappels sont calculés et rien n'est envoyé |
 
 `SUPABASE_SECRET_KEY`, `POSTGRES_PASSWORD`, `INVITE_TOKEN_HMAC_SECRET`,
@@ -380,6 +380,8 @@ sh scripts/deploy-functions.sh --list
 sh scripts/backup.sh
 sh scripts/restore.sh <horodatage> --dry-run
 sh scripts/generate-vapid-keys.sh     # → .env.vapid (600), à ne pas versionner
+sh scripts/set-push-secrets.sh        # project_url + service_role_key dans Vault
+sh scripts/set-push-secrets.sh --check  # vérification, sans écrire
 ```
 
 Dans `supabase-project/` : `sh run.sh start|stop|logs <service>|recreate <service>`.
