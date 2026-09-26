@@ -375,10 +375,37 @@ begin
   );
 
   -- Le test manuel ne lit aucune table métier : un seul destinataire possible.
+  --
+  -- Et ce destinataire ne peut pas être omis. La fonction lève une exception si
+  -- `p_user_id` est nul, et c'est une propriété de sécurité, pas une
+  -- commodité : un appel sans destinataire produirait une notification que
+  -- personne ne reçoit, et un appel qui devinerait l'identifiant d'un autre
+  -- enverrait hors de son propre foyer. La fonction d'envoi deviendrait un
+  -- service de messagerie ouvert à quiconque possède une session — ce que
+  -- l'écriture du message dans la base, en 0019, cherche précisément à
+  -- empêcher.
+  perform testkit.expect_denied(
+    'select public.due_push_notifications(''test'', now(), null)',
+    'un test sans destinataire est refusé'
+  );
   perform testkit.eq(
-    testkit.count('select 1 from public.due_push_notifications(''test'', now(), null)'),
-    1::bigint,
+    jsonb_array_length(public.due_push_notifications('test', now(), v_alice)),
+    1,
     'un test produit exactement une notification'
+  );
+  -- Le titre et la cible sont écrits par la base : l'appelant n'a aucun
+  -- paramètre pour les choisir, et cette assertion le verrouille.
+  perform testkit.eq(
+    (select n.value ->> 'title'
+       from jsonb_array_elements(public.due_push_notifications('test', now(), v_alice)) n),
+    'Notifications activées',
+    'le titre du test est écrit par la base, pas par l''appelant'
+  );
+  perform testkit.eq(
+    (select n.value ->> 'url'
+       from jsonb_array_elements(public.due_push_notifications('test', now(), v_alice)) n),
+    '/parametres',
+    'le test renvoie vers les paramètres, seul endroit où on peut le couper'
   );
   perform testkit.eq(
     (select count(*) from jsonb_array_elements(public.due_push_notifications('test', now(), v_alice)) n
