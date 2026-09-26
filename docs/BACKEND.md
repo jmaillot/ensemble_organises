@@ -731,6 +731,24 @@ n'échoue, le calcul des rappels continue, et rien ne part. Un secret absent se
 remarque donc au bout de plusieurs jours, en croyant que le foyer a coupé ses
 notifications. D'où le `--check`.
 
+**Ce que renvoie un job.** `private.dispatch_push_notifications()` et
+`private.dispatch_birthday_alerts()` renvoient toutes deux la même forme :
+
+```json
+{ "due": 2, "dispatched": true, "generated_at": "2026-09-26T05:00:00+00:00" }
+```
+
+* `due` : nombre de notifications ayant **au moins un abonné**. C'est le seul
+  chiffre qui décrit le foyer, et il ne dépend d'aucun secret.
+* `dispatched` : `false` quand `due = 0` — le job n'a appelé personne, ce qui est
+  le cas normal sur une stack où personne n'a activé les notifications. Un
+  `dispatched: false` malgré un `due > 0` signale, lui, un secret manquant ou
+  une Edge Function injoignable.
+* Depuis la migration 0019, ces fonctions ne rendent plus les compteurs de
+  fenêtre (« semaine », « mois ») : décider de ce qui est dû appartient à
+  `public.due_push_notifications()`, et le résumer ici demanderait de faire
+  compter deux fois la même chose par deux chemins différents.
+
 Sans ces variables, la fonction échoue explicitement en `500` — elle ne doit
 jamais laisser croire à un envoi réussi. La clé publique n'a **pas** à être
 ajoutée au frontend : `push-subscribe` la renvoie au navigateur via
@@ -798,10 +816,13 @@ Points de conception :
   `scope` (`rappels` ou `anniversaires`). Deux fonctions d'envoi, ce serait deux
   déploiements à tenir alignés et deux jeux de secrets.
 * `private.dispatch_daily_notifications()` (migration 0011) pointait vers une
-  fonction `daily-briefing` qui n'a jamais existé. Elle est **conservée** — son
-  corps est inchangé, et `supabase/tests/0004_cron.sql` vérifie qu'elle ne
-  référence plus cet endpoint — mais plus aucun job ne l'appelle : `0011` avait
-  créé la fonction sans programmer le job.
+  fonction `daily-briefing` qui n'a jamais existé, et plus aucun job ne l'appelle
+  : `0011` avait créé la fonction sans programmer le job. La migration **0021**
+  la fait déléguer à `private.dispatch_push_notifications()`, qui est le même
+  travail sous son nom actuel. Le corps n'est donc écrit qu'une fois, l'ancien
+  nom continue de fonctionner, et l'endpoint fantôme a disparu du dépôt.
+  `supabase/tests/0004_cron.sql` vérifie les deux moitiés : elle délègue, et elle
+  ne référence plus `daily-briefing`.
 * Si `pg_cron` n'est pas installé sur l'image, la migration émet un `notice` et
   s'arrête proprement : le schéma reste déployable.
 

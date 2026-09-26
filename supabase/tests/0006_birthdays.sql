@@ -147,11 +147,12 @@ end;
 $$;
 
 -- ===========================================================================
--- 3. Résumé du dispatch
+-- 3. Ce que le job envoie, et ce qu'il déclare avoir envoyé
 --
--- Aucun push n'est tant qu'il existe : le dispatch renvoie les alertes à
--- traiter. L'assertion reste valable même si Vault contient un jour
--- `push_endpoint` (installation de l'Edge Function d'envoi).
+-- Aucun push n'est déclenché tant que personne n'est abonné. Les assertions
+-- restent valables même si Vault contient un jour `push_endpoint`
+-- (installation de l'Edge Function d'envoi) : sans abonné, le job n'a rien à
+-- distribuer et n'appelle donc personne.
 -- ===========================================================================
 do $$
 declare
@@ -161,10 +162,14 @@ declare
   v_today date := (now() at time zone 'Europe/Paris')::date;
   v_birthday text := private.new_id('birthday');
   v_result jsonb;
+  -- `least(…, 28)` évite de construire un 29 février sur une année non
+  -- bissextile. Le prix à payer : entre le 29 et le 31 du mois, l'anniversaire
+  -- construit est le 28, déjà passé, et son occurrence est l'année suivante.
+  -- Ce test doit donc dire s'il prétend tester « le jour » ou « le 28 »,
+  -- plutôt que d'échouer un tiers du temps selon la date d'exécution.
+  v_birthday_is_today boolean := extract(day from v_today)::integer <= 28;
 begin
   -- Anniversaire du jour : toujours dans la fenêtre, puisqu'il est à 0 jour.
-  -- `least(…, 28)` évite de construire un 29 février sur une année non
-  -- bissextile ; le cas du 29 février lui-même est exclu de l'assertion.
   insert into public.birthdays (id, household_id, name, birth_date, linked_member_id)
   values (
     v_birthday,
@@ -178,7 +183,7 @@ begin
     alice_m
   );
 
-  if extract(day from v_today) <> 29 then
+  if v_birthday_is_today then
     perform testkit.eq(
       (select count(*) from private.household_birthday_alerts(home) a where a.birthday_id = v_birthday),
       1::bigint,
@@ -186,29 +191,65 @@ begin
     );
   end if;
 
+  -- Le nouveau contrat. Depuis 0019, le dispatch ne rend plus les compteurs de
+  -- fenêtre (« semaine », « mois ») : ce n'est plus à lui de décider de ce qui
+  -- est dû, `public.due_push_notifications()` le fait. Il rend donc seulement ce
+  -- qu'il a distribué, et ce qui reste lisible par un job pg_cron.
+  --
+  -- Ce qui remplace les compteurs, c'est la liste des notifications à envoyer,
+  -- vérifiée directement sur la fonction qui la produit : c'est elle, et non le
+  -- résumé, qui décide de ce qu'un membre recevra.
+  if v_birthday_is_today then
+    perform testkit.eq(
+      testkit.count(
+        'select 1 from private.push_birthday_notifications(null) n where n.reminder_id = ''$v_birthday$'''
+      ),
+      1::bigint,
+      'l''anniversaire du jour produit une notification, pour le membre lié'
+    );
+    perform testkit.eq(
+      (
+        select n.tag || '|' || n.url || '|' || n.title
+          from private.push_birthday_notifications(null) n
+         where n.reminder_id = ''$v_birthday$'''
+      ),
+      'anniversaire-' || v_birthday || '|/anniversaires|Anniversaire',
+      'la notification porte une balise qui regroupe les envois du même jour'
+    );
+  end if;
+
   v_result := private.dispatch_birthday_alerts();
 
-  perform testkit.ok(v_result ? 'alerts', 'le résumé contient le nombre d''alertes');
-  perform testkit.ok(v_result ? 'semaine', 'le résumé distingue la fenêtre « semaine »');
-  perform testkit.ok(v_result ? 'mois', 'le résumé distingue la fenêtre « mois »');
-  perform testkit.ok(v_result ? 'sent', 'le résumé indique ce qui a été distribué');
+  perform testkit.ok(v_result ? 'due', 'le résumé contient le nombre de notifications à envoyer');
+  perform testkit.ok(v_result ? 'dispatched', 'le résumé indique ce qui a été distribué');
   perform testkit.ok(v_result ? 'generated_at', 'le résumé est horodaté');
+
+  -- Aucun membre de ce test n'a d'abonnement : le job n'a personne à notifier,
+  -- et il n'essaie donc pas d'appeler l'Edge Function. Cette assertion reste
+  -- vraie même si Vault contient un jour `push_endpoint`.
   perform testkit.eq(
-    (v_result ->> 'alerts')::integer,
-    (select count(*) from private.household_birthday_alerts())::integer,
-    'le résumé compte exactement les alertes à traiter'
+    (v_result ->> 'due')::integer,
+    0,
+    'sans abonné, le job n''a personne à notifier'
   );
-  perform testkit.ok(
-    (v_result ->> 'sent')::integer <= (v_result ->> 'alerts')::integer,
-    'rien n''est distribué au-delà des alertes calculées'
+  perform testkit.eq(
+    v_result ->> 'dispatched',
+    'false',
+    'rien n''est distribué quand il n''y a aucun destinataire'
   );
 end;
 $$;
 
--- Le dispatch lit ses secrets dans Vault, jamais en clair dans une commande.
+-- Le dispatch des anniversaires ne lit aucun secret lui-même : il délègue à
+-- `private.post_push_dispatch()`, qui est le seul point de lecture de Vault.
+-- Deux points de lecture seraient deux endroits où un secret pourrait se
+-- glisser. La preuve que la lecture a bien lieu, et qu'elle est différée à
+-- l'exécution, est dans `0004_cron.sql` : la répéter ici demanderait à cette
+-- fonction de porter un code qu'elle ne contient pas.
 select testkit.ok(
-  pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%vault.decrypted_secrets%',
-  'le dispatch lit ses secrets dans Vault au moment de l''exécution'
+  pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%post_push_dispatch(''anniversaires'')%'
+  and pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) not like '%vault.%',
+  'le dispatch des anniversaires délègue la lecture des secrets'
 );
 
 -- ===========================================================================

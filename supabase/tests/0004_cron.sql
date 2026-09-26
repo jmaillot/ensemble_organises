@@ -208,13 +208,10 @@ $$;
 select testkit.ok(
   pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%vault.decrypted_secrets%',
   'la fonction de dispatch lit ses secrets dans Vault au moment de l''exécution');
-select testkit.ok(
-  pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) like '%vault.decrypted_secrets%',
-  'le dispatch historique lit ses secrets dans Vault au moment de l''exécution');
 
--- Et les deux dispatchs push délèguent bien à cette fonction unique, sans
--- jamais lire Vault eux-mêmes : deux points de lecture seraient deux endroits
--- où un secret pourrait se glisser.
+-- Et les trois dispatchs délèguent bien à cette fonction unique, sans jamais
+-- lire Vault eux-mêmes : deux points de lecture seraient deux endroits où un
+-- secret pourrait se glisser.
 select testkit.ok(
   pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) like '%post_push_dispatch(''rappels'')%'
   and pg_get_functiondef('private.dispatch_push_notifications()'::regprocedure) not like '%vault.%',
@@ -223,6 +220,15 @@ select testkit.ok(
   pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) like '%post_push_dispatch(''anniversaires'')%'
   and pg_get_functiondef('private.dispatch_birthday_alerts()'::regprocedure) not like '%vault.%',
   'le dispatch des anniversaires délègue la lecture des secrets');
+
+-- `dispatch_daily_notifications()` est l'ancien nom du dispatch des rappels
+-- (migration 0011). Elle délègue donc au dispatch des rappels, lui-même : le
+-- travail n'est écrit qu'une fois, et le nom historique ne renvoie plus à un
+-- endpoint fantôme.
+select testkit.ok(
+  pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) like '%dispatch_push_notifications()%'
+  and pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) not like '%vault.%',
+  'le dispatch historique délègue au dispatch des rappels');
 
 -- Le point d'entrée est unique : une seule Edge Function à déployer et à
 -- surveiller, et les deux jobs ne peuvent pas diverger d'un point d'entrée.

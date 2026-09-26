@@ -182,19 +182,19 @@ declare
 begin
   select user_id into v_camille from testkit.fx where key = 'camille';
 
-  select testkit.expect_denied(format(
+  perform testkit.expect_denied(format(
     'select public.register_push_subscription(%L, %L, %L, %L, null, null)',
     v_camille, 'http://fcm.googleapis.com/fcm/send/x', testkit.push_p256dh(), testkit.push_auth_secret()),
     'un endpoint en HTTP ne peut pas être enregistré');
-  select testkit.expect_denied(format(
+  perform testkit.expect_denied(format(
     'select public.register_push_subscription(%L, %L, %L, %L, null, null)',
     v_camille, testkit.push_endpoint('x1'), 'trop-court', testkit.push_auth_secret()),
     'une clé publique tronquée est refusée');
-  select testkit.expect_denied(format(
+  perform testkit.expect_denied(format(
     'select public.register_push_subscription(%L, %L, %L, %L, null, null)',
     v_camille, testkit.push_endpoint('x1'), testkit.push_p256dh(), 'trop-court'),
     'un secret d''authentification tronqué est refusé');
-  select testkit.expect_denied(format(
+  perform testkit.expect_denied(format(
     'select public.register_push_subscription(null, %L, %L, %L, null, null)',
     testkit.push_endpoint('x1'), testkit.push_p256dh(), testkit.push_auth_secret()),
     'un appel sans acteur est refusé : l''identifiant ne se devine pas');
