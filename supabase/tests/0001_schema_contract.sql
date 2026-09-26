@@ -404,6 +404,21 @@ $$;
   -- le propriétaire qui l'exerce — mais ce test ne prouve pas qu'un helper
   -- est encore *nécessaire*. Il prouve qu'aucun droit n'a été accordé sans
   -- chemin utilisé.
+  --
+  -- Ce contrôle ne REMPLACE PAS les listes en dur du §7, ni celles de 0005 et
+  -- 0006. Elles ne sont pas redondantes : elles affirment une troisième chose
+  -- que celui-ci ne regarde pas — que `service_role` PEUT exécuter. C'est la
+  -- moitié positive du contrat, et elle est ce qui fait fonctionner les Edge
+  -- Functions et les jobs `pg_cron` : révoquer `service_role` sur
+  -- `dispatch_birthday_alerts` ne casse aucun test d'ici, et casse le job de
+  -- 06 h 40.
+  --
+  -- Cette moitié-là ne s'inverse pas. « Ne pas être exécutable par un
+  -- client » se démontre par référence, parce qu'un client ne doit rien
+  -- voir. « Doit être exécutable par le serveur » est une décision par
+  -- fonction : certaines sont réservées au serveur, d'autres non, et rien
+  -- dans la base ne permet de trancher. Elle reste donc énumérée — et c'est
+  -- une limite assumée, pas un oubli.
   do $$
   declare
     v_injustifiees text[];
