@@ -102,20 +102,61 @@ command -v node >/dev/null 2>&1 || {
 }
 
 umask 077
-# La clé privée est écrite dans le fichier, jamais renvoyée sur stdout : le
-# script l'affiche ? non. Node écrit les DEUX clés sur stdout, on n'en relit
-# qu'une, et la privée est réinjectée ici sans être imprimée.
-PUBLIC_KEY="$(node --input-type=module -e '
-  const { publicKey } = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
-  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", publicKey));
-  process.stdout.write(Buffer.from(raw).toString("base64url"));
+
+# UNE SEULE PAIRE, ET VÉRIFIÉE.
+#
+# Le premier jet appelait `crypto.subtle.generateKey` DEUX fois : une pour la clé
+# publique, une pour la clé privée. Ce sont donc deux paires SANS RAPPORT.
+# `push-notify` signait le jeton VAPID avec l'une et annonçait l'autre : le
+# service Push vérifie la signature avec la clé publique annoncée, et il aurait
+# refusé CHAQUE envoi — sans la moindre erreur locale, puisque tout fonctionnait.
+#
+# Le contrôle de longueur ne pouvait pas le voir : deux clés fraîchement générées
+# font 87 et 184 caractères, exactement comme une paire cohérente. C'est pour
+# cela que la vérification ci-dessous refait le chemin inverse (privée →
+# publique) au lieu de se fier à la longueur.
+#
+# La clé privée n'est jamais renvoyée sur stdout du script : elle va dans le
+# fichier en 600, et seule sa longueur est affichée.
+PAIRE="$(node --input-type=module -e '
+  import { createPublicKey, generateKeyPairSync } from "node:crypto";
+
+  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+
+  // La clé publique VAPID est le POINT NON COMPRIMÉ : 0x04 || X || Y, 65 octets.
+  // Export SPKI : les 65 derniers octets sont exactement ce point.
+  const spki = publicKey.export({ format: "der", type: "spki" });
+  const point = spki.subarray(spki.length - 65);
+  if (point[0] !== 0x04) {
+    process.stderr.write("point de courbe non compressé inattendu\n");
+    process.exit(1);
+  }
+
+  const pkcs8 = privateKey.export({ format: "der", type: "pkcs8" });
+
+  // Vérification : la clé privée redonne-t-elle le point annoncé ?
+  const retour = createPublicKey({ key: pkcs8, format: "der", type: "pkcs8" })
+    .export({ format: "der", type: "spki" })
+    .subarray(-65);
+  if (!retour.equals(point)) {
+    process.stderr.write("la clé privée ne correspond pas à la clé publique\n");
+    process.exit(1);
+  }
+
+  process.stdout.write(
+    Buffer.from(point).toString("base64url") + " " + Buffer.from(pkcs8).toString("base64url")
+  );
 ')"
 
-PRIVATE_KEY="$(node --input-type=module -e '
-  const { privateKey } = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", privateKey));
-  process.stdout.write(Buffer.from(pkcs8).toString("base64url"));
-')"
+case "$PAIRE" in
+  *' '*) ;;
+  *)
+    echo "generate-vapid-keys.sh: génération vide ou inattendue, abandon." >&2
+    exit 1
+    ;;
+esac
+PUBLIC_KEY="${PAIRE%% *}"
+PRIVATE_KEY="${PAIRE#* }"
 
 if [ -z "$PUBLIC_KEY" ] || [ -z "$PRIVATE_KEY" ]; then
   echo "generate-vapid-keys.sh: génération vide, abandon." >&2
