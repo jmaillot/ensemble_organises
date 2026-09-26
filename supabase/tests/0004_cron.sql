@@ -277,19 +277,25 @@ select testkit.ok(
 -- Et le secret ne doit se trouver ni dans l'URL, ni dans un corps de message :
 -- les deux sont journalisés par pg_net, et conservés en base.
 --
--- Un REGEX, et non un `like`. Le premier jet utilisait
--- `not like '%v_key%||%functions/v1%'`, qui matchait à cheval sur deux
--- instructions : le `v_key` de la DÉCLARATION de variable, puis le `||` de
--- l'URL, plus loin. Le motif était donc satisfaite par le code correct, et
--- l'assertion échouait à raison. `[^
-]*` ancre le motif sur la seule ligne
--- qui porte l'instruction — c'est la propriété qu'on veut vérifier.
+-- On vérifie donc la FORME POSITIVE de ces deux expressions, plutôt qu'une
+-- interdiction. Un motif négatif — `not like '%v_key%||%functions/v1%'` — avait
+-- matché à cheval sur deux instructions : le `v_key` de la DÉCLARATION de
+-- variable, puis le `||` de l'URL, plus loin. Il était donc satisfait par le
+-- code correct, et l'assertion échouait à raison.
+--
+-- Une forme positive échoue dès que quelqu'un touche à l'expression : ajouter
+-- la clé dans l'URL, y dans le corps, ou y mettre autre chose, et le littéral
+-- ne correspond plus. Elle n'a besoin ni de regex, ni d'échappement, donc elle
+-- ne dépend d'aucun réglage de session — un `\n` dans un littéral SQL n'est un
+-- retour à la ligne que selon `standard_conforming_strings`, et cette instance
+-- l'a interprété comme tel, ce qui avait rendu l'assertion précédente
+-- illisible.
 select testkit.ok(
   pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
-      !~ '(?s)url := [^\n]*v_key'
+      like '%url := rtrim(v_url, ''''%functions/v1/push-notify''%'
   and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
-      !~ '(?s)body := [^\n]*v_key',
-  'le secret ne transite ni par l''URL ni par le corps de la requête');
+      like '%body := jsonb_build_object(''scope'', p_scope)%',
+  'l''URL et le corps sont exactement les expressions attendues, sans la clé');
 
 -- Sur une instance qui a pg_net, le dispatch ne doit plus être inerte. La suite
 -- ne suppose pas l'extension : elle le signale, comme elle le fait pour pg_cron.
