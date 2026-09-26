@@ -173,10 +173,16 @@ if [ "${#PUBLIC_KEY}" -ne 87 ] || [ "${#PRIVATE_KEY}" -ne 184 ]; then
   exit 1
 fi
 
+# Le heredoc n'est PAS quoté : il doit expandre `$(date)`, $PUBLIC_KEY,
+# $PRIVATE_KEY et $SUBJECT. Conséquence à connaître : les backticks y sont
+# interpolés comme une substitution de commande. Un commentaire les utilisant
+# comme décoration — « le conteneur `functions` » — faisait exécuter le mot par
+# le shell, qui répondait « functions: not found » au milieu de la génération.
+# D'où les crochets ci-dessous, qui sont du texte et rien d'autre.
 cat > "$OUT_FILE" <<EOF
 # Généré par scripts/generate-vapid-keys.sh le $(date '+%Y-%m-%d %H:%M').
 # Ne pas versionner. VAPID_PRIVATE_KEY n'est lue que par l'Edge Function
-# push-notify, dans l'environnement du conteneur `functions`.
+# push-notify, dans l'environnement du conteneur [functions].
 
 VAPID_PUBLIC_KEY=$PUBLIC_KEY
 VAPID_PRIVATE_KEY=$PRIVATE_KEY
