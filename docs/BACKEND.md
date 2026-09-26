@@ -780,6 +780,93 @@ aucun appareil enregistré, `500` configuration VAPID absente, `503` migration
 
 ---
 
+### 6.6 Valider les chemins d'envoi sur un serveur réel
+
+`0007_push.sql` vérifie la logique des trois chemins sans en produire aucun : ses
+assertions s'arrêtent à la frontière HTTP, et c'est délibéré — un envoi réel dans
+une transaction annulée n'enverrait rien. La validation se fait donc sur la stack,
+et « ça marche » se distingue de « ça a été vérifié » par **ce qui disparaît de
+la base**.
+
+Le chemin « Envoyer un test » ne prouve que lui-même : il signe, chiffre et
+envoie, mais ne consomme aucun rappel. Les deux chemins qui restent ne sont
+validés que par la **disparition de la ligne de rappel** après l'envoi.
+
+#### Un rappel dû maintenant
+
+Le formulaire de tâche n'expose pas le champ de rappel, donc la ligne se crée en
+SQL. On la rattache à la tâche ouverte la plus récente, ce qui évite d'avoir à
+connaître un identifiant d'utilisateur :
+
+```sh
+sh scripts/psql.sh -c "
+  insert into public.task_reminders (id, task_id, remind_at)
+  select private.new_id('task-reminder'), t.id, now()
+    from public.tasks t
+   where t.status <> 'fait'
+   order by t.created_at desc
+   limit 1;"
+```
+
+Si la requête ne renvoie rien, le foyer n'a aucune tâche ouverte : en créer une
+depuis l'interface d'abord.
+
+#### L'envoi, sans attendre le job
+
+Le job `eo-push-dispatch` passe toutes les quinze minutes. La même fonction
+s'appelle directement, ce qui évite l'attente et rend le test déterministe :
+
+```sh
+sh scripts/psql.sh -c "select private.dispatch_push_notifications();"
+```
+
+Trois lectures, et une seule compte :
+
+| Résultat | Lecture |
+|---|---|
+| `due = 0` | aucune notification n'a d'abonné, ou aucun rappel n'est dans la fenêtre de 24 h |
+| `due = 1`, `dispatched = true`, et **la ligne de rappel a disparu** | le chemin est validé, consommation comprise |
+| `due = 1`, `dispatched = true`, et la ligne est **toujours là** | l'envoi est passé mais la consommation non : `consume_push_reminders` n'a rien supprimé, et le même rappel reviendra au prochain passage |
+| `due = 1`, `dispatched = false` | un secret manque dans Vault, ou l'Edge Function est injoignable — `sh scripts/set-push-secrets.sh --check` |
+
+Vérifier la disparition :
+
+```sh
+sh scripts/psql.sh -c "select count(*) from public.task_reminders;"
+```
+
+C'est le seul contrôle qui distingue les deux derniers cas du tableau. Sans
+lui, un envoi réussi et un rappel qui revient se ressemblent.
+
+#### Le compteur d'échecs suit-il ?
+
+```sh
+sh scripts/psql.sh -c "
+  select last_status, failure_count, last_success_at is not null as a_reussi
+    from public.push_subscriptions;"
+```
+
+`last_status = 201` et `failure_count = 0` après un envoi réussi : c'est la
+décision de suppression qui se prend sur ces deux colonnes, pas sur le journal de
+la fonction.
+
+#### Le chemin anniversaires
+
+La source filtre sur `days_until = 0`, ce qui vaut **toute la journée** du
+24 décembre au 1er janvier : il n'y a pas de fenêtre d'une minute. Le job
+`eo-birthday-alerts` passe à 06 h 40, et c'est donc le matin qu'un anniversaire du
+jour est annoncé. Le valider suppose d'insérer un anniversaire daté du jour,
+puis d'appeler `private.dispatch_birthday_alerts()`.
+
+Le message se comporte comme un rappel, avec une différence qui n'est pas
+dérisoire : **rien n'est consommé.** `consume_push_reminders` ne connaît que
+`tache`, `evenement` et `routine`, et un anniversaire n'a pas de ligne à
+supprimer puisqu'il est recalculé chaque matin. Une relance manuelle le
+réannoncera donc, ce qui est le comportement voulu — mais c'est aussi pourquoi ce
+chemin ne peut pas être validé par la disparition d'une ligne, et il faut le
+vérifier autrement.
+
+
 ## 7. Tâches planifiées (pg_cron)
 
 ```bash
@@ -1093,20 +1180,23 @@ Functions, espace disque, expiration des certificats, résultat de
   appartient à plusieurs foyers, la fonction exige `householdId` dans le corps
   et répond `409` sinon. Le client (`app/src/lib/invites.ts`) ne l'envoie pas
   aujourd'hui : il faut ajouter `householdId` à ces trois appels côté frontend.
-* **Notifications Web Push** : la chaîne est complète (§6.4, §6.5) mais
-  **jamais exécutée sur un serveur** — les migrations 0018 et 0019 et la suite
-  `0007_push.sql` n'ont pas été appliquées, faute de stack disponible au moment
-  de leur écriture. Le chiffrement, lui, est vérifié : 19 assertions contre les
-  vecteurs publiés de la RFC 8291. Avant la mise en production :
-  * appliquer `sh scripts/migrate.sh` puis `sh scripts/test-db.sh` ;
-  * `sh scripts/deploy-functions.sh` — sans quoi `push-subscribe` répond 404 et
-    le panneau affiche « service de notifications indisponible » ;
-  * générer la paire VAPID (`sh scripts/generate-vapid-keys.sh`) et injecter les
-    trois variables dans le service `functions` ;
-  * déposer `project_url` et `service_role_key` dans Vault, sans quoi les deux
-    dispatch calculent les rappels et n'envoient rien, en émettant un `warning` ;
-  * activer les notifications depuis le panneau et utiliser « Envoyer un test »
-    pour valider la chaîne complète sur un seul appareil.
+* **Notifications Web Push** : la chaîne est **exécutée pour de vrai** depuis le
+  26 septembre 2026. Le chemin « Envoyer un test » a été validé sur un appareil
+  réel, ce qui prouve la paire VAPID, l'abonnement, le chiffrement RFC 8291 et
+  l'acceptation de la signature par le service Push. Restent non validés par un
+  envoi réel, et vérifiés uniquement par `0007_push.sql` :
+  * le chemin des rappels (`eo-push-dispatch`, toutes les quinze minutes) ;
+  * le chemin des anniversaires (`eo-birthday-alerts`, chaque matin) ;
+  * la **consommation** d'un rappel après envoi — `consume_push_reminders` n'a
+    jamais rien supprimé en production, et c'est ce qui empêche un rappel
+    d'être renvoyé quatre fois par heure.
+
+  Le formulaire de tâche n'expose pas encore le champ de rappel : `tasks` en
+  affiche un (`reminderTime`), mais rien ne le saisit. Un rappel ne peut donc
+  être créé que par SQL, et l'absence de ce champ est un manque du module
+  Tâches, pas de la chaîne push.
+
+  Pour les trois chemins restants, la marche à suivre est en §6.6.
 * **Cadence des rappels** : `profiles.reminder_frequency` est enregistrée et
   affichée, mais **aucun envoi ne s'y conforme**. Les rappels sont unitaires,
   donc toujours immédiats ; la cadence ne pourra être appliquée qu'à un point de
