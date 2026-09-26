@@ -100,6 +100,128 @@ La RLS est la frontière d'autorisation finale. Les règles minimales sont :
 - `household_invite_tokens` n'est jamais lisible directement par le client; création, régénération et utilisation passent par des opérations serveur transactionnelles.
 - Les tests PostgreSQL incluent des cas négatifs explicites : utilisateur sans foyer, membre de deux foyers, tentative de lecture/écriture inter-foyer, suppression d'un objet d'un autre foyer et escalade de privilèges.
 
+### 2.7 Vérification avant commit
+
+Section prescriptive. Elle vient de quatre campagnes où un défaut a franchi la
+migration, le test de contrat **et** la relecture, pour n'échouer qu'à la
+première exécution. Les récits sont dans `docs/RETROSPECTIVE.md`, les
+mécanismes sont ici.
+
+#### La chaîne, dans cet ordre
+
+```sh
+cd app && npm run typecheck && npm test && npm run build
+cd app && npm run test:e2e
+python3 scripts/check-sql-statique.py
+sh scripts/test-db.sh          # sur une machine qui a Docker
+```
+
+Docker n'est pas toujours disponible. Les quatre premières étapes suffisent
+alors, et `test-db.sh` devient un **passage obligatoire** avant de considérer un
+changement SQL comme validé. Ne pas annoncer « le SQL est bon » parce que la
+migration s'est appliquée : c'est précisément le cas des défauts que cette
+section existe pour attraper.
+
+#### A. Le SQL n'est vérifié qu'à l'exécution
+
+`create function` enregistre un corps sans l'exécuter. Une migration s'applique,
+le test de contrat passe, la relecture ne voit rien — et la fonction ne se
+révèle qu'à son premier appel, en production, quatre fois par heure.
+
+1. **Ne jamais réécrire une migration appliquée.** Corriger vers l'avant, dans
+   une nouvelle migration. Le dépôt garde le code fautif, c'est voulu : il
+   raconte ce qui s'est passé.
+2. Ce qui compte, c'est la **définition effective** d'une fonction : la
+   dernière, celle que la base contient.
+3. `set search_path = ''` n'est pas une précaution facultative — c'est ce qui
+   empêche un appelant de détourner la fonction. Mais un `search_path` vide ne
+   résout **aucun** nom : toute table s'écrit `public.tasks`.
+4. Un CTE masque la table du même nom. `join tasks t` dans le CTE `tasks` joint
+   le CTE à lui-même.
+5. `returns table (a, b, …)` ne décrit pas seulement le résultat : en PL/pgSQL,
+   `a` et `b` sont des **variables**. Une référence non qualifiée est ambiguë, ou
+   silencieusement remplacée par `NULL`.
+
+#### B. Le contrôle statique SQL
+
+`python3 scripts/check-sql-statique.py` — vert avant tout commit. Six
+vérifications : nom de table non qualifié sous un `search_path` vide, CTE qui se
+rejoint lui-même, littéral laissé ouvert en fin de ligne, référence non qualifiée
+à une colonne de `returns table`, types des deux arguments de `testkit.eq`,
+variable plpgsql dans une chaîne SQL exécutée par `testkit.count()`.
+
+Trois règles qui rendent le contrôle digne de confiance :
+
+* il ne porte que sur la **définition effective** ; les définitions dépassées
+  sont signalées sans faire échouer le contrôle, sinon le dépôt serait rouge
+  indéfiniment pour une faute déjà corrigée ;
+* il ne conclut que sur ce qu'il peut déterminer **avec certitude** — un
+  littéral s'accorde sur l'autre argument, donc il ne peut pas être un conflit ;
+* **un contrôle se prouve sur un cas qui doit échouer.** Un vérificateur qui
+  n'a jamais refusé quelque chose n'a pas été exercé. Et un vérificateur qui
+  refuse du code que les tests couvrent est pire qu'aucun : on apprend à
+  l'ignorer avant qu'il ne trouve un vrai défaut.
+
+#### C. La frontière du conteneur
+
+`psql.sh` exécute psql **dans** le conteneur `db`. Le dépôt et le `/tmp` de
+l'hôte n'y existent pas. **Le seul canal qui traverse la frontière est l'entrée
+standard.**
+
+| Forme | Verdict |
+|---|---|
+| `psql.sh < fichier` | correct — stdin |
+| `psql.sh -f fichier` | **échoue** : le chemin est résolu dans le conteneur |
+| `psql.sh -c "$(cat fichier)"` | met le contenu dans la liste des processus |
+| `psql.sh -c "… $SECRET …"` | **jamais** : le secret est lisible par quiconque voit les processus |
+
+Corollaire : un utilitaire qui résout un contexte avant d'agir doit détourner
+l'entrée standard de cette phase (`< /dev/null`), sinon il mange celle de
+l'appelant. C'est le cas de `db_printenv`.
+
+#### D. Écrire une assertion à partir de l'implémentation
+
+1. **Lire la fonction avant d'écrire l'assertion.** Une assertion écrite de
+   mémoire teste l'idée qu'on se fait du code, pas le code.
+2. **Toute assertion borne sa portée.** Compter sur toute une table suppose
+   une base vide ; la règle est presque toujours *par foyer*. Sur une base
+   contenant des données réelles, une assertion non bornée échoue pour une
+   raison qui n'a rien à voir avec ce qu'elle vérifie.
+3. **Aucune tautologie.** `count(*) >= 0`, `x is not null` sur une colonne
+   `not null`, `expect_true(true)` : vertes sans rien vérifier. Une assertion
+   fausse n'est pas moins fausse qu'une assertion absente.
+4. **Sur un fichier de test nouveau, un échec est la norme**, pas un signal
+   d'alarme. Le signal d'alarme, c'est un fichier qui n'a jamais rien vérifié.
+5. `testkit.eq` est `eq(anyelement, anyelement, text)` : les deux valeurs
+   doivent être du même type. Et `testkit.count('…')` exécute dans une fonction
+   séparée : une variable du bloc appelant n'y existe pas.
+
+#### E. Corriger la classe, pas l'instance
+
+Devant un défaut, poser deux questions : « comment corriger celui-ci » **et**
+« quelles autres occurrences de la même cause restent dans le dépôt ». La
+première répare, la deuxième évite les allers-retours suivants. Une seule
+inspection vaut souvent mieux que dix exécutions.
+
+#### F. Un succès muet est un échec inexpliqué
+
+« Ça n'a rien fait, sans erreur » n'est pas « ça a marché ». Un résultat
+silencieux se traite comme un échec tant qu'il n'est pas expliqué. Corollaire
+inverse : tout contrôle doit produire une preuve de sa propre efficacité.
+
+#### G. Le message de commit est vérifié avant le push, pas après
+
+Un message fautif poussé puis amendé impose un `--force-with-lease` sur un
+branche déjà partagée. Le contenu est identique, mais cela fait tirer deux fois
+à quelqu'un d'autre. Relire le message **avant** `git push`.
+
+#### H. Les secrets
+
+Ni versionné, ni en ligne de commande, ni dans `cron.job.command`. Les
+variables du dépôt ne portent que des **noms** ; les valeurs vivent dans le
+`.env` de la stack, dans Vault, ou dans le gestionnaire de secrets de
+l'exploitant. Voir §2.6 et `docs/BACKEND.md` §6.4.
+
 ---
 
 ## 3. Architecture du projet
