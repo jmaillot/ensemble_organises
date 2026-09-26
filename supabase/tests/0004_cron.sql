@@ -230,6 +230,48 @@ select testkit.ok(
   and pg_get_functiondef('private.dispatch_daily_notifications()'::regprocedure) not like '%vault.%',
   'le dispatch historique délègue au dispatch des rappels');
 
+-- Le prédicat doit interroger le catalogue avec le bon TYPE d'objet.
+--
+-- `net.http_post` est une fonction, et `to_regclass` ne résout que les
+-- relations : il répondait `NULL` même pg_net installée, si bien que le
+-- dispatch était inerte par construction et que `dispatched` valait `false` en
+-- permanence. Aucun envoi n'est donc parti, et le chemin « Envoyer un test »
+-- fonctionnait quand même, puisqu'il n'emprunte pas ce chemin.
+--
+-- L'assertion porte sur la FORME du prédicat, pas sur la présence de pg_net :
+-- elle est donc vraie sur une stack qui n'a pas l'extension, et fausse partout
+-- ailleurs. Une assertion « pg_net est installée » aurait été vraie chez vous
+-- et muette ailleurs — c'est-à-dire incapable de signaler le défaut qu'elle
+-- prétend surveiller.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%to_regproc(%net.http_post%'
+  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure)
+      not like '%to_regclass(''net.http_post'')%',
+  'le dispatch teste l''existence de net.http_post comme une fonction, pas comme une relation');
+
+-- Et les deux causes restent distinguables : « pg_net ou Vault absent » obligeait
+-- à trancher entre deux origines sans instrument. Fusionner de nouveau les deux
+-- messages ferait échouer cette assertion.
+select testkit.ok(
+  pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%pg_net absent%'
+  and pg_get_functiondef('private.post_push_dispatch(text)'::regprocedure) like '%Vault absent%',
+  'le dispatch nomme la cause qu''il a constatée, extension ou coffre');
+
+-- Sur une instance qui a pg_net, le dispatch ne doit plus être inerte. La suite
+-- ne suppose pas l'extension : elle le signale, comme elle le fait pour pg_cron.
+do $$
+begin
+  if to_regproc('net.http_post') is null then
+    raise notice 'pg_net absent sur cette instance : la non-inertie du dispatch n''est pas vérifiée.';
+    return;
+  end if;
+
+  perform testkit.ok(
+    to_regclass('vault.decrypted_secrets') is not null,
+    'pg_net et Vault sont présents : le dispatch a de quoi envoyer');
+end;
+$$;
+
 -- Le point d'entrée est unique : une seule Edge Function à déployer et à
 -- surveiller, et les deux jobs ne peuvent pas diverger d'un point d'entrée.
 select testkit.ok(
