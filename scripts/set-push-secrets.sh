@@ -164,7 +164,22 @@ chmod 600 "$SQL_FILE"
 
 echo "Dépôt des secrets de notification dans Vault (valeurs non affichées)…"
 # Ni `--rollback` ni affichage : voir la note « PAS DE --rollback » en tête.
-sh "$SCRIPT_DIR/psql.sh" -f "$SQL_FILE" >/dev/null
+#
+# Le SQL passe par l'ENTRÉE STANDARD, et c'est délibéré à deux titres :
+#
+#   * `-c "$SQL_FILE"` mettrait le chemin — donc, pour `-c`, le contenu — dans
+#     la ligne de commande, donc dans la liste des processus. Les secrets y
+#     seraient lisibles par quiconque peut voir les processus de la machine.
+#   * `-f "$SQL_FILE"` paraît plus sûr, et ne l'est pas : `psql.sh` exécute
+#     psql DANS le conteneur `db`, où le dépôt et le /tmp de l'hôte n'existent
+#     pas. Le premier jet de ce script faisait ainsi `-f`, et échouait sur
+#     « /tmp/eo-vault-….sql: No such file or directory » — un fichier bien
+#     écrit, en 600, que personne ne pouvait lire depuis le conteneur.
+#
+# L'entrée standard est le seul canal qui traverse la frontière. Elle suppose
+# que la résolution de contexte de `psql.sh` ne la consomme pas : c'est
+# exactement ce que `< /dev/null` sur `db_printenv` garantit (scripts/lib-db.sh).
+sh "$SCRIPT_DIR/psql.sh" <"$SQL_FILE" >/dev/null
 
 rm -f "$SQL_FILE"
 trap - EXIT INT TERM

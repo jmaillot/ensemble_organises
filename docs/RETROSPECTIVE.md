@@ -298,6 +298,22 @@ explicitement l'entrée standard de cette phase (`< /dev/null`), sous peine de
 manger celle de l'appelant. Et « ça n'a rien fait, sans erreur » n'est pas « ça a
 marché » : un succès muet se traite comme un échec tant qu'il n'est pas expliqué.
 
+La même frontière en a produit un troisième membre, et il fallait le chercher
+avant de le corriger. `set-push-secrets.sh` écrivait son SQL — qui contient les
+deux secrets en clair — dans un fichier en 600 sur l'hôte, puis appelait
+`psql.sh -f ce_fichier`. Les précautions semblaient bonnes : rien en ligne de
+commande, fichier supprimé par un `trap`. `-f` ne fonctionne néanmoins pas,
+pour la raison déjà décrite : psql s'exécute dans le conteneur, où le `/tmp` de
+l'hôte n'existe pas. Le seul canal qui traverse la frontière est l'entrée
+standard.
+
+Et c'est là que `-c` se distingue de `-f` : les deux mettent quelque chose dans
+la liste des processus, mais `-c` y met le **contenu**. Pour un script dont tout
+le propos est de ne pas exposer les secrets, `-c` est le pire des deux — et `-f`
+paraît la solution prudente alors qu'elle ne fonctionne pas du tout. Un contrôle
+de sécurité peut être plus silencieusement mauvais que l'absence de contrôle :
+il donne en plus l'impression d'être traité.
+
 ---
 
 ## 3. Les garde-fous désormais en place
