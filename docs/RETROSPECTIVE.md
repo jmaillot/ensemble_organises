@@ -137,7 +137,7 @@ qui est plus fort, et un `count(*) = 0` présupposerait le droit de lecture.
 le test de contrat passe, la relecture ne voit rien — et la fonction ne se
 révèle qu'à son premier appel, en production, tous les quarts d'heure.
 
-C'est arrivé quatre fois, pour quatre raisons sans rapport :
+C'est arrivé cinq fois, pour cinq raisons sans rapport :
 
 | Défaut | Erreur à la première exécution |
 |---|---|
@@ -145,6 +145,7 @@ C'est arrivé quatre fois, pour quatre raisons sans rapport :
 | liste de colonnes sur un appel de fonction | `a column definition list is only allowed for functions returning record` |
 | tables non qualifiées sous `search_path = ''` | `relation "task_reminders" does not exist` |
 | CTE nommé comme la table qu'il sélectionne | `recursive reference to query "tasks" must not appear within a non-recursive CTE` |
+| colonne de `returns table` référencée sans qualification | `column reference "user_id" is ambiguous` |
 
 Le troisième est le plus grave, et le plus trompeur : `set search_path = ''` est
 la bonne pratique — c'est ce qui empêche un appelant de détourner la fonction via
@@ -156,13 +157,26 @@ tâche, d'événement ou de routine n'aurait été distribué.
 Le quatrième mérite une explication, parce qu'il est invisible à la relecture :
 dans un CTE, le nom du CTE est résolu **avant** la table du même nom. `join tasks
 t` à l'intérieur du CTE `tasks` ne joint pas la table, il joint le CTE à
-lui-même. Les deux défauts se sont révélés dans l'ordre — d'abord le nom non
-qualifié, ensuite l'auto-référence — ce qui donne le change : corriger le
-premier fait apparaître le second, et l'on peut croire à une régression.
+lui-même. Les défauts deux et trois de cette fonction sont apparus dans
+l'ordre — d'abord le nom non qualifié, ensuite l'auto-référence, ensuite
+l'ambiguïté — ce qui donne le change : corriger le premier fait apparaître le
+suivant, et l'on peut croire à une régression. C'est aussi pourquoi il a fallu
+quatre migrations correctives pour une fonction écrite en une fois, et une seule
+d'entre ellesrait la cause initiale.
 
-**Règle** : `search_path = ''` et nom de CTE sont deux décisions à prendre
-ensemble, et aucune n'est vérifiable en lisant. `scripts/check-sql-statique.py`
-les vérifie désormais sur la définition effective de chaque fonction.
+Le cinquième est le plus trompeur de tous, parce que son pire cas est
+**silencieux**. `returns table (user_id uuid, …)` ne décrit pas seulement le
+résultat : en PL/pgSQL, ces colonnes sont des VARIABLES. Une référence non
+qualifiée est un conflit, et ses deux issues sont mauvaises — PostgreSQL refuse
+si deux tables fournissent la colonne ; si une seule le fait, plpgsql lui
+substitue la variable, qui vaut `NULL` dans une fonction renvoyant un ensemble.
+Le second cas ne lève aucune erreur et renvoie des lignes vides. Seule une
+assertion sur le **contenu** des lignes l'aurait vu, et il n'y en avait pas.
+
+**Règle** : `search_path = ''`, nom de CTE et colonnes de sortie sont trois
+décisions à prendre ensemble, et aucune n'est vérifiable en lisant.
+`scripts/check-sql-statique.py` les vérifie sur la définition effective de
+chaque fonction.
 
 Corollaire, moins évident : une assertion peut aussi décrire un état que le
 code n'a jamais atteint. Deux fois, un test affirmait que le code était
@@ -175,7 +189,8 @@ exigeant.
 
 Écrire un vérificateur et le voir vert ne prouve rien. Le premier jet de
 `check-sql-statique.py` a annoncé « aucun défaut » sur un fichier qui en
-comportait un, pour trois raisons successives :
+comportait un. Il en a fallu **quatre** pour qu'il morde, et chaque fois
+l'échappatoire était différente :
 
 * il **sautait** le corps `$$ … $$` sans l'analyser — or c'est du plpgsql, et
   c'est là que se trouvait le défaut ;
@@ -183,11 +198,23 @@ comportait un, pour trois raisons successives :
   n'était jamais ouvert et que le fichier entier passait en état « littéral
   ouvert » ;
 * il détectait bien le cas, mais rapportait les **cent lignes** en aval de la
-  cause, ce qui revenait à noyer le signal.
+  cause, ce qui revenait à noyer le signal ;
+* sur le contrôle suivant, il signalait des alias (`… as body`) et des
+  affectations (`debtor_id := …`) — du code qui fonctionne, et que
+  `0005_ardoise.sql` exécute avec succès.
 
-**Règle** : un contrôle se prouve sur un cas qui **doit** échouer. Ici, la
-version cassée du fichier, rejouée depuis Git. Un vérificateur qui n'a jamais
-refusé quelque chose n'a pas encore été exercé.
+Le dernier est le plus instructif. `0005` passait, donc ces fonctions
+s'exécutaient réellement : un contrôle qui condamne du code qui marche est
+**pire** qu'absence de contrôle, parce qu'on apprend à l'ignorer avant qu'il ne
+trouve un vrai défaut. C'est de là qu'est venue la seule restriction qui vaille
+la peine : en `language sql`, `returns table` ne déclare que des NOMS de
+colonnes, il n'y a pas de variable, donc pas de substitution, donc pas de
+risque. Le contrôle ne vise plus que `language plpgsql`.
+
+**Règle** : un contrôle se prouve sur un cas qui **doit** échouer — ici, la
+version cassée du fichier rejouée depuis Git, et une fonction piégée. Un
+vérificateur qui n'a jamais refusé quelque chose n'a pas encore été exercé ; et
+un vérificateur qui refuse du code que les tests couvrent, non plus.
 
 ---
 

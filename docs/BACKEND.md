@@ -956,7 +956,7 @@ python3 scripts/check-sql-statique.py 0019       # un seul fichier
 ```
 
 Cette campagne ne remplace pas `test-db.sh` : elle ne connaît pas le schéma, et
-ne remplacera jamais un test exécuté. Elle existe parce que quatre défauts de la
+ne remplacera jamais un test exécuté. Elle existe parce que cinq défauts de la
 même famille ont franchi la migration, le test de contrat **et** la relecture,
 pour n'échouer qu'à la première exécution :
 
@@ -966,6 +966,7 @@ pour n'échouer qu'à la première exécution :
 | liste de colonnes sur un appel de fonction | `a column definition list is only allowed for functions returning record` |
 | tables non qualifiées sous `search_path = ''` | `relation "task_reminders" does not exist` |
 | CTE nommé comme la table qu'il sélectionne | `recursive reference to query "tasks" must not appear within a non-recursive CTE` |
+| colonne de sortie de `returns table` référencée sans qualification | `column reference "user_id" is ambiguous` |
 
 Aucun n'est visible à la création : `create function` enregistre le corps sans
 l'exécuter, et une migration appliquée n'est plus réécrite. Le contrôle vérifie
@@ -973,14 +974,27 @@ donc la **définition effective** de chaque fonction — la dernière, celle que
 base contient — et signale sans les condamner les définitions dépassées, qui
 restent au dépôt avec leur code fautif.
 
-Trois vérifications : aucun nom de table non qualifié sous un `search_path`
+Le dernier mérite d'être lu deux fois. `returns table (user_id uuid, …)` ne
+décrit pas seulement le résultat : en PL/pgSQL, ces colonnes sont des
+**variables**. Une référence non qualifiée est donc un conflit, et ses deux
+issues sont mauvaises — PostgreSQL refuse si deux tables fournissent la colonne,
+et si une seule le fait, plpgsql lui substitue la variable, qui vaut `NULL` dans
+une fonction renvoyant un ensemble. Le second cas ne lève aucune erreur et
+renvoie des lignes vides : seule une assertion sur le **contenu** des lignes peut
+le voir.
+
+Quatre vérifications : aucun nom de table non qualifié sous un `search_path`
 vide, aucun CTE qui se rejoint lui-même, aucun littéral laissé ouvert en fin de
-ligne. Ce dernier point mérite un mot : un `$nom$` utilisé comme espace réservé
-dans une chaîne entre en collision avec la syntaxe de dollar-quoting de
-PostgreSQL, et un guillemet fermant mal placé produit une erreur qui désigne le
-`$` de la variable au lieu du guillemet qui manque. Le corpus de référence est
-la RFC 8291 pour le chiffrement ; ici, il n'y en a pas d'autre que la base
-elle-même.
+ligne, aucune référence non qualifiée à une colonne de `returns table`. Ce
+dernier point ne vise que `language plpgsql` : en `language sql`, `returns table`
+ne déclare que des noms de colonnes, il n'y a pas de variable et donc pas de
+risque. Un contrôle qui condamne du code qui fonctionne vaut moins que pas de
+contrôle du tout — on apprend à l'ignorer.
+
+Un mot sur le dernier piège, rencontré en chemin : un `$nom$` utilisé comme
+espace réservé dans une chaîne entre en collision avec la syntaxe de
+dollar-quoting de PostgreSQL, et un guillemet fermant mal placé produit une
+erreur qui désigne le `$` de la variable au lieu du guillemet qui manque.
 
 ---
 

@@ -20,6 +20,12 @@ Les vérifications
    « unterminated quoted string », ou, quand le guillemet refermant est mal
    placé, une erreur de dollar-quoting qui désigne le `$` d'une variable
    interpolée et envoie le lecteur chercher au mauvais endroit.
+4. COLONNE DE SORTIE AMBIGUË — dans une fonction `returns table (a, b, …)`, les
+   colonnes de sortie sont des VARIABLES PL/pgSQL. Un `select a, …` non qualifié
+   est donc ambigu, et PostgreSQL le refuse dès que deux tables fournissant la
+   colonne entrent en jeu. Le second cas est pire : une seule table la fournit,
+   plpgsql lui substitue la variable — NULL dans une fonction renvoyant un
+   ensemble — et la requête renvoie des lignes vides SANS lever d'erreur.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -269,6 +275,85 @@ def _controler(corps: str) -> tuple[list[str], list[str]]:
     return non_qualifies, sorted(auto_refs)
 
 
+RE_RETURNS_TABLE = re.compile(r"returns\s+table\s*\((.*?)\)\s*\n", re.I | re.S)
+RE_DEBUT_CORPS = re.compile(r"\bas\s+\$\$", re.I)
+RE_ALIAS = re.compile(r"\bas\s+$", re.I)
+RE_LANGAGE_PLPGSQL = re.compile(r"\blanguage\s+plpgsql\b", re.I)
+RE_AFFECTATION = re.compile(r"\s*:=")
+
+
+def _colonnes_de_sortie(corps: str) -> list[str]:
+    """Noms des colonnes de `returns table`, en ne coupant pas `numeric(14, 2)`.
+
+    Découper sur les virgules naïvement produit une colonne nommée `2` — et une
+    fonction de calcul de soldes en a une dans chaque signature.
+    """
+    m = RE_RETURNS_TABLE.search(corps)
+    if not m:
+        return []
+    morceaux, profondeur, courant = [], 0, ""
+    for c in m.group(1):
+        if c == "(":
+            profondeur += 1
+        elif c == ")":
+            profondeur -= 1
+        if c == "," and profondeur == 0:
+            morceaux.append(courant)
+            courant = ""
+        else:
+            courant += c
+    morceaux.append(courant)
+    return [p.strip().split()[0].lower() for p in morceaux if p.strip()]
+
+
+def _colonnes_de_sortie_ambiguës(corps: str) -> list[str]:
+    """Références NON qualifiées à une colonne de `returns table`.
+
+    `returns table (user_id uuid, …)` ne décrit pas seulement le résultat : en
+    PL/pgSQL, ces colonnes sont des VARIABLES. Toute référence non qualifiée à
+    l'une d'elles est donc un conflit.
+
+    Deux exclusions, sans lesquelles le contrôle ne veut plus rien dire :
+
+    * `… as body` DÉFINIT un alias, il ne RÉFÉRENCE pas la colonne. La moitié des
+      signalements seraient des alias : une CTE dont les colonnes portent les
+      mêmes noms que celles de la fonction est ici la forme naturelle ;
+    * `debtor_id := …` AFFECTE la variable de sortie. C'est la forme idiomatique
+      d'une fonction renvoyant une seule ligne, et non un conflit.
+
+    Et un préalable qui vaut plus que les deux autres : le contrôle ne vise que
+    les fonctions `language plpgsql`. En `language sql`, `returns table` ne
+    déclare que des NOMS de colonnes de sortie — il n'y a pas de variable, donc
+    pas de substitution, donc pas de risque. Signaler là-dessus condamnerait du
+    code qui fonctionne, et ferait perdre au contrôle toute crédibilité.
+    """
+    if not RE_LANGAGE_PLPGSQL.search(corps):
+        return []
+    colonnes = _colonnes_de_sortie(corps)
+    if not colonnes:
+        return []
+    d = RE_DEBUT_CORPS.search(corps)
+    if not d:
+        return []
+    corps_sql = _sans_commentes(corps[d.end():])
+    corps_sql = re.sub(r"'(?:[^']|'')*'", " '' ", corps_sql)   # littéraux : hors jeu
+
+    findings: list[str] = []
+    for nom in colonnes:
+        for m2 in re.finditer(rf"(?<![.\w]){re.escape(nom)}\b", corps_sql, re.I):
+            apres = corps_sql[m2.end():m2.end() + 2]
+            if apres.startswith("("):          # appel de fonction
+                continue
+            if apres.startswith("."):          # `paid.amount` : qualifiant
+                continue
+            if RE_AFFECTATION.match(corps_sql, m2.end()):    # `debtor_id := …`
+                continue
+            if RE_ALIAS.search(corps_sql[: m2.start()]):     # `… as body` : alias
+                continue
+            findings.append(f"{nom} (ligne {corps_sql[: m2.start()].count(chr(10)) + 1})")
+    return findings
+
+
 def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, str, str, bool]]:
     """(fichier, nom, corps, langage, est_effective) pour chaque fonction définie.
 
@@ -375,6 +460,18 @@ def main() -> int:
                 f"      CTE qui se rejoint lui-même : {', '.join(auto_refs)}\n"
                 f"      → PostgreSQL refuse un « recursive reference to query » dans un\n"
                 f"        CTE non récursif, à l'exécution. Renommez le CTE."
+            )
+
+        ambigues = _colonnes_de_sortie_ambiguës(corps)
+        if ambigues:
+            defauts.append(
+                f"{f.name}  {signature}\n"
+                f"      référence NON qualifiée à une colonne de `returns table` :\n"
+                f"        {', '.join(ambigues)}\n"
+                f"      → ces colonnes sont des variables PL/pgSQL. PostgreSQL refuse\n"
+                f"        l'ambiguïté si deux tables les fournissent, et SUBSTITUE la\n"
+                f"        variable — donc NULL — si une seule le fait, sans erreur.\n"
+                f"        Qualifiez par l'alias du CTE ou de la table."
             )
 
     # Le troisième contrôle ne porte pas sur les fonctions mais sur les
