@@ -21,7 +21,9 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
   return (
     <div className={cn('mb-7 flex items-start justify-between gap-5 max-[650px]:block', className)}>
       <div>
-        <Button variant="quiet" size="sm" icon="arrowLeft" onClick={() => navigate('/')} className="mb-3 -ml-2">
+        {/* `/` est la page publique de l'authentification, pas le tableau de
+            bord : y renvoyer sortait l'utilisateur de l'application. */}
+        <Button variant="quiet" size="sm" icon="arrowLeft" onClick={() => navigate('/accueil')} className="mb-3 -ml-2">
           Retour à la maison
         </Button>
         <p className="eyebrow mb-2">{kicker ?? entry?.kicker ?? 'Espace du foyer'}</p>

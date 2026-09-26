@@ -38,7 +38,11 @@ export interface ModuleEntry {
   navLabel?: string;
   /** Présent dans la grille de l'accueil. */
   tile: boolean;
-  /** Présent dans la barre latérale. */
+  /**
+   * Épinglé en haut de la barre latérale comme accès rapide. `false` ne veut
+   * pas dire « absent de la navigation » : le module reste listé par
+   * `catalogueModules`, dans la section « Tous les espaces ».
+   */
   nav: boolean;
 }
 
@@ -66,6 +70,19 @@ export const moduleMap: Record<ModuleKey, ModuleEntry> = Object.fromEntries(
 ) as Record<ModuleKey, ModuleEntry>;
 
 export const navModules: ModuleKey[] = modules.filter((entry) => entry.nav).map((entry) => entry.key);
+
+/**
+ * Catalogue complet des espaces du foyer.
+ *
+ * C'est la liste qui garantit qu'aucune catégorie n'est inatteignable : elle
+ * alimente la section « Tous les espaces » de la barre latérale, le dialogue
+ * mobile et la grille de l'accueil. `navModules` n'en retient que quelques
+ * entrées comme accès rapides, et ne doit jamais devenir le seul endroit où
+ * un module est référencé.
+ */
+export const catalogueModules: ModuleEntry[] = modules;
+
+export const modulePath = (key: ModuleKey) => `/${key}`;
 
 export const mobileNavModules: ModuleKey[] = ['accueil', 'taches', 'calendrier', 'cercle'];
 

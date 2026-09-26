@@ -154,6 +154,17 @@
   max-width: 520px;
 }
 
+/* Sur-titre de section de la barre latérale. Les marges restent à la charge de
+   l'appelant : l'export les portait sur la règle, la grille de la barre
+   latérale les varie selon le point de rupture. */
+@utility section-kicker {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 @utility tile-overlay {
   background: linear-gradient(
     180deg,

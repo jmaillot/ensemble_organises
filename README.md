@@ -439,6 +439,15 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 - **Points de rupture** repris de l'export : 1180 px (barre latérale 218 px),
   920 px (barre latérale 76 px, colonnes empilées), 650 px (navigation basse,
   colonne unique).
+- **Navigation des catégories** : `app/src/lib/modules.ts` déclare le catalogue
+  complet, et `catalogueModules` est la seule liste qui garantisse qu'aucun
+  espace n'est inatteignable. Il alimente la section repliable « Tous les
+  espaces » de la barre latérale, le dialogue « Espaces » de la navigation
+  mobile sous 650 px, et la grille de l'accueil. `navModules` n'en garde que
+  quelques-unes comme accès rapides épinglés : un module absent de cette liste
+  n'est pas absent de la navigation. `src/lib/modules.test.ts` et
+  `src/app/router.test.tsx` verrouillent l'invariant — le second rend chaque
+  route du catalogue pour vérifier qu'elle aboutit à son écran et non à un 404.
 - **Matrice de contrôle** : 360, 390, 430, 600, 820, 1024, 1366, 1440 et
   1920 px de large — aucun débordement horizontal toléré.
 - **Accessibilité** : cibles ≥ 44 px, `focus-visible` visible partout, libellés

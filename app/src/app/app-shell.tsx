@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
-import { mobileNavModules, moduleMap, navLabelOf, navModules, type ModuleKey } from '@/lib/modules';
+import {
+  mobileNavModules,
+  moduleMap,
+  modulePath,
+  navLabelOf,
+  navModules,
+  type ModuleKey,
+} from '@/lib/modules';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
+import { ModuleCatalogueDialog, ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
@@ -25,6 +33,7 @@ export function AppShell() {
   const { install, canInstall } = useInstallPrompt();
   const { online, pending, syncing, syncNow } = useOfflineSync();
   const [showOffline, setShowOffline] = useState(true);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const { rows: openTasks } = useResource<TaskRow>('tasks', { filter: { status: 'a_faire' } });
   const openTaskCount = openTasks.length;
 
@@ -64,20 +73,15 @@ export function AppShell() {
           </div>
         </div>
 
-        <div>
+        {/* Zone de défilement : seize catégories ne tiennent pas dans la hauteur
+            d'un écran. `w-full` parce que la barre latérale centre ses enfants
+            sous 920 px, où les libellés disparaissent. */}
+        <div className="min-h-0 w-full flex-1 overflow-y-auto pb-1 scrollbar-slim">
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Navigation</p>
           <nav aria-label="Navigation principale">
             <ul className="grid list-none gap-1 p-0">
               <li>
-                <NavLink
-                  to="/accueil"
-                  className={({ isActive }) =>
-                    cn(
-                      'flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
-                      isActive && 'bg-accent-soft font-[750] text-accent-strong',
-                    )
-                  }
-                >
+                <NavLink to="/accueil" className={navItemClass}>
                   <Icon name={homeIcon} />
                   <span className="max-[920px]:sr-only">Maison</span>
                 </NavLink>
@@ -86,15 +90,7 @@ export function AppShell() {
                 const entry = moduleMap[key];
                 return (
                   <li key={key}>
-                    <NavLink
-                      to={`/${key}`}
-                      className={({ isActive }) =>
-                        cn(
-                          'flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
-                          isActive && 'bg-accent-soft font-[750] text-accent-strong',
-                        )
-                      }
-                    >
+                    <NavLink to={modulePath(key)} className={navItemClass}>
                       <Icon name={entry.icon} />
                       <span className="max-[920px]:sr-only">{navLabelOf(entry)}</span>
                       {key === 'taches' && openTaskCount > 0 ? (
@@ -113,9 +109,8 @@ export function AppShell() {
               })}
             </ul>
           </nav>
+          <ModuleCatalogueNav />
         </div>
-
-        <div className="flex-1" />
 
         <div>
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Votre espace</p>
@@ -214,13 +209,13 @@ export function AppShell() {
         </main>
       </div>
 
-      <nav aria-label="Navigation mobile" className="mobile-nav fixed right-[10px] bottom-[10px] left-[10px] z-20 grid-cols-4 gap-1 rounded-[17px] border border-border bg-surface/92 p-[7px] shadow-[var(--shadow-md)] backdrop-blur-[16px]">
+      <nav aria-label="Navigation mobile" className="mobile-nav fixed right-[10px] bottom-[10px] left-[10px] z-20 grid-cols-5 gap-1 rounded-[17px] border border-border bg-surface/92 p-[7px] shadow-[var(--shadow-md)] backdrop-blur-[16px]">
         {mobileNavModules.map((key) => {
           const entry = key === 'accueil' ? { label: 'Maison', icon: homeIcon, short: 'Maison' } : moduleMap[key];
           return (
             <NavLink
               key={key}
-              to={`/${key}`}
+              to={modulePath(key)}
               className={({ isActive }) =>
                 cn(
                   'grid min-h-[46px] place-items-center gap-px rounded-[11px] text-[9px] font-[750] text-muted',
@@ -233,7 +228,21 @@ export function AppShell() {
             </NavLink>
           );
         })}
+        {/* Sous 650 px, la barre latérale est masquée : sans cette entrée, les
+            douze catégories sans accès rapide n'auraient aucun bouton. */}
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={catalogueOpen}
+          onClick={() => setCatalogueOpen(true)}
+          className="grid min-h-[46px] place-items-center gap-px rounded-[11px] text-[9px] font-[750] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+        >
+          <Icon name="grid" size="sm" />
+          Espaces
+        </button>
       </nav>
+
+      <ModuleCatalogueDialog open={catalogueOpen} onOpenChange={setCatalogueOpen} />
     </div>
   );
 }

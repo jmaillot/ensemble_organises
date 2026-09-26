@@ -18,6 +18,9 @@ export function ModuleTile({ entry, className, onNavigate }: ModuleTileProps) {
   return (
     <button
       type="button"
+      // Le nom accessible est l'action, pas l'accroche ni la photo : sans
+      // `aria-label`, un lecteur d'écran concatène les trois lignes de la tuile.
+      aria-label={`Ouvrir ${entry.label}`}
       className={cn(
         'relative isolate min-h-[154px] overflow-hidden rounded-[16px] text-left text-surface shadow-[var(--shadow-sm)] transition-[transform,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:-translate-y-[3px] hover:shadow-[var(--shadow-md)] active:translate-y-[-1px]',
         className,
