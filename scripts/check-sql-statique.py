@@ -586,12 +586,19 @@ def _variables_dans_sql_dynamique(texte: str, nom_fichier: str) -> list[str]:
         variables = _variables_du_bloc(corps)
         if not variables:
             continue
+        # Les parenthèses portées par un littéral ne comptent pas : un motif
+        # de regex en contient presque toujours, dont certaines non appariées,
+        # et le comptage caractère par caractère perdrait sinon le fil —
+        # rupture anticipée (miss silencieux) ou dépassement. Le masque
+        # conserve longueurs et sauts de ligne : les offsets restent valides et
+        # l'argument est ensuite relu sur le corps d'origine.
+        masque = _masque_litteraux(corps)
         for appel in RE_SQL_DYNAMIQUE.finditer(corps):
             prof, i = 1, appel.end()
-            while i < len(corps) and prof:
-                if corps[i] == "(":
+            while i < len(masque) and prof:
+                if masque[i] == "(":
                     prof += 1
-                elif corps[i] == ")":
+                elif masque[i] == ")":
                     prof -= 1
                     if prof == 0:
                         break
@@ -663,7 +670,12 @@ def _conflits_de_types(texte: str, nom_fichier: str) -> list[str]:
                 )
 
         corps_sans = _sans_commentes(corps)
-        corps_sans = re.sub(r"'(?:[^']|'')*'", " '' ", corps_sans)
+        # Masque à longueur conservée (et non substitution par `''`) : les
+        # parenthèses des littéraux sont neutralisées pour le comptage
+        # ci-dessous, sans décaler ni les offsets ni les numéros de ligne —
+        # la substitution précédente les décalait dès qu'un littéral contenait
+        # un saut de ligne.
+        corps_sans = _masque_litteraux(corps_sans)
 
         for appel in re.finditer(r"\btestkit\.eq\s*\(", corps_sans):
             prof, i = 1, appel.end()
