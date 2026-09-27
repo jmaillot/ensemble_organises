@@ -517,6 +517,10 @@ parcours en français (`fr-FR`, `Europe/Paris`).
 
 ## 13. Limites connues et prochaines étapes
 
+L'état actionnable — qui fait quoi, et comment vérifier que c'est fini — vit
+dans [`docs/TODO.md`](docs/TODO.md), seule liste qui fait foi. Ce qui suit
+n'en est qu'un résumé de contexte.
+
 - **Le schéma a été exécuté, pas le Web Push.** Les migrations 0001 à 0017 et
   les six premières suites SQL ont tourné sur une vraie base le 25 septembre
   2026 (244 assertions, voir [`docs/RETROSPECTIVE.md`](docs/RETROSPECTIVE.md)).
