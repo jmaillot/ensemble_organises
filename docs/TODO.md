@@ -134,77 +134,25 @@ s'emboîter.
 
 ---
 
-- [ ] **5. Publication Cercle avec photo : « bucket not found »**
+- [x] **5. Publication Cercle avec photo : « bucket not found »**
 
-**Qui peut le faire : l'agent.**
-
-**Cause établie.** Le frontend vise `CERCLES_BUCKET = 'cercle'`
-(`app/src/modules/cercle/api.ts:22`, upload ligne 65, URL signée ligne 71),
-mais la 0010 ne crée que `household-media` et `household-avatars`, et ses
-politiques Storage ne connaissent que ces deux noms. Le chemin d'objet
-`${householdId}/${postId}/…` suit déjà la convention `foldername[1]` des
-politiques : c'est le nom du bucket qui diverge, pas le chemin.
-
-**Ce qu'il faut.** Pointer la constante vers `household-media`, vérifier les
-trois usages (upload, URL signée, suppression éventuelle) et l'octroi MIME
-(0010 : jpeg/png/webp/avif/heic + mp4/quicktime).
-
-**Terminé quand** une publication avec photo part depuis l'app (pas depuis
-le mode démo), et que l'image s'affiche via l'URL signée après rechargement.
+**Validé en usage le 27/09/2026** (rebuild + publication avec photo).
+Cause : `CERCLES_BUCKET = 'cercle'`, inexistant ; pointe désormais vers
+`household-media`, seul nom que les politiques Storage connaissent
+(`app/src/modules/cercle/api.ts:22`).
 
 ---
 
-- [ ] **6. Tâche/routine avec assigné : « permission denied for function parent_household_id »**
+- [x] **6. Tâche/routine avec assigné : « permission denied for function parent_household_id »**
 
-**Qui peut le faire : l'agent.**
-
-**Cause établie.** `0009_grants.sql:68` révoque `EXECUTE` sur
-`private.parent_household_id(text, text)` à `authenticated`, mais
-`task_assignees_insert` (`0007:362-368`) et `routine_assignees_insert`
-(`0007:400-407`) l'appellent **directement** dans leur `WITH CHECK`. Une
-expression de politique s'exécute avec les droits de l'appelant : sans
-`EXECUTE`, toute assignation échoue en 42501. Seules les créations **avec**
-assigné sont touchées ; sans assigné, le chemin ne passe pas par là.
-
-**Pourquoi les tests sont verts.** `0002` ne fait qu'`expect_denied` sur les
-assignations, et un refus pour défaut de privilège porte le même code 42501
-qu'un refus RLS : le négatif passe pour la mauvaise raison. `0007_push:366`
-insère dans un bloc `do`, donc avec le rôle propriétaire, hors RLS. Aucun
-test n'assert le chemin heureux en `authenticated`.
-
-**Ce qu'il faut (corriger vers l'avant).** Ne pas simplement re-granter la
-fonction : `0009:41-43` documente la doctrine « les helpers de politique ne
-renvoient que des booléens », et `parent_household_id` renvoie du texte. Donc :
-nouvelle migration avec deux enveloppes booléennes `SECURITY DEFINER`
-(`member_in_task_household`, `member_in_routine_household`), `GRANT EXECUTE`
-à `authenticated`, réécriture des deux politiques dessus, et tests positifs
-en `authenticated` (assignation même foyer acceptée, inter-foyer refusée).
-
-**Terminé quand** `sh scripts/test-db.sh` est vert avec les nouveaux tests,
-**et** qu'une tâche puis une routine avec assigné se créent depuis l'app
-(le test seul ne suffit plus : c'est exactement ce qu'il n'a pas vu).
-
----
-
-- [ ] **7. Création d'une liste de cadeaux impossible**
-
-**Qui peut le faire : l'agent. Cause établie le 27/09/2026 par le corps
-`POST gift_lists` : `400`, `error=23514`.**
-
-Ce n'est ni la RLS ni un GRANT, mais le trigger `validate_member_refs`
-(`0008:228`) : l'`owner_member_id` envoyé n'appartient pas au foyer. C'est un
-**membre fantôme** — le `currentMemberId` persisté localement désignait un
-membre d'avant le wipe du 27/09, supprimé côté serveur. Le foyer, lui, se
-chargeait bien : le symptôme ressemblait à un problème de droits.
-
-**Ce qui est fait.** `loadHousehold` (`session-store.ts`) ne conserve le
-membre persisté que si le serveur vient de le renvoyer, sinon retombe sur le
-premier membre — couvert par `session-store.test.ts` (fantôme + contrôle).
-
-**Terminé quand**, après rebuild + **déconnexion/reconnexion des deux
-postes** (les stores locaux tiennent encore le fantôme, seul un nouveau
-`loadHousehold` le purge), une liste se crée depuis l'app et reste visible
-après rechargement.
+**Validé en usage le 27/09/2026** (tâche et routine avec assigné depuis
+l'app) + `test-db.sh` vert avec les premiers chemins heureux en
+`authenticated`.
+Cause : `0009:68` révoquait `EXECUTE` sur `parent_household_id`, appelée en
+direct par les deux politiques d'assignation ; les tests ne faisaient
+qu'`expect_denied` (même code 42501 dans les deux cas). Corrigé vers
+l'avant en 0026 (enveloppes booléennes DEFINER + tests positifs), doctrine
+booléens de `0009:41-43` préservée.
 
 ---
 
@@ -238,20 +186,27 @@ toast d'erreur. Reste le vrai manque, en #10.
 
 ---
 
-- [ ] **10. Types de prestataires proposés par défaut**
+- [x] **10. Types de prestataires proposés par défaut**
 
-**Qui peut le faire : l'agent.**
+**Validé en usage le 27/09/2026** (dix types proposés sur MAILLOT).
+`create_household` sème Médecin, Dentiste, Pharmacie, Plombier,
+Électricien, Garagiste, Coiffeur, Vétérinaire, Assurance, Banque (0027,
+rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
 
-Un foyer neuf part d'une liste vide et ressaisit les mêmes métiers.
-`create_household` sème désormais dix types (0027 : Médecin, Dentiste,
-Pharmacie, Plombier, Électricien, Garagiste, Coiffeur, Vétérinaire,
-Assurance, Banque), modifiables comme les autres ; les foyers existants
-sont rattrapés sans écraser leurs types (`on conflict do nothing`).
-Couvert par `0008_household_defaults.sql` (semence, unicité, ajout perso).
+---
 
-**Terminé quand** `sh scripts/test-db.sh` est vert avec la 0008, **et**
-qu'un foyer créé depuis l'app propose les dix types dans « Gérer les
-types ».
+## Plus tard
+
+- **7. Création d'une liste de cadeaux impossible.** Re-tenté le 27/09 après
+  le durcissement anti-fantôme (`loadHousehold` ne garde que le membre
+  renvoyé par le serveur) : toujours impossible. La piste fantôme n'est donc
+  pas la (seule) cause, ou le store local n'avait pas été purgé
+  (déconnexion/reconnexion non confirmée). À ré-enquêter avec une trace
+  fraîche : corps du `POST gift_lists` (quel `owner_member_id` est envoyé ?)
+  + `currentMemberId` du localStorage face aux membres en base. Voir l'historique
+  dans git (`TODO.md`, commits du 27/09).
+
+---
 
 ---
 
