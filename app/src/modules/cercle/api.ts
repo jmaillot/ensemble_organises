@@ -18,8 +18,10 @@ export const cercleTables = {
   reactions: 'post_reactions',
 } as const;
 
-/** Bucket privé des médias du Cercle (politiques RLS sur le chemin d'objet). */
-export const CERCLES_BUCKET = 'cercle';
+/** Bucket privé des médias du Cercle : `household-media` (0010), seul nom que
+ * les politiques Storage connaissent. Le chemin d'objet commence par le foyer,
+ * comme elles l'exigent. */
+export const CERCLES_BUCKET = 'household-media';
 /** Durée de validité des URL signées servies par le Storage. */
 const SIGNED_URL_TTL = 60 * 60 * 24 * 30;
 

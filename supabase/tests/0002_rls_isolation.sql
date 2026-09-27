@@ -200,6 +200,29 @@ select testkit.expect_denied(format(
   (select row_id from testkit.fx where key = 'task_a'), (select row_id from testkit.fx where key = 'carol')),
   'un assignataire doit appartenir au foyer de la tâche');
 
+-- --- Tables enfants : le chemin heureux en authenticated ---------------------
+-- Régression du 27/09/2026 : 0009 révoquait EXECUTE sur
+-- `parent_household_id`, qu'aucun test positif n'exerçait — les négatifs
+-- ci-dessus portent le même code 42501 dans les deux cas, et 0007 insère avec
+-- le rôle propriétaire, hors RLS. Ces assertions sont les seules qui auraient
+-- vu la régression : une assignation même foyer DOIT passer en authenticated.
+select testkit.eq(testkit.affected(format(
+  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  (select row_id from testkit.fx where key = 'task_a'), (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
+  'Alice assigne Bob à une tâche de son foyer');
+select testkit.eq(testkit.affected(format(
+  'insert into public.routines (id, household_id, name, created_by) values (%L, %L, %L, %L)',
+  'routine_a', (select household_id from testkit.fx where key = 'alice'), 'Vaisselle', (select row_id from testkit.fx where key = 'alice'))), 1::bigint,
+  'Alice crée une routine de son foyer');
+select testkit.eq(testkit.affected(format(
+  'insert into public.routine_assignees (routine_id, member_id) values (%L, %L)',
+  'routine_a', (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
+  'Alice assigne Bob à une routine de son foyer');
+select testkit.expect_denied(format(
+  'insert into public.routine_assignees (routine_id, member_id) values (%L, %L)',
+  'routine_a', (select row_id from testkit.fx where key = 'dave')),
+  'un assignataire de routine doit appartenir au foyer de la routine');
+
 -- --- Intégrité des colonnes dénormalisées et références ---------------------
 select testkit.expect_denied(format(
   'insert into public.shopping_list_items (id, list_id, household_id, name) values (%L, %L, %L, %L)',
