@@ -75,6 +75,20 @@ function RequireHousehold({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Un utilisateur qui a déjà un foyer n'a rien à faire sur le choix
+ * créer/rejoindre : la page y affirme « Vous n'avez pas encore de foyer »,
+ * et l'y laisser croire fait créer des foyers en double. `/foyer/nouveau` et
+ * `/foyer/rejoindre` restent accessibles (second foyer légitime).
+ */
+function RequireNoHousehold({ children }: { children: ReactNode }) {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  if (householdId) {
+    return <Navigate to="/accueil" replace />;
+  }
+  return <>{children}</>;
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   if (typeof window !== 'undefined') {
@@ -106,9 +120,11 @@ export function AppRoutes() {
         path="/foyer"
         element={
           <RequireAuth>
-            <Suspense fallback={<RouteFallback />}>
-              <WelcomePage />
-            </Suspense>
+            <RequireNoHousehold>
+              <Suspense fallback={<RouteFallback />}>
+                <WelcomePage />
+              </Suspense>
+            </RequireNoHousehold>
           </RequireAuth>
         }
       />

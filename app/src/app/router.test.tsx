@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/toast';
 import { createTestQueryClient, seedHouseholdStore } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionStore } from '@/stores/session-store';
 import { demoUser } from '@/hooks/use-auth';
 import { catalogueModules, modulePath } from '@/lib/modules';
@@ -50,5 +51,37 @@ describe('Routes du foyer', () => {
     expect(page.querySelector('h1')).not.toBeNull();
     expect(screen.queryByRole('heading', { name: 'Cette page n’existe pas' })).not.toBeInTheDocument();
     expect(page.getAttribute('data-module')).toBe(entry.key);
+  });
+});
+
+/**
+ * `/foyer` affirme « Vous n'avez pas encore de foyer » : un utilisateur qui a
+ * un foyer ne doit jamais la voir, sinon il crée des foyers en double en
+ * croyant le sien perdu.
+ */
+describe('Garde /foyer', () => {
+  it('redirige vers /accueil quand un foyer est chargé', async () => {
+    seedHouseholdStore();
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    renderAt('/foyer');
+
+    const page = await waitFor(
+      () => {
+        const found = document.querySelector('[data-module="accueil"]');
+        expect(found, '/foyer avec un foyer devrait mener au tableau de bord').not.toBeNull();
+        return found!;
+      },
+      { timeout: 5000 },
+    );
+    expect(page.querySelector('h1')).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: /pas encore de foyer/i })).not.toBeInTheDocument();
+  });
+
+  it('affiche le choix créer/rejoindre quand aucun foyer n’est chargé', async () => {
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    renderAt('/foyer');
+
+    expect(await screen.findByRole('heading', { name: /pas encore de foyer/i })).toBeInTheDocument();
   });
 });
