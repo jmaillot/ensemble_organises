@@ -90,9 +90,9 @@ les cas existants morsent toujours.
 
 ---
 
-- [ ] **3. Le chemin anniversaires n'a jamais été validé par un envoi**
+- [x] **3. Le chemin anniversaires n'a jamais été validé par un envoi**
 
-**Qui peut le faire : l'agent, puis l'utilisateur.**
+**Qui peut le faire : l'agent, puis l'utilisateur.** — **Fait le 27 septembre 2026** par `sh scripts/test-dispatch-anniversaires.sh` (écrit pour l'occasion, modèle `test-dispatch-push.sh`, propriété inversée : réannonce au lieu de disparaître) : deux dispatches, `200` et `delivered: 2` les deux fois, `consumed: 0` comme prévu par contrat, tag encore dû avant le second appel, nettoyage vérifié par comptage.
 
 `eo-birthday-alerts` passe chaque matin à 06 h 40 et n'a jamais rien envoyé.
 `0006_birthdays.sql` couvre sa logique, et §6.6 explique pourquoi ce chemin ne
