@@ -58,7 +58,14 @@ export async function loadHousehold() {
     return null;
   }
   const members = memberships.filter((membership) => membership.household_id === active.id) as HouseholdMemberRow[];
-  store.setHousehold(active, members, store.currentMemberId || members[0]?.id);
+  // Le membre persisté localement peut ne plus exister côté serveur (ménage
+  // manuel, membre retiré, base restaurée) : un identifiant fantôme passerait
+  // ensuite les écritures (`validate_member_refs` répond 23514) et masquerait
+  // les listes privées. On ne garde que ce que le serveur vient de renvoyer.
+  const currentMemberId = members.some((member) => member.id === store.currentMemberId)
+    ? store.currentMemberId
+    : undefined;
+  store.setHousehold(active, members, currentMemberId);
   return active;
 }
 

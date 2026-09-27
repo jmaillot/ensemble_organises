@@ -188,21 +188,23 @@ en `authenticated` (assignation même foyer acceptée, inter-foyer refusée).
 
 - [ ] **7. Création d'une liste de cadeaux impossible**
 
-**Qui peut le faire : l'agent, après le message exact.**
+**Qui peut le faire : l'agent. Cause établie le 27/09/2026 par le corps
+`POST gift_lists` : `400`, `error=23514`.**
 
-**État.** Cause non établie : la politique `gift_lists_insert` (`0007:460`)
-n'appelle aucune fonction révoquée (`can_write_household` +
-`member_in_household`, toutes deux accordées). Pistes, dans l'ordre :
-`owner_member_id` périmé envoyé par le client (membre d'avant le wipe du
-27/09 : `member_in_household` rend faux → 42501 RLS, pas une erreur de
-fonction), puis visibilité `can_read_gift_list` après création.
+Ce n'est ni la RLS ni un GRANT, mais le trigger `validate_member_refs`
+(`0008:228`) : l'`owner_member_id` envoyé n'appartient pas au foyer. C'est un
+**membre fantôme** — le `currentMemberId` persisté localement désignait un
+membre d'avant le wipe du 27/09, supprimé côté serveur. Le foyer, lui, se
+chargeait bien : le symptôme ressemblait à un problème de droits.
 
-**Ce qu'il faut d'abord.** Reproduire et relever le **message exact**
-(toast ou Network `POST gift_lists` → corps de réponse), plus
-l'`owner_member_id` envoyé (DevTools → onglet Requête).
+**Ce qui est fait.** `loadHousehold` (`session-store.ts`) ne conserve le
+membre persisté que si le serveur vient de le renvoyer, sinon retombe sur le
+premier membre — couvert par `session-store.test.ts` (fantôme + contrôle).
 
-**Terminé quand** une liste se crée depuis l'app et reste visible après
-rechargement. Le critère exact sera resserré une fois le message connu.
+**Terminé quand**, après rebuild + **déconnexion/reconnexion des deux
+postes** (les stores locaux tiennent encore le fantôme, seul un nouveau
+`loadHousehold` le purge), une liste se crée depuis l'app et reste visible
+après rechargement.
 
 ---
 
@@ -227,24 +229,29 @@ couvrent les deux sens + un 29/02.
 
 ---
 
-- [ ] **9. Prestataires : « sans type » sans possibilité d'en créer un**
+- [x] **9. Prestataires : « sans type » sans possibilité d'en créer un**
 
-**Qui peut le faire : l'agent, après le comportement exact.**
+**Résolu le 27/09/2026 sans code : le bouton « Gérer les types » existait
+(`prestataires-page.tsx:101`, état vide :159), il avait été manqué.** Les
+politiques `provider_types` sont standard et la sauvegarde est câblée avec
+toast d'erreur. Reste le vrai manque, en #10.
 
-**État.** Ni l'UI ni la base n'interdisent la création : le bouton
-« Gérer les types » est câblé (`prestataires-page.tsx:101`, état vide :159,
-dialogue :261) et `provider_types` porte les politiques standard
-(`0007:192`, insert `can_write_household`, sans colonne d'auteur). Reste à
-voir ce qui se passe réellement : bouton absent à l'écran ? toast d'erreur
-à la sauvegarde (texte exact) ? contrainte `provider_types_name_unique`
-sur un doublon ?
+---
 
-**Ce qu'il faut d'abord.** Reproduire et noter : le bouton est-il visible ?
-Que dit le toast (texte exact) ou le Network (`POST provider_types` → corps) ?
+- [ ] **10. Types de prestataires proposés par défaut**
 
-**Terminé quand** un type créé depuis « Gérer les types » est proposé dans
-le formulaire prestataire et persiste après rechargement. Le critère exact
-sera resserré une fois le comportement connu.
+**Qui peut le faire : l'agent.**
+
+Un foyer neuf part d'une liste vide et ressaisit les mêmes métiers.
+`create_household` sème désormais dix types (0027 : Médecin, Dentiste,
+Pharmacie, Plombier, Électricien, Garagiste, Coiffeur, Vétérinaire,
+Assurance, Banque), modifiables comme les autres ; les foyers existants
+sont rattrapés sans écraser leurs types (`on conflict do nothing`).
+Couvert par `0008_household_defaults.sql` (semence, unicité, ajout perso).
+
+**Terminé quand** `sh scripts/test-db.sh` est vert avec la 0008, **et**
+qu'un foyer créé depuis l'app propose les dix types dans « Gérer les
+types ».
 
 ---
 
