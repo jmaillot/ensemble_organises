@@ -219,9 +219,15 @@ echo "  Anniversaire  $Anniv  (tag $Tag)"
 # seulement qu'un total `due >= 1` venait d'un autre foyer (la source est
 # globale par conception).
 vu_par_le_dispatch() {
+  # Forme effective depuis 0020 (0019 portait `as n(notification jsonb)`,
+  # refusé à l'exécution : une liste de définitions de colonnes n'est
+  # admise que sur une fonction renvoyant `record`, et
+  # `jsonb_array_elements` renvoie `setof jsonb` dont la colonne s'appelle
+  # `value`). Ce script avait recopié la forme dépassée : c'est lui qui
+  # échouait, pas le dispatch.
   un "select count(*)::text
-        from jsonb_array_elements(public.due_push_notifications('anniversaires')) as n(notification jsonb)
-       where n.notification ->> 'tag' = '$Tag'"
+        from jsonb_array_elements(public.due_push_notifications('anniversaires')) as n
+       where n.value ->> 'tag' = '$Tag'"
 }
 
 Vu="$(vu_par_le_dispatch)"
