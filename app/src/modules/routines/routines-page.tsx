@@ -151,7 +151,7 @@ export default function RoutinesPage() {
                   <SearchInput
                     aria-label="Rechercher une routine"
                     placeholder="Rechercher une routine"
-                    className="w-auto min-w-[200px]"
+                    className="w-auto min-w-[200px] max-[650px]:w-full max-[650px]:min-w-0"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />

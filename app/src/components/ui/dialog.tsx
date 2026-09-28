@@ -20,7 +20,7 @@ export const DialogContent = forwardRef<
           // Radix rend l'overlay et le contenu en frères : le panneau est donc
           // centré par lui-même au-dessus du voile, sinon il tomberait dans le
           // flux normal de la page, sous la ligne de flottaison.
-          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-40px)] w-[calc(100vw-40px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[22px] bg-surface p-[23px] shadow-[var(--shadow-lg)] sm:max-h-[720px]',
+          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-40px)] w-[calc(100vw-40px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[22px] bg-surface p-[23px] shadow-[var(--shadow-lg)] sm:max-h-[720px] max-[650px]:top-auto max-[650px]:right-[10px] max-[650px]:bottom-[calc(10px+env(safe-area-inset-bottom))] max-[650px]:left-[10px] max-[650px]:w-auto max-[650px]:max-w-none max-[650px]:translate-x-0 max-[650px]:translate-y-0 max-[650px]:rounded-t-[22px] max-[650px]:rounded-b-none max-[650px]:px-4 max-[650px]:pt-5 max-[650px]:pb-[calc(20px+env(safe-area-inset-bottom))] max-[650px]:max-h-[calc(100dvh-20px-env(safe-area-inset-bottom))]',
           className,
         )}
         {...rest}
@@ -28,7 +28,7 @@ export const DialogContent = forwardRef<
         {children}
         {hideClose ? null : (
           <DialogPrimitive.Close
-            className="absolute top-4 right-4 grid size-[42px] place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint"
+            className="absolute top-4 right-4 grid size-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint max-[650px]:top-3 max-[650px]:right-3"
             aria-label="Fermer"
           >
             <Icon name="close" size="sm" />
@@ -66,5 +66,5 @@ export const DialogDescription = forwardRef<
 });
 
 export function DialogActions({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('mt-5 flex flex-wrap justify-end gap-2', className)} {...rest} />;
+  return <div className={cn('mt-5 flex flex-wrap justify-end gap-2 max-[650px]:flex-col-reverse max-[650px]:items-stretch [&>*]:max-[650px]:w-full', className)} {...rest} />;
 }

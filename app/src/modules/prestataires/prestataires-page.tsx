@@ -110,7 +110,7 @@ export default function PrestatairesPage() {
       <MetricRow items={metrics} />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5 max-[650px]:w-full">
           <label htmlFor="provider-type-filter" className="text-[11px] font-extrabold text-muted">
             Type
           </label>
@@ -118,7 +118,7 @@ export default function PrestatairesPage() {
             id="provider-type-filter"
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
-            className="min-w-[190px]"
+            className="min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
           >
             <option value={ALL_TYPES}>Tous les types</option>
             {types.map((type) => (
@@ -137,7 +137,7 @@ export default function PrestatairesPage() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher un prestataire"
-            containerClassName="min-w-[220px]"
+            containerClassName="min-w-[220px] max-[650px]:min-w-0"
           />
         </div>
         <p className="m-0 mb-3 ml-auto text-[11px] text-muted" aria-live="polite">

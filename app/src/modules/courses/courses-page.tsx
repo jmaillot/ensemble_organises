@@ -136,15 +136,15 @@ export default function CoursesPage() {
           title="Listes de courses"
           description="Cochez, partagez, et laissez le reste au foyer."
           action={
-            <div className="flex items-center gap-2">
-              <label htmlFor="courses-grouping" className="text-[11px] font-extrabold text-muted">
+            <div className="flex items-center gap-2 max-[650px]:w-full">
+              <label htmlFor="courses-grouping" className="shrink-0 text-[11px] font-extrabold text-muted">
                 Regroupement
               </label>
               <Select
                 id="courses-grouping"
                 value={grouping}
                 onChange={(event) => setGrouping(event.target.value === 'ajout' ? 'ajout' : 'rayon')}
-                className="min-w-[170px]"
+                className="min-w-[170px] max-[650px]:min-w-0 max-[650px]:flex-1"
               >
                 <option value="rayon">Par rayon</option>
                 <option value="ajout">Par ordre d’ajout</option>

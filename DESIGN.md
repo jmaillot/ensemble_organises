@@ -216,6 +216,24 @@ Grilles principales :
 
 Le mobile ne doit jamais scroller horizontalement. Les tableaux longs utilisent une zone de scroll interne (`.table-wrap`), pas la page entière.
 
+### Contrat mobile `≤ 650px`
+
+Ces règles sont normatives : toute nouvelle vue mobile les applique sans exception. Source : run OpenDesign `deb572da` (28/09/2026), validé 6/6.
+
+| Sujet | Règle |
+|---|---|
+| Dégagement bas | Le `main` réserve `calc(86px + env(safe-area-inset-bottom))` ; aucun padding-bottom supplémentaire sur `body` (pas de double scroll) |
+| Navigation basse | `.mobile-nav` en `bottom: calc(10px + env(safe-area-inset-bottom))`, hauteur ≈ `62px`, cibles `46px` |
+| Toast | `bottom: 92px` sur mobile pour ne jamais passer sous la navigation |
+| Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
+| Fil d'Ariane | Préfixe tronqué en ellipsis (`42vw` max), libellé du module également tronqué ; CTA secondaire de topbar masqué |
+| Cibles tactiles | Notifications et avatar `≥ 44px`, bouton de fermeture de dialogue `44px`, `.check-option` `≥ 44px` sur mobile |
+| Tableaux | Conteneur en `overflow-x: auto` + `overscroll-x: contain`, tableau Ardoise à `min-width: 680px` en `table-auto` |
+| Formulaires | Grilles fixes (`[1fr_130px]`, `.form-row`) en 1 colonne sous `650px` |
+| Dialogues | Feuille de bas de page sous `650px`, `border-radius: 22px 22px 0 0`, hauteur bornée par `100dvh`, actions empilées en colonne inversée |
+| Bande KPI | `MetricRow` reste à 2 colonnes (bandeau compact) — les grilles de contenu passent, elles, à 1 colonne |
+| Débordement | `html, body` en `overflow-x: hidden` avec repli `clip`, enfants de grille en `min-width: 0` |
+
 ## 9. Composants
 
 ### Navigation et chrome
@@ -372,6 +390,7 @@ Contraintes :
 - [ ] Les rayons et ombres proviennent des tokens.
 - [ ] Les breakpoints 1180 / 920 / 650 sont respectés.
 - [ ] Aucun élément ne déborde horizontalement sur mobile.
+- [ ] Le contrat mobile `≤ 650px` (section 8) est appliqué en entier sur toute nouvelle vue.
 - [ ] Les états de focus sont visibles.
 - [ ] Les images sont locales et attribuées lorsque nécessaire.
 - [ ] Les données de démonstration sont signalées.

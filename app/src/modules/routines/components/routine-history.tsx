@@ -58,7 +58,7 @@ export function RoutineHistory({ entries, period, onPeriodChange, isLoading = fa
       action={
         <Select
           aria-label="Filtrer l’historique"
-          className="w-auto min-w-[170px]"
+          className="w-auto min-w-[170px] max-[650px]:w-full max-[650px]:min-w-0"
           value={period}
           onChange={(event) => onPeriodChange(Number(event.target.value) as HistoryPeriod)}
         >

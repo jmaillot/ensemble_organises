@@ -42,7 +42,7 @@ const parseAmount = (value: string) => {
 };
 
 const checkOption =
-  'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[11px] font-semibold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong';
+  'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[11px] font-semibold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong max-[650px]:min-h-11';
 
 export interface ExpenseFormDialogProps {
   open: boolean;
@@ -226,7 +226,7 @@ export function ExpenseFormDialog({
                   {members
                     .filter((member) => participants.includes(member.id))
                     .map((member) => (
-                      <Field key={member.id} label={member.name} className="grid-cols-[1fr_130px] items-center gap-3">
+                      <Field key={member.id} label={member.name} className="grid-cols-[1fr_130px] items-center gap-3 max-[650px]:grid-cols-1">
                         {(props) => (
                           <Input
                             {...props}

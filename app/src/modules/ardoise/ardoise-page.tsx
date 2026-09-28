@@ -112,10 +112,11 @@ export default function ArdoisePage() {
               onAction={() => setExpenseDialogOpen(true)}
             />
           ) : (
-            <div className="scrollbar-slim w-full max-w-full overflow-x-auto">
-              {/* Colonnes fixes : le tableau se resserre jusqu'à 360px sans
-                  jamais faire déborder la page horizontalement. */}
-              <table className="w-full table-fixed border-collapse [&>th]:px-1 [&>td]:px-1 sm:[&>th]:px-0 sm:[&>td]:px-0">
+            <div className="scrollbar-slim w-full max-w-full overflow-x-auto overscroll-x-contain">
+              {/* Scroll interne : le tableau garde 680px minimum en
+                  `table-auto` pour rester lisible à 360px sans jamais faire
+                  défiler la page horizontalement. */}
+              <table className="w-full min-w-[680px] table-auto border-collapse [&>th]:px-1 [&>td]:px-1 sm:[&>th]:px-0 sm:[&>td]:px-0">
                 <caption className="sr-only">Dépenses du foyer, payeur, participants et montant</caption>
                 <thead>
                   <tr className="[&>th]:border-t [&>th]:border-border [&>th]:py-3 [&>th]:text-left [&>th]:text-[10px] [&>th]:font-extrabold [&>th]:tracking-[0.08em] [&>th]:uppercase [&>th]:text-muted [&>th:last-child]:text-right">

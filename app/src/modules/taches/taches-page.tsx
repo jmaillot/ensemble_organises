@@ -133,7 +133,7 @@ export default function TachesPage() {
             action={
               <Select
                 aria-label="Filtrer les tâches"
-                className="w-auto min-w-[190px]"
+                className="w-auto min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
                 value={filter}
                 onChange={(event) => setFilter(event.target.value as typeof filter)}
               >

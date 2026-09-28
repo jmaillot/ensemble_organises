@@ -157,10 +157,10 @@ export function AppShell() {
 
       <div className="min-w-0 flex-1">
         <header className="topbar-surface sticky top-0 z-10 flex h-[76px] items-center justify-between gap-5 border-b border-border px-[38px] max-[1180px]:px-[26px] max-[920px]:px-5 max-[650px]:h-16 max-[650px]:px-[15px]">
-          <nav aria-label="Fil d’Ariane" className="flex items-center gap-2 text-[13px] text-muted max-[650px]:text-xs">
-            <span>Ensemble &amp; Organisés</span>
+          <nav aria-label="Fil d’Ariane" className="flex min-w-0 items-center gap-2 text-[13px] text-muted max-[650px]:text-xs">
+            <span className="shrink-0 max-[650px]:max-w-[42vw] max-[650px]:truncate">Ensemble &amp; Organisés</span>
             <span aria-hidden="true">/</span>
-            <strong className="font-[750] text-fg">{currentLabel}</strong>
+            <strong className="font-[750] text-fg max-[650px]:min-w-0 max-[650px]:truncate">{currentLabel}</strong>
           </nav>
           <div className="flex items-center gap-2.5">
             {canInstall ? (
@@ -194,7 +194,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-[15px] max-[650px]:pt-[23px] max-[650px]:pb-[35px]">
+        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-[15px] max-[650px]:pt-[23px] max-[650px]:pb-[calc(86px+env(safe-area-inset-bottom))]">
           {!online && showOffline ? (
             <div
               role="status"
@@ -219,7 +219,7 @@ export function AppShell() {
         </main>
       </div>
 
-      <nav aria-label="Navigation mobile" className="mobile-nav fixed right-[10px] bottom-[10px] left-[10px] z-20 grid-cols-5 gap-1 rounded-[17px] border border-border bg-surface/92 p-[7px] shadow-[var(--shadow-md)] backdrop-blur-[16px]">
+      <nav aria-label="Navigation mobile" className="mobile-nav fixed right-[10px] bottom-[calc(10px+env(safe-area-inset-bottom))] left-[10px] z-20 grid-cols-5 gap-1 rounded-[17px] border border-border bg-surface/92 p-[7px] shadow-[var(--shadow-md)] backdrop-blur-[16px]">
         {mobileNavModules.map((key) => {
           const entry = key === 'accueil' ? { label: 'Maison', icon: homeIcon, short: 'Maison' } : moduleMap[key];
           return (
