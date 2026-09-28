@@ -196,4 +196,21 @@ test.describe('Mises en page', () => {
       expect(width, 'une tuile du dialogue est invisible').toBeGreaterThan(40);
     }
   });
+
+  test('les pages du parcours foyer démarrent en haut sur mobile', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'le centrage vertical ne gêne que sous 650 px');
+
+    // `place-items-center` sur un viewport `min-h-screen` au contenu court
+    // laissait ~40 % de vide en haut : le contenu doit démarrer près du haut.
+    for (const [path, name] of [
+      ['/foyer/rejoindre', 'Rejoindre un foyer'],
+      ['/foyer/nouveau', 'Créer mon foyer'],
+    ] as const) {
+      await page.goto(path);
+      const top = await page
+        .getByRole('heading', { name })
+        .evaluate((heading) => Math.round(heading.getBoundingClientRect().top));
+      expect(top, `vide vertical en haut de ${path}`).toBeLessThan(200);
+    }
+  });
 });

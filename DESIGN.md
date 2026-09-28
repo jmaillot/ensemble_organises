@@ -233,6 +233,7 @@ Ces règles sont normatives : toute nouvelle vue mobile les applique sans except
 | Dialogues | Feuille de bas de page sous `650px`, `border-radius: 22px 22px 0 0`, hauteur bornée par `100dvh`, actions empilées en colonne inversée |
 | Bande KPI | `MetricRow` reste à 2 colonnes (bandeau compact) — les grilles de contenu passent, elles, à 1 colonne |
 | Débordement | `html, body` en `overflow-x: hidden` avec repli `clip`, enfants de grille en `min-width: 0` |
+| Parcours pré-connexion | Pages `/foyer*` et `/connexion` : contenu aligné en haut sous `650px` (`items-start`), jamais centré verticalement dans `min-h-screen` |
 
 ## 9. Composants
 

@@ -4,7 +4,7 @@ import { Icon } from '@/components/shared/icon';
 
 export default function WelcomePage() {
   return (
-    <div className="mx-auto grid min-h-screen max-w-[900px] place-items-center px-5 py-12 max-[650px]:px-[15px]">
+    <div className="mx-auto grid min-h-screen max-w-[900px] place-items-center px-5 py-12 max-[650px]:items-start max-[650px]:px-[15px]">
       <div className="w-full">
         <p className="eyebrow mb-2">Bienvenue</p>
         <h1 className="mb-2.5 text-[clamp(26px,3.2vw,40px)] leading-[1.05]">Vous n’avez pas encore de foyer</h1>

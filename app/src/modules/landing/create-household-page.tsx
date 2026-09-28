@@ -61,7 +61,7 @@ export default function CreateHouseholdPage() {
 
   if (token) {
     return (
-      <div className="mx-auto grid min-h-screen max-w-[760px] place-items-center px-5 py-12 max-[650px]:px-[15px]">
+      <div className="mx-auto grid min-h-screen max-w-[760px] place-items-center px-5 py-12 max-[650px]:items-start max-[650px]:px-[15px]">
         <div className="w-full">
           <span className="mb-4 grid size-12 place-items-center rounded-[16px] bg-accent-soft text-accent-strong">
             <Icon name="checkCircle" size="lg" />
@@ -114,7 +114,7 @@ export default function CreateHouseholdPage() {
   }
 
   return (
-    <div className="mx-auto grid min-h-screen max-w-[620px] place-items-center px-5 py-12 max-[650px]:px-[15px]">
+    <div className="mx-auto grid min-h-screen max-w-[620px] place-items-center px-5 py-12 max-[650px]:items-start max-[650px]:px-[15px]">
       <div className="w-full">
         <Link to="/connexion" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg">
           <Icon name="arrowLeft" size="sm" />
