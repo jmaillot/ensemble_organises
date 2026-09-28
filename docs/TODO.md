@@ -63,15 +63,14 @@ puis cliquer « Envoyer un test » dans les 40 secondes :
 
 ---
 
-- [ ] **2. Le contrôleur de littéraux est sourd dans deux endroits**
+- [x] **2. Le contrôleur de littéraux est sourd dans deux endroits**
 
-Diagnosticé et localisé, non corrigé. La correction tient en une ligne par
-site ; elle n'a pas été appliquée parce qu'elle aurait pu casser des
-contrôles verts, et qu'aucun cas ne permet encore de le prouver.
+**Corrigé et vérifié le 27/09** (preuve en 4 cas d'abord : variable après
+`)` non appariée manquée, `format(%L)` silencieuse, conflit de types
+détecté, mêmes types silencieux — puis `_masque_litteraux` aux deux sites,
+contrôle vert à l'identique : 76 fonctions, 26 migrations, 9 tests).
 
-**Qui peut le faire : l'agent.**
-
-`check-sql-statique.py` compte des parenthèses sur un corps `do $$` sans
+`check-sql-statique.py` comptait des parenthèses sur un corps `do $$` sans
 masquer les littéraux, aux lignes **590** et **669**. Un littéral contenant des
 parenthèses non appariées — `'private\.(\w+)\s*\('` en contient deux — décale
 le comptage, et le contrôle cherche ensuite dans une structure qu'il n'a jamais
@@ -112,8 +111,6 @@ n'y a pas de fenêtre d'une minute à rater.
 
 **Terminé quand** le rapport dit `200` avec `delivered: 1`, et qu'un second
 appel est annoncé une seconde fois.
-
----
 
 ---
 
