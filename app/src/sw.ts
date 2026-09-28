@@ -90,20 +90,21 @@ function readPayload(event: PushEvent): PushPayload {
 
 self.addEventListener('push', (event: PushEvent) => {
   const payload = readPayload(event);
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      tag: payload.tag,
-      // Sans lui, tout renvoi sous le même tag (rappel répété, tests
-      // successifs) remplace le précédent en silence : ni bannière, ni son.
-      // Le tag continue de regrouper, mais chaque envoi ré-alerte.
-      renotify: true,
-      icon: 'icon.svg',
-      badge: 'icon.svg',
-      lang: 'fr',
-      data: { url: payload.url },
-    }),
-  );
+  // `renotify` est standard mais absent de la lib DOM de TypeScript : extension
+  // locale plutôt qu'un contournement global.
+  const options: NotificationOptions & { renotify: boolean } = {
+    body: payload.body,
+    tag: payload.tag,
+    // Sans lui, tout renvoi sous le même tag (rappel répété, tests
+    // successifs) remplace le précédent en silence : ni bannière, ni son.
+    // Le tag continue de regrouper, mais chaque envoi ré-alerte.
+    renotify: true,
+    icon: 'icon.svg',
+    badge: 'icon.svg',
+    lang: 'fr',
+    data: { url: payload.url },
+  };
+  event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
