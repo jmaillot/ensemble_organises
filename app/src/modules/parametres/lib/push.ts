@@ -447,6 +447,52 @@ export async function renamePushDevice(id: string, label: string): Promise<strin
 }
 
 /**
+ * Endpoint de l'abonnement du navigateur courant, ou `null`.
+ *
+ * C'est le seul moyen de savoir si « cet appareil » figure parmi les lignes
+ * du serveur : après une réinstallation, l'endpoint change, et le serveur
+ * peut notifier un fantôme pendant que le téléphone ne reçoit rien — ouvert
+ * comme fermé. Comparer plutôt que supposer.
+ */
+export async function readLocalEndpoint(): Promise<string | null> {
+  if (!isPushSupported()) return null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return subscription?.endpoint ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Supprime un appareil du compte, y compris un appareil qui n'existe plus
+ * (ancien téléphone, navigateur réinstallé).
+ *
+ * Contrairement à `disablePush` — qui ne connaît que l'abonnement du
+ * navigateur courant — l'endpoint vient ici de la liste du serveur : c'est ce
+ * qui permet de purger les lignes mortes. S'il correspond à l'abonnement
+ * local, celui-ci est résilié aussi, sinon il reviendrait à la prochaine
+ * synchronisation.
+ */
+export async function removePushDevice(endpoint: string): Promise<{ removed: boolean; localRemoved: boolean }> {
+  let localRemoved = false;
+  if (isPushSupported()) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription && subscription.endpoint === endpoint) {
+        localRemoved = await subscription.unsubscribe();
+      }
+    } catch {
+      // État local inchangé : le serveur fait foi pour l'arrêt des envois.
+    }
+  }
+  const result = await invoke<{ removed?: boolean }>(FUNCTION_NAME, { action: 'unsubscribe', endpoint });
+  return { removed: result?.removed === true, localRemoved };
+}
+
+/**
  * Demande un envoi de test sur les appareils du compte connecté.
  *
  * Le message est écrit par la base, pas par le client : `push-notify` refuse

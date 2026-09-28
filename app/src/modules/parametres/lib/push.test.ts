@@ -25,7 +25,9 @@ import {
   fromProfileColumns,
   getPushPermissionState,
   isPushSupported,
+  readLocalEndpoint,
   readPushServerState,
+  removePushDevice,
   renamePushDevice,
   toProfileColumns,
 } from './push';
@@ -361,5 +363,63 @@ describe('nom d’appareil', () => {
     invoke.mockResolvedValueOnce({ data: null, error: new Error('coupure'), response: undefined });
 
     await expect(renamePushDevice('push_1', 'PC du salon')).rejects.toThrow(/injoignable/);
+  });
+});
+
+describe('suppression d’appareil', () => {
+  it('révoque la ligne du serveur et résilie l’abonnement local correspondant', async () => {
+    const subscription = makeSubscription('https://fcm.googleapis.com/fcm/send/mort', VAPID_KEY);
+    installBrowser({ current: subscription, permission: 'granted' });
+    invoke.mockResolvedValueOnce({ data: { removed: true }, error: null });
+
+    const result = await removePushDevice('https://fcm.googleapis.com/fcm/send/mort');
+
+    expect(result).toEqual({ removed: true, localRemoved: true });
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
+    const unsubscribeCall = invoke.mock.calls.find(
+      (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'unsubscribe',
+    );
+    expect(unsubscribeCall?.[1]).toMatchObject({
+      body: { action: 'unsubscribe', endpoint: 'https://fcm.googleapis.com/fcm/send/mort' },
+    });
+  });
+
+  it('laisse l’abonnement local tranquille quand la ligne est un autre appareil', async () => {
+    const subscription = makeSubscription('https://fcm.googleapis.com/fcm/send/vivant', VAPID_KEY);
+    installBrowser({ current: subscription, permission: 'granted' });
+    invoke.mockResolvedValueOnce({ data: { removed: true }, error: null });
+
+    const result = await removePushDevice('https://fcm.googleapis.com/fcm/send/mort');
+
+    expect(result).toEqual({ removed: true, localRemoved: false });
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('rapporte un refus du serveur sans mentir', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    invoke.mockResolvedValueOnce({ data: { removed: false }, error: null });
+
+    const result = await removePushDevice('https://fcm.googleapis.com/fcm/send/mort');
+
+    expect(result.removed).toBe(false);
+  });
+});
+
+describe('endpoint local', () => {
+  it('renvoie l’endpoint de l’abonnement du navigateur', async () => {
+    installBrowser({ current: makeSubscription('https://fcm.googleapis.com/fcm/send/ici', VAPID_KEY), permission: 'granted' });
+
+    expect(await readLocalEndpoint()).toBe('https://fcm.googleapis.com/fcm/send/ici');
+  });
+
+  it('renvoie null sans abonnement', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+
+    expect(await readLocalEndpoint()).toBeNull();
+  });
+
+  it('renvoie null quand le navigateur ne gère pas le push', async () => {
+    // Sans installBrowser, ni Notification ni PushManager : indisponible.
+    expect(await readLocalEndpoint()).toBeNull();
   });
 });

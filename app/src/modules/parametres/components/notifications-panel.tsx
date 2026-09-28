@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -19,7 +20,9 @@ import {
   getPushPermissionState,
   pushPermissionHints,
   pushPermissionLabels,
+  readLocalEndpoint,
   readPushServerState,
+  removePushDevice,
   renamePushDevice,
   sendTestPush,
   toProfileColumns,
@@ -51,6 +54,9 @@ export function NotificationsPanel() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState<PushDevice | null>(null);
+  const [deletingPending, setDeletingPending] = useState(false);
+  const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (isLocalMode) {
@@ -58,7 +64,9 @@ export function NotificationsPanel() {
       return;
     }
     try {
-      setServer({ ...(await readPushServerState()), loaded: true, error: null });
+      const [state, endpoint] = await Promise.all([readPushServerState(), readLocalEndpoint()]);
+      setServer({ ...state, loaded: true, error: null });
+      setLocalEndpoint(endpoint);
     } catch (error) {
       const message = error instanceof PushRequestError ? error.message : 'Service de notifications inaccessible.';
       setServer({ ...EMPTY_STATE, loaded: true, error: message });
@@ -101,6 +109,25 @@ export function NotificationsPanel() {
 
   const devices: PushDevice[] = server.devices;
   const hasDevice = devices.length > 0;
+
+  const confirmDelete = async () => {
+    if (!deleting || deletingPending) return;
+    setDeletingPending(true);
+    try {
+      const result = await removePushDevice(deleting.endpoint);
+      toast(
+        result.removed
+          ? 'Appareil supprimé : il ne recevra plus les rappels.'
+          : 'Appareil introuvable sur ce compte.',
+      );
+      setDeleting(null);
+      await refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Suppression impossible.');
+    } finally {
+      setDeletingPending(false);
+    }
+  };
 
   const startRename = (device: PushDevice) => {
     setRenamingId(device.id);
@@ -233,6 +260,13 @@ export function NotificationsPanel() {
           ) : null}
         </div>
 
+        {hasDevice && localEndpoint !== null && !devices.some((device) => device.endpoint === localEndpoint) ? (
+          <p className="mb-4 mt-0 rounded-[10px] bg-amber-soft px-3 py-2 text-[11px] text-[oklch(52%_0.11_78)]">
+            Cet appareil n’est pas enregistré : le serveur notifie peut-être un ancien abonnement. Appuyez sur «
+            Synchroniser cet appareil » depuis CE téléphone.
+          </p>
+        ) : null}
+
         {hasDevice ? (
           <div className="mt-5 border-t border-border pt-1">
             <h3 className="mt-3 mb-1 text-xs font-extrabold">Appareils enregistrés</h3>
@@ -240,6 +274,7 @@ export function NotificationsPanel() {
               {devices.map((device) => {
                 const label = device.device_label ?? friendlyDeviceName(device.device);
                 const editing = renamingId === device.id;
+                const isCurrent = localEndpoint !== null && device.endpoint === localEndpoint;
                 return (
                   <li key={device.id} className="grid gap-1 border-t border-border py-2 first:border-t-0 first:pt-0">
                     {editing ? (
@@ -273,8 +308,15 @@ export function NotificationsPanel() {
                       </form>
                     ) : (
                       <div className="flex items-center justify-between gap-3 text-[11px]">
-                        <span className="min-w-0 truncate font-semibold text-fg" title={device.device}>
-                          {label}
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate font-semibold text-fg" title={device.device}>
+                            {label}
+                          </span>
+                          {isCurrent ? (
+                            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-extrabold text-accent-strong">
+                              Cet appareil
+                            </span>
+                          ) : null}
                         </span>
                         <span className="flex shrink-0 items-center gap-1 text-muted">
                           <span>
@@ -288,6 +330,14 @@ export function NotificationsPanel() {
                             className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
                           >
                             <Icon name="edit" size="sm" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleting(device)}
+                            aria-label={`Supprimer ${label}`}
+                            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+                          >
+                            <Icon name="trash" size="sm" />
                           </button>
                         </span>
                       </div>
@@ -375,6 +425,21 @@ export function NotificationsPanel() {
           Push, et rien d’autre.
         </p>
       </Panel>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title={
+          deleting
+            ? `Supprimer « ${deleting.device_label ?? friendlyDeviceName(deleting.device)} »`
+            : 'Supprimer l’appareil'
+        }
+        description="Cet appareil ne recevra plus les rappels du foyer. Pour le réenregistrer, réactivez les notifications dessus."
+        confirmLabel={deletingPending ? 'Suppression…' : 'Supprimer'}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }
