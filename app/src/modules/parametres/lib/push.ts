@@ -374,6 +374,9 @@ export async function enablePush(): Promise<PushSetupResult> {
     keys: subscription.keys,
     expirationTime: subscription.expirationTime,
     userAgent: navigator.userAgent,
+    // Nom initial lisible (« Chrome · Android ») : renommable ensuite dans
+    // le panneau, sans second appel.
+    label: friendlyDeviceName(navigator.userAgent ?? ''),
   });
 
   return { state: 'autorise', registered: true, message: 'Notifications activées sur cet appareil.' };
@@ -426,6 +429,21 @@ export async function disablePush(): Promise<PushDisableResult> {
   }
 
   return { state: getPushPermissionState(), unsubscribed, serverConfirmed };
+}
+
+/**
+ * Renomme un appareil du compte connecté (chaîne vide : efface le nom).
+ *
+ * Seules les lignes du demandeur sont renommables : la fonction SQL vérifie
+ * l'acteur, et l'Edge Function traduit son refus en 404.
+ */
+export async function renamePushDevice(id: string, label: string): Promise<string | null> {
+  const result = await invoke<{ id?: string; device_label?: string | null }>(FUNCTION_NAME, {
+    action: 'rename',
+    id,
+    label,
+  });
+  return result?.device_label ?? null;
 }
 
 /**

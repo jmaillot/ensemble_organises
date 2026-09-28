@@ -26,6 +26,7 @@ import {
   getPushPermissionState,
   isPushSupported,
   readPushServerState,
+  renamePushDevice,
   toProfileColumns,
 } from './push';
 
@@ -323,5 +324,42 @@ describe('friendlyDeviceName', () => {
   it('ne ment jamais quand l’UA est inconnu', () => {
     expect(friendlyDeviceName('')).toBe('Navigateur inconnu');
     expect(friendlyDeviceName('curl/8.0')).toBe('Navigateur inconnu');
+  });
+});
+
+describe('nom d’appareil', () => {
+  it('envoie un nom lisible à l’inscription', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    invoke.mockResolvedValueOnce({ data: { vapid_public_key: VAPID_KEY, push_configured: true }, error: null });
+    invoke.mockResolvedValueOnce({ data: [], error: null });
+    invoke.mockResolvedValueOnce({ data: { id: 'push_1' }, error: null });
+
+    await enablePush();
+
+    const subscribeCall = invoke.mock.calls.find(
+      (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'subscribe',
+    );
+    const body = subscribeCall?.[1] as { body: { label?: unknown } };
+    expect(typeof body.body.label === 'string' && body.body.label.length > 0 && body.body.label.length <= 80).toBe(
+      true,
+    );
+  });
+
+  it('renomme via l’action dédiée et renvoie le nom du serveur', async () => {
+    invoke.mockResolvedValueOnce({ data: { id: 'push_1', device_label: 'PC du salon' }, error: null });
+
+    const label = await renamePushDevice('push_1', 'PC du salon');
+
+    expect(label).toBe('PC du salon');
+    const renameCall = invoke.mock.calls.find(
+      (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'rename',
+    );
+    expect(renameCall?.[1]).toMatchObject({ body: { action: 'rename', id: 'push_1', label: 'PC du salon' } });
+  });
+
+  it('remonte l’échec de renommage sans l’avaler', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: new Error('coupure'), response: undefined });
+
+    await expect(renamePushDevice('push_1', 'PC du salon')).rejects.toThrow(/injoignable/);
   });
 });

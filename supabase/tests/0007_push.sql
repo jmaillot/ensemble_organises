@@ -664,4 +664,84 @@ begin
 end;
 $$;
 
+-- ===========================================================================
+-- 7. Nom d'appareil : distinguer deux navigateurs identiques, et lire le
+--    dernier code d'envoi sans deviner.
+-- ===========================================================================
+do $$
+declare
+  v_camille uuid;
+  v_thomas uuid;
+  v_result jsonb;
+  v_id text;
+begin
+  select user_id into v_camille from testkit.fx where key = 'camille';
+  select user_id into v_thomas from testkit.fx where key = 'thomas';
+
+  -- Inscription avec nom : la liste le renvoie, avec le dernier code.
+  v_result := public.register_push_subscription(
+    v_camille, testkit.push_endpoint('lbl1'), testkit.push_p256dh(), testkit.push_auth_secret(),
+    null, 'UA de test', 'Téléphone de Camille');
+  v_id := v_result ->> 'id';
+  perform testkit.ok(v_id is not null, 'l''inscription nommée renvoie son identifiant');
+  perform testkit.eq(
+    (select device_label from public.push_subscriptions where endpoint = testkit.push_endpoint('lbl1')),
+    'Téléphone de Camille',
+    'le nom est persisté à l''inscription'
+  );
+
+  -- Resynchronisation sans nom : le nom choisi est conservé, pas effacé.
+  perform public.register_push_subscription(
+    v_camille, testkit.push_endpoint('lbl1'), testkit.push_p256dh(), testkit.push_auth_secret(), null, 'UA de test');
+  perform testkit.eq(
+    (select device_label from public.push_subscriptions where endpoint = testkit.push_endpoint('lbl1')),
+    'Téléphone de Camille',
+    'une resynchronisation sans nom conserve le nom choisi'
+  );
+
+  -- Renommage par le propriétaire, puis effacement par chaîne vide.
+  v_result := public.rename_push_subscription(v_camille, v_id, 'PC du salon');
+  perform testkit.eq(v_result ->> 'device_label', 'PC du salon', 'le renommage renvoie le nouveau nom');
+  perform testkit.eq(
+    (select device_label from public.push_subscriptions where id = v_id),
+    'PC du salon',
+    'le nom renommé est persisté'
+  );
+  perform public.rename_push_subscription(v_camille, v_id, '   ');
+  perform testkit.ok(
+    (select device_label from public.push_subscriptions where id = v_id) is null,
+    'un nom vide efface le nom au lieu d''enregistrer du blanc'
+  );
+
+  -- On ne renomme pas l'appareil d'un autre membre.
+  perform testkit.expect_denied(
+    format('select public.rename_push_subscription(%L, %L, %L)', v_thomas, v_id, 'Intrus'),
+    'le renommage d''un appareil d''autrui est refusé');
+  perform testkit.ok(
+    (select device_label from public.push_subscriptions where id = v_id) is null,
+    'l''appareil est intact après un renommage étranger'
+  );
+
+  -- Nom trop long : refusé avant toute écriture.
+  perform testkit.expect_denied(
+    format('select public.rename_push_subscription(%L, %L, %L)', v_camille, v_id, repeat('x', 81)),
+    'un nom de 81 caractères est refusé');
+  perform testkit.expect_denied(
+    format('select public.register_push_subscription(%L, %L, %L, %L, null, null, %L)',
+      v_camille, testkit.push_endpoint('lbl2'), testkit.push_p256dh(), testkit.push_auth_secret(), repeat('y', 81)),
+    'une inscription avec un nom de 81 caractères est refusée');
+
+  -- La liste expose le nom et le dernier code, jamais les clés.
+  v_result := public.list_push_subscriptions(v_camille);
+  perform testkit.ok(
+    v_result -> 0 ? 'device_label' and v_result -> 0 ? 'last_status',
+    'la liste expose le nom et le dernier code d''envoi'
+  );
+  perform testkit.ok(
+    v_result -> 0 ? 'p256dh' is not true and v_result -> 0 ? 'auth_secret' is not true,
+    'les clés de chiffrement ne quittent toujours pas le serveur'
+  );
+end;
+$$;
+
 rollback;

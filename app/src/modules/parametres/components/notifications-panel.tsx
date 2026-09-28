@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Select } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
+import { Icon } from '@/components/shared/icon';
 import { Panel } from '@/components/shared/module-shell';
 import { Switch } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
@@ -19,6 +20,7 @@ import {
   pushPermissionHints,
   pushPermissionLabels,
   readPushServerState,
+  renamePushDevice,
   sendTestPush,
   toProfileColumns,
   type PushPermissionState,
@@ -46,6 +48,9 @@ export function NotificationsPanel() {
   const [pending, setPending] = useState(false);
   const [server, setServer] = useState<ServerState>(EMPTY_STATE);
   const [preferences, setPreferences] = useState<ReminderPreferences>(defaultReminderPreferences);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   const refresh = useCallback(async () => {
     if (isLocalMode) {
@@ -96,6 +101,26 @@ export function NotificationsPanel() {
 
   const devices: PushDevice[] = server.devices;
   const hasDevice = devices.length > 0;
+
+  const startRename = (device: PushDevice) => {
+    setRenamingId(device.id);
+    setDraft(device.device_label ?? friendlyDeviceName(device.device));
+  };
+
+  const saveRename = async (device: PushDevice) => {
+    if (renaming) return;
+    setRenaming(true);
+    try {
+      await renamePushDevice(device.id, draft);
+      toast(draft.trim() ? 'Appareil renommé.' : 'Nom effacé.');
+      setRenamingId(null);
+      await refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Renommage impossible.');
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   return (
     <div className="grid gap-[18px] max-[920px]:grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
@@ -212,15 +237,70 @@ export function NotificationsPanel() {
           <div className="mt-5 border-t border-border pt-1">
             <h3 className="mt-3 mb-1 text-xs font-extrabold">Appareils enregistrés</h3>
             <ul className="m-0 grid list-none gap-2 p-0">
-              {devices.map((device) => (
-                <li key={device.id} className="flex items-baseline justify-between gap-3 py-1 text-[11px] text-muted">
-                  <span title={device.device}>{friendlyDeviceName(device.device)}</span>
-                  <span className="shrink-0">
-                    {device.failure_count > 0 ? `${device.failure_count} envoi(s) sans succès · ` : ''}
-                    {formatDeviceDate(device.last_success_at)}
-                  </span>
-                </li>
-              ))}
+              {devices.map((device) => {
+                const label = device.device_label ?? friendlyDeviceName(device.device);
+                const editing = renamingId === device.id;
+                return (
+                  <li key={device.id} className="grid gap-1 border-t border-border py-2 first:border-t-0 first:pt-0">
+                    {editing ? (
+                      <form
+                        className="flex gap-2"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void saveRename(device);
+                        }}
+                      >
+                        <Input
+                          value={draft}
+                          maxLength={80}
+                          onChange={(event) => setDraft(event.target.value)}
+                          aria-label={`Nom de l’appareil ${label}`}
+                          autoFocus
+                          disabled={renaming}
+                        />
+                        <Button size="sm" type="submit" disabled={renaming}>
+                          {renaming ? '…' : 'OK'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          type="button"
+                          disabled={renaming}
+                          onClick={() => setRenamingId(null)}
+                        >
+                          Annuler
+                        </Button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3 text-[11px]">
+                        <span className="min-w-0 truncate font-semibold text-fg" title={device.device}>
+                          {label}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1 text-muted">
+                          <span>
+                            {device.failure_count > 0 ? `${device.failure_count} envoi(s) sans succès · ` : ''}
+                            {formatDeviceDate(device.last_success_at)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => startRename(device)}
+                            aria-label={`Renommer ${label}`}
+                            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
+                          >
+                            <Icon name="edit" size="sm" />
+                          </button>
+                        </span>
+                      </div>
+                    )}
+                    <p className="m-0 text-[10px] text-muted">
+                      Ajouté le {formatDeviceDate(device.created_at)}
+                      {device.failure_count > 0 && device.last_status !== null
+                        ? ` · dernier code ${device.last_status}`
+                        : ''}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : null}

@@ -2,7 +2,7 @@
  * Edge Function `push-subscribe`.
  *
  * Point d'entrée : `POST /functions/v1/push-subscribe`
- * Corps : `{ action: 'config' | 'subscribe' | 'unsubscribe' | 'list', ... }`
+ * Corps : `{ action: 'config' | 'subscribe' | 'unsubscribe' | 'rename' | 'list', ... }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: 'user'` — session obligatoire (`Authorization: Bearer <JWT>`).
@@ -33,7 +33,8 @@
  *   config     -> { vapid_public_key: string | null, push_configured: boolean }
  *   subscribe  -> { id, endpoint, created_at, last_success_at }
  *   unsubscribe-> { removed: boolean }
- *   list       -> [{ id, endpoint, device, created_at, last_success_at, failure_count }]
+ *   rename     -> { id, device_label: string | null }
+ *   list       -> [{ id, endpoint, device, device_label, created_at, last_success_at, last_status, failure_count }]
  *
  * Note d'exécution : `withSupabase` renvoie un gestionnaire `fetch` ; on le
  * passe à `Deno.serve`, forme équivalente à `export default { fetch }` pour le
@@ -114,6 +115,14 @@ const isoInstant = z
   .nullish()
   .transform((value) => value ?? null);
 
+/** Nom d'appareil : 80 caractères maximum, vide ou absent pour effacer. */
+const deviceLabel = z
+  .string()
+  .trim()
+  .max(80, 'Nom d’appareil trop long (80 caractères maximum).')
+  .nullish()
+  .transform((value) => (value && value.length > 0 ? value : null));
+
 const requestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('config') }),
   z.object({
@@ -122,8 +131,14 @@ const requestSchema = z.discriminatedUnion('action', [
     keys: z.object({ p256dh, auth: authSecret }),
     expirationTime: isoInstant,
     userAgent: z.string().trim().max(300).nullish().transform((value) => value ?? null),
+    label: deviceLabel.optional(),
   }),
   z.object({ action: z.literal('unsubscribe'), endpoint }),
+  z.object({
+    action: z.literal('rename'),
+    id: z.string().trim().min(1).max(64),
+    label: deviceLabel,
+  }),
   z.object({ action: z.literal('list') }),
 ]);
 
@@ -150,7 +165,7 @@ async function parseBody(request: Request): Promise<RequestBody> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { config: 60, subscribe: 20, unsubscribe: 20, list: 30 };
+const LIMITS: Record<string, number> = { config: 60, subscribe: 20, unsubscribe: 20, rename: 20, list: 30 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -201,6 +216,8 @@ function translateRpcError(error: { code?: string; message: string }): Subscribe
 
   if (message.includes('session requise')) return new SubscribeError(401, 'Connectez-vous pour activer les notifications.');
   if (message.includes('endpoint obligatoire')) return new SubscribeError(400, 'Adresse de service Push absente.');
+  if (message.includes('trop long')) return new SubscribeError(400, 'Nom d’appareil trop long (80 caractères maximum).');
+  if (message.includes('introuvable')) return new SubscribeError(404, 'Appareil introuvable sur ce compte.');
   if (message.includes('clé publique')) {
     return new SubscribeError(400, 'Clés d’abonnement incomplètes : réactivez les notifications.');
   }
@@ -228,6 +245,7 @@ async function handleSubscribe(admin: AdminClient, userId: string, body: Request
     p_auth_secret: body.keys.auth,
     p_expiration_time: body.expirationTime,
     p_user_agent: body.userAgent,
+    p_device_label: body.label ?? null,
   });
 
   if (error) throw translateRpcError(error);
@@ -253,6 +271,17 @@ async function handleUnsubscribe(admin: AdminClient, userId: string, body: Reque
 
   if (error) throw translateRpcError(error);
   return json({ removed: data === true });
+}
+
+async function handleRename(admin: AdminClient, userId: string, body: RequestBody & { action: 'rename' }) {
+  const { data, error } = await admin.rpc('rename_push_subscription', {
+    p_user_id: userId,
+    p_subscription_id: body.id,
+    p_label: body.label,
+  });
+
+  if (error) throw translateRpcError(error);
+  return json(data ?? { id: body.id, device_label: body.label });
 }
 
 async function handleList(admin: AdminClient, userId: string) {
@@ -297,6 +326,7 @@ Deno.serve(
 
       if (body.action === 'subscribe') return await handleSubscribe(admin, userId, body);
       if (body.action === 'unsubscribe') return await handleUnsubscribe(admin, userId, body);
+      if (body.action === 'rename') return await handleRename(admin, userId, body);
       return await handleList(admin, userId);
     } catch (error) {
       if (error instanceof SubscribeError) return json({ error: error.message }, error.status);

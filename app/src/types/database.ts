@@ -41,8 +41,10 @@ export interface PushDevice {
   id: string;
   endpoint: string;
   device: string;
+  device_label: string | null;
   created_at: IsoDateTime;
   last_success_at: IsoDateTime | null;
+  last_status: number | null;
   failure_count: number;
 }
 
