@@ -12,7 +12,16 @@ Dernière mise à jour : 26 septembre 2026.
 
 ---
 
-- [ ] **1. L'affichage des notifications n'est pas établi**
+- [x] **1. L'affichage des notifications est établi**
+
+**Clos le 28/09/2026 : remise prouvée de bout en bout.** Le poste 2 ne
+recevait rien parce que son abonnement navigateur avait disparu
+(`getSubscription() → null`, permission pourtant `granted`) pendant que le
+serveur gardait l'orphelin — d'où des `delivered` côté service et un silence
+côté SW. Après réabonnement propre : snippet 40 s → `NOTIFICATION REÇUE ->
+["Ensemble & Organisés"]`. *Leçon : `delivered` signifie « accepté par le
+service », jamais « reçu par le navigateur » ; en cas de silence, vérifier
+d'abord l'abonnement vivant (`getSubscription()`), pas le serveur.*
 
 **Qui peut le faire : l'utilisateur.** C'est le seul point bloquant.
 
