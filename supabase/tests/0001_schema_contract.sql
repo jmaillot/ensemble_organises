@@ -62,7 +62,7 @@ begin
           ('conversation_members', ARRAY['conversation_id', 'member_id']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
-          ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[])
+          ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(
