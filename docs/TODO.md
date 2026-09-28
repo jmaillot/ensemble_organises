@@ -12,16 +12,16 @@ Dernière mise à jour : 26 septembre 2026.
 
 ---
 
-- [x] **1. L'affichage des notifications est établi**
+- [ ] **1. L'affichage des notifications, à revalider sur mobile**
 
-**Clos le 28/09/2026 : remise prouvée de bout en bout.** Le poste 2 ne
-recevait rien parce que son abonnement navigateur avait disparu
-(`getSubscription() → null`, permission pourtant `granted`) pendant que le
-serveur gardait l'orphelin — d'où des `delivered` côté service et un silence
-côté SW. Après réabonnement propre : snippet 40 s → `NOTIFICATION REÇUE ->
-["Ensemble & Organisés"]`. *Leçon : `delivered` signifie « accepté par le
-service », jamais « reçu par le navigateur » ; en cas de silence, vérifier
-d'abord l'abonnement vivant (`getSubscription()`), pas le serveur.*
+**Établi le 28/09 : la remise fonctionne** (snippet 40 s → `NOTIFICATION
+REÇUE`). Le silence venait de deux couches : abonnement navigateur disparu
+(`getSubscription() → null`, `granted` pourtant) pendant que le serveur
+gardait l'orphelin — *`delivered` signifie « accepté par le service »,
+jamais « reçu »* — puis remplacement silencieux même tag (pas de `renotify`
+dans `sw.ts`, corrigé + typé, en attente de rebuild).
+**Mis de côté à la demande : retest sur mobile au moment opportun**
+(bannière au 1er envoi, puis seconde bannière au renvoi même tag).
 
 **Qui peut le faire : l'utilisateur.** C'est le seul point bloquant.
 
