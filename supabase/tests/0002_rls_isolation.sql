@@ -280,6 +280,40 @@ select testkit.eq(testkit.affected(format(
   'le nouveau propriétaire peut administrer la liste reçue');
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 
+-- --- Listes de cadeaux : INSERT…RETURNING en authenticated -------------------
+-- Régression du 28/09/2026 : `can_read_gift_list` relisait `gift_lists` par
+-- son id, et une ligne créée dans la même commande est invisible aux scans de
+-- cette commande (MVCC : `cmin == curcid`). L'app demande toujours la
+-- représentation, donc toute création échouait en 42501 côté client — alors
+-- que l'insertion nue, la lecture, `UPDATE…RETURNING` et les suites (jamais
+-- d'INSERT…RETURNING en authenticated) passaient. Ces deux blocs sont les
+-- seuls qui auraient vu la régression : sans eux, le fichier reste vert sur
+-- une base où l'app ne peut rien créer.
+do $$
+declare
+  v_privee text;
+  v_foyer text;
+begin
+  insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
+  values ('list_ret_privee',
+          (select household_id from testkit.fx where key = 'alice'),
+          (select row_id from testkit.fx where key = 'alice'),
+          'Retour privée', 'privee')
+  returning id into v_privee;
+  perform testkit.eq(v_privee, 'list_ret_privee',
+    'une liste privée se crée avec représentation en authenticated');
+
+  insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
+  values ('list_ret_foyer',
+          (select household_id from testkit.fx where key = 'alice'),
+          (select row_id from testkit.fx where key = 'alice'),
+          'Retour foyer', 'foyer')
+  returning id into v_foyer;
+  perform testkit.eq(v_foyer, 'list_ret_foyer',
+    'une liste du foyer se crée avec représentation en authenticated');
+end;
+$$;
+
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(
   'update public.dashboard_widgets set position_x = 9 where member_id = %L', (select row_id from testkit.fx where key = 'carol'))), 0::bigint,
