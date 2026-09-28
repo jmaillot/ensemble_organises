@@ -1,4 +1,6 @@
 import { data } from '@/lib/data';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { randomId } from '@/lib/utils';
 import type { BirthdayRow, GiftItemRow, GiftListRow, GiftListShareRow } from '@/types';
 import { roundPrice, type GiftPermission, type GiftShareInput, type NewGiftItemInput, type NewGiftListInput } from './types';
 
@@ -51,6 +53,25 @@ export async function deleteGiftItem(id: string): Promise<void> {
 }
 
 export async function createGiftList(householdId: string, ownerMemberId: string, input: NewGiftListInput): Promise<GiftListRow> {
+  // INSERT…RETURNING est refusé sur gift_lists : sa politique SELECT relit la
+  // ligne par son id, invisible dans la même commande (MVCC). On insère donc
+  // sans représentation, puis on relit la ligne commise (voir 0028/0032).
+  if (isSupabaseConfigured && supabase) {
+    const id = randomId('gift_lists');
+    const { error } = await supabase.from('gift_lists').insert({
+      id,
+      household_id: householdId,
+      owner_member_id: ownerMemberId,
+      name: input.name.trim(),
+      visibility: input.visibility,
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    const rows = await data.list<GiftListRow>('gift_lists', { id });
+    const row = rows[0];
+    if (!row) throw new Error('Liste introuvable après création.');
+    return row;
+  }
   return data.create<GiftListRow>('gift_lists', {
     household_id: householdId,
     owner_member_id: ownerMemberId,

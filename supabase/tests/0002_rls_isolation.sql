@@ -280,39 +280,32 @@ select testkit.eq(testkit.affected(format(
   'le nouveau propriétaire peut administrer la liste reçue');
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 
--- --- Listes de cadeaux : INSERT…RETURNING en authenticated -------------------
--- Régression du 28/09/2026 : `can_read_gift_list` relisait `gift_lists` par
--- son id, et une ligne créée dans la même commande est invisible aux scans de
--- cette commande (MVCC : `cmin == curcid`). L'app demande toujours la
--- représentation, donc toute création échouait en 42501 côté client — alors
--- que l'insertion nue, la lecture, `UPDATE…RETURNING` et les suites (jamais
--- d'INSERT…RETURNING en authenticated) passaient. Ces deux blocs sont les
--- seuls qui auraient vu la régression : sans eux, le fichier reste vert sur
--- une base où l'app ne peut rien créer.
-do $$
-declare
-  v_privee text;
-  v_foyer text;
-begin
-  insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
-  values ('list_ret_privee',
-          (select household_id from testkit.fx where key = 'alice'),
-          (select row_id from testkit.fx where key = 'alice'),
-          'Retour privée', 'privee')
-  returning id into v_privee;
-  perform testkit.eq(v_privee, 'list_ret_privee',
-    'une liste privée se crée avec représentation en authenticated');
-
-  insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
-  values ('list_ret_foyer',
-          (select household_id from testkit.fx where key = 'alice'),
-          (select row_id from testkit.fx where key = 'alice'),
-          'Retour foyer', 'foyer')
-  returning id into v_foyer;
-  perform testkit.eq(v_foyer, 'list_ret_foyer',
-    'une liste du foyer se crée avec représentation en authenticated');
-end;
-$$;
+-- --- Listes de cadeaux : création sans représentation -------------------------
+-- L'app insère sans `Prefer: return=representation`, puis relit : la
+-- politique SELECT relit la ligne par son id, et une ligne créée dans la
+-- même commande est invisible à cette relecture (MVCC : cmin == curcid).
+-- Ces assertions miment exactement ce chemin supporté (insert nu, puis
+-- select) ; un INSERT…RETURNING direct reste refusé par construction.
+select testkit.eq(testkit.affected(format(
+  'insert into public.gift_lists (id, household_id, owner_member_id, name, visibility) values (%L, %L, %L, %L, %L)',
+  'list_noret_privee',
+  (select household_id from testkit.fx where key = 'alice'),
+  (select row_id from testkit.fx where key = 'alice'),
+  'Sans retour privée', 'privee')), 1::bigint,
+  'une liste privée s''insère sans représentation en authenticated');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_lists where id = %L', 'list_noret_privee')), 1::bigint,
+  '... et se relit juste après, dans une autre commande');
+select testkit.eq(testkit.affected(format(
+  'insert into public.gift_lists (id, household_id, owner_member_id, name, visibility) values (%L, %L, %L, %L, %L)',
+  'list_noret_foyer',
+  (select household_id from testkit.fx where key = 'alice'),
+  (select row_id from testkit.fx where key = 'alice'),
+  'Sans retour foyer', 'foyer')), 1::bigint,
+  'une liste du foyer s''insère sans représentation en authenticated');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_lists where id = %L', 'list_noret_foyer')), 1::bigint,
+  '... et se relit juste après, dans une autre commande');
 
 -- --- Widgets : préférences personnelles -------------------------------------
 select testkit.eq(testkit.affected(format(

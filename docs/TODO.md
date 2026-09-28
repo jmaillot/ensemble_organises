@@ -156,6 +156,31 @@ booléens de `0009:41-43` préservée.
 
 ---
 
+- [ ] **7. Création d'une liste de cadeaux impossible**
+
+**Qui peut le faire : l'agent, reste la vérification app.**
+
+Chaîne causale établie par sondes (28/09) : `INSERT…RETURNING` refusé car
+la politique `SELECT` relit la ligne par son id, invisible dans la même
+commande (MVCC) — insertion nue OK, lecture OK. Tentative 0028 (réécrire le
+`SELECT` en prédicats) abandonnée : elle coïncidait avec l'échec du transfert
+en `UPDATE`, sans cause moteur élucidée malgré ~40 sondes, et portait une
+corrélation perdue (corrigée en 0029, devenue sans objet) ; retour à la
+version historiquement verte en 0032.
+Fix retenu : `createGiftList` insère **sans** représentation puis relit la
+ligne commise (le seul chemin que PG supporte ici) ; 0002 couvre
+insert-puis-select pour `privee` et `foyer`.
+
+**Terminé quand**, après migrate + rebuild, une liste se crée depuis l'app
+(`privee` ET `foyer`) et reste visible après rechargement. Le transfert de
+propriété entre membres reste, lui, une anomalie moteur non élucidée
+(composants vrais isolément, `WITH CHECK` faux en conjonction, même en
+`(true, true)`, triggers/FK/plans écartés) : aucun chemin applicatif ne
+l'emprunte (vérifié par grep : aucune écriture d'`owner_member_id` côté
+app), il ne bloque donc rien en usage.
+
+---
+
 - [ ] **8. Date d'anniversaire affichée en MM/DD/YYYY**
 
 **Qui peut le faire : l'agent.**
@@ -197,16 +222,7 @@ rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
 
 ## Plus tard
 
-- **7. Création d'une liste de cadeaux impossible.** Re-tenté le 27/09 après
-  le durcissement anti-fantôme (`loadHousehold` ne garde que le membre
-  renvoyé par le serveur) : toujours impossible. La piste fantôme n'est donc
-  pas la (seule) cause, ou le store local n'avait pas été purgé
-  (déconnexion/reconnexion non confirmée). À ré-enquêter avec une trace
-  fraîche : corps du `POST gift_lists` (quel `owner_member_id` est envoyé ?)
-  + `currentMemberId` du localStorage face aux membres en base. Voir l'historique
-  dans git (`TODO.md`, commits du 27/09).
-
----
+(Rien pour le moment — le #7 est remonté en actif le 28/09 avec son fix.)
 
 ---
 
