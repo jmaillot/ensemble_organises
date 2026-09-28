@@ -94,6 +94,10 @@ self.addEventListener('push', (event: PushEvent) => {
     self.registration.showNotification(payload.title, {
       body: payload.body,
       tag: payload.tag,
+      // Sans lui, tout renvoi sous le même tag (rappel répété, tests
+      // successifs) remplace le précédent en silence : ni bannière, ni son.
+      // Le tag continue de regrouper, mais chaque envoi ré-alerte.
+      renotify: true,
       icon: 'icon.svg',
       badge: 'icon.svg',
       lang: 'fr',
