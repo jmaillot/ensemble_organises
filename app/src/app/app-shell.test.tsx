@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { catalogueModules } from '@/lib/modules';
+import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
 
 function renderShell(route: string) {
@@ -35,10 +36,15 @@ describe('AppShell', () => {
     expect(within(breadcrumb).getByText('À faire')).toBeInTheDocument();
   });
 
-  it('propose une navigation basse sur mobile', () => {
+  it('propose un hamburger qui ouvre le tiroir des espaces', async () => {
+    const user = userEvent.setup();
     renderShell('/accueil');
-    const mobile = screen.getByRole('navigation', { name: 'Navigation mobile' });
-    expect(within(mobile).getAllByRole('link').length).toBe(4);
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    // Maison + seize modules, chacun joignable en un tap.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(17);
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir Courses' })).toBeInTheDocument();
   });
 
   it('marque la page active dans la navigation', () => {
@@ -97,22 +103,49 @@ describe('AppShell — catalogue des espaces', () => {
     expect(screen.getByRole('link', { name: 'Courses' })).toBeInTheDocument();
   });
 
-  it('ouvre le catalogue en tuiles depuis la navigation mobile', async () => {
+  it('ouvre le tiroir en tuiles depuis le hamburger', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Espaces' }));
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
-    const dialog = screen.getByRole('dialog');
-    const grid = within(dialog).getByRole('list', { name: 'Tous les espaces' });
-    expect(within(grid).getAllByRole('button')).toHaveLength(catalogueModules.length);
-    expect(within(grid).getByRole('button', { name: 'Ouvrir Anniversaires' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(17);
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir Anniversaires' })).toBeInTheDocument();
   });
 
-  it('ferme le catalogue après avoir choisi une catégorie', async () => {
+  it('ferme le tiroir après avoir choisi un espace', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Espaces' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ouvrir Courses' }));
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Ouvrir Courses' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('le tiroir couvre chaque espace du catalogue, plus la maison', () => {
+    const keys = MOBILE_DRAWER_GROUPS.flatMap((group) => group.keys);
+    expect(keys).toContain('accueil');
+    for (const entry of catalogueModules) {
+      expect(keys, `${entry.key} injoignable sur mobile`).toContain(entry.key);
+    }
+  });
+
+  it('filtre les espaces depuis la recherche du tiroir', async () => {
+    const user = userEvent.setup();
+    renderShell('/accueil');
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'courses');
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(1);
+  });
+
+  it('retrouve un espace sans taper ses accents', async () => {
+    const user = userEvent.setup();
+    renderShell('/accueil');
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'a faire');
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir À faire' })).toBeInTheDocument();
   });
 });

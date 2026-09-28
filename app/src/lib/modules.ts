@@ -84,8 +84,6 @@ export const catalogueModules: ModuleEntry[] = modules;
 
 export const modulePath = (key: ModuleKey) => `/${key}`;
 
-export const mobileNavModules: ModuleKey[] = ['accueil', 'taches', 'calendrier', 'cercle'];
-
 export const assetUrl = (file: string) => `/assets/${file}`;
 
 /** Libellé affiché dans la barre latérale et le fil d'Ariane. */

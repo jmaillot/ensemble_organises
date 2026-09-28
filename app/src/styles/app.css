@@ -256,24 +256,15 @@
     width: 21px;
     height: 21px;
   }
-
-  .mobile-nav {
-    display: none;
-  }
 }
 
-/* Comportement responsive de l'export : la navigation basse remplace la
-   barre latérale sous 650px. */
+/* Garde-fou : aucune vue ne doit scroller horizontalement sous 650px. */
 @media (max-width: 650px) {
   html,
   body {
     max-width: 100%;
     overflow-x: hidden;
     overflow-x: clip;
-  }
-
-  .mobile-nav {
-    display: grid;
   }
 }
 

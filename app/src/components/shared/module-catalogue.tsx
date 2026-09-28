@@ -3,8 +3,6 @@ import { NavLink } from 'react-router';
 import { cn } from '@/lib/utils';
 import { catalogueModules, modulePath } from '@/lib/modules';
 import { Icon } from './icon';
-import { ModuleTile } from './module-tile';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 /**
  * Traitement d'un lien de navigation de la barre latérale. Partagé par les
@@ -63,44 +61,5 @@ export function ModuleCatalogueNav({ className }: { className?: string }) {
         </ul>
       ) : null}
     </div>
-  );
-}
-
-/**
- * Le même catalogue en tuiles, dans un dialogue.
- *
- * Sous 650 px la barre latérale est masquée : sans ce dialogue, la navigation
- * basse — quatre entrées — resterait le seul moyen d'atteindre les catégories.
- */
-export function ModuleCatalogueDialog({
-  open,
-  onOpenChange,
-  className,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  className?: string;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn('max-w-[720px]', className)}>
-        <DialogHeader>
-          <p className="eyebrow mb-2">Navigation</p>
-          <DialogTitle>Tous les espaces</DialogTitle>
-          <DialogDescription>
-            Les {catalogueModules.length} espaces du foyer, chacun avec son bouton.
-          </DialogDescription>
-        </DialogHeader>
-        {/* Libellé distinct de celui de la barre latérale : sous 650 px celle-ci
-            reste dans le DOM, et deux listes homonymes seraient ambiguës. */}
-        <ul aria-label="Tous les espaces" className="m-0 grid list-none grid-cols-3 gap-3 p-0 max-[650px]:grid-cols-2">
-          {catalogueModules.map((entry) => (
-            <li key={entry.key} className="min-w-0">
-              <ModuleTile entry={entry} onNavigate={() => onOpenChange(false)} />
-            </li>
-          ))}
-        </ul>
-      </DialogContent>
-    </Dialog>
   );
 }

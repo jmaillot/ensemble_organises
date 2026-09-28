@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed right-[22px] bottom-[22px] z-70 flex flex-col items-end gap-2 max-[650px]:inset-x-[15px] max-[650px]:bottom-[92px] max-[650px]:items-stretch"
+        className="pointer-events-none fixed right-[22px] bottom-[22px] z-70 flex flex-col items-end gap-2 max-[650px]:inset-x-3 max-[650px]:bottom-[calc(16px+env(safe-area-inset-bottom))] max-[650px]:items-stretch"
         role="region"
         aria-label="Notifications de l’application"
       >

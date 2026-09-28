@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { catalogueModules, mobileNavModules, modules, navModules } from './modules';
+import { catalogueModules, modules, navModules } from './modules';
 
 /**
  * Vitest ne garantit pas le répertoire courant du runner : on remonte depuis
@@ -51,11 +51,6 @@ describe('Catalogue des espaces', () => {
 
   it('ne laisse aucun accès rapide hors du catalogue', () => {
     for (const key of navModules) {
-      expect(catalogueModules.some((entry) => entry.key === key)).toBe(true);
-    }
-    for (const key of mobileNavModules) {
-      // `accueil` est le tableau de bord, pas un espace du foyer.
-      if (key === 'accueil') continue;
       expect(catalogueModules.some((entry) => entry.key === key)).toBe(true);
     }
   });

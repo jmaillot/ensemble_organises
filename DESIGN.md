@@ -212,7 +212,7 @@ Grilles principales :
 | `> 1180px` | Layout complet, sidebar `246px`, modules en 4 colonnes |
 | `≤ 1180px` | Sidebar `218px`, contenu `26px`, modules en 3 colonnes |
 | `≤ 920px` | Sidebar réduite à `76px`, icônes seules, side column en 2 colonnes |
-| `≤ 650px` | Sidebar masquée, navigation mobile fixe, grilles en 1 colonne, padding `15px` |
+| `≤ 650px` | Sidebar masquée, hamburger + tiroir, grilles en 1 colonne, padding `12px` |
 
 Le mobile ne doit jamais scroller horizontalement. Les tableaux longs utilisent une zone de scroll interne (`.table-wrap`), pas la page entière.
 
@@ -222,13 +222,15 @@ Ces règles sont normatives : toute nouvelle vue mobile les applique sans except
 
 | Sujet | Règle |
 |---|---|
-| Dégagement bas | Le `main` réserve `calc(86px + env(safe-area-inset-bottom))` ; aucun padding-bottom supplémentaire sur `body` (pas de double scroll) |
-| Navigation basse | `.mobile-nav` en `bottom: calc(10px + env(safe-area-inset-bottom))`, hauteur ≈ `62px`, cibles `46px` |
-| Toast | `bottom: 92px` sur mobile pour ne jamais passer sous la navigation |
+| Dégagement bas | Le `main` réserve `calc(28px + env(safe-area-inset-bottom))` (plus de barre basse) ; aucun padding-bottom supplémentaire sur `body` (pas de double scroll) |
+| Topbar mobile | Hauteur `56px`, trois éléments : hamburger, marque `34px`, notifications + avatar `44px`. Fil d'Ariane et CTA « Installer » supprimés sous `650px` |
+| Tiroir | Unique menu mobile : recherche `44px`, 17 espaces groupés (Au quotidien / Le foyer / Pratique), carte foyer, préférences (admin), déconnexion. Fermeture overlay / bouton / `Échap` / balayage gauche ; focus piégé, rendu au hamburger, `aria-modal` synchronisé |
+| Toast | `bottom: calc(16px + env(safe-area-inset-bottom))` sur mobile |
 | Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
-| Fil d'Ariane | Préfixe tronqué en ellipsis (`42vw` max), libellé du module également tronqué ; CTA secondaire de topbar masqué |
-| Cibles tactiles | Notifications et avatar `≥ 44px`, bouton de fermeture de dialogue `44px`, `.check-option` `≥ 44px` sur mobile |
-| Tableaux | Ardoise : tableau desktop (`max-[650px]:hidden`), cartes empilées sur mobile (`min-[651px]:hidden`) — aucun scroll horizontal, même interne |
+| Cibles tactiles | Notifications, avatar, fermeture de dialogue et `.check-option` `≥ 44px` sur mobile |
+| En-têtes de module | Retour en pastille `44px` (libellé `sr-only`), titre `24px`, eyebrow et lede masqués sous `650px` ; l'action principale reste visible |
+| Densité mobile | Contenu `14px 12px`, panneaux et cartes `14px`, tuiles de module `104px` (accroche masquée), `BalanceCard` compacte (`34px`, texte masqué), coupons sans hauteur minimale |
+| Tableaux | Ardoise : une seule variante montée via `useIsMobileLayout` — tableau sur bureau, cartes empilées sur mobile. Aucun scroll horizontal, même interne |
 | Formulaires | Grilles fixes (`[1fr_130px]`, `.form-row`) en 1 colonne sous `650px` |
 | Dialogues | Feuille de bas de page sous `650px`, `border-radius: 22px 22px 0 0`, hauteur bornée par `100dvh`, actions empilées en colonne inversée |
 | Bande KPI | `MetricRow` reste à 2 colonnes (bandeau compact) — les grilles de contenu passent, elles, à 1 colonne |

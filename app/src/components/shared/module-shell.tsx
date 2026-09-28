@@ -19,18 +19,32 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
   const navigate = useNavigate();
   const entry = moduleMap[module];
   return (
-    <div className={cn('mb-7 flex items-start justify-between gap-5 max-[650px]:block', className)}>
-      <div>
+    <div className={cn('mb-7 flex items-start justify-between gap-5 max-[650px]:mb-5 max-[650px]:block', className)}>
+      <div className="max-[650px]:flex max-[650px]:items-center max-[650px]:gap-2.5">
         {/* `/` est la page publique de l'authentification, pas le tableau de
             bord : y renvoyer sortait l'utilisateur de l'application. */}
-        <Button variant="quiet" size="sm" icon="arrowLeft" onClick={() => navigate('/accueil')} className="mb-3 -ml-2">
-          Retour à la maison
+        <Button
+          variant="quiet"
+          size="sm"
+          icon="arrowLeft"
+          onClick={() => navigate('/accueil')}
+          className="mb-3 -ml-2 max-[650px]:m-0 max-[650px]:size-11 max-[650px]:shrink-0 max-[650px]:rounded-full max-[650px]:border max-[650px]:border-border max-[650px]:bg-surface max-[650px]:p-0"
+        >
+          {/* Le libellé reste le nom accessible (même en `sr-only`) : aucun
+              `aria-label` redondant, qui casserait les requêtes par label. */}
+          <span className="max-[650px]:sr-only">Retour à la maison</span>
         </Button>
-        <p className="eyebrow mb-2">{kicker ?? entry?.kicker ?? 'Espace du foyer'}</p>
-        <h1 className="mb-2 text-[length:var(--text-module)] leading-[1.06]">{title ?? entry?.label ?? 'Espace'}</h1>
-        <p className="lede mb-0 max-w-[620px] text-[15px]">{description ?? entry?.detail ?? ''}</p>
+        <div className="min-w-0">
+          <p className="eyebrow mb-2 max-[650px]:hidden">{kicker ?? entry?.kicker ?? 'Espace du foyer'}</p>
+          <h1 className="mb-2 text-[length:var(--text-module)] leading-[1.06] max-[650px]:mb-0 max-[650px]:truncate max-[650px]:text-[24px] max-[650px]:leading-[1.16]">
+            {title ?? entry?.label ?? 'Espace'}
+          </h1>
+          <p className="lede mb-0 max-w-[620px] text-[15px] max-[650px]:hidden">
+            {description ?? entry?.detail ?? ''}
+          </p>
+        </div>
       </div>
-      {actions ? <div className="flex flex-wrap justify-end gap-2 max-[650px]:mt-4 max-[650px]:justify-start">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap justify-end gap-2 max-[650px]:mt-3 max-[650px]:justify-start">{actions}</div> : null}
     </div>
   );
 }
@@ -57,7 +71,7 @@ export function Panel({ title, description, action, children, className, id }: P
   return (
     // `min-w-0` : une carte peut toujours rétrécir sous la largeur de sa colonne
     // de grille, sinon son contenu le plus large ferait déborder la page.
-    <section id={id} className={cn('panel-surface min-w-0 rounded-[16px] p-[19px]', className)}>
+    <section id={id} className={cn('panel-surface min-w-0 rounded-[16px] p-[19px] max-[650px]:p-[14px]', className)}>
       {title || action ? (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-col max-[650px]:gap-2.5">
           <div>

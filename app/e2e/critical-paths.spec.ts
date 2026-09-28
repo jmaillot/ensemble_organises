@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * (aucun backend requis) : c'est le mode local documenté de l'application.
  */
 
-/** Le projet Playwright « mobile » utilise la navigation basse. */
+/** Le projet Playwright « mobile » utilise le tiroir hamburger. */
 function viewportIsMobile(page: Page) {
   return (page.viewportSize()?.width ?? 1280) <= 650;
 }
@@ -15,9 +15,12 @@ async function openDemoSession(page: Page) {
   await page.goto('/connexion');
   await page.getByRole('button', { name: 'Entrer dans la démonstration' }).click();
   await page.waitForURL('**/accueil');
-  // Le fil d'Ariane est toujours visible ; la barre latérale, elle, cède la
-  // place à la navigation basse sous 650 px.
-  await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toBeVisible();
+  if (viewportIsMobile(page)) {
+    // Sous 650 px, le fil d'Ariane cède la place au hamburger.
+    await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
+  } else {
+    await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toBeVisible();
+  }
   await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
 }
 
@@ -32,11 +35,18 @@ test.describe('Connexion et foyer', () => {
 
   test('la session de démonstration ouvre le tableau de bord', async ({ page }) => {
     await openDemoSession(page);
-    // Sur mobile, la navigation basse remplace la barre latérale.
-    const navigation = page.getByRole('navigation', {
-      name: viewportIsMobile(page) ? 'Navigation mobile' : 'Navigation principale',
-    });
-    await expect(navigation).toBeVisible();
+    if (viewportIsMobile(page)) {
+      // Sur mobile, le hamburger remplace la barre latérale.
+      await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+      await expect(page.getByRole('dialog', { name: 'Menu des espaces du foyer' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Ouvrir Courses' })).toBeVisible();
+      await page.keyboard.press('Escape');
+    } else {
+      // Le fil d'Ariane est toujours visible ; la barre latérale, elle, cède la
+      // place au tiroir sous 650 px.
+      const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
+      await expect(navigation).toBeVisible();
+    }
     // Le nom du foyer figure dans l'en-tête de l'accueil, visible partout.
     await expect(page.locator('main').getByText(/Foyer Martin/)).toBeVisible();
   });
@@ -182,19 +192,20 @@ test.describe('Mises en page', () => {
     }
   });
 
-  test('le catalogue mobile montre ses seize tuiles', async ({ page }) => {
-    test.skip(!viewportIsMobile(page), 'le dialogue n’existe que sous 650 px');
+  test('le tiroir mobile expose les dix-sept espaces, filtre et se referme', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'le tiroir n’existe que sous 650 px');
 
     await openDemoSession(page);
-    await page.getByRole('button', { name: 'Espaces' }).click();
+    await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
 
-    const tiles = page.getByRole('dialog').locator('button[aria-label^="Ouvrir"]');
-    await expect(tiles).toHaveCount(16);
+    const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(17);
 
-    const widths = await tiles.evaluateAll((list) => list.map((tile) => Math.round(tile.getBoundingClientRect().width)));
-    for (const width of widths) {
-      expect(width, 'une tuile du dialogue est invisible').toBeGreaterThan(40);
-    }
+    await page.getByRole('searchbox', { name: 'Rechercher un espace' }).fill('courses');
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
   });
 
   test('les pages du parcours foyer démarrent en haut sur mobile', async ({ page }) => {

@@ -17,15 +17,15 @@ export interface BalanceCardProps {
 /** Carte sombre d'ouverture : le total de l'ardoise et les deux actions clés. */
 export function BalanceCard({ total, monthLabel, onAddExpense, onInvite }: BalanceCardProps) {
   return (
-    <div className="mb-[18px] rounded-[22px] bg-fg p-[23px] text-surface">
+    <div className="mb-[18px] rounded-[22px] bg-fg p-[23px] text-surface max-[650px]:mb-3 max-[650px]:p-4">
       <p className="eyebrow mb-2 text-on-dark">{`Ardoise\u00a0· ${monthLabel}`}</p>
-      <strong data-testid="balance-total" className="font-display text-[46px] tracking-[-0.06em]">
+      <strong data-testid="balance-total" className="font-display text-[46px] tracking-[-0.06em] max-[650px]:text-[34px]">
         {formatEuro(total)}
       </strong>
-      <p className="mt-2 mb-0 text-[12px] text-on-dark">
+      <p className="mt-2 mb-0 text-[12px] text-on-dark max-[650px]:hidden">
         Répartis automatiquement, selon les membres choisis pour chaque dépense.
       </p>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2 max-[650px]:mt-4">
         <Button icon="plus" onClick={onAddExpense} className="bg-surface text-fg hover:bg-[oklch(96%_0.01_240)]">
           Ajouter une dépense
         </Button>

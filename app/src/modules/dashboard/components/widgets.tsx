@@ -329,7 +329,7 @@ export function ActivityCard({ entries }: { entries: { id: string; actor: string
 
 export function ShoppingCard({ shopping }: { shopping: { title: string; relative: string } | null }) {
   return (
-    <section className="coupon-card relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface">
+    <section className="coupon-card relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
       <span aria-hidden="true" className="coupon-ring" />
       <p className="mb-4 text-[11px] text-on-dark">
         {shopping ? 'Prochaine course' : 'Courses'}
