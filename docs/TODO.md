@@ -115,23 +115,6 @@ appel est annoncé une seconde fois.
 
 ---
 
-- [ ] **4. Le parcours humain n'a jamais été fait**
-
-**Qui peut le faire : l'utilisateur.** Aucun test ne peut l'atteindre.
-
-Le formulaire de tâche expose bien le champ de rappel — `reminderAt` au
-schéma Zod, saisie en `datetime-local`, `saveTask` appelant
-`setTaskReminder`, `removeTask` nettoyant au passage. Le `notificationclick` du
-service worker est écrit : fermeture, focus d'un onglet de même origine, et
-`openWindow` sinon. Tout est là, et rien n'a été exercé.
-
-**Comment faire.** Créer une tâche, lui mettre un rappel à deux minutes,
-attendre, et cliquer la notification. Vérifier qu'elle mène à `/taches`.
-
-**Terminé quand** la notification est apparue et que le clic a ouvert la
-tâche. Un chemin dont chaque maillon est vérifié peut encore ne pas
-s'emboîter.
-
 ---
 
 - [x] **5. Publication Cercle avec photo : « bucket not found »**
@@ -156,28 +139,14 @@ booléens de `0009:41-43` préservée.
 
 ---
 
-- [ ] **7. Création d'une liste de cadeaux impossible**
+- [x] **7. Création d'une liste de cadeaux impossible**
 
-**Qui peut le faire : l'agent, reste la vérification app.**
-
-Chaîne causale établie par sondes (28/09) : `INSERT…RETURNING` refusé car
-la politique `SELECT` relit la ligne par son id, invisible dans la même
-commande (MVCC) — insertion nue OK, lecture OK. Tentative 0028 (réécrire le
-`SELECT` en prédicats) abandonnée : elle coïncidait avec l'échec du transfert
-en `UPDATE`, sans cause moteur élucidée malgré ~40 sondes, et portait une
-corrélation perdue (corrigée en 0029, devenue sans objet) ; retour à la
-version historiquement verte en 0032.
-Fix retenu : `createGiftList` insère **sans** représentation puis relit la
-ligne commise (le seul chemin que PG supporte ici) ; 0002 couvre
-insert-puis-select pour `privee` et `foyer`.
-
-**Terminé quand**, après migrate + rebuild, une liste se crée depuis l'app
-(`privee` ET `foyer`) et reste visible après rechargement. Le transfert de
-propriété entre membres reste, lui, une anomalie moteur non élucidée
-(composants vrais isolément, `WITH CHECK` faux en conjonction, même en
-`(true, true)`, triggers/FK/plans écartés) : aucun chemin applicatif ne
-l'emprunte (vérifié par grep : aucune écriture d'`owner_member_id` côté
-app), il ne bloque donc rien en usage.
+**Validé en usage le 28/09** (`privee` et `foyer` créées depuis l'app).
+Cause : `INSERT…RETURNING` refusé car la politique `SELECT` relit la ligne
+par son id, invisible dans la même commande (MVCC) ; `createGiftList` insère
+désormais sans représentation puis relit (0032 restaure le `SELECT`
+historique). Reste en toile de fond l'anomalie transfert inter-membres,
+sans chemin applicatif.
 
 ---
 
@@ -209,7 +178,12 @@ rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
 
 ## Plus tard
 
-(Rien pour le moment — le #7 est remonté en actif le 28/09 avec son fix.)
+- **4. Le parcours humain (rappels de tâche) n'a jamais été fait.** Parké le
+28/09 : les rappels ne se déclenchent pas du tout en usage (rien n'arrive,
+pas seulement un défaut d'affichage). À rouvrir avec, dans l'ordre : le
+rappel est-il créé en base (`task_reminders`) ? la fenêtre du dispatch le
+couvre-t-elle ? le push part-il (`delivered`, voir #1) ? Voir l'historique
+dans git (`TODO.md`).
 
 ---
 
