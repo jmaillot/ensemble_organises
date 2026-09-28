@@ -57,8 +57,6 @@ create policy gift_lists_select on public.gift_lists
   );
 
 comment on function private.can_read_gift_list(text) is
-  'NE PLUS UTILISER pour les politiques propres de gift_lists : la relecture
-   de la ligne par son id est invisible à INSERT…RETURNING (MVCC, même
-   commande). Réservée aux tables enfants, qui lisent des listes commises.';
+  'Reservee aux tables enfants (listes commises) : ne plus utiliser pour les politiques propres de gift_lists, dont la relecture est invisible a INSERT...RETURNING.';
 
 commit;
