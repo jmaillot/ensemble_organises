@@ -8,7 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useMembers } from '@/stores/household-store';
 import type { Birthday, BirthdayFormValues } from '../types';
-import { formatDayMonth } from '../types';
+import { formatDayMonth, formatFrDate, parseFrDate } from '../types';
 
 const birthdaySchema = z.object({
   name: z.string().trim().min(1, 'Le nom est obligatoire.'),
@@ -16,7 +16,7 @@ const birthdaySchema = z.object({
     .string()
     .trim()
     .min(1, 'La date de naissance est obligatoire.')
-    .refine((value) => !Number.isNaN(Date.parse(`${value}T12:00:00`)), 'Indiquez une date valide.'),
+    .refine((value) => parseFrDate(value) !== null, 'Indiquez une date valide au format JJ/MM/AAAA.'),
   linkedMemberId: z.string(),
   photoUrl: z
     .string()
@@ -28,7 +28,7 @@ const defaultValues = (birthday: Birthday | null): BirthdayFormValues =>
   birthday
     ? {
         name: birthday.name,
-        birthDate: birthday.birthDate,
+        birthDate: formatFrDate(birthday.birthDate),
         linkedMemberId: birthday.linkedMemberId ?? '',
         photoUrl: birthday.photoUrl ?? '',
       }
@@ -51,6 +51,8 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
   const errors = formState.errors;
   const photoUrl = watch('photoUrl') ?? '';
   const birthDate = watch('birthDate') ?? '';
+  // L'indice travaille en ISO, la saisie en JJ/MM/AAAA : conversion gardée.
+  const birthDateIso = parseFrDate(birthDate);
 
   useEffect(() => {
     if (!open) return;
@@ -70,17 +72,38 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
           </DialogDescription>
         </DialogHeader>
 
-        <form noValidate className="grid gap-3.5" onSubmit={handleSubmit(async (values) => onSubmit(values))}>
+        <form
+          noValidate
+          className="grid gap-3.5"
+          onSubmit={handleSubmit(async (values) => {
+            const iso = parseFrDate(values.birthDate);
+            if (!iso) return;
+            await onSubmit({ ...values, birthDate: iso });
+          })}
+        >
           <Field label="Nom" error={errors.name?.message}>
             {(props) => <Input {...props} {...register('name')} placeholder="Ex. Maya Martin" autoComplete="off" />}
           </Field>
 
           <Field
             label="Date de naissance"
-            hint={birthDate ? `Prochain anniversaire : ${formatDayMonth(birthDate)}` : 'Le jour et le mois suffisent.'}
+            hint={
+              birthDateIso
+                ? `Prochain anniversaire : ${formatDayMonth(birthDateIso)}`
+                : 'Au format JJ/MM/AAAA.'
+            }
             error={errors.birthDate?.message}
           >
-            {(props) => <Input {...props} type="date" {...register('birthDate')} />}
+            {(props) => (
+              <Input
+                {...props}
+                type="text"
+                inputMode="numeric"
+                autoComplete="bday"
+                placeholder="JJ/MM/AAAA"
+                {...register('birthDate')}
+              />
+            )}
           </Field>
 
           <Field label="Membre du foyer" optional error={errors.linkedMemberId?.message}>

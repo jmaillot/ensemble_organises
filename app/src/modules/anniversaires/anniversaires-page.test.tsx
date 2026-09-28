@@ -40,7 +40,7 @@ describe('AnniversairesPage', () => {
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText(/^Nom/), 'Zoé Bernard');
     const birthDate = within(dialog).getByLabelText(/^Date de naissance/);
-    await user.type(birthDate, '1995-03-14');
+    await user.type(birthDate, '14/03/1995');
     await user.selectOptions(within(dialog).getByLabelText(/Membre du foyer/), 'member-lina');
     await user.click(within(dialog).getByRole('button', { name: /Ajouter l’anniversaire/ }));
 
@@ -72,5 +72,7 @@ describe('AnniversairesPage', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText(/^Nom/)).toHaveValue('Maya Martin');
+    // Stockée en ISO, ressaisie en JJ/MM/AAAA.
+    expect(within(dialog).getByLabelText(/^Date de naissance/)).toHaveValue('07/10/1992');
   });
 });

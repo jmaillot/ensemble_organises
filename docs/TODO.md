@@ -183,22 +183,19 @@ app), il ne bloque donc rien en usage.
 
 - [ ] **8. Date d'anniversaire affichée en MM/DD/YYYY**
 
-**Qui peut le faire : l'agent.**
+**Qui peut le faire : l'agent. Implémenté le 28/09, reste l'essai app.**
 
-**Cause établie.** Le dialogue utilise un `<Input type="date">` natif
-(`birthday-form-dialog.tsx:83`), dont l'affichage suit la locale du
-**navigateur**, pas `lang="fr"` de la page : le Firefox du poste 2 est en
-`en-US` (prouvé par `Accept-Language` dans la trace réseau du 27/09). La
-valeur stockée est saine (ISO) ; seule la présentation est américaine.
+Cause : `<Input type="date">` natif (`birthday-form-dialog.tsx:83`), affichage
+suivant la locale du **navigateur** (le Firefox du poste 2 est en `en-US`).
+Fix : champ texte explicite `JJ/MM/AAAA` (`inputMode` numérique, indice
+`bday`), `parseFrDate`/`formatFrDate` (`anniversaires/types.ts`, contrôle
+aller-retour : 30/02 et 31/04 refusés, 29/02 accepté seulement les années
+bissextiles), conversion ISO à la frontière du dialogue (le schéma `Zod` et
+le stockage restent en ISO). Couvert : `types.test.ts` (deux sens + cas
+limites), dialogue (saisie `14/03/1995`, réaffichage `07/10/1992`).
 
-**Ce qu'il faut.** Ne plus dépendre de la locale navigateur : champ texte
-explicite `JJ/MM/AAAA` avec parse/format ISO + validation Zod (jour/mois
-valides, 29/02 accepté), en gardant le `datetime` accessible au clavier et
-l'indice « Prochain anniversaire » existant.
-
-**Terminé quand** `27/09/1990` saisi à la main est accepté, stocké en ISO,
-réaffiché en `JJ/MM/AAAA` à la réouverture, et que les tests du dialogue
-couvrent les deux sens + un 29/02.
+**Terminé quand**, après rebuild, `27/09/1990` saisi à la main est accepté,
+stocké, et réaffiché en `JJ/MM/AAAA` à la réouverture.
 
 ---
 

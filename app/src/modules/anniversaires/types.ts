@@ -1,5 +1,5 @@
 import { getDaysInMonth } from 'date-fns';
-import { daysBetween, initials, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
+import { daysBetween, initials, pad, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import { toColorTag } from '@/modules/calendrier/types';
 import type { BirthdayRow, HouseholdMemberRow, MemberColorTag } from '@/types';
 
@@ -72,6 +72,35 @@ export function birthdayCountdown(birthday: Birthday): string {
   if (birthday.daysUntil === 0) return 'C’est aujourd’hui';
   if (birthday.daysUntil === 1) return 'Demain';
   return `Dans ${birthday.daysUntil} jours`;
+}
+
+/**
+ * Saisie `JJ/MM/AAAA` → ISO, ou `null` si invalide.
+ *
+ * Le champ natif `type="date"` suit la locale du navigateur (MM/DD/YYYY sur
+ * un Firefox en-US) : la saisie est donc un texte explicite, validé ici sans
+ * ambiguïté. Le contrôle aller-retour refuse le 30 février ou un 31 avril,
+ * et n'accepte le 29 février que les années bissextiles.
+ */
+const FR_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+export function parseFrDate(value: string): string | null {
+  const match = FR_DATE.exec(value.trim());
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return `${String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`;
+}
+
+/** ISO → `JJ/MM/AAAA` pour l'affichage et la ressaisie, `''` si malformé. */
+export function formatFrDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!match) return '';
+  return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
 /** Un anniversaire se répète chaque année : seul le mois et le jour comptent. */
