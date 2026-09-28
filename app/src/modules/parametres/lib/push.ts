@@ -65,6 +65,38 @@ export const defaultReminderPreferences: ReminderPreferences = {
   routineReminders: true,
 };
 
+/**
+ * Libellé lisible d'un user-agent pour la liste des appareils.
+ *
+ * La liste affichait des UA bruts (~150 caractères), tronqués sur mobile :
+ * impossible d'y distinguer « le téléphone » du « PC », ni de savoir quel
+ * enregistrement reçoit vraiment les envois. Navigateur + OS suffisent à
+ * trancher ; l'UA complet reste disponible en `title`.
+ */
+export function friendlyDeviceName(userAgent: string): string {
+  const browser = /Edg\//.test(userAgent)
+    ? 'Edge'
+    : /Firefox\//.test(userAgent)
+      ? 'Firefox'
+      : /Chrome\//.test(userAgent)
+        ? 'Chrome'
+        : /Safari\//.test(userAgent)
+          ? 'Safari'
+          : null;
+  const os = /Android/.test(userAgent)
+    ? 'Android'
+    : /iPhone|iPad/.test(userAgent)
+      ? 'iOS'
+      : /Windows NT/.test(userAgent)
+        ? 'Windows'
+        : /Mac OS X/.test(userAgent)
+          ? 'macOS'
+          : /Linux/.test(userAgent)
+            ? 'Linux'
+            : null;
+  return [browser, os].filter(Boolean).join(' · ') || 'Navigateur inconnu';
+}
+
 const FUNCTION_NAME = 'push-subscribe';
 const NOTIFY_FUNCTION_NAME = 'push-notify';
 

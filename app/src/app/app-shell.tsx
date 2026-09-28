@@ -45,6 +45,24 @@ export function AppShell() {
     };
   }, []);
 
+  useEffect(() => {
+    // App ouverte : le service worker relaie les push en `postMessage` pour
+    // afficher une popup in-app (toast) plutôt que de ne compter que sur la
+    // notification système. Format émis par `sw.ts`.
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    // Référence capturée : le démontage ne doit pas relire `navigator`.
+    const container = navigator.serviceWorker;
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: unknown; title?: unknown; body?: unknown } | null;
+      if (!data || data.type !== 'EO_PUSH') return;
+      const title = typeof data.title === 'string' ? data.title : '';
+      const body = typeof data.body === 'string' ? data.body : '';
+      toast([title, body].filter(Boolean).join(' — ') || 'Nouveau rappel du foyer.');
+    };
+    container.addEventListener('message', onServiceWorkerMessage);
+    return () => container.removeEventListener('message', onServiceWorkerMessage);
+  }, [toast]);
+
   const currentKey = (location.pathname.replace(/^\//, '') || 'accueil') as ModuleKey;
   // `parametres` n'appartient pas au catalogue des espaces du foyer : il a son
   // propre libellé de navigation.

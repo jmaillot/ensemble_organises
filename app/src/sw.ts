@@ -104,7 +104,26 @@ self.addEventListener('push', (event: PushEvent) => {
     lang: 'fr',
     data: { url: payload.url },
   };
-  event.waitUntil(self.registration.showNotification(payload.title, options));
+  event.waitUntil(
+    (async () => {
+      // App ouverte et visible : popup in-app via la page, et notification
+      // système SILENCIEUSE. Chrome impose une notification visible par
+      // message push (`userVisibleOnly`) : la sauter afficherait un message
+      // générique du navigateur à la place du rappel.
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const visible = windows.some((client) => client.visibilityState === 'visible');
+      if (visible) {
+        for (const client of windows) {
+          client.postMessage({ type: 'EO_PUSH', title: payload.title, body: payload.body, url: payload.url });
+        }
+        await self.registration.showNotification(payload.title, { ...options, silent: true });
+        return;
+      }
+      // App fermée ou cachée : notification système classique (rideau
+      // Android, centre de notifications Windows).
+      await self.registration.showNotification(payload.title, options);
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event: NotificationEvent) => {

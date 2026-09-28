@@ -24,6 +24,11 @@ function entryFor(key: DrawerKey): DrawerEntry {
   return { key, label: entry.short, icon: entry.icon, to: modulePath(key) };
 }
 
+/**
+ * Regroupement historique des espaces (OD `df6d3917`). Le tiroir affiche une
+ * liste plate — aucun regroupement imposé — mais l'invariant de couverture
+ * (chaque espace du catalogue + la maison) reste branché dessus.
+ */
 export const MOBILE_DRAWER_GROUPS: Array<{ title: string; keys: DrawerKey[] }> = [
   { title: 'Au quotidien', keys: ['accueil', 'taches', 'calendrier', 'courses', 'routines', 'notes'] },
   { title: 'Le foyer', keys: ['ardoise', 'cadeaux', 'anniversaires', 'cercle', 'messages'] },
@@ -147,7 +152,9 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
                   className="absolute right-[5px] bottom-[5px] size-[15px] rounded-full border-2 border-accent"
                 />
               </span>
-              <strong className="font-display text-[15px] tracking-[-0.02em]">Menu</strong>
+              <strong className="min-w-0 flex-1 truncate font-display text-[15px] tracking-[-0.02em]">
+                Ensemble &amp; Organisés
+              </strong>
             </span>
             <DialogPrimitive.Close
               className="grid size-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint"
@@ -168,28 +175,13 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
           {/* Seule la liste défile : le pied (foyer, préférences,
               déconnexion) reste épinglé en bas du tiroir. */}
           <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
-            {filtered ? (
-              <ul className="m-0 grid list-none gap-1 p-0">
-                {filtered.map((entry) => (
-                  <li key={entry.key}>
-                    <DrawerLink entry={entry} onNavigate={() => onOpenChange(false)} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              MOBILE_DRAWER_GROUPS.map((group) => (
-                <section key={group.title} aria-label={group.title} className="mb-4 last:mb-0">
-                  <p className="section-kicker mx-1 mb-1.5">{group.title}</p>
-                  <ul className="m-0 grid list-none gap-1 p-0">
-                    {group.keys.map((key) => (
-                      <li key={key}>
-                        <DrawerLink entry={entryFor(key)} onNavigate={() => onOpenChange(false)} />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))
-            )}
+            <ul className="m-0 grid list-none gap-1 p-0">
+              {(filtered ?? ALL_ENTRIES).map((entry) => (
+                <li key={entry.key}>
+                  <DrawerLink entry={entry} onNavigate={() => onOpenChange(false)} />
+                </li>
+              ))}
+            </ul>
             {filtered && filtered.length === 0 ? (
               <p className="m-0 px-1 py-3 text-xs text-muted">Aucun espace pour « {query.trim()} ».</p>
             ) : null}

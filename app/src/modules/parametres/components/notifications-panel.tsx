@@ -13,6 +13,7 @@ import {
   defaultReminderPreferences,
   disablePush,
   enablePush,
+  friendlyDeviceName,
   fromProfileColumns,
   getPushPermissionState,
   pushPermissionHints,
@@ -213,7 +214,7 @@ export function NotificationsPanel() {
             <ul className="m-0 grid list-none gap-2 p-0">
               {devices.map((device) => (
                 <li key={device.id} className="flex items-baseline justify-between gap-3 py-1 text-[11px] text-muted">
-                  <span className="truncate">{device.device}</span>
+                  <span title={device.device}>{friendlyDeviceName(device.device)}</span>
                   <span className="shrink-0">
                     {device.failure_count > 0 ? `${device.failure_count} envoi(s) sans succès · ` : ''}
                     {formatDeviceDate(device.last_success_at)}

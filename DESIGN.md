@@ -224,7 +224,7 @@ Ces règles sont normatives : toute nouvelle vue mobile les applique sans except
 |---|---|
 | Dégagement bas | Le `main` réserve `calc(28px + env(safe-area-inset-bottom))` (plus de barre basse) ; aucun padding-bottom supplémentaire sur `body` (pas de double scroll) |
 | Topbar mobile | Hauteur `56px`, trois éléments : hamburger, marque `34px`, notifications + avatar `44px`. Fil d'Ariane et CTA « Installer » supprimés sous `650px` |
-| Tiroir | Unique menu mobile : recherche `44px`, 17 espaces groupés (Au quotidien / Le foyer / Pratique), carte foyer, préférences (admin), déconnexion. Fermeture overlay / bouton / `Échap` / balayage gauche ; focus piégé, rendu au hamburger, `aria-modal` synchronisé |
+| Tiroir | Unique menu mobile : recherche `44px`, les 17 espaces en liste plate (aucune catégorie imposée), carte foyer, préférences (admin), déconnexion. Fermeture overlay / bouton / `Échap` / balayage gauche ; focus piégé, rendu au hamburger, `aria-modal` synchronisé |
 | Toast | `bottom: calc(16px + env(safe-area-inset-bottom))` sur mobile |
 | Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
 | Cibles tactiles | Notifications, avatar, fermeture de dialogue et `.check-option` `≥ 44px` sur mobile |
@@ -356,6 +356,8 @@ Les modules du catalogue sont :
 
 - Manifest : nom, description, couleur de thème, affichage `standalone`, icône locale.
 - Service worker : cache d’abord pour les ressources versionnées, repli vers `index.html` pour une navigation.
+- Notifications : app ouverte et visible → popup in-app (toast via `postMessage EO_PUSH`) + notification système **silencieuse** (Chrome impose une notification visible par push, sous peine d'un message générique) ; app fermée ou cachée → notification système classique (rideau Android, centre Windows). Le clic ouvre ou refocalise la page cible, jamais de doublon de fenêtre.
+- Après réinstallation de la PWA, l'abonnement push change d'`endpoint` : réactiver dans Préférences → « Synchroniser cet appareil », puis « Envoyer un test ».
 - Les données de démonstration utilisent `localStorage` avec une clé de version.
 - Une évolution de schéma doit prévoir une migration ou une réinitialisation explicite.
 - Les médias importés par l’utilisateur doivent être limités à une taille raisonnable et l’échec de quota doit être annoncé.

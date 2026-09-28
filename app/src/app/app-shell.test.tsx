@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
@@ -42,6 +42,8 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    // L'en-tête porte le nom de l'application, pas un « Menu » générique.
+    expect(within(dialog).getByText('Ensemble & Organisés')).toBeInTheDocument();
     // Maison + seize modules, chacun joignable en un tap.
     expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(17);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Courses' })).toBeInTheDocument();
@@ -147,5 +149,32 @@ describe('AppShell — catalogue des espaces', () => {
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'a faire');
     expect(within(dialog).getByRole('link', { name: 'Ouvrir À faire' })).toBeInTheDocument();
+  });
+
+  it('affiche une popup quand le service worker relaie un push (app ouverte)', async () => {
+    const listeners = new Map<string, Set<(event: MessageEvent) => void>>();
+    Object.defineProperty(window.navigator, 'serviceWorker', {
+      value: {
+        addEventListener: vi.fn((type: string, listener: (event: MessageEvent) => void) => {
+          const set = listeners.get(type) ?? new Set<(event: MessageEvent) => void>();
+          set.add(listener);
+          listeners.set(type, set);
+        }),
+        removeEventListener: vi.fn(),
+      },
+      configurable: true,
+    });
+    try {
+      renderShell('/accueil');
+      const handler = [...(listeners.get('message') ?? [])][0];
+      expect(handler, 'le shell écoute le service worker').toBeDefined();
+      act(() => {
+        handler!({ data: { type: 'EO_PUSH', title: 'Rappel', body: 'Dentiste à 18h' } } as MessageEvent);
+      });
+      expect(await screen.findByText('Rappel — Dentiste à 18h')).toBeInTheDocument();
+    } finally {
+      // @ts-expect-error restauration de l'environnement jsdom
+      delete window.navigator.serviceWorker;
+    }
   });
 });

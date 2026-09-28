@@ -21,6 +21,7 @@ import {
   defaultReminderPreferences,
   disablePush,
   enablePush,
+  friendlyDeviceName,
   fromProfileColumns,
   getPushPermissionState,
   isPushSupported,
@@ -294,5 +295,33 @@ describe('préférences', () => {
   it('complète les préférences absentes par les valeurs par défaut', () => {
     // Un profil antérieur à la migration 0018 n'a aucune de ces colonnes.
     expect(fromProfileColumns({})).toEqual(defaultReminderPreferences);
+  });
+});
+
+describe('friendlyDeviceName', () => {
+  it('résume le navigateur et l’OS pour distinguer les appareils', () => {
+    expect(
+      friendlyDeviceName(
+        'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36',
+      ),
+    ).toBe('Chrome · Android');
+    expect(
+      friendlyDeviceName(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      ),
+    ).toBe('Chrome · Windows');
+    expect(
+      friendlyDeviceName(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
+      ),
+    ).toBe('Edge · Windows');
+    expect(friendlyDeviceName('Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0')).toBe(
+      'Firefox · Linux',
+    );
+  });
+
+  it('ne ment jamais quand l’UA est inconnu', () => {
+    expect(friendlyDeviceName('')).toBe('Navigateur inconnu');
+    expect(friendlyDeviceName('curl/8.0')).toBe('Navigateur inconnu');
   });
 });
