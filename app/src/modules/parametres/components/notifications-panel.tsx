@@ -397,9 +397,7 @@ export function NotificationsPanel() {
                     )}
                     <p className="m-0 text-[10px] text-muted">
                       Ajouté le {formatDeviceDate(device.created_at)}
-                      {device.failure_count > 0 && device.last_status !== null
-                        ? ` · dernier code ${device.last_status}`
-                        : ''}
+                      {device.last_status !== null ? ` · dernier code ${device.last_status}` : ''}
                     </p>
                   </li>
                 );
