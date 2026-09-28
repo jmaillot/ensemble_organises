@@ -501,6 +501,92 @@ export async function pingServiceWorkerVersion(timeoutMs = 3000): Promise<string
 }
 
 /**
+ * Renouvelle l'abonnement du navigateur : résilie l'existant (navigateur et
+ * serveur) puis en crée un neuf.
+ *
+ * C'est le remède à la désynchronisation silencieuse : si les clés stockées
+ * côté serveur ne correspondent plus à celles du navigateur, le service Push
+ * accepte les messages (201) mais le navigateur ne peut pas les déchiffrer
+ * et les jette sans rien afficher — ni popup, ni notification, ni erreur.
+ * La resynchronisation simple réutilise l'abonnement existant et conserve
+ * donc le désaccord ; seul un renouvellement complet réaligne les deux bouts.
+ */
+export async function resyncPush(): Promise<PushSetupResult & { rotated: boolean }> {
+  if (isLocalMode) {
+    return {
+      state: getPushPermissionState(),
+      registered: false,
+      rotated: false,
+      message: 'Le mode démonstration n’envoie aucune notification.',
+    };
+  }
+  if (!isPushSupported()) {
+    return { state: 'indisponible', registered: false, rotated: false, message: pushPermissionHints.indisponible };
+  }
+
+  const state = getPermissionState(await Notification.requestPermission());
+  if (state !== 'autorise') {
+    return { state, registered: false, rotated: false, message: pushPermissionHints[state] };
+  }
+
+  const { vapidPublicKey, pushConfigured } = await readPushConfig();
+  if (!pushConfigured || !vapidPublicKey) {
+    return {
+      state: 'autorise',
+      registered: false,
+      rotated: false,
+      message: 'Le service de notifications n’est pas configuré sur ce serveur (clé VAPID absente).',
+    };
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) {
+    // L'ancien endpoint est révoqué côté serveur AVANT d'en demander un
+    // nouveau : sinon la liste accumule une ligne morte à chaque rotation.
+    await removePushDevice(existing.endpoint).catch(() => undefined);
+    try {
+      await existing.unsubscribe();
+    } catch {
+      // Déjà résilié par removePushDevice, ou navigateur récalcitrant.
+    }
+  }
+
+  const subscription = await ensureBrowserSubscription(vapidPublicKey);
+
+  await invoke(FUNCTION_NAME, {
+    action: 'subscribe',
+    endpoint: subscription.endpoint,
+    keys: subscription.keys,
+    expirationTime: subscription.expirationTime,
+    userAgent: navigator.userAgent,
+    label: friendlyDeviceName(navigator.userAgent ?? ''),
+  });
+
+  return { state: 'autorise', registered: true, rotated: existing !== null, message: 'Appareil resynchronisé.' };
+}
+
+/**
+ * Répare un service worker mort ou obsolète : désenregistre puis recharge.
+ *
+ * Quand le worker actif ne répond plus au ping (ou qu'aucun n'est actif
+ * malgré un abonnement existant), les push arrivent sans jamais s'afficher.
+ * Le rechargement qui suit réinstalle le worker courant du bundle.
+ */
+export async function repairServiceWorker(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    if (registrations.length === 0) return false;
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+    window.location.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Supprime un appareil du compte, y compris un appareil qui n'existe plus
  * (ancien téléphone, navigateur réinstallé).
  *

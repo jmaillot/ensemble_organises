@@ -30,6 +30,8 @@ import {
   readPushServerState,
   removePushDevice,
   renamePushDevice,
+  repairServiceWorker,
+  resyncPush,
   toProfileColumns,
 } from './push';
 
@@ -72,10 +74,20 @@ let browser: BrowserStubs;
 
 function installBrowser({ current, permission }: { current: FakeSubscription | null; permission: NotificationPermission }) {
   const subscribe = vi.fn(async () => makeSubscription('https://fcm.googleapis.com/fcm/send/neuf', VAPID_KEY));
+  // Un vrai navigateur ne rend plus d'abonnement après résiliation : le mock
+  // fait pareil, sinon un renouvellement testerait une réutilisation.
+  let live: FakeSubscription | null = current;
+  if (current) {
+    const revoke = current.unsubscribe;
+    current.unsubscribe = vi.fn(async () => {
+      live = null;
+      return revoke();
+    });
+  }
   browser = { current, subscribe, permission };
 
   const pushManager = {
-    getSubscription: vi.fn(async () => current),
+    getSubscription: vi.fn(async () => live),
     subscribe,
   };
 
@@ -468,5 +480,89 @@ describe('ping du service worker', () => {
 
   it('renvoie null sans service worker', async () => {
     expect(await pingServiceWorkerVersion(20)).toBeNull();
+  });
+});
+
+describe('resynchronisation', () => {
+  function installConfig() {
+    invoke.mockImplementation(async (_name: string, options: { body: { action: string } }) => {
+      const action = options.body.action;
+      if (action === 'config') return { data: { vapid_public_key: VAPID_KEY, push_configured: true }, error: null };
+      if (action === 'unsubscribe') return { data: { removed: true }, error: null };
+      return { data: { id: 'push_neuf' }, error: null };
+    });
+  }
+
+  it('renouvelle l’abonnement au lieu de réutiliser un désaccord de clés', async () => {
+    const stale = makeSubscription('https://fcm.googleapis.com/fcm/send/vieux', VAPID_KEY);
+    installBrowser({ current: stale, permission: 'granted' });
+    installConfig();
+
+    const result = await resyncPush();
+
+    expect(result.registered).toBe(true);
+    expect(result.rotated).toBe(true);
+    // L'ancien endpoint est révoqué côté serveur avant d'en demander un neuf.
+    const revokeCall = invoke.mock.calls.find(
+      (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'unsubscribe',
+    );
+    expect(revokeCall?.[1]).toMatchObject({ body: { endpoint: 'https://fcm.googleapis.com/fcm/send/vieux' } });
+    expect(browser.subscribe).toHaveBeenCalledTimes(1);
+    const registerCall = invoke.mock.calls.find(
+      (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'subscribe',
+    );
+    expect((registerCall?.[1] as { body: { endpoint: string } }).body.endpoint).toBe(
+      'https://fcm.googleapis.com/fcm/send/neuf',
+    );
+  });
+
+  it('ne révoque rien quand il n’y a pas d’abonnement existant', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    installConfig();
+
+    const result = await resyncPush();
+
+    expect(result.registered).toBe(true);
+    expect(result.rotated).toBe(false);
+    expect(
+      invoke.mock.calls.some((call) => (call[1] as { body?: { action?: string } })?.body?.action === 'unsubscribe'),
+    ).toBe(false);
+  });
+});
+
+describe('réparation du service worker', () => {
+  it('renvoie faux sans service worker', async () => {
+    expect(await repairServiceWorker()).toBe(false);
+  });
+
+  it('renvoie faux sans enregistrement', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    const withRegs = navigator.serviceWorker as unknown as { getRegistrations?: () => Promise<unknown[]> };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { ...(navigator.serviceWorker as object), getRegistrations: async () => [] },
+    });
+    void withRegs;
+
+    expect(await repairServiceWorker()).toBe(false);
+  });
+
+  it('désenregistre puis recharge la page', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    const unregister = vi.fn(async () => true);
+    const reload = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { ...(navigator.serviceWorker as object), getRegistrations: async () => [{ unregister }] },
+    });
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload } });
+    try {
+        expect(await repairServiceWorker()).toBe(true);
+      expect(unregister).toHaveBeenCalledTimes(1);
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
   });
 });

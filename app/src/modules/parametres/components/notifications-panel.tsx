@@ -26,6 +26,8 @@ import {
   readPushServerState,
   removePushDevice,
   renamePushDevice,
+  repairServiceWorker,
+  resyncPush,
   sendTestPush,
   toProfileColumns,
   type PushPermissionState,
@@ -207,7 +209,11 @@ export function NotificationsPanel() {
             onClick={async () => {
               setPending(true);
               try {
-                const result = await enablePush();
+                // Un appareil déjà enregistré est RENOUVELÉ, pas réutilisé :
+                // si les clés serveur ne correspondent plus à celles du
+                // navigateur, le service Push accepte (201) mais le navigateur
+                // jette sans afficher. Seul un abonnement neuf réaligne.
+                const result = hasDevice ? await resyncPush() : await enablePush();
                 setPermission(result.state);
                 await refresh();
                 toast(result.message);
@@ -272,6 +278,27 @@ export function NotificationsPanel() {
               }}
             >
               Envoyer un test
+            </Button>
+          ) : null}
+
+          {server.loaded && isPushSupported() && swVersion === null ? (
+            <Button
+              variant="secondary"
+              icon="refresh"
+              disabled={pending}
+              onClick={async () => {
+                setPending(true);
+                try {
+                  const repaired = await repairServiceWorker();
+                  if (!repaired) {
+                    toast('Aucun service worker à réparer : réinstallez en effaçant les données du site.');
+                  }
+                } finally {
+                  setPending(false);
+                }
+              }}
+            >
+              Réparer le service worker
             </Button>
           ) : null}
         </div>
