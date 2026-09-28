@@ -18,6 +18,8 @@ import {
   friendlyDeviceName,
   fromProfileColumns,
   getPushPermissionState,
+  isPushSupported,
+  pingServiceWorkerVersion,
   pushPermissionHints,
   pushPermissionLabels,
   readLocalEndpoint,
@@ -57,6 +59,7 @@ export function NotificationsPanel() {
   const [deleting, setDeleting] = useState<PushDevice | null>(null);
   const [deletingPending, setDeletingPending] = useState(false);
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
+  const [swVersion, setSwVersion] = useState<string | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     if (isLocalMode) {
@@ -76,6 +79,19 @@ export function NotificationsPanel() {
   useEffect(() => {
     setPermission(getPushPermissionState());
     void refresh();
+    // Quel worker est réellement actif ? Un worker obsolète reçoit les push
+    // sans savoir les afficher : aucun popup, aucune notification, sans erreur.
+    let cancelled = false;
+    if (isPushSupported()) {
+      void pingServiceWorkerVersion().then((version) => {
+        if (!cancelled) setSwVersion(version);
+      });
+    } else {
+      setSwVersion(null);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   // Les préférences sont lues sur le profil : un interrupteur doit refléter ce
@@ -270,6 +286,16 @@ export function NotificationsPanel() {
         {hasDevice ? (
           <div className="mt-5 border-t border-border pt-1">
             <h3 className="mt-3 mb-1 text-xs font-extrabold">Appareils enregistrés</h3>
+            {isPushSupported() ? (
+              <p className="m-0 mb-1 text-[10px] text-muted">
+                Service worker local :{' '}
+                {swVersion === undefined
+                  ? 'vérification…'
+                  : swVersion === null
+                    ? 'injoignable — réinstallez en effaçant les données du site'
+                    : `actif (${swVersion})`}
+              </p>
+            ) : null}
             <ul className="m-0 grid list-none gap-2 p-0">
               {devices.map((device) => {
                 const label = device.device_label ?? friendlyDeviceName(device.device);

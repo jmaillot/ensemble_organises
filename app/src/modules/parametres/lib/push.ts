@@ -466,6 +466,41 @@ export async function readLocalEndpoint(): Promise<string | null> {
 }
 
 /**
+ * Version fonctionnelle du service worker actif, ou `null`.
+ *
+ * `null` ne veut pas dire « pas de worker » : un worker actif mais antérieur
+ * au ping (sans gestionnaire `EO_VERSION`) ne répond pas non plus. Dans les
+ * deux cas, la conclusion est la même — le worker en place ne sait pas
+ * afficher les rappels — et le remède aussi : réinstaller en effaçant les
+ * données du site.
+ */
+export async function pingServiceWorkerVersion(timeoutMs = 3000): Promise<string | null> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null;
+    const registration = await navigator.serviceWorker.ready;
+    const worker = registration.active ?? navigator.serviceWorker.controller;
+    if (!worker) return null;
+    return await new Promise<string | null>((resolve) => {
+      const timer = window.setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('message', onMessage);
+        resolve(null);
+      }, timeoutMs);
+      const onMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: unknown; version?: unknown } | null;
+        if (!data || data.type !== 'EO_VERSION_REPLY') return;
+        window.clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener('message', onMessage);
+        resolve(typeof data.version === 'string' ? data.version : null);
+      };
+      navigator.serviceWorker.addEventListener('message', onMessage);
+      worker.postMessage({ type: 'EO_VERSION' });
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Supprime un appareil du compte, y compris un appareil qui n'existe plus
  * (ancien téléphone, navigateur réinstallé).
  *

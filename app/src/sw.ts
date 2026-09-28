@@ -41,6 +41,16 @@ const FALLBACK: PushPayload = {
   tag: 'eo-rappel',
 };
 
+/**
+ * Version fonctionnelle du worker, répondue au ping `EO_VERSION` de la page.
+ * À bumper à chaque modification des gestionnaires ci-dessous : c'est ce qui
+ * permet au panneau de détecter un worker ACTIF mais OBSOLÈTE (mise à jour
+ * bloquée derrière un ancien worker sans `skipWaiting`, données de site
+ * conservées à la réinstallation…), cas où les push arrivent mais où rien ne
+ * s'affiche, nulle part, sans aucune erreur.
+ */
+const SW_VERSION = 'push-popup-v1';
+
 self.skipWaiting();
 clientsClaim();
 
@@ -153,3 +163,18 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
  * traité ici, et `clients.openWindow` est la seule action possible — un
  * `postMessage` à la page n'aurait personne pour le recevoir.
  */
+
+// --- Diagnostic : la page ping pour savoir QUEL worker est actif ------------
+
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  const data = event.data as { type?: unknown } | null;
+  if (!data || data.type !== 'EO_VERSION') return;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of windows) {
+        client.postMessage({ type: 'EO_VERSION_REPLY', version: SW_VERSION });
+      }
+    })(),
+  );
+});

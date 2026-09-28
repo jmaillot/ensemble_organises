@@ -25,6 +25,7 @@ import {
   fromProfileColumns,
   getPushPermissionState,
   isPushSupported,
+  pingServiceWorkerVersion,
   readLocalEndpoint,
   readPushServerState,
   removePushDevice,
@@ -421,5 +422,51 @@ describe('endpoint local', () => {
   it('renvoie null quand le navigateur ne gère pas le push', async () => {
     // Sans installBrowser, ni Notification ni PushManager : indisponible.
     expect(await readLocalEndpoint()).toBeNull();
+  });
+});
+
+describe('ping du service worker', () => {
+  function installPingableWorker(reply: string | null) {
+    const listeners = new Set<(event: MessageEvent) => void>();
+    const worker = {
+      postMessage: vi.fn(() => {
+        if (reply !== null) {
+          listeners.forEach((listener) => listener({ data: { type: 'EO_VERSION_REPLY', version: reply } } as MessageEvent));
+        }
+      }),
+    };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        ready: Promise.resolve({ active: worker }),
+        controller: null,
+        addEventListener: vi.fn((_type: string, listener: (event: MessageEvent) => void) => {
+          listeners.add(listener);
+        }),
+        removeEventListener: vi.fn((type: string, listener: (event: MessageEvent) => void) => {
+          if (type === 'message') listeners.delete(listener);
+        }),
+      },
+    });
+    return worker;
+  }
+
+  it('renvoie la version du worker actif', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    const worker = installPingableWorker('push-popup-v1');
+
+    expect(await pingServiceWorkerVersion(500)).toBe('push-popup-v1');
+    expect(worker.postMessage).toHaveBeenCalledWith({ type: 'EO_VERSION' });
+  });
+
+  it('renvoie null quand personne ne répond', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    installPingableWorker(null);
+
+    expect(await pingServiceWorkerVersion(20)).toBeNull();
+  });
+
+  it('renvoie null sans service worker', async () => {
+    expect(await pingServiceWorkerVersion(20)).toBeNull();
   });
 });
