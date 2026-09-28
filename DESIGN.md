@@ -228,7 +228,7 @@ Ces règles sont normatives : toute nouvelle vue mobile les applique sans except
 | Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
 | Fil d'Ariane | Préfixe tronqué en ellipsis (`42vw` max), libellé du module également tronqué ; CTA secondaire de topbar masqué |
 | Cibles tactiles | Notifications et avatar `≥ 44px`, bouton de fermeture de dialogue `44px`, `.check-option` `≥ 44px` sur mobile |
-| Tableaux | Conteneur en `overflow-x: auto` + `overscroll-x: contain`, tableau Ardoise à `min-width: 680px` en `table-auto` |
+| Tableaux | Ardoise : tableau desktop (`max-[650px]:hidden`), cartes empilées sur mobile (`min-[651px]:hidden`) — aucun scroll horizontal, même interne |
 | Formulaires | Grilles fixes (`[1fr_130px]`, `.form-row`) en 1 colonne sous `650px` |
 | Dialogues | Feuille de bas de page sous `650px`, `border-radius: 22px 22px 0 0`, hauteur bornée par `100dvh`, actions empilées en colonne inversée |
 | Bande KPI | `MetricRow` reste à 2 colonnes (bandeau compact) — les grilles de contenu passent, elles, à 1 colonne |

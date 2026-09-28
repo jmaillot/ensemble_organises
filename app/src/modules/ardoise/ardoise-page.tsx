@@ -7,6 +7,7 @@ import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/m
 import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, pluralize, relativeDayLabel } from '@/lib/utils';
+import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { useAddExpense, useArdoise, useDeleteExpense, useSendInvitation } from './hooks/use-ardoise';
 import type { Expense, NewExpenseInput } from './types';
 import { BalanceCard, MemberBalances } from './components/balance-panel';
@@ -42,6 +43,9 @@ export default function ArdoisePage() {
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<Expense | null>(null);
+  // Une seule variante est montée : tableau sur bureau, cartes empilées sur
+  // mobile. Aucun scroll horizontal, même interne.
+  const isMobileLayout = useIsMobileLayout();
 
   const handleAddExpense = async (values: NewExpenseInput) => {
     try {
@@ -111,11 +115,57 @@ export default function ArdoisePage() {
               actionLabel="Ajouter une dépense"
               onAction={() => setExpenseDialogOpen(true)}
             />
+          ) : isMobileLayout ? (
+            /* Mobile : cartes empilées, aucun scroll horizontal. */
+            <ul className="m-0 grid list-none gap-2.5 p-0" aria-label="Dépenses du foyer">
+              {expenses.map((expense) => (
+                <li key={expense.id} className="min-w-0 rounded-[13px] border border-border bg-bg p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <strong className="block truncate text-[13px]">{expense.title}</strong>
+                      <small className="block text-[10px] text-muted">
+                        {relativeDayLabel(expense.date)} · Payé par {expense.paidByName}
+                      </small>
+                    </div>
+                    <strong className="shrink-0 font-display text-[15px]">{formatEuro(expense.amount)}</strong>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center">
+                      {expense.participants.slice(0, 5).map((participant) => (
+                        <MemberAvatar
+                          key={participant.key}
+                          name={participant.name}
+                          colorTag={participant.colorTag}
+                          size="sm"
+                          className="-ml-[5px] border-2 border-surface first:ml-0"
+                        />
+                      ))}
+                      {expense.participants.length > 5 ? (
+                        <span
+                          aria-hidden="true"
+                          className="-ml-[5px] grid size-[23px] shrink-0 place-items-center rounded-[8px] border-2 border-surface bg-bg text-[9px] font-extrabold text-muted"
+                        >
+                          +{expense.participants.length - 5}
+                        </span>
+                      ) : null}
+                      <span className="sr-only">{pluralize(expense.participants.length, 'participant')}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`${rowAction} hover:bg-coral-soft hover:text-coral max-[650px]:size-11`}
+                      aria-label={`Supprimer la dépense ${expense.title}`}
+                      onClick={() => setPendingDeletion(expense)}
+                    >
+                      <span className="sr-only">Supprimer</span>
+                      <Icon name="trash" size="sm" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           ) : (
+            /* Bureau : tableau complet avec scroll interne si besoin. */
             <div className="scrollbar-slim w-full max-w-full overflow-x-auto overscroll-x-contain">
-              {/* Scroll interne : le tableau garde 680px minimum en
-                  `table-auto` pour rester lisible à 360px sans jamais faire
-                  défiler la page horizontalement. */}
               <table className="w-full min-w-[680px] table-auto border-collapse [&>th]:px-1 [&>td]:px-1 sm:[&>th]:px-0 sm:[&>td]:px-0">
                 <caption className="sr-only">Dépenses du foyer, payeur, participants et montant</caption>
                 <thead>
