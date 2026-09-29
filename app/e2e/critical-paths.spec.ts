@@ -229,7 +229,6 @@ test.describe('Mises en page', () => {
     test.skip(!viewportIsMobile(page), 'poignées tactiles : mobile uniquement');
 
     await openDemoSession(page);
-    await page.getByRole('button', { name: 'Personnaliser l’accueil' }).click();
 
     const handle = page.getByRole('button', { name: /Réordonner : / }).first();
     await expect(handle).toBeVisible();
@@ -245,7 +244,6 @@ test.describe('Mises en page', () => {
     test.skip(viewportIsMobile(page), 'glisser-déposer souris : bureau uniquement');
 
     await openDemoSession(page);
-    await page.getByRole('button', { name: 'Personnaliser l’accueil' }).click();
 
     const widgets = page.locator('[data-widget]');
     const before = await widgets.first().getAttribute('data-widget');

@@ -16,11 +16,10 @@ export interface WidgetCardProps {
   isEditing: boolean;
   children: React.ReactNode;
   dragHandleProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
-  onHide?: () => void;
 }
 
-/** En-tête commun des widgets : libellé, icône, poignée et menu. */
-export function WidgetCard({ placement, isEditing, onHide, dragHandleProps, children }: WidgetCardProps) {
+/** En-tête commun des widgets : libellé, icône et poignée toujours visible. */
+export function WidgetCard({ placement, isEditing, dragHandleProps, children }: WidgetCardProps) {
   const labels: Record<WidgetPlacement['kind'], { label: string; icon: IconName }> = {
     calendrier: { label: 'Calendrier', icon: 'calendar' },
     taches: { label: 'Tâches', icon: 'checkCircle' },
@@ -43,25 +42,18 @@ export function WidgetCard({ placement, isEditing, onHide, dragHandleProps, chil
           <Icon name={icon} size="sm" className="text-accent-strong" />
           {label}
         </span>
-        {isEditing ? (
-          <button
-            type="button"
-            {...dragHandleProps}
-            className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
-            aria-label={`Réordonner : ${label}`}
-          >
-            <Icon name="drag" size="sm" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onHide}
-            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
-            aria-label={`Masquer le widget ${label}`}
-          >
-            <Icon name="more" size="sm" />
-          </button>
-        )}
+        {/* Poignée permanente : le réordonnancement se fait en place, sans
+            passer par le mode édition. `select-none` + `touch-callout: none`
+            empêchent la loupe de sélection de texte d'Android/iOS de voler
+            l'appui long ; `touch-none` garde le geste pour dnd-kit. */}
+        <button
+          type="button"
+          {...dragHandleProps}
+          className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-[9px] text-muted select-none transition-colors [-webkit-touch-callout:none] hover:bg-accent-faint hover:text-fg"
+          aria-label={`Réordonner : ${label}`}
+        >
+          <Icon name="drag" size="sm" />
+        </button>
       </div>
       {children}
     </article>
@@ -77,14 +69,13 @@ export function CalendarWidget({
   events,
   holidays,
   dragHandleProps,
-  onHide,
 }: WidgetBase & { events: EventRow[]; holidays: FrenchHoliday[] }) {
   const cursor = new Date();
   const eventDates = new Set(events.map((event) => toLocalDate(event.start_at).toISOString().slice(0, 10)));
   const holidayDates = new Set(holidays.map((holiday) => holiday.date));
   const { days, monthLabel } = buildMiniCalendar(cursor, eventDates, holidayDates);
   return (
-    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} onHide={onHide}>
+    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <p className="mb-2.5 text-[11px] font-semibold text-muted capitalize">{monthLabel}</p>
       <div className="grid grid-cols-7 gap-[5px]">
         {WEEKDAY_INITIALS.map((day, index) => (
@@ -119,10 +110,9 @@ export function TasksWidget({
   onToggleTask,
   isUpdating,
   dragHandleProps,
-  onHide,
 }: WidgetBase & { tasks: TaskRow[]; onToggleTask: (task: TaskRow) => void; isUpdating: boolean }) {
   return (
-    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} onHide={onHide}>
+    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       {tasks.length === 0 ? (
         <div className="grid place-items-center py-4 text-center">
           <p className="mb-3 text-xs text-muted">Aucune tâche à faire. Le foyer est à jour.</p>
@@ -162,10 +152,9 @@ export function WeatherWidget({
   isEditing,
   city,
   dragHandleProps,
-  onHide,
 }: WidgetBase & { city: string }) {
   return (
-    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} onHide={onHide}>
+    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <div className="mt-1 flex items-center gap-3">
         <span className="grid size-[43px] shrink-0 place-items-center rounded-[15px] bg-amber-soft text-amber">
           <Icon name="sun" size="lg" />
@@ -187,11 +176,10 @@ export function BirthdaysWidget({
   isEditing,
   birthdays,
   dragHandleProps,
-  onHide,
 }: WidgetBase & { birthdays: { row: BirthdayRow; daysUntil: number }[] }) {
   const next = birthdays[0];
   return (
-    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} onHide={onHide}>
+    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       {birthdays.length === 0 ? (
         <p className="text-xs text-muted">Aucun anniversaire suivi pour l'instant.</p>
       ) : (
@@ -231,10 +219,9 @@ export function RoutinesWidget({
   isEditing,
   progress,
   dragHandleProps,
-  onHide,
 }: WidgetBase & { progress: { done: number; total: number; nextLabel: string; ratio: number } }) {
   return (
-    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} onHide={onHide}>
+    <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <strong className="block font-display text-[30px] leading-none tracking-[-0.05em]">
         {progress.done} / {progress.total}
       </strong>

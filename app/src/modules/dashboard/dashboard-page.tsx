@@ -46,7 +46,7 @@ import {
   WeatherWidget,
   WIDGET_COLUMNS,
 } from './components/widgets';
-import { firstName, formatDashboardEyebrow, WIDGET_META } from './types';
+import { firstName, formatDashboardEyebrow } from './types';
 import { reorderPreferences, resetPreferences, toggleWidget, type WidgetKind } from './types';
 
 const taskSchema = z.object({
@@ -183,11 +183,7 @@ export default function DashboardPage() {
         <div className="min-w-0">
           <SectionHeading
             title="Les essentiels du jour"
-            description={
-              isEditing
-                ? 'Glissez les poignées pour réorganiser (appui long sur mobile).'
-                : 'Activez « Personnaliser l’accueil » pour réorganiser les widgets.'
-            }
+            description="Glissez les poignées pour réorganiser (appui long sur mobile)."
             action={<CountBadge value={dashboard.placements.length} label="widgets affichés" />}
           />
 
@@ -205,7 +201,6 @@ export default function DashboardPage() {
               <SortableContext
                 items={visibleKinds}
                 strategy={rectSortingStrategy}
-                disabled={!isEditing}
               >
                 <div
                   className={cn(
@@ -218,14 +213,6 @@ export default function DashboardPage() {
                       key={placement.kind}
                       kind={placement.kind}
                       isEditing={isEditing}
-                      onHide={() => {
-                        const label = WIDGET_META[placement.kind]?.label ?? placement.kind;
-                        void dashboard.setWidgetOrder(toggleWidget(dashboard.widgets, placement.kind));
-                        // Un masquage silencieux en un tap faisait « disparaître »
-                        // les widgets sans recours visible : le toast dit où les
-                        // réactiver (« Personnaliser l’accueil »).
-                        toast(`Widget ${label} masqué. Réactivez-le dans « Personnaliser l’accueil ».`);
-                      }}
                       dashboard={dashboard}
                     />
                   ))}
@@ -316,31 +303,27 @@ export default function DashboardPage() {
 function SortableWidget({
   kind,
   isEditing,
-  onHide,
   dashboard,
 }: {
   kind: WidgetKind;
   isEditing: boolean;
-  onHide: () => void;
   dashboard: ReturnType<typeof useDashboard>;
 }) {
   const placement = dashboard.placements.find((entry) => entry.kind === kind)!;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: kind,
-    disabled: !isEditing,
   });
 
-  const dragHandleProps = isEditing
-    ? { ...attributes, ...listeners, ref: setActivatorNodeRef as unknown as React.Ref<HTMLButtonElement> }
-    : undefined;
-
+  // Poignées permanentes : le drag est possible en place, sans mode édition.
   const common = {
     placement,
     isEditing,
-    dragHandleProps: dragHandleProps
-      ? { ...attributes, ...listeners, 'aria-label': `Réordonner : ${kind}` } as React.ButtonHTMLAttributes<HTMLButtonElement>
-      : undefined,
-    onHide,
+    dragHandleProps: {
+      ...attributes,
+      ...listeners,
+      ref: setActivatorNodeRef as unknown as React.Ref<HTMLButtonElement>,
+      'aria-label': `Réordonner : ${kind}`,
+    } as React.ButtonHTMLAttributes<HTMLButtonElement>,
   };
 
   const body = () => {

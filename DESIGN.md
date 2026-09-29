@@ -227,7 +227,7 @@ Ces règles sont normatives : toute nouvelle vue mobile les applique sans except
 | Tiroir | Unique menu mobile : recherche `44px`, les 17 espaces en liste plate (aucune catégorie imposée), carte foyer, préférences (admin), déconnexion. Fermeture overlay / bouton / `Échap` / balayage gauche ; focus piégé, rendu au hamburger, `aria-modal` synchronisé |
 | Toast | `bottom: calc(16px + env(safe-area-inset-bottom))` sur mobile |
 | Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
-| Cibles tactiles | Notifications, avatar, fermeture de dialogue et `.check-option` `≥ 44px` sur mobile ; poignées de widgets `44px` avec `touch-action: none` (TouchSensor : appui long 180ms, le scroll garde la priorité) |
+| Cibles tactiles | Notifications, avatar, fermeture de dialogue et `.check-option` `≥ 44px` sur mobile ; poignées de widgets `44px` permanentes avec `touch-action: none`, `select-none` et `-webkit-touch-callout: none` (TouchSensor : appui long 180ms, le scroll garde la priorité ; pas de loupe de sélection) |
 | En-têtes de module | Retour en pastille `44px` (libellé `sr-only`), titre `24px`, eyebrow et lede masqués sous `650px` ; l'action principale reste visible |
 | Densité mobile | Contenu `14px 12px`, panneaux et cartes `14px`, tuiles de module `104px` (accroche masquée), `BalanceCard` compacte (`34px`, texte masqué), coupons sans hauteur minimale |
 | Tableaux | Ardoise : une seule variante montée via `useIsMobileLayout` — tableau sur bureau, cartes empilées sur mobile. Aucun scroll horizontal, même interne |
