@@ -183,7 +183,11 @@ export default function DashboardPage() {
         <div className="min-w-0">
           <SectionHeading
             title="Les essentiels du jour"
-            description={isEditing ? 'Glissez les poignées pour réorganiser.' : 'Glissez les widgets pour les réorganiser.'}
+            description={
+              isEditing
+                ? 'Glissez les poignées pour réorganiser (appui long sur mobile).'
+                : 'Activez « Personnaliser l’accueil » pour réorganiser les widgets.'
+            }
             action={<CountBadge value={dashboard.placements.length} label="widgets affichés" />}
           />
 
