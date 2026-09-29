@@ -22,6 +22,7 @@ import {
   pingServiceWorkerVersion,
   pushPermissionHints,
   pushPermissionLabels,
+  readLastPushReceipt,
   readLocalEndpoint,
   readPushServerState,
   removePushDevice,
@@ -31,6 +32,7 @@ import {
   sendTestPush,
   toProfileColumns,
   type PushPermissionState,
+  type PushReceipt,
   type PushServerState,
   type ReminderPreferences,
 } from '../lib/push';
@@ -39,6 +41,16 @@ import { reminderFrequencies, reminderFrequencyLabel } from '../types';
 type ServerState = PushServerState & { loaded: boolean; error: string | null };
 
 const EMPTY_STATE: ServerState = { vapidPublicKey: null, pushConfigured: false, devices: [], loaded: false, error: null };
+
+/** Date et heure courtes en français pour le reçu du dernier push. */
+function formatReceiptDate(value: number): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
 
 /** Date courte en français : la colonne « dernier envoi » ne demande pas plus. */
 function formatDeviceDate(value: string | null): string {
@@ -62,6 +74,7 @@ export function NotificationsPanel() {
   const [deletingPending, setDeletingPending] = useState(false);
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [swVersion, setSwVersion] = useState<string | null | undefined>(undefined);
+  const [receipt, setReceipt] = useState<PushReceipt | null>(null);
 
   const refresh = useCallback(async () => {
     if (isLocalMode) {
@@ -95,6 +108,16 @@ export function NotificationsPanel() {
       cancelled = true;
     };
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readLastPushReceipt().then((value) => {
+      if (!cancelled) setReceipt(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Les préférences sont lues sur le profil : un interrupteur doit refléter ce
   // que le serveur applique réellement, y compris depuis un autre appareil.
@@ -321,6 +344,12 @@ export function NotificationsPanel() {
                   : swVersion === null
                     ? 'injoignable — réinstallez en effaçant les données du site'
                     : `actif (${swVersion})`}
+              </p>
+            ) : null}
+            {receipt ? (
+              <p className="m-0 mb-1 text-[10px] text-muted">
+                Dernier push reçu : {formatReceiptDate(receipt.at)} (« {receipt.title} ») ·{' '}
+                {receipt.error ? `échec d’affichage (${receipt.error})` : receipt.shown ? 'affiché' : 'reçu'}
               </p>
             ) : null}
             <ul className="m-0 grid list-none gap-2 p-0">

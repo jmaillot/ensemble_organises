@@ -51,6 +51,37 @@ const FALLBACK: PushPayload = {
  */
 const SW_VERSION = 'push-popup-v1';
 
+/** Clé du reçu du dernier push, lisible par la page via l'API Cache. */
+const PUSH_RECEIPT_URL = '/__push_last__';
+
+interface PushReceipt {
+  at: number;
+  title: string;
+  shown: boolean;
+  error: string | null;
+}
+
+/**
+ * Constate la réception, quoi qu'il arrive ensuite.
+ *
+ * Le panneau lit ce reçu : s'il avance à chaque test sans notification,
+ * c'est la phase d'affichage (OS, permission révoquée après coup) qui est en
+ * cause ; s'il ne bouge pas, c'est le transport (service Push → navigateur).
+ * L'écriture est isolée : un stockage indisponible ne doit jamais faire
+ * perdre la notification elle-même.
+ */
+async function writePushReceipt(receipt: PushReceipt): Promise<void> {
+  try {
+    const cache = await caches.open('eo-push-log');
+    await cache.put(
+      new Request(PUSH_RECEIPT_URL),
+      new Response(JSON.stringify(receipt), { headers: { 'content-type': 'application/json' } }),
+    );
+  } catch {
+    // Stockage indisponible (navigation privée…) : tant pis pour le reçu.
+  }
+}
+
 self.skipWaiting();
 clientsClaim();
 
@@ -116,22 +147,29 @@ self.addEventListener('push', (event: PushEvent) => {
   };
   event.waitUntil(
     (async () => {
-      // App ouverte et visible : popup in-app via la page, et notification
-      // système SILENCIEUSE. Chrome impose une notification visible par
-      // message push (`userVisibleOnly`) : la sauter afficherait un message
-      // générique du navigateur à la place du rappel.
-      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const visible = windows.some((client) => client.visibilityState === 'visible');
-      if (visible) {
-        for (const client of windows) {
-          client.postMessage({ type: 'EO_PUSH', title: payload.title, body: payload.body, url: payload.url });
+      const receipt: PushReceipt = { at: Date.now(), title: payload.title, shown: false, error: null };
+      try {
+        // App ouverte et visible : popup in-app via la page, et notification
+        // système SILENCIEUSE. Chrome impose une notification visible par
+        // message push (`userVisibleOnly`) : la sauter afficherait un message
+        // générique du navigateur à la place du rappel.
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const visible = windows.some((client) => client.visibilityState === 'visible');
+        if (visible) {
+          for (const client of windows) {
+            client.postMessage({ type: 'EO_PUSH', title: payload.title, body: payload.body, url: payload.url });
+          }
+          await self.registration.showNotification(payload.title, { ...options, silent: true });
+        } else {
+          // App fermée ou cachée : notification système classique (rideau
+          // Android, centre de notifications Windows).
+          await self.registration.showNotification(payload.title, options);
         }
-        await self.registration.showNotification(payload.title, { ...options, silent: true });
-        return;
+        receipt.shown = true;
+      } catch (error) {
+        receipt.error = error instanceof Error ? error.name : 'inconnue';
       }
-      // App fermée ou cachée : notification système classique (rideau
-      // Android, centre de notifications Windows).
-      await self.registration.showNotification(payload.title, options);
+      await writePushReceipt(receipt);
     })(),
   );
 });

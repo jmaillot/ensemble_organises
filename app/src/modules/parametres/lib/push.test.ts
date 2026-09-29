@@ -566,3 +566,51 @@ describe('réparation du service worker', () => {
     }
   });
 });
+
+describe('reçu du dernier push', () => {
+  function installCache(stored: unknown) {
+    const responses = new Map<string, { json: () => Promise<unknown> }>();
+    if (stored !== undefined) {
+      responses.set('/__push_last__', {
+        json: async () => {
+          if (typeof stored === 'string') throw new Error('corps illisible');
+          return stored;
+        },
+      });
+    }
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => ({ match: vi.fn(async () => responses.get('/__push_last__') ?? null) })),
+    });
+  }
+
+  it('lit le reçu écrit par le worker', async () => {
+    installCache({ at: 1720000000000, title: 'Rappel', shown: true, error: null });
+    try {
+      const { readLastPushReceipt } = await import('./push');
+
+      expect(await readLastPushReceipt()).toEqual({ at: 1720000000000, title: 'Rappel', shown: true, error: null });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('renvoie null sans reçu ou sans Cache API', async () => {
+    const { readLastPushReceipt } = await import('./push');
+
+    expect(await readLastPushReceipt()).toBeNull();
+
+    installCache(undefined);
+    try {
+      expect(await readLastPushReceipt()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    installCache('pas-du-json');
+    try {
+      expect(await readLastPushReceipt()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

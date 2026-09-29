@@ -466,6 +466,39 @@ export async function readLocalEndpoint(): Promise<string | null> {
 }
 
 /**
+ * Reçu du dernier push traité par le service worker, ou `null`.
+ *
+ * Écrit par le worker lui-même dans l'API Cache (`eo-push-log`), donc lisible
+ * par la page sans passer par le réseau : `shown` dit si l'affichage a
+ * abouti, `error` porte l'échec éventuel.
+ */
+export interface PushReceipt {
+  at: number;
+  title: string;
+  shown: boolean;
+  error: string | null;
+}
+
+export async function readLastPushReceipt(): Promise<PushReceipt | null> {
+  try {
+    if (typeof caches === 'undefined') return null;
+    const cache = await caches.open('eo-push-log');
+    const response = await cache.match('/__push_last__');
+    if (!response) return null;
+    const parsed = (await response.json()) as Partial<PushReceipt>;
+    if (typeof parsed.at !== 'number' || typeof parsed.title !== 'string') return null;
+    return {
+      at: parsed.at,
+      title: parsed.title,
+      shown: parsed.shown === true,
+      error: typeof parsed.error === 'string' ? parsed.error : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Version fonctionnelle du service worker actif, ou `null`.
  *
  * `null` ne veut pas dire « pas de worker » : un worker actif mais antérieur
