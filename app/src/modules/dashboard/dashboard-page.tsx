@@ -46,7 +46,7 @@ import {
   WeatherWidget,
   WIDGET_COLUMNS,
 } from './components/widgets';
-import { firstName, formatDashboardEyebrow } from './types';
+import { firstName, formatDashboardEyebrow, WIDGET_META } from './types';
 import { reorderPreferences, resetPreferences, toggleWidget, type WidgetKind } from './types';
 
 const taskSchema = z.object({
@@ -214,7 +214,14 @@ export default function DashboardPage() {
                       key={placement.kind}
                       kind={placement.kind}
                       isEditing={isEditing}
-                      onHide={() => void dashboard.setWidgetOrder(toggleWidget(dashboard.widgets, placement.kind))}
+                      onHide={() => {
+                        const label = WIDGET_META[placement.kind]?.label ?? placement.kind;
+                        void dashboard.setWidgetOrder(toggleWidget(dashboard.widgets, placement.kind));
+                        // Un masquage silencieux en un tap faisait « disparaître »
+                        // les widgets sans recours visible : le toast dit où les
+                        // réactiver (« Personnaliser l’accueil »).
+                        toast(`Widget ${label} masqué. Réactivez-le dans « Personnaliser l’accueil ».`);
+                      }}
                       dashboard={dashboard}
                     />
                   ))}
