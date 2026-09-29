@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
@@ -42,6 +42,20 @@ describe('Accueil — preferences de widgets', () => {
 });
 
 describe('Accueil — rendu', () => {
+  // La météo part sur le réseau : les rendus restent hermétiques en simulant
+  // un service injoignable (le widget affiche alors son état d'erreur).
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('service météo injoignable');
+      }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('affiche le greeting, le foyer et les cinq widgets', async () => {
     renderWithProviders(<DashboardPage />);
     expect(await screen.findByRole('heading', { level: 1, name: /Bonjour Camille/ })).toBeInTheDocument();
@@ -50,6 +64,8 @@ describe('Accueil — rendu', () => {
     const widgets = screen.getAllByRole('article', { name: /^Widget / });
     expect(widgets).toHaveLength(5);
     expect(within(screen.getByRole('article', { name: 'Widget Calendrier' })).getByText(/septembre/)).toBeInTheDocument();
+    // Service simulé injoignable : le widget météo affiche son état d'erreur.
+    expect(await within(screen.getByRole('article', { name: 'Widget Météo' })).findByText(/vérifiez la connexion/)).toBeInTheDocument();
   });
 
   it('propose les seize espaces du foyer dans la grille', async () => {

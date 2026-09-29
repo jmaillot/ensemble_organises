@@ -36,6 +36,7 @@ export function ProfileForm() {
   const householdId = useHouseholdStore((state) => state.householdId);
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
   const setMembers = useHouseholdStore((state) => state.setMembers);
+  const setCity = useHouseholdStore((state) => state.setCity);
   const members = useHouseholdStore((state) => state.members);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +74,12 @@ export function ProfileForm() {
     setError(null);
     try {
       await saveProfile(target, values);
-      // Le nom affiché dans la barre supérieure et les avatars suit le foyer.
+      // Le nom affiché dans la barre supérieure et les avatars suit le foyer,
+      // la ville suit l'accueil (repli local avant le retour du profil).
+      setCity(values.city.trim());
       setMembers(members.map((member) => (member.id === target.memberId ? { ...member, display_name: values.displayName } : member)));
       await queryClient.invalidateQueries({ queryKey: profileKeys.all });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard', 'profile-city'] });
       toast('Profil enregistré. La météo de l’accueil suit votre ville.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.');

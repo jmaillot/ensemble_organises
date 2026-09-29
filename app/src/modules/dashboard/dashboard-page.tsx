@@ -34,6 +34,7 @@ import { modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { useDashboard } from './hooks/use-dashboard';
+import { useWeather } from './hooks/use-weather';
 import {
   ActivityCard,
   BirthdaysWidget,
@@ -340,7 +341,7 @@ function SortableWidget({
         />
       );
     }
-    if (kind === 'meteo') return <WeatherWidget {...common} city={dashboard.city} />;
+    if (kind === 'meteo') return <MeteoSlot {...common} city={dashboard.city} />;
     if (kind === 'anniversaires') return <BirthdaysWidget {...common} birthdays={dashboard.upcomingBirthdays} />;
     return <RoutinesWidget {...common} progress={dashboard.routineProgress} />;
   };
@@ -355,6 +356,22 @@ function SortableWidget({
       {body()}
     </div>
   );
+}
+
+/** Conteneur météo : le hook vit dans un composant, jamais dans `body()`. */
+function MeteoSlot({
+  placement,
+  isEditing,
+  dragHandleProps,
+  city,
+}: {
+  placement: React.ComponentProps<typeof WeatherWidget>['placement'];
+  isEditing: boolean;
+  dragHandleProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
+  city: string;
+}) {
+  const weather = useWeather(city);
+  return <WeatherWidget placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} city={city} weather={weather} />;
 }
 
 function BirthdayPreview({

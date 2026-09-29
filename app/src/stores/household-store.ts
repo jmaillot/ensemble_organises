@@ -10,7 +10,7 @@ interface HouseholdState {
   members: HouseholdMemberRow[];
   /** Membre correspondant à l'utilisateur connecté (profil géré par un parent). */
   currentMemberId: string;
-  /** Ville du profil : elle pilote le widget météo de l'accueil. */
+  /** Ville du profil (`profiles.city`) : cache local, repli hors ligne et démo. */
   city: string;
   setCity: (city: string) => void;
   setHousehold: (household: HouseholdRow, members: HouseholdMemberRow[], currentMemberId?: string) => void;

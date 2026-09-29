@@ -220,6 +220,12 @@ Ne jamais maintenir une seconde liste manuelle de fichiers Compose :
   et `supavisor` restent sur le réseau Docker interne.
 * Les WebSockets Realtime (`/realtime/v1/websocket`) doivent conserver
   `Upgrade`/`Connection` : ne pas ajouter de middleware qui les supprime.
+* Le widget météo appelle Open-Meteo depuis le navigateur (géocodage + prévision,
+  sans clé) : le `connect-src` de la CSP posée au niveau Traefik sur la route
+  frontend **doit** autoriser `https://api.open-meteo.com` et
+  `https://geocoding-api.open-meteo.com`. Sans cela, la météo fonctionne en
+  `npm run dev` mais est bloquée en production — et le widget affiche son état
+  d'erreur (« Météo indisponible »), pas un écran vide.
 
 ---
 

@@ -541,9 +541,12 @@ n'en est qu'un résumé de contexte.
   prévu par le référentiel).
 - **Accusés de lecture des messages** suivis côté client : il faudrait une
   colonne `read_at` et une mise à jour serveur.
-- **Ville du profil** : elle pilote le widget météo de l'accueil, aujourd'hui
-  stockée dans les préférences du widget ; une colonne `profiles.city` est
-  préférable.
+- **Ville du profil** : `profiles.city` (migration 0034, contrainte 2–60
+  caractères) est désormais la source de vérité du widget météo ; le formulaire
+  la lit en premier et réécrit l'ancien `dashboard_widgets.settings.city` en
+  repli. Migration **écrite mais non appliquée** : `supabase-project/` n'est
+  pas amorcé ici, donc `migrate.sh` + `test-db.sh` restent à passer avant
+  déploiement.
 - **Colonnes suggérées par les modules** : `notes.visibility`
 (remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
 `pets.next_reminder_date`, `trips.status`.

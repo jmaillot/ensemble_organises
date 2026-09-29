@@ -22,7 +22,7 @@ declare
 begin
   for r in
     select * from (values
-          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'created_at', 'updated_at']::text[]),
+          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'created_at', 'updated_at']::text[]),
           ('households', ARRAY['id', 'name', 'avatar_color', 'created_by', 'created_at', 'updated_at']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
@@ -545,6 +545,21 @@ select testkit.eq(testkit.affected(format(
   'update public.profiles set display_name = %L where id = %L',
   'Bob M.', (select user_id from testkit.fx where key = 'bob'))), 1::bigint,
   'un client peut modifier son propre nom d''affichage');
+
+-- La ville du profil pilote le widget météo : même régime que le nom, avec
+-- la contrainte du formulaire (2 à 60 caractères).
+select testkit.eq(testkit.affected(format(
+  'update public.profiles set city = %L where id = %L',
+  'Lyon', (select user_id from testkit.fx where key = 'bob'))), 1::bigint,
+  'un client peut régler sa propre ville');
+select testkit.expect_denied(format(
+  'update public.profiles set city = %L where id = %L',
+  'X', (select user_id from testkit.fx where key = 'bob')),
+  'une ville trop courte doit être refusée par la contrainte');
+select testkit.eq(testkit.affected(format(
+  'update public.profiles set city = %L where id <> %L',
+  'Paris', (select user_id from testkit.fx where key = 'bob'))), 0::bigint,
+  'un client ne modifie la ville d''autrui : les profiles lus sont les siens');
 
 -- Les préférences de rappel appartiennent au profil : c'est le serveur qui les
 -- applique, pas une copie dans le navigateur. Le client les modifie donc, mais

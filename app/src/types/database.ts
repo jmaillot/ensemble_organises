@@ -20,6 +20,8 @@ export interface ProfileRow {
   display_name: string;
   avatar_url: string | null;
   provider: AuthProvider;
+  /** Ville du profil, pilote le widget météo. NULL : repli interface (Lyon). */
+  city: string | null;
   reminder_frequency: ReminderFrequency;
   task_reminders_enabled: boolean;
   event_reminders_enabled: boolean;

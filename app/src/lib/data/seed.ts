@@ -70,6 +70,7 @@ export const demoProfile: ProfileRow = {
   display_name: 'Camille Martin',
   avatar_url: null,
   provider: 'email',
+  city: 'Lyon',
   reminder_frequency: 'immediat',
   task_reminders_enabled: true,
   event_reminders_enabled: true,

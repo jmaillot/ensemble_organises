@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
+import { useSessionUser } from '@/hooks/use-auth';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useFrenchHolidays } from '@/hooks/use-french-holidays';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
 import { todayIso, toLocalDate, toIsoDate, daysBetween } from '@/lib/utils';
-import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, PostRow, TaskRow } from '@/types';
+import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, PostRow, ProfileRow, TaskRow } from '@/types';
 import {
   layoutWidgets,
   nextEventOfDay,
@@ -177,8 +178,30 @@ export function useDashboard(): DashboardData {
     };
   }, [routines.dueToday, routines.routines]);
 
-  const city = useHouseholdStore((state) => state.city);
-  const setCity = useHouseholdStore((state) => state.setCity);
+  const cityFromStore = useHouseholdStore((state) => state.city);
+  const setCityInStore = useHouseholdStore((state) => state.setCity);
+  const sessionUser = useSessionUser();
+
+  // Source de vérité : `profiles.city`. Le store reste le repli (démo, hors
+  // ligne, premier rendu avant la réponse).
+  const { data: profileRows } = useQuery({
+    queryKey: ['dashboard', 'profile-city', sessionUser?.id ?? 'demo'],
+    enabled: Boolean(sessionUser?.id),
+    queryFn: () => data.list<ProfileRow>('profiles', { id: sessionUser?.id ?? '' }),
+  });
+  const city = profileRows?.[0]?.city?.trim() || cityFromStore;
+  const setCity = useCallback(
+    async (next: string) => {
+      setCityInStore(next);
+      if (!sessionUser?.id) return;
+      try {
+        await data.update('profiles', sessionUser.id, { city: next } as never);
+      } catch {
+        // Hors ligne ou refus : le store garde la valeur, la file rejouera.
+      }
+    },
+    [sessionUser?.id, setCityInStore],
+  );
 
   const activity = useMemo<ActivityEntry[]>(() => {
     const memberName = (id: string) => members.find((member) => member.id === id)?.display_name ?? 'Un membre';

@@ -10,9 +10,10 @@ import type { HouseholdColor } from './types';
  */
 
 /**
- * Le schéma ne comporte pas de ville dans `profiles` : la ville du profil est
- * stockée dans les réglages du widget météo du membre (`dashboard_widgets.
- * settings`), seule source de vérité côté interface pour l'instant.
+ * Le profil porte la ville (`profiles.city`), source de vérité du widget
+ * météo. Les réglages du widget (`dashboard_widgets.settings.city`) restent
+ * lus en repli et réécrits à la sauvegarde, le temps que chaque profil ait
+ * une ville.
  */
 export const DEFAULT_CITY = 'Lyon';
 
@@ -35,6 +36,16 @@ const cityFromSettings = (settings: Record<string, unknown> | null) =>
 
 export async function fetchProfile({ userId, memberId, householdId }: ProfileTarget): Promise<ProfileSettings> {
   const [profile] = await data.list<ProfileRow>('profiles', { id: userId });
+  const cityFromProfile = profile?.city?.trim() ?? '';
+  if (cityFromProfile) {
+    return {
+      userId,
+      displayName: profile?.display_name ?? '',
+      email: profile?.email ?? '',
+      city: cityFromProfile,
+      provider: profile?.provider ?? 'email',
+    };
+  }
   const widgets = await data.list<DashboardWidgetRow>('dashboard_widgets', { household_id: householdId });
   const meteo = widgets.find((widget) => widget.widget_type === 'meteo' && widget.member_id === memberId);
   return {
@@ -47,7 +58,8 @@ export async function fetchProfile({ userId, memberId, householdId }: ProfileTar
 }
 
 export async function saveProfile(target: ProfileTarget, values: { displayName: string; city: string }): Promise<void> {
-  await data.update<ProfileRow>('profiles', target.userId, { display_name: values.displayName });
+  const city = values.city.trim();
+  await data.update<ProfileRow>('profiles', target.userId, { display_name: values.displayName, city });
 
   const widgets = await data.list<DashboardWidgetRow>('dashboard_widgets', { household_id: target.householdId });
   const meteo = widgets.find((widget) => widget.widget_type === 'meteo' && widget.member_id === target.memberId);

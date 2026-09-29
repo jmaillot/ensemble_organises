@@ -9,6 +9,7 @@ import type { BirthdayRow, EventRow, TaskRow } from '@/types';
 import { priorityFromRank } from '@/modules/taches/types';
 import { PriorityTag } from '@/components/shared/module-shell';
 import type { FrenchHoliday } from '@/hooks/use-french-holidays';
+import type { WeatherState } from '../hooks/use-weather';
 import { WIDGET_COLUMNS, WEEKDAY_INITIALS, buildMiniCalendar, type WidgetPlacement } from '../types';
 
 export interface WidgetCardProps {
@@ -151,21 +152,31 @@ export function WeatherWidget({
   placement,
   isEditing,
   city,
+  weather,
   dragHandleProps,
-}: WidgetBase & { city: string }) {
+}: WidgetBase & { city: string; weather: WeatherState }) {
+  const measured = weather.measuredAt
+    ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(weather.measuredAt))
+    : null;
   return (
     <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <div className="mt-1 flex items-center gap-3">
         <span className="grid size-[43px] shrink-0 place-items-center rounded-[15px] bg-amber-soft text-amber">
-          <Icon name="sun" size="lg" />
+          <Icon name={weather.icon} size="lg" />
         </span>
-        <div>
-          <strong className="block font-display text-[22px] tracking-[-0.04em]">18°</strong>
-          <span className="block text-[11px] text-muted">Ensoleillé · {city}</span>
+        <div aria-live="polite">
+          <strong className="block font-display text-[22px] tracking-[-0.04em]">
+            {weather.status === 'loading' ? '…' : weather.temperature == null ? '—' : `${Math.round(weather.temperature)}°`}
+          </strong>
+          <span className="block text-[11px] text-muted">
+            {weather.status === 'loading' ? 'Chargement de la météo…' : `${weather.label} · ${city}`}
+          </span>
         </div>
       </div>
       <p className="mt-2 text-xs text-muted">
-        Ville du profil · {city}. <span className="text-[11px] text-muted/80">Données de démonstration : la météo en direct arrive avec le service météo.</span>
+        {weather.status === 'error'
+          ? 'Météo indisponible : vérifiez la connexion. Seul le nom de ville est transmis à Open-Meteo.'
+          : `Ville du profil · ${city}${measured ? ` · relevé à ${measured}` : ''}. Source Open-Meteo.`}
       </p>
     </WidgetCard>
   );
