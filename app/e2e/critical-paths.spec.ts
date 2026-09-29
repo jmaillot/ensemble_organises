@@ -224,4 +224,45 @@ test.describe('Mises en page', () => {
       expect(top, `vide vertical en haut de ${path}`).toBeLessThan(200);
     }
   });
+
+  test('les poignées de widgets sont tactiles (44px, sans vol de scroll)', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'poignées tactiles : mobile uniquement');
+
+    await openDemoSession(page);
+    await page.getByRole('button', { name: 'Personnaliser l’accueil' }).click();
+
+    const handle = page.getByRole('button', { name: /Réordonner : / }).first();
+    await expect(handle).toBeVisible();
+    // Sans `touch-action: none`, le navigateur fait défiler la page au lieu
+    // de laisser dnd-kit tenir le geste : plus rien ne bouge au doigt.
+    expect(await handle.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+    const box = await handle.boundingBox();
+    expect(box?.width, 'poignée sous 44px de large').toBeGreaterThanOrEqual(44);
+    expect(box?.height, 'poignée sous 44px de haut').toBeGreaterThanOrEqual(44);
+  });
+
+  test('glisser un widget le réordonne et le persiste', async ({ page }) => {
+    test.skip(viewportIsMobile(page), 'glisser-déposer souris : bureau uniquement');
+
+    await openDemoSession(page);
+    await page.getByRole('button', { name: 'Personnaliser l’accueil' }).click();
+
+    const widgets = page.locator('[data-widget]');
+    const before = await widgets.first().getAttribute('data-widget');
+    const handle = page.getByRole('button', { name: /Réordonner : / }).first();
+    // Le clic sur « Personnaliser » a fait défiler la page : la poignée est
+    // hors viewport, et un drag hors viewport ne touche aucun élément.
+    await handle.scrollIntoViewIfNeeded();
+    const target = widgets.nth(1);
+    const from = (await handle.boundingBox())!;
+    const to = (await target.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => widgets.first().getAttribute('data-widget'), { timeout: 5000 })
+      .not.toBe(before);
+  });
 });

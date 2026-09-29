@@ -3,6 +3,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -66,8 +67,13 @@ export default function DashboardPage() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const dashboard = useDashboard();
 
+  // Souris : déplacement immédiat. Tactile : appui long (le défilement
+  // garde la priorité sur un toucher bref) ; `touch-action: none` sur les
+  // poignées empêche le navigateur de voler le geste une fois le délai passé.
+  // Clavier : inchangé, via les poignées focusables.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

@@ -47,7 +47,7 @@ export function WidgetCard({ placement, isEditing, onHide, dragHandleProps, chil
           <button
             type="button"
             {...dragHandleProps}
-            className="grid size-8 shrink-0 cursor-grab place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
+            className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-[9px] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
             aria-label={`Réordonner : ${label}`}
           >
             <Icon name="drag" size="sm" />
@@ -365,7 +365,7 @@ export function CustomizePanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="mb-0.5 font-display text-base tracking-[-0.03em]">Personnaliser l’accueil</h2>
-          <p className="m-0 text-[11px] text-muted">Glissez les widgets pour les réorganiser, masquez ceux dont vous n’avez pas besoin.</p>
+          <p className="m-0 text-[11px] text-muted">Glissez les poignées pour réorganiser (appui long sur mobile), masquez ceux dont vous n’avez pas besoin.</p>
         </div>
         <Button size="sm" variant="quiet" onClick={onClose} icon="close">
           Terminer
