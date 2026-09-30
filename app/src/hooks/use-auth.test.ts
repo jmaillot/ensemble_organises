@@ -175,6 +175,40 @@ describe("chemin d'authentification", () => {
     unmount();
   });
 
+  it("n'affiche jamais l'application avant que la session restaurée soit posée", async () => {
+    // Régression (rechargement en mode Supabase) : `setReady(true)` partait
+    // sans attendre `applySession`, donc un rendu commitait
+    // (ready=true, status='initialising' ou résidu 'guest') et la garde
+    // renvoyait vers `/connexion` un utilisateur pourtant connecté.
+    auth.getSession.mockResolvedValue({ data: { session: { user } } });
+    // Le profil répond dans une macrotâche ultérieure (réseau) : avec
+    // l'ancien code, le rendu (ready=true, status='initialising') commettait
+    // avant la fin de `applySession`, et la garde redirigeait. Sans ce délai,
+    // `act()` fusionne les rendus et le cas fautif reste invisible au test.
+    listMock.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve([{ id: user.id, display_name: 'Alice Martin' }]), 50)),
+    );
+    const { useAuthBootstrap } = await import('./use-auth');
+    const { useSessionStore: store } = await import('@/stores/session-store');
+
+    const seen: Array<{ ready: boolean; status: string }> = [];
+    const { unmount } = renderHook(() => {
+      const ready = useAuthBootstrap();
+      const status = store((state) => state.status);
+      seen.push({ ready, status });
+      return ready;
+    });
+
+    await waitFor(() => expect(store.getState().status).toBe('authenticated'), { timeout: 4000 });
+    await waitFor(() => expect(seen.some((state) => state.ready)).toBe(true));
+    expect(store.getState().status).toBe('authenticated');
+    // Aucun rendu ne montre l'application (ready) sans session posée : ni
+    // `initialising` (rechargement frais), ni `guest` (résidu d'un état
+    // précédent, visible quand `setReady` partait sans attendre).
+    expect(seen.some((state) => state.ready && state.status !== 'authenticated')).toBe(false);
+    unmount();
+  });
+
   it('déconnecte sur SIGNED_OUT', async () => {
     await applySession(user);
 

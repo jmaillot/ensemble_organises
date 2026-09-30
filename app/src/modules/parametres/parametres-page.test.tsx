@@ -27,6 +27,23 @@ describe('Paramètres du foyer', () => {
     expect(await screen.findByRole('img', { name: 'QR code du token d’invitation' })).toBeInTheDocument();
   });
 
+  it('réaffiche le dernier token actif sans en générer un nouveau', async () => {
+    const user = userEvent.setup();
+    const first = renderWithProviders(<ParametresPage />);
+
+    await user.click(screen.getByRole('tab', { name: 'Invitations' }));
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau token' }));
+    const token = await screen.findByText(/^[A-Za-z0-9_-]{22}$/);
+    const value = token.textContent ?? '';
+    expect(value).toHaveLength(22);
+
+    // Rechargement du panneau : le même token revient, sans régénération.
+    first.unmount();
+    renderWithProviders(<ParametresPage />);
+    await user.click(screen.getByRole('tab', { name: 'Invitations' }));
+    expect(await screen.findByText(value)).toBeInTheDocument();
+  });
+
   it('n’ouvre aucune action d’invitation pour un membre non administrateur', async () => {    const user = userEvent.setup();
     renderWithProviders(<ParametresPage />, { withHousehold: false });
     useHouseholdStore.setState({

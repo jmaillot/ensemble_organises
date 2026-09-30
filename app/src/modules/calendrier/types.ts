@@ -1,6 +1,6 @@
 import type { FrenchHoliday } from '@/hooks/use-french-holidays';
-import { formatLongDate, pluralize } from '@/lib/utils';
-import type { BirthdayRow, EventReminderRow, EventRow, HouseholdMemberRow, MemberColorTag } from '@/types';
+import { formatLongDate, formatShortDate, pluralize } from '@/lib/utils';
+import type { BirthdayRow, EventReminderRow, EventRow, HouseholdMemberRow, MemberColorTag, TaskStatus } from '@/types';
 
 /** Couleurs de membre acceptées par `events.color` (pastille du calendrier). */
 const COLOR_TAGS = ['accent', 'ink', 'coral', 'amber', 'violet'] as const satisfies readonly MemberColorTag[];
@@ -111,6 +111,16 @@ export type AgendaItem =
       author: HouseholdMemberRow | null;
     }
   | {
+      kind: 'tache';
+      key: string;
+      taskId: string;
+      time: string;
+      title: string;
+      subtitle: string | null;
+      colorTag: MemberColorTag;
+      chipLabel: string;
+    }
+  | {
       kind: 'anniversaire';
       key: string;
       time: string;
@@ -128,12 +138,34 @@ export type AgendaItem =
       chipLabel: string;
     };
 
-/** Journée de l'agenda : événements du foyer, anniversaires, puis jours fériés. */
+/** Tâche vue depuis le calendrier : échéance et retard suffisent. */
+export interface CalendarTask {
+  id: string;
+  name: string;
+  dueDate: string | null;
+  status: TaskStatus;
+  isLate: boolean;
+  lateDays: number;
+}
+
+/** Tâches dues au plus tard le jour affiché, terminées exclues. */
+export function tasksOfDay(tasks: readonly CalendarTask[], date: string): CalendarTask[] {
+  return tasks
+    .filter((task) => task.status !== 'fait' && task.dueDate !== null && task.dueDate <= date)
+    .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
+}
+
+/** Journée de l'agenda : événements et tâches du foyer, anniversaires, puis jours fériés. */
 export function buildAgenda(
   date: string,
-  sources: { events: readonly CalendarEvent[]; birthdays: readonly CalendarBirthday[]; holidays: readonly FrenchHoliday[] },
+  sources: {
+    events: readonly CalendarEvent[];
+    tasks: readonly CalendarTask[];
+    birthdays: readonly CalendarBirthday[];
+    holidays: readonly FrenchHoliday[];
+  },
 ): AgendaItem[] {
-  const { events, birthdays, holidays } = sources;
+  const { events, tasks, birthdays, holidays } = sources;
   const eventsOfDay = events
     .filter((event) => event.date === date)
     .map<AgendaItem>((event) => ({
@@ -148,6 +180,21 @@ export function buildAgenda(
       author: event.author,
     }))
     .sort((a, b) => a.time.localeCompare(b.time));
+
+  const tasksOfTheDay = tasksOfDay(tasks, date).map<AgendaItem>((task) => ({
+    kind: 'tache',
+    key: `tache-${task.id}`,
+    taskId: task.id,
+    time: task.isLate ? 'En retard' : task.dueDate === date ? 'Échéance' : formatShortDate(task.dueDate as string),
+    title: task.name,
+    subtitle: task.isLate
+      ? `En retard de ${task.lateDays} j`
+      : task.dueDate === date
+        ? null
+        : `Échéance le ${formatShortDate(task.dueDate as string)}`,
+    colorTag: 'violet',
+    chipLabel: task.isLate ? 'En retard' : 'Tâche',
+  }));
 
   const birthdaysOfDay = birthdays
     .filter((birthday) => birthday.monthDay === date.slice(5))
@@ -173,7 +220,7 @@ export function buildAgenda(
       chipLabel: 'Jour férié',
     }));
 
-  return [...eventsOfDay, ...birthdaysOfDay, ...holidaysOfDay];
+  return [...eventsOfDay, ...tasksOfTheDay, ...birthdaysOfDay, ...holidaysOfDay];
 }
 
 export interface DayMarker {
@@ -181,6 +228,9 @@ export interface DayMarker {
   colorTag: MemberColorTag;
   hasBirthday: boolean;
   hasHoliday: boolean;
+  /** Tâches dues ce jour-là (non terminées), pastille violette. */
+  hasTask: boolean;
+  taskCount: number;
 }
 
 export type DayMarkerMap = Record<string, DayMarker>;
@@ -189,31 +239,52 @@ function isSameMonthDay(iso: string, monthDay: string) {
   return iso.slice(5) === monthDay;
 }
 
-/** Pastilles de la grille : couleur du membre pour un événement, ambre pour un férié. */
+/** Pastilles de la grille : couleur du membre pour un événement, violet pour une tâche, ambre pour un férié. */
 export function buildDayMarkers(
   days: readonly { iso: string }[],
-  sources: { events: readonly CalendarEvent[]; birthdays: readonly CalendarBirthday[]; holidays: readonly FrenchHoliday[] },
+  sources: {
+    events: readonly CalendarEvent[];
+    tasks: readonly CalendarTask[];
+    birthdays: readonly CalendarBirthday[];
+    holidays: readonly FrenchHoliday[];
+  },
+  today: string,
 ): DayMarkerMap {
   const markers: DayMarkerMap = {};
   days.forEach(({ iso }) => {
     const events = sources.events.filter((event) => event.date === iso);
+    // Ponctuel (dû ce jour-là) plus rappels en retard épinglés à aujourd'hui :
+    // sans la seconde condition, une tâche en retard teinterait tout le futur.
+    const tasks = sources.tasks.filter(
+      (task) =>
+        task.status !== 'fait' &&
+        task.dueDate !== null &&
+        (task.dueDate === iso || (task.isLate && iso === today)),
+    );
     const birthdays = sources.birthdays.filter((birthday) => isSameMonthDay(iso, birthday.monthDay));
     const holiday = sources.holidays.find((entry) => entry.date === iso);
-    if (events.length === 0 && birthdays.length === 0 && !holiday) return;
+    if (events.length === 0 && tasks.length === 0 && birthdays.length === 0 && !holiday) return;
     markers[iso] = {
       count: events.length + birthdays.length,
       colorTag: holiday && events.length === 0 ? 'amber' : (events[0]?.colorTag ?? birthdays[0]?.colorTag ?? 'coral'),
       hasBirthday: birthdays.length > 0,
       hasHoliday: Boolean(holiday),
+      hasTask: tasks.length > 0,
+      taskCount: tasks.length,
     };
   });
   return markers;
 }
 
-/** Libellé complet d'une case : « Vendredi 25 septembre 2026, 2 événements ». */
+/** Libellé complet d'une case : « Vendredi 25 septembre 2026, 2 événements, 1 tâche ». */
 export function dayButtonLabel(iso: string, marker?: DayMarker) {
   const base = capitalize(formatLongDate(iso));
-  if (!marker || marker.count === 0) return marker?.hasHoliday ? `${base}, jour férié` : base;
-  return `${base}, ${pluralize(marker.count, 'événement')}${marker.hasHoliday ? ', jour férié' : ''}`;
+  if (!marker || (marker.count === 0 && marker.taskCount === 0))
+    return marker?.hasHoliday ? `${base}, jour férié` : base;
+  const parts = [
+    marker.count > 0 ? pluralize(marker.count, 'événement') : null,
+    marker.taskCount > 0 ? pluralize(marker.taskCount, 'tâche') : null,
+  ].filter((part): part is string => part !== null);
+  return `${base}, ${parts.join(', ')}${marker.hasHoliday ? ', jour férié' : ''}`;
 }
 

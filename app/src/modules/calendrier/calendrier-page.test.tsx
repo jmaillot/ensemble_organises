@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import CalendrierPage from './calendrier-page';
@@ -78,6 +78,31 @@ describe('CalendrierPage', () => {
     expect(screen.queryByText('Journée libre')).not.toBeInTheDocument();
   });
 
+  it('affiche les tâches dues et en retard dans l’agenda du jour', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    // Aujourd’hui : la tâche due aujourd’hui plus celle d’hier, en retard.
+    await selectDay(user, today);
+    expect(await screen.findByText('Valider les rendez-vous du carnet')).toBeInTheDocument();
+    expect(screen.getByText('Choisir le menu du week-end')).toBeInTheDocument();
+    expect(screen.getAllByText('En retard').length).toBeGreaterThanOrEqual(2);
+    // La tâche terminée ne remonte pas dans l’agenda.
+    expect(screen.queryByText('Ranger les photos de l’été')).not.toBeInTheDocument();
+    // Chaque tâche propose la navigation vers son module, pas d’édition inline.
+    expect(
+      screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
+    ).toBeInTheDocument();
+  });
+
+  it('signale les jours avec tâches par une pastille violette', async () => {
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    expect(await screen.findByText('Tâche')).toBeInTheDocument();
+    const dayButton = await screen.findByRole('button', { name: new RegExp(`^${dayLabel(today)}, .*tâche`) });
+    expect(dayButton).toHaveAttribute('data-has-event', 'true');
+  });
+
   it('ajoute un événement via le dialogue et l’affiche dans la grille et l’agenda', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
@@ -118,8 +143,10 @@ describe('CalendrierPage', () => {
     const alert = await screen.findByRole('alertdialog');
     await user.click(within(alert).getByRole('button', { name: 'Supprimer l’événement' }));
 
-    expect(await screen.findByText('Journée libre')).toBeInTheDocument();
-    expect(screen.queryByText('Courses du samedi')).not.toBeInTheDocument();
+    expect(await screen.findByText('Choisir le menu du week-end')).toBeInTheDocument();
+    // L’événement est parti, mais la tâche en retard du foyer reste affichée.
+    expect(screen.queryByText('Journée libre')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Courses du samedi')).not.toBeInTheDocument());
   });
 
   it('distingue un jour férié d’un événement du foyer dans l’agenda', async () => {

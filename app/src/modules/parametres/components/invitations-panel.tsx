@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -8,10 +8,10 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { QrCode } from '@/components/shared/qr-code';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { createInviteToken, getInviteTokenSummary, revokeInviteToken } from '@/lib/invites';
+import { createInviteToken, forgetInviteToken, getInviteTokenSummary, isRecallValid, recallInviteToken, rememberInviteToken, revokeInviteToken } from '@/lib/invites';
 import { addDays, formatMediumDate, pluralize, todayIso } from '@/lib/utils';
 import { useHouseholdStore, useIsAdmin } from '@/stores/household-store';
-import type { InviteTokenPreview, InviteTokenSummary } from '@/types';
+import type { InviteTokenSummary } from '@/types';
 
 const inviteKeys = { all: ['parametres', 'invitations'] as const };
 
@@ -25,7 +25,7 @@ export function InvitationsPanel() {
   const [maxUses, setMaxUses] = useState(10);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generated, setGenerated] = useState<InviteTokenPreview | null>(null);
+  const [recallBump, setRecallBump] = useState(0);
   const [showQr, setShowQr] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
 
@@ -36,6 +36,11 @@ export function InvitationsPanel() {
 
   const summary: InviteTokenSummary | null = summaryQuery.data ?? null;
 
+  // Le brut n'existe côté serveur qu'à la génération : le rappel local
+  // permet de le réafficher tant que le résumé désigne le même token actif.
+  const recalled = useMemo(() => recallInviteToken(), [summary, recallBump]);
+  const displayed = recalled && isRecallValid(recalled, summary) ? recalled : null;
+
   const generate = async () => {
     setPending(true);
     setError(null);
@@ -44,9 +49,16 @@ export function InvitationsPanel() {
         expiresAt: expiresOn ? `${expiresOn}T23:59:00.000Z` : null,
         maxUses,
       });
-      setGenerated(preview);
-      setShowQr(false);
       await queryClient.invalidateQueries({ queryKey: inviteKeys.all });
+      // Le résumé frais porte la création du token qui vient de naître : le
+      // rappel est ancré dessus, pas sur l'instant local. `refetch` renvoie
+      // les données ; le cache seul peut encore être vide à cet instant.
+      const { data: fresh } = await summaryQuery.refetch();
+      if (preview.token && fresh?.createdAt) {
+        rememberInviteToken({ token: preview.token, householdId: fresh.householdId, createdAt: fresh.createdAt });
+      }
+      setRecallBump((bump) => bump + 1);
+      setShowQr(false);
       toast('Nouveau token généré. Le précédent est invalidé.');
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : 'Génération impossible.');
@@ -121,16 +133,16 @@ export function InvitationsPanel() {
           </Button>
         </div>
 
-        {generated ? (
+        {displayed ? (
           <div className="grid gap-4 rounded-[16px] border border-border bg-bg p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div>
               <p className="eyebrow mb-2">Token d’invitation</p>
-              <p className="mb-4 font-mono text-lg tracking-[0.12em] break-all">{generated.token}</p>
+              <p className="mb-4 font-mono text-lg tracking-[0.12em] break-all">{displayed.token}</p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   icon="copy"
                   onClick={async () => {
-                    await navigator.clipboard?.writeText(generated.token);
+                    await navigator.clipboard?.writeText(displayed.token);
                     toast('Token copié dans le presse-papiers.');
                   }}
                 >
@@ -145,19 +157,20 @@ export function InvitationsPanel() {
                 >
                   {showQr ? 'Masquer le QR' : 'QR'}
                 </Button>
-                <Button variant="secondary" icon="share" onClick={() => void share(generated.token)}>
+                <Button variant="secondary" icon="share" onClick={() => void share(displayed.token)}>
                   Partager
                 </Button>
               </div>
               <p className="mt-4 mb-0 text-[11px] text-muted">
-                Maximum {pluralize(generated.maxUses, 'utilisation')}
-                {generated.expiresAt ? ` · valide jusqu’au ${formatMediumDate(generated.expiresAt.slice(0, 10))}` : ' · sans date d’expiration'}. La
-                base n’en conserve que l’empreinte : ce token ne sera plus affiché ensuite.
+                Maximum {pluralize(summary?.maxUses ?? 10, 'utilisation')}
+                {summary?.expiresAt ? ` · valide jusqu’au ${formatMediumDate(summary.expiresAt.slice(0, 10))}` : ' · sans date d’expiration'}. La
+                base n’en conserve que l’empreinte : ce token est rappelé depuis cet appareil et ne sera plus
+                affichable ailleurs.
               </p>
             </div>
             {showQr ? (
               <div id={qrId} className="rounded-[16px] border border-border bg-surface p-3">
-                <QrCode value={generated.token} size={168} label="QR code du token d’invitation" />
+                <QrCode value={displayed.token} size={168} label="QR code du token d’invitation" />
               </div>
             ) : null}
           </div>
@@ -195,7 +208,8 @@ export function InvitationsPanel() {
         onConfirm={async () => {
           try {
             await revokeInviteToken();
-            setGenerated(null);
+            forgetInviteToken();
+            setRecallBump((bump) => bump + 1);
             setShowQr(false);
             await queryClient.invalidateQueries({ queryKey: inviteKeys.all });
             toast('Token révoqué.');

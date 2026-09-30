@@ -4,11 +4,12 @@ import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
 import { toCalendarBirthday, toCalendarEvent, toColorTag } from '../types';
-import type { CalendarBirthday, CalendarEvent, EventFormValues, EventReminder } from '../types';
+import type { CalendarBirthday, CalendarEvent, CalendarTask, EventFormValues, EventReminder } from '../types';
 import { deleteEvent, listEventReminders, saveEvent } from '../api';
 import type { EventInput } from '../api';
 import type { QueryClient } from '@tanstack/react-query';
-import type { BirthdayRow, EventRow } from '@/types';
+import type { BirthdayRow, EventRow, TaskRow } from '@/types';
+import { toTask } from '@/modules/taches/types';
 
 export interface SaveEventVariables {
   id: string | null;
@@ -31,6 +32,7 @@ export function invalidateTables(queryClient: QueryClient, tables: string[]) {
 
 export interface CalendrierResource {
   events: CalendarEvent[];
+  tasks: CalendarTask[];
   birthdays: CalendarBirthday[];
   /** Rappel de chaque événement, indexé par `event_id`. */
   reminders: Record<string, EventReminder>;
@@ -44,8 +46,8 @@ export interface CalendrierResource {
 }
 
 /**
- * Données du module Calendrier : événements et rappels du foyer, complétés par
- * les anniversaires afin de les afficher à côté des rendez-vous.
+ * Données du module Calendrier : événements, tâches et rappels du foyer,
+ * complétés par les anniversaires afin de les afficher à côté des rendez-vous.
  */
 export function useCalendrier(): CalendrierResource {
   const queryClient = useQueryClient();
@@ -54,6 +56,7 @@ export function useCalendrier(): CalendrierResource {
   const householdId = useHouseholdStore((state) => state.householdId);
 
   const eventsResource = useResource<EventRow>('events');
+  const tasksResource = useResource<TaskRow>('tasks');
   const birthdaysResource = useResource<BirthdayRow>('birthdays');
 
   const eventIds = useMemo(() => eventsResource.rows.map((row) => row.id), [eventsResource.rows]);
@@ -64,14 +67,18 @@ export function useCalendrier(): CalendrierResource {
   });
 
   const refresh = useCallback(
-    () => invalidateTables(queryClient, ['events', 'event_reminders']),
+    () => invalidateTables(queryClient, ['events', 'tasks', 'event_reminders']),
     [queryClient],
   );
 
   // Écoute les écritures venues d’un autre onglet ou du temps réel.
   useEffect(() => {
-    const unsubscribe = data.subscribe('events', refresh);
-    return unsubscribe;
+    const unsubscribeEvents = data.subscribe('events', refresh);
+    const unsubscribeTasks = data.subscribe('tasks', refresh);
+    return () => {
+      unsubscribeEvents();
+      unsubscribeTasks();
+    };
   }, [refresh]);
 
   const saveMutation = useMutation({
@@ -101,6 +108,15 @@ export function useCalendrier(): CalendrierResource {
     [birthdaysResource.rows, members],
   );
 
+  const tasks = useMemo<CalendarTask[]>(
+    () =>
+      tasksResource.rows.map((row) => {
+        const task = toTask(row);
+        return { id: task.id, name: task.name, dueDate: task.dueDate, status: task.status, isLate: task.isLate, lateDays: task.lateDays };
+      }),
+    [tasksResource.rows],
+  );
+
   const reminders = useMemo(() => {
     const map: Record<string, EventReminder> = {};
     (remindersQuery.data ?? []).forEach((row) => {
@@ -111,11 +127,12 @@ export function useCalendrier(): CalendrierResource {
 
   return {
     events,
+    tasks,
     birthdays,
     reminders,
-    isLoading: eventsResource.isLoading || birthdaysResource.isLoading,
-    isError: eventsResource.isError || birthdaysResource.isError,
-    error: eventsResource.error ?? birthdaysResource.error,
+    isLoading: eventsResource.isLoading || tasksResource.isLoading || birthdaysResource.isLoading,
+    isError: eventsResource.isError || tasksResource.isError || birthdaysResource.isError,
+    error: eventsResource.error ?? tasksResource.error ?? birthdaysResource.error,
     refetch: eventsResource.refetch,
     isMutating: saveMutation.isPending || removeMutation.isPending,
     saveEvent: (variables) => saveMutation.mutateAsync(variables),

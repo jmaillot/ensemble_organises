@@ -112,7 +112,7 @@ export function useAuthBootstrap() {
     }
 
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       const session = data.session;
       if (!session) {
@@ -120,7 +120,16 @@ export function useAuthBootstrap() {
         setReady(true);
         return;
       }
-      void applySession(session.user);
+      // La session ET le foyer sont posés avant le premier rendu : `setReady`
+      // sans attendre laissait `status` à `initialising` pendant que le
+      // routeur affichait déjà les routes, et la garde renvoyait vers
+      // `/connexion` un utilisateur pourtant connecté (rechargement).
+      // La session ET le foyer sont posés avant le premier rendu : `setReady`
+      // sans attendre laissait `status` à `initialising` pendant que le
+      // routeur affichait déjà les routes, et la garde renvoyait vers
+      // `/connexion` un utilisateur pourtant connecté (rechargement).
+      await applySession(session.user);
+      if (!active) return;
       setReady(true);
     });
 

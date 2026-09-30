@@ -7,7 +7,7 @@ import { ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useCalendarGrid } from '@/hooks/use-calendar';
 import { useFrenchHolidays } from '@/hooks/use-french-holidays';
-import { formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize } from '@/lib/utils';
+import { formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize, todayIso } from '@/lib/utils';
 import { CalendarGrid } from './components/calendar-grid';
 import { AgendaList } from './components/agenda-list';
 import { EventFormDialog } from './components/event-form-dialog';
@@ -20,7 +20,7 @@ const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.
 export default function CalendrierPage() {
   const toast = useToast();
   const navigate = useNavigate();
-  const { events, birthdays, reminders, isLoading, isError, error, refetch, isMutating, saveEvent, removeEvent } =
+  const { events, tasks, birthdays, reminders, isLoading, isError, error, refetch, isMutating, saveEvent, removeEvent } =
     useCalendrier();
   // Curseur calé sur le 1er du mois courant : la grille démarre bien le lundi.
   const today = new Date();
@@ -36,12 +36,12 @@ export default function CalendrierPage() {
   const selected = grid.selected;
 
   const agenda = useMemo(
-    () => buildAgenda(selected, { events, birthdays, holidays }),
-    [selected, events, birthdays, holidays],
+    () => buildAgenda(selected, { events, tasks, birthdays, holidays }),
+    [selected, events, tasks, birthdays, holidays],
   );
   const markers = useMemo(
-    () => buildDayMarkers(grid.days, { events, birthdays, holidays }),
-    [grid.days, events, birthdays, holidays],
+    () => buildDayMarkers(grid.days, { events, tasks, birthdays, holidays }, todayIso()),
+    [grid.days, events, tasks, birthdays, holidays],
   );
   const eventsThisMonth = useMemo(
     () => events.filter((event) => event.date.startsWith(`${grid.year}-${pad(grid.month + 1)}`)).length,
@@ -103,7 +103,7 @@ export default function CalendrierPage() {
           <Panel
             id="calendar-agenda-panel"
             title={titleCase(formatLongDate(selected))}
-            description="Les événements de cette journée."
+            description="Les événements et tâches de cette journée."
             action={<CountBadge value={agenda.length} label="éléments dans l’agenda" />}
           >
             <div aria-live="polite">
@@ -113,6 +113,7 @@ export default function CalendrierPage() {
                 isLoading={isLoading}
                 onEdit={openEdit}
                 onDelete={(event) => setPendingDelete(event)}
+                onOpenTask={() => navigate('/taches')}
               />
             </div>
             {isLoading ? null : (

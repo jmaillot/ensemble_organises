@@ -91,7 +91,11 @@ export async function getInviteTokenSummary(): Promise<InviteTokenSummary | null
       householdId: useHouseholdStore.getState().householdId ?? undefined,
     });
   }
-  const householdId = await currentHouseholdId();
+  // Même règle que la création : la session absente (démo, tests) retombe sur
+  // le foyer actif plutôt que sur aucun résumé.
+  const householdId = useSessionStore.getState().user
+    ? await currentHouseholdId()
+    : (useHouseholdStore.getState().householdId ?? null);
   if (!householdId) return null;
   const [token] = await data.list<HouseholdInviteTokenRow>('household_invite_tokens', { household_id: householdId });
   if (!token) return null;
@@ -121,6 +125,70 @@ export async function redeemInviteToken(token: string): Promise<string> {
 }
 
 export const inviteHeaders = (token: string) => ({ [INVITE_SECRET_HEADER]: token });
+
+/**
+ * Rappel local du dernier token généré sur cet appareil.
+ *
+ * Le serveur ne conserve que l'empreinte HMAC : le brut ne peut pas être
+ * relu ensuite. Pour éviter de régénérer un token à chaque visite du
+ * panneau, l'aperçu est conservé dans `localStorage`, scoped par foyer, et
+ * n'est réaffiché que si le résumé serveur désigne le même token encore
+ * actif (même foyer, même `createdAt`). Un autre appareil, un navigateur
+ * nettoyé ou un token régénéré ailleurs invalide le rappel : il faut alors
+ * générer un nouveau token, jamais le deviner.
+ */
+export interface RememberedInviteToken {
+  token: string;
+  householdId: string;
+  createdAt: string;
+}
+
+const REMEMBER_KEY = 'ensemble-organises-invite-token';
+
+export function rememberInviteToken(input: { token: string; householdId: string; createdAt: string }): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify(input));
+  } catch {
+    // Stockage plein ou refusé : le rappel est un confort, pas un requis.
+  }
+}
+
+export function recallInviteToken(): RememberedInviteToken | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RememberedInviteToken>;
+    if (typeof parsed.token !== 'string' || typeof parsed.householdId !== 'string' || typeof parsed.createdAt !== 'string') {
+      return null;
+    }
+    if (!parsed.token || !parsed.householdId || !parsed.createdAt) return null;
+    return { token: parsed.token, householdId: parsed.householdId, createdAt: parsed.createdAt };
+  } catch {
+    // Valeur corrompue : on l'ignore plutôt que de casser le panneau.
+    return null;
+  }
+}
+
+export function forgetInviteToken(): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    // Sans objet : le rappel est un confort, pas un requis.
+  }
+}
+
+/** Le rappel ne vaut que pour le token actif désigné par le résumé serveur. */
+export function isRecallValid(saved: RememberedInviteToken | null, summary: InviteTokenSummary | null): boolean {
+  if (!saved || !summary) return false;
+  return (
+    summary.isActive &&
+    summary.householdId === saved.householdId &&
+    summary.createdAt === saved.createdAt
+  );
+}
 
 async function currentHouseholdId() {
   const user = useSessionStore.getState().user;

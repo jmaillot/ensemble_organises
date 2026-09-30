@@ -150,13 +150,17 @@ export function CalendarGrid({
             >
               <span aria-hidden="true">{day.number}</span>
               {marker ? (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'absolute bottom-[7px] left-2 size-[5px] rounded-full',
-                    isToday ? 'bg-surface' : memberTagClass(marker.colorTag),
-                  )}
-                />
+                <span aria-hidden="true" className="absolute bottom-[7px] left-2 flex items-center gap-[3px]">
+                  <span
+                    className={cn(
+                      'size-[5px] rounded-full',
+                      isToday ? 'bg-surface' : memberTagClass(marker.colorTag),
+                    )}
+                  />
+                  {marker.hasTask ? (
+                    <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[oklch(55%_0.13_300)]')} />
+                  ) : null}
+                </span>
               ) : null}
             </button>
           );
@@ -175,6 +179,10 @@ export function CalendarGrid({
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="size-[6px] rounded-full bg-amber" />
           Jour férié
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="size-[6px] rounded-full bg-[oklch(55%_0.13_300)]" />
+          Tâche
         </span>
         <span className="basis-full text-[10px] text-muted sm:basis-auto">Maintenez une date pour créer un événement.</span>
       </div>

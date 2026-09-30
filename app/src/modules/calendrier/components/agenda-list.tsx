@@ -7,6 +7,7 @@ import type { AgendaItem, CalendarEvent } from '../types';
 /** Libellé français du type d'entrée d'agenda. */
 const chipClass: Record<AgendaItem['kind'], string> = {
   event: 'bg-accent-soft text-accent-strong',
+  tache: 'bg-[oklch(94%_0.05_300)] text-[oklch(48%_0.13_300)]',
   anniversaire: 'bg-accent-faint text-accent-strong',
   ferie: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
 };
@@ -17,10 +18,12 @@ export interface AgendaListProps {
   isLoading?: boolean;
   onEdit?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
+  /** Les tâches se gèrent dans leur module : simple navigation. */
+  onOpenTask?: () => void;
 }
 
-/** Journée sélectionnée : événements, anniversaires et jours fériés. */
-export function AgendaList({ date, items, isLoading = false, onEdit, onDelete }: AgendaListProps) {
+/** Journée sélectionnée : événements, tâches, anniversaires et jours fériés. */
+export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, onOpenTask }: AgendaListProps) {
   if (isLoading) return <LoadingRows rows={3} />;
 
   if (items.length === 0) {
@@ -63,6 +66,18 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete }:
               ) : null}
             </div>
           </div>
+          {item.kind === 'tache' && onOpenTask ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onOpenTask}
+                aria-label={`Ouvrir ${item.title} dans les tâches`}
+                className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+              >
+                <Icon name="arrow" size="sm" />
+              </button>
+            </div>
+          ) : null}
           {item.kind === 'event' && (onEdit || onDelete) ? (
             <div className="flex items-center gap-1.5">
               {onEdit ? (
