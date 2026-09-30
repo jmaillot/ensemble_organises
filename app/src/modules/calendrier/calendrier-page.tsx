@@ -117,11 +117,10 @@ export default function CalendrierPage() {
               />
             </div>
             {isLoading ? null : (
-              <div className="mt-4 grid gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 <Button
                   variant="secondary"
                   icon="plus"
-                  fullWidth
                   onClick={() => openCreate(selected)}
                 >
                   Ajouter un événement
@@ -129,7 +128,6 @@ export default function CalendrierPage() {
                 <Button
                   variant="secondary"
                   icon="plus"
-                  fullWidth
                   onClick={() => navigate('/taches', { state: { dueDate: selected } })}
                 >
                   Ajouter une tâche
