@@ -88,12 +88,12 @@ begin
     ' values (%L, %L, ''membre'', %L, 5.00)',
     private.new_id('expense-participant'), cinema, lina_m));
 
-  -- Un participant externe est refusé sur une dépense (0038 : partage entre
-  -- membres uniquement), quel que soit son foyer de rattachement.
+  -- Part externe : refusée depuis 0038, colonne purgée en 0039 — le type
+  -- lui-même viole la contrainte, quel que soit le foyer de rattachement.
   perform testkit.expect_denied(format(
-    'insert into public.expense_participants (id, expense_id, participant_type, external_participant_id, share_amount)'
+    'insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)'
     ' values (%L, %L, ''externe'', %L, 10.00)',
-    private.new_id('expense-participant'), cinema, private.new_id('external')),
+    private.new_id('expense-participant'), cinema, lina_m),
     'un participant externe ne peut pas partager une dépense');
 
   -- Un membre ne peut pas être à la fois `membre` et `externe`.

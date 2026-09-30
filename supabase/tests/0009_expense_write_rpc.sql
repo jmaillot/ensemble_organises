@@ -127,14 +127,14 @@ begin
     perform testkit.ok(sqlerrm like '%introuvable%', 'le refus dit l''absence : ' || sqlerrm);
   end;
 
-  -- Part externe : refusée depuis 0038, même rattachée au foyer.
+  -- Part externe : refusée (membres uniquement depuis 0039).
   begin
     perform public.create_expense(home, 'Avec un ami', 20.00, alice_m, current_date, 'egal',
       jsonb_build_array(
         jsonb_build_object('participant_type', 'externe', 'member_id', null, 'external_participant_id', 'external_x', 'share_amount', 20)));
     perform testkit.ok(false, 'une part externe doit être refusée par le RPC');
   exception when others then
-    perform testkit.ok(sqlerrm like '%ne sont plus acceptés%', 'le refus dit l''exclusion : ' || sqlerrm);
+    perform testkit.ok(sqlerrm like '%seuls les membres%', 'le refus dit l''exclusion : ' || sqlerrm);
   end;
 end;
 $$;

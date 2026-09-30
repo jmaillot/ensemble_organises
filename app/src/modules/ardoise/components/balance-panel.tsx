@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/primitives';
 import { Panel } from '@/components/shared/module-shell';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { formatEuro } from '@/lib/utils';
@@ -66,7 +65,6 @@ export function MemberBalances({ balances, source = 'local' }: MemberBalancesPro
                   className={`size-2 shrink-0 rounded-full ${balance.colorTag ? memberTagClass(balance.colorTag) : 'bg-muted'}`}
                 />
                 {balance.name}
-                {balance.kind === 'externe' ? <Badge tone="muted">externe</Badge> : null}
               </span>
               <strong
                 className={

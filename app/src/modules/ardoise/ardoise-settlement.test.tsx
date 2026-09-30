@@ -54,21 +54,20 @@ describe('ArdoisePage — soldes serveur', () => {
     mockInvoke.mockReset();
   });
 
-  it('affiche les soldes et transferts du serveur, externes locaux conservés', async () => {
+  it('affiche les soldes et transferts du serveur', async () => {
     mockInvoke.mockResolvedValueOnce({ data: serverPayload, error: null });
     renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
 
     expect(mockInvoke).toHaveBeenCalledWith('expense-settlement', { body: { household_id: DEMO_HOUSEHOLD_ID } });
     expect(await screen.findByText('Soldes calculés côté serveur.')).toBeInTheDocument();
-    // Le snapshot local (externes) peut arriver après le serveur : attendre.
+    // Le snapshot local peut arriver après le serveur : attendre.
     await screen.findByText('Courses du samedi');
 
     // Soldes serveur, pas calcul local (Thomas local ≈ +19,98, serveur −50).
     expect(rowText(`balance-row-membre:${DEMO_MEMBERS.thomas}`)).toContain(plain(formatEuro(-50)));
     expect(rowText(`balance-row-membre:${DEMO_MEMBERS.camille}`)).toContain(plain(formatEuro(100)));
-    // Enfant exclu comme dans les graines locales, externe conservé.
+    // Enfant exclu comme dans les graines locales.
     expect(screen.queryByTestId(`balance-row-membre:${DEMO_MEMBERS.noe}`)).toBeNull();
-    expect(screen.getByTestId('balance-row-externe:external-1')).toBeInTheDocument();
 
     // Transfert serveur proposé tel quel.
     expect(await screen.findByRole('button', { name: 'Copier le règlement : Thomas Martin vers Camille Martin' })).toBeInTheDocument();
@@ -80,6 +79,5 @@ describe('ArdoisePage — soldes serveur', () => {
 
     expect(await screen.findByText('Calcul automatique à chaque ajout.')).toBeInTheDocument();
     await screen.findByText('Courses du samedi');
-    expect(screen.getByTestId('balance-row-externe:external-1')).toBeInTheDocument();
   });
 });

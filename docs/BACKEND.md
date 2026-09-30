@@ -1032,9 +1032,8 @@ inaccessibles au client (`service_role` uniquement) :
 L'intégrité de la répartition est garantie par le schéma et par la base, pas par
 le client :
 
-* `expense_participants` impose `membre` ⇒ `member_id` rempli et
-  `external_participant_id` nul, et l'inverse pour `externe` (contrainte de
-  forme, inchangée) ;
+* `expense_participants` impose `participant_type = 'membre'` avec `member_id`
+  rempli (contrainte `expense_participants_kind_check`, migration 0039) ;
 * depuis la migration 0038, les parts `externe` sont **refusées** : le RPC
   comme le déclencheur `validate_expense_participant` n'acceptent que des
   membres du foyer — les lignes existantes restent lisibles, aucune nouvelle

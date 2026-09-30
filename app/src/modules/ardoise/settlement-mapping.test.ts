@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { HouseholdMemberRow } from '@/types';
 import { fetchServerSettlement, toServerBalances, toServerSettlements, type ServerSettlement } from './api';
-import { externalKey, externalSettlements, memberKey, type Balance } from './types';
+import { memberKey } from './types';
 
 const members = [
   { id: 'm-camille', display_name: 'Camille Martin', color_tag: 'accent', role: 'admin' },
@@ -54,21 +54,6 @@ describe('toServerSettlements', () => {
         amount: 25.5,
       },
     ]);
-  });
-});
-
-describe('externalSettlements', () => {
-  const camille: Balance = { key: memberKey('m-camille'), kind: 'membre', name: 'Camille', colorTag: 'accent', amount: 17 };
-  const julie: Balance = { key: externalKey('external-1'), kind: 'externe', name: 'Julie', colorTag: null, amount: -17 };
-
-  it('ne garde que les jambes impliquant un externe', () => {
-    const legs = externalSettlements([camille, julie]);
-    expect(legs).toHaveLength(1);
-    expect(legs[0]).toMatchObject({ fromName: 'Julie', toName: 'Camille', amount: 17 });
-  });
-
-  it('rend une liste vide quand le serveur suffit', () => {
-    expect(externalSettlements([camille, { ...julie, key: memberKey('m-thomas'), kind: 'membre', amount: -17 }])).toEqual([]);
   });
 });
 

@@ -21,11 +21,12 @@ const input = {
 };
 
 describe('expensePartsPayload', () => {
-  it('respecte la contrainte membre/externe de la base', () => {
-    expect(expensePartsPayload(['membre:a', 'externe:e'], [15, 15])).toEqual([
-      { participant_type: 'membre', member_id: 'a', external_participant_id: null, share_amount: 15 },
-      { participant_type: 'externe', member_id: null, external_participant_id: 'e', share_amount: 15 },
+  it('ne mappe que des membres et refuse les externes', () => {
+    expect(expensePartsPayload(['membre:a', 'membre:b'], [15, 15])).toEqual([
+      { participant_type: 'membre', member_id: 'a', share_amount: 15 },
+      { participant_type: 'membre', member_id: 'b', share_amount: 15 },
     ]);
+    expect(() => expensePartsPayload(['membre:a', 'externe:e'], [15, 15])).toThrow('ne sont plus acceptés');
   });
 });
 
@@ -42,8 +43,8 @@ describe('createExpense par RPC', () => {
       p_expense_date: '2026-09-30',
       p_split_type: 'egal',
       p_parts: [
-        { participant_type: 'membre', member_id: 'alice', external_participant_id: null, share_amount: 15 },
-        { participant_type: 'membre', member_id: 'bob', external_participant_id: null, share_amount: 15 },
+        { participant_type: 'membre', member_id: 'alice', share_amount: 15 },
+        { participant_type: 'membre', member_id: 'bob', share_amount: 15 },
       ],
     });
   });

@@ -7,15 +7,12 @@ import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot, t
 import { ardoiseKeys, useServerSettlement } from './use-settlement';
 import {
   computeBalances,
-  externalKey,
-  externalSettlements,
   memberKey,
   roundCents,
   simplifyDebts,
   toExpense,
   type Balance,
   type Expense,
-  type ExternalParticipant,
   type InvitationInput,
   type MemberOption,
   type NewExpenseInput,
@@ -34,7 +31,6 @@ export interface ArdoiseData {
   /** `serveur` quand `expense-settlement` répond, `local` sinon (démo, hors ligne, erreur). */
   settlementSource: 'serveur' | 'local';
   sharingMembers: MemberOption[];
-  externalParticipants: ExternalParticipant[];
   currentMember: HouseholdMemberRow | null;
   total: number;
   monthTotal: number;
@@ -57,12 +53,6 @@ export function useArdoise(): ArdoiseData {
     queryFn: () => fetchArdoiseSnapshot(householdId as string),
   });
 
-  const externalParticipants = useMemo<ExternalParticipant[]>(
-    () =>
-      (query.data?.externalParticipants ?? []).map((row) => ({ id: row.id, name: row.name, contact: row.contact })),
-    [query.data],
-  );
-
   const memberOptions = useMemo<MemberOption[]>(
     () => members.map((member) => ({ id: member.id, name: member.display_name, colorTag: member.color_tag, role: member.role })),
     [members],
@@ -72,10 +62,8 @@ export function useArdoise(): ArdoiseData {
   const resolver = useMemo<ParticipantResolver>(() => {
     const memberIndex = new Map<string, { name: string; colorTag: MemberColorTag | null }>();
     members.forEach((member) => memberIndex.set(member.id, { name: member.display_name, colorTag: member.color_tag }));
-    const externalIndex = new Map<string, { name: string; colorTag: null }>();
-    externalParticipants.forEach((participant) => externalIndex.set(participant.id, { name: participant.name, colorTag: null }));
-    return (kind, id) => (kind === 'membre' ? (memberIndex.get(id) ?? null) : (externalIndex.get(id) ?? null));
-  }, [externalParticipants, members]);
+    return (kind, id) => (kind === 'membre' ? (memberIndex.get(id) ?? null) : null);
+  }, [members]);
 
   const expenses = useMemo<Expense[]>(() => {
     const snapshot = query.data;
@@ -91,31 +79,20 @@ export function useArdoise(): ArdoiseData {
         key: memberKey(member.id),
         kind: 'membre',
         memberId: member.id,
-        externalParticipantId: null,
         name: member.name,
         colorTag: member.colorTag,
         shareAmount: 0,
       })),
-      ...externalParticipants.map<Participant>((participant) => ({
-        key: externalKey(participant.id),
-        kind: 'externe',
-        memberId: null,
-        externalParticipantId: participant.id,
-        name: participant.name,
-        colorTag: null,
-        shareAmount: 0,
-      })),
     ],
-    [externalParticipants, sharers],
+    [sharers],
   );
 
   const balances = useMemo(() => computeBalances(expenses, seeds), [expenses, seeds]);
   const localSettlements = useMemo(() => simplifyDebts(balances), [balances]);
 
-  // Référence serveur quand elle répond : les soldes membres et leurs
-  // transferts viennent de la base, les externes restent calculés localement
-  // (le serveur les ignore). Sinon, calcul local intégral — démo, hors ligne,
-  // ou fonction injoignable : jamais un écran d'erreur pour des soldes.
+  // Référence serveur quand elle répond, calcul local intégral sinon — démo,
+  // hors ligne, ou fonction injoignable : jamais un écran d'erreur pour des
+  // soldes.
   const settlementQuery = useServerSettlement(householdId);
   const serverPayload = settlementQuery.data ?? null;
 
@@ -125,23 +102,16 @@ export function useArdoise(): ArdoiseData {
     }
   }, [settlementQuery.isError, settlementQuery.error]);
 
-  const externalBalances = useMemo(
-    () => computeBalances(expenses, seeds.filter((seed) => seed.kind === 'externe')),
-    [expenses, seeds],
-  );
-
   const { displayBalances, displaySettlements, settlementSource } = useMemo(() => {
     if (!serverPayload) {
       return { displayBalances: balances, displaySettlements: localSettlements, settlementSource: 'local' as const };
     }
-    const memberBalances = toServerBalances(serverPayload, members);
-    const combined = [...memberBalances, ...externalBalances];
     return {
-      displayBalances: combined,
-      displaySettlements: [...toServerSettlements(serverPayload), ...externalSettlements(combined)],
+      displayBalances: toServerBalances(serverPayload, members),
+      displaySettlements: toServerSettlements(serverPayload),
       settlementSource: 'serveur' as const,
     };
-  }, [serverPayload, balances, localSettlements, members, externalBalances]);
+  }, [serverPayload, balances, localSettlements, members]);
 
   const total = useMemo(() => roundCents(expenses.reduce((sum, expense) => sum + expense.amount, 0)), [expenses]);
   const monthTotal = useMemo(() => {
@@ -155,7 +125,6 @@ export function useArdoise(): ArdoiseData {
     settlements: displaySettlements,
     settlementSource,
     sharingMembers: sharers,
-    externalParticipants,
     currentMember,
     total,
     monthTotal,

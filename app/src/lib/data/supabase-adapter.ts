@@ -26,7 +26,6 @@ const HOUSEHOLD_SCOPED = new Set([
   'recipes',
   'expenses',
   'expense_participants',
-  'external_participants',
   'gift_lists',
   'gift_items',
   'gift_list_shares',

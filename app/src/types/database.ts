@@ -222,19 +222,11 @@ export interface ExpenseRow {
   created_at: IsoDateTime;
 }
 
-export interface ExternalParticipantRow {
-  id: Uuid;
-  household_id: Uuid;
-  name: string;
-  contact: string | null;
-}
-
 export interface ExpenseParticipantRow {
   id: Uuid;
   expense_id: Uuid;
-  participant_type: 'membre' | 'externe';
-  member_id: Uuid | null;
-  external_participant_id: Uuid | null;
+  participant_type: 'membre';
+  member_id: Uuid;
   share_amount: number;
 }
 

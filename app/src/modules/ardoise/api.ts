@@ -1,8 +1,7 @@
 import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import type { ExpenseParticipantRow, ExpenseRow, ExternalParticipantRow, HouseholdMemberRow, InvitationRow } from '@/types';
+import type { ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, InvitationRow } from '@/types';
 import {
-  EXTERNAL_KEY_PREFIX,
   MEMBER_KEY_PREFIX,
   memberKey,
   normalizeShares,
@@ -21,7 +20,6 @@ import {
 export interface ArdoiseSnapshot {
   expenses: ExpenseRow[];
   participants: ExpenseParticipantRow[];
-  externalParticipants: ExternalParticipantRow[];
 }
 
 /** Les dépenses ne se partagent qu'entre membres (décision 0038, même message que le serveur). */
@@ -31,12 +29,11 @@ function assertMembersOnly(participants: string[]): void {
   }
 }
 export async function fetchArdoiseSnapshot(householdId: string): Promise<ArdoiseSnapshot> {
-  const [expenses, participants, externalParticipants] = await Promise.all([
+  const [expenses, participants] = await Promise.all([
     data.list<ExpenseRow>('expenses', { household_id: householdId }),
     data.list<ExpenseParticipantRow>('expense_participants', {}),
-    data.list<ExternalParticipantRow>('external_participants', { household_id: householdId }),
   ]);
-  return { expenses, participants, externalParticipants };
+  return { expenses, participants };
 }
 
 /**
@@ -81,13 +78,10 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
 
   try {
     for (const [index, key] of input.participants.entries()) {
-      const isMember = key.startsWith(MEMBER_KEY_PREFIX);
-      // Contrainte SQL : `membre` ⇒ member_id renseigné, `externe` l'inverse.
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expense.id,
-        participant_type: isMember ? 'membre' : 'externe',
-        member_id: isMember ? key.slice(MEMBER_KEY_PREFIX.length) : null,
-        external_participant_id: isMember ? null : key.slice(EXTERNAL_KEY_PREFIX.length),
+        participant_type: 'membre',
+        member_id: key.slice(MEMBER_KEY_PREFIX.length),
         share_amount: roundCents(shares[index] ?? 0),
       });
     }
@@ -148,12 +142,10 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
   try {
     await Promise.all(oldParts.map((participant) => data.remove('expense_participants', participant.id)));
     for (const [index, key] of input.participants.entries()) {
-      const isMember = key.startsWith(MEMBER_KEY_PREFIX);
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expenseId,
-        participant_type: isMember ? 'membre' : 'externe',
-        member_id: isMember ? key.slice(MEMBER_KEY_PREFIX.length) : null,
-        external_participant_id: isMember ? null : key.slice(EXTERNAL_KEY_PREFIX.length),
+        participant_type: 'membre',
+        member_id: key.slice(MEMBER_KEY_PREFIX.length),
         share_amount: roundCents(shares[index] ?? 0),
       });
     }
@@ -182,7 +174,6 @@ async function restoreExpense(old: ExpenseRow, oldParts: ExpenseParticipantRow[]
         expense_id: part.expense_id,
         participant_type: part.participant_type,
         member_id: part.member_id,
-        external_participant_id: part.external_participant_id,
         share_amount: part.share_amount,
       })
       .catch(() => undefined);
@@ -190,16 +181,17 @@ async function restoreExpense(old: ExpenseRow, oldParts: ExpenseParticipantRow[]
 }
 
 /**
- * Parts au format du RPC : même contrainte SQL qu'en base (`membre` exige
- * `member_id`, `externe` l'inverse), vérifiée par la fonction avant écriture.
+ * Parts au format du RPC : membres du foyer uniquement (externes purgés,
+ * 0039), vérifiées par la fonction avant écriture.
  */
 export function expensePartsPayload(keys: string[], shares: number[]) {
   return keys.map((key, index) => {
-    const isMember = key.startsWith(MEMBER_KEY_PREFIX);
+    if (!key.startsWith(MEMBER_KEY_PREFIX)) {
+      throw new Error('Les participants externes ne sont plus acceptés sur une dépense : partagez entre membres du foyer.');
+    }
     return {
-      participant_type: isMember ? 'membre' : 'externe',
-      member_id: isMember ? key.slice(MEMBER_KEY_PREFIX.length) : null,
-      external_participant_id: isMember ? null : key.slice(EXTERNAL_KEY_PREFIX.length),
+      participant_type: 'membre',
+      member_id: key.slice(MEMBER_KEY_PREFIX.length),
       share_amount: roundCents(shares[index] ?? 0),
     };
   });
@@ -272,9 +264,7 @@ export async function createInvitation(householdId: string, input: InvitationInp
 
 /**
  * Contrat de réponse de `expense-settlement` (montants au centime, solde
- * positif = le foyer doit au membre). Membres uniquement : le serveur ignore
- * les participants externes, qui restent calculés localement (voir
- * `externalSettlements` dans `types.ts`).
+ * positif = le foyer doit au membre). Membres du foyer uniquement.
  */
 export interface ServerSettlement {
   household_id: string;

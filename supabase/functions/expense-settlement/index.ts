@@ -15,8 +15,7 @@
  *   `public.expense_settlement()` (migration 0013). C'est la référence que le
  *   client affiche quand il est connecté (`useServerSettlement`) ; le calcul
  *   local de `app/src/modules/ardoise/types.ts` ne sert que de repli (démo,
- *   hors ligne, fonction injoignable) et pour les participants externes, que
- *   le serveur ignore.
+ *   hors ligne, fonction injoignable).
  *
  * CONTRAT DE RÉPONSE
  *   {

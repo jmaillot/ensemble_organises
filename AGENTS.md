@@ -446,8 +446,7 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 
 ### Ardoise
 - `expenses` (id, household_id, title, amount, paid_by member_id, expense_date, split_type [égal/personnalisé])
-- `expense_participants` (id, expense_id, participant_type [membre/externe], member_id nullable, external_participant_id nullable, share_amount) — contrainte SQL : `membre` exige `member_id` non nul et `external_participant_id` nul; `externe` exige l'inverse. Les deux références sont validées dans le même foyer.
-- `external_participants` (id, household_id, name, contact) — participant externe aux membres du foyer, mais toujours rattaché au même `household_id`
+- `expense_participants` (id, expense_id, participant_type [`membre`], member_id, share_amount) — les dépenses se partagent entre membres du foyer uniquement (externes purgés, migration 0039).
 - Solde calculé côté serveur (vue SQL ou Edge Function) : qui doit combien à qui, simplifié (algorithme de compensation des dettes)
 
 ### Cadeaux

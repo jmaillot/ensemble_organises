@@ -3,24 +3,21 @@ import type { ExpenseParticipantRow, ExpenseRow, MemberColorTag } from '@/types'
 /** Type de partage porté par `expenses.split_type`. */
 export type SplitType = 'egal' | 'personnalise';
 
-/** Nature d'un participant : membre du foyer ou participant externe. */
-export type ParticipantKind = 'membre' | 'externe';
+/** Nature d'un participant : toujours un membre du foyer (externes purgés, 0039). */
+export type ParticipantKind = 'membre';
 
 export const MEMBER_KEY_PREFIX = 'membre:';
-export const EXTERNAL_KEY_PREFIX = 'externe:';
 
 export const memberKey = (id: string) => `${MEMBER_KEY_PREFIX}${id}`;
-export const externalKey = (id: string) => `${EXTERNAL_KEY_PREFIX}${id}`;
 
-/** Résolution d'un `member_id` / `external_participant_id` en libellé. */
+/** Résolution d'un `member_id` en libellé. */
 export type ParticipantResolver = (kind: ParticipantKind, id: string) => { name: string; colorTag: MemberColorTag | null } | null;
 
 export interface Participant {
-  /** `membre:<id>` ou `externe:<id>` : clé stable d'un participant. */
+  /** `membre:<id>` : clé stable d'un participant. */
   key: string;
   kind: ParticipantKind;
-  memberId: string | null;
-  externalParticipantId: string | null;
+  memberId: string;
   name: string;
   colorTag: MemberColorTag | null;
   shareAmount: number;
@@ -36,12 +33,6 @@ export interface Expense {
   date: string;
   splitType: SplitType;
   participants: Participant[];
-}
-
-export interface ExternalParticipant {
-  id: string;
-  name: string;
-  contact: string | null;
 }
 
 export interface MemberOption {
@@ -134,16 +125,14 @@ export function toExpense(
     date: row.expense_date,
     splitType: row.split_type === 'personnalise' ? 'personnalise' : 'egal',
     participants: participants
-      .filter((participant) => participant.expense_id === row.id)
+      .filter((participant) => participant.expense_id === row.id && participant.participant_type === 'membre')
       .map((participant) => {
-        const isMember = participant.participant_type === 'membre';
-        const id = isMember ? participant.member_id : participant.external_participant_id;
-        const resolved = id ? resolve(isMember ? 'membre' : 'externe', id) : null;
+        const id = participant.member_id;
+        const resolved = id ? resolve('membre', id) : null;
         return {
-          key: isMember ? memberKey(id ?? '') : externalKey(id ?? ''),
-          kind: isMember ? 'membre' : 'externe',
-          memberId: isMember ? participant.member_id : null,
-          externalParticipantId: isMember ? null : participant.external_participant_id,
+          key: memberKey(id ?? ''),
+          kind: 'membre',
+          memberId: participant.member_id,
           name: resolved?.name ?? 'Participant',
           colorTag: resolved?.colorTag ?? null,
           shareAmount: Number(participant.share_amount) || 0,
@@ -154,7 +143,7 @@ export function toExpense(
 
 /**
  * Solde de chaque participant : ce qu'il a avancé moins sa part.
- * Les participants externes sont conservés pour que la somme reste nulle.
+ * La somme des soldes est nulle : seuls des membres partagent (0039).
  */
 export function computeBalances(expenses: Expense[], seeds: Participant[]): Balance[] {
   const totals = new Map<string, number>();
@@ -211,15 +200,4 @@ export function simplifyDebts(balances: Balance[]): Settlement[] {
     if (debtor.amount < 0.005) debtorIndex += 1;
   }
   return settlements;
-}
-
-/**
- * Jambes impliquant un participant externe. Le serveur ne produit que des
- * transferts entre membres : quand les soldes membres viennent du serveur,
- * ces jambes sont le complément local qui évite de perdre les dettes des
- * externes. Les jambes entre membres sont écartées (référence serveur).
- */
-export function externalSettlements(balances: Balance[]): Settlement[] {
-  const isExternal = (key: string) => key.startsWith(EXTERNAL_KEY_PREFIX);
-  return simplifyDebts(balances).filter((settlement) => isExternal(settlement.fromKey) || isExternal(settlement.toKey));
 }

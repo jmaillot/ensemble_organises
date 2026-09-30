@@ -8,8 +8,8 @@ import ArdoisePage from './ardoise-page';
 
 /** Total des quatre dépenses du foyer de démonstration. */
 const seedTotal = 84.5 + 62.3 + 8.5 + 34;
-/** Thomas : (essence 62,30 − sa part 31,15) + (cinéma 34,00 − sa part 17,00) − part des courses. */
-const seedThomas = 62.3 - 31.15 + 34 - 17 - 28.17;
+/** Thomas : (essence 62,30 − sa part 31,15) + cinéma 34,00 entièrement pour lui − part des courses. */
+const seedThomas = 62.3 - 31.15 + 34 - 34 - 28.17;
 /** Camille : courses 84,50 − sa part 28,17 − part de l'essence. */
 const seedCamille = 84.5 - 28.17 - 31.15;
 

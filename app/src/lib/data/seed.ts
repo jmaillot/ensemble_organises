@@ -8,7 +8,6 @@ import type {
   EventRow,
   ExpenseParticipantRow,
   ExpenseRow,
-  ExternalParticipantRow,
   GiftItemRow,
   GiftListRow,
   GiftListShareRow,
@@ -422,19 +421,14 @@ export const demoExpenses: ExpenseRow[] = [
   },
 ];
 
-export const demoExternalParticipants: ExternalParticipantRow[] = [
-  { id: 'external-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Julie (voisine)', contact: '06 12 34 56 78' },
-];
-
 export const demoExpenseParticipants: ExpenseParticipantRow[] = [
-  { id: 'ep-1', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, external_participant_id: null, share_amount: 28.17 },
-  { id: 'ep-2', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, external_participant_id: null, share_amount: 28.17 },
-  { id: 'ep-3', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.lina, external_participant_id: null, share_amount: 28.16 },
-  { id: 'ep-4', expense_id: 'expense-2', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, external_participant_id: null, share_amount: 31.15 },
-  { id: 'ep-5', expense_id: 'expense-2', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, external_participant_id: null, share_amount: 31.15 },
-  { id: 'ep-6', expense_id: 'expense-3', participant_type: 'membre', member_id: DEMO_MEMBERS.lina, external_participant_id: null, share_amount: 8.5 },
-  { id: 'ep-7', expense_id: 'expense-4', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, external_participant_id: null, share_amount: 17 },
-  { id: 'ep-8', expense_id: 'expense-4', participant_type: 'externe', member_id: null, external_participant_id: 'external-1', share_amount: 17 },
+  { id: 'ep-1', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, share_amount: 28.17 },
+  { id: 'ep-2', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, share_amount: 28.17 },
+  { id: 'ep-3', expense_id: 'expense-1', participant_type: 'membre', member_id: DEMO_MEMBERS.lina, share_amount: 28.16 },
+  { id: 'ep-4', expense_id: 'expense-2', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, share_amount: 31.15 },
+  { id: 'ep-5', expense_id: 'expense-2', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, share_amount: 31.15 },
+  { id: 'ep-6', expense_id: 'expense-3', participant_type: 'membre', member_id: DEMO_MEMBERS.lina, share_amount: 8.5 },
+  { id: 'ep-7', expense_id: 'expense-4', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, share_amount: 34 },
 ];
 
 export const demoGiftLists: GiftListRow[] = [
@@ -848,7 +842,6 @@ const seedTables: Record<string, Row[]> = {
   routine_completions: demoRoutineCompletions as unknown as Row[],
   recipes: demoRecipes as unknown as Row[],
   expenses: demoExpenses as unknown as Row[],
-  external_participants: demoExternalParticipants as unknown as Row[],
   expense_participants: demoExpenseParticipants as unknown as Row[],
   gift_lists: demoGiftLists as unknown as Row[],
   gift_items: demoGiftItems as unknown as Row[],
