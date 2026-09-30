@@ -65,7 +65,7 @@ export default function CalendrierPage() {
           <Button icon="plus" onClick={() => openCreate(selected)}>
             Ajouter un événement
           </Button>
-          <Button variant="secondary" icon="checkCircle" onClick={() => navigate('/taches', { state: { dueDate: selected } })}>
+          <Button icon="checkCircle" onClick={() => navigate('/taches', { state: { dueDate: selected } })}>
             Ajouter une tâche
           </Button>
         </>
