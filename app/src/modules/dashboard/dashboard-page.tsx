@@ -109,7 +109,6 @@ export default function DashboardPage() {
   };
 
   const openTasks = dashboard.openTasks;
-  const dueToday = openTasks.filter((task) => task.due_date === new Date().toISOString().slice(0, 10));
   const nextEvent = dashboard.nextEvent;
 
   return (
@@ -147,16 +146,33 @@ export default function DashboardPage() {
           <h2 className="mb-1.5 text-xl tracking-[-0.02em]">
             {openTasks.length === 0
               ? 'Le foyer est à jour, profitez-en.'
-              : dueToday.length > 0
-                ? `${dueToday.length} échéance${dueToday.length > 1 ? 's' : ''} à garder en tête.`
+              : dashboard.todayItems.length > 0
+                ? `${dashboard.todayItems.length} point${dashboard.todayItems.length > 1 ? 's' : ''} à garder en tête.`
                 : `${openTasks.length} tâche${openTasks.length > 1 ? 's' : ''} en attente.`}
           </h2>
-          <p className="m-0 text-[13px] text-ink-soft">
-            {nextEvent
-              ? `Le rendez-vous de ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))} approche.`
-              : 'Aucune échéance aujourd’hui : la journée est à vous.'}{' '}
-            Les courses, elles, sont presque prêtes.
-          </p>
+          {dashboard.todayItems.length === 0 ? (
+            <p className="m-0 text-[13px] text-ink-soft">
+              {nextEvent
+                ? `Le rendez-vous de ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))} approche.`
+                : 'Aucune échéance aujourd’hui : la journée est à vous.'}{' '}
+              Les courses, elles, sont presque prêtes.
+            </p>
+          ) : (
+            <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Programme du jour">
+              {dashboard.todayItems.slice(0, 5).map((item) => (
+                <li key={item.id} className="flex items-baseline gap-2 text-[13px] text-ink-soft">
+                  <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
+                  <span className="min-w-0 truncate">
+                    <strong className="font-semibold text-fg">{item.title}</strong>
+                    <span> · {item.detail}</span>
+                  </span>
+                </li>
+              ))}
+              {dashboard.todayItems.length > 5 ? (
+                <li className="text-[12px] text-muted">…et {dashboard.todayItems.length - 5} autre{dashboard.todayItems.length - 5 > 1 ? 's' : ''}.</li>
+              ) : null}
+            </ul>
+          )}
         </div>
         <div className="relative z-1 mt-0 min-w-[132px] border-l-0 border-t border-accent/25 pt-3.5 pl-0 min-[650px]:mt-0 min-[650px]:border-t-0 min-[650px]:border-l min-[650px]:pt-0 min-[650px]:pl-5">
           <span className="block text-[11px] text-muted">Prochain rendez-vous</span>

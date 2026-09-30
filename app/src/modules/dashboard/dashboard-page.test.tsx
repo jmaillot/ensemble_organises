@@ -66,6 +66,10 @@ describe('Accueil — rendu', () => {
     expect(within(screen.getByRole('article', { name: 'Widget Calendrier' })).getByText(/septembre/)).toBeInTheDocument();
     // Service simulé injoignable : le widget météo affiche son état d'erreur.
     expect(await within(screen.getByRole('article', { name: 'Widget Météo' })).findByText(/vérifiez la connexion/)).toBeInTheDocument();
+    // Le point du jour liste le programme : retards, échéances et horaires.
+    const programme = screen.getByRole('list', { name: 'Programme du jour' });
+    expect(within(programme).getByText(/Rendez-vous chez le médecin/)).toBeInTheDocument();
+    expect(within(programme).getByText(/À 19:30/)).toBeInTheDocument();
   });
 
   it('propose les seize espaces du foyer dans la grille', async () => {

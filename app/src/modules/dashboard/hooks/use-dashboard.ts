@@ -42,6 +42,8 @@ export interface DashboardData {
   /* Météo */
   city: string;
   setCity: (city: string) => void;
+  /* Point du jour : tout ce qui est planifié aujourd'hui, avec horaires. */
+  todayItems: TodayItem[];
   /* Activité */
   activity: ActivityEntry[];
   /* Ardoise */
@@ -52,6 +54,15 @@ export interface DashboardData {
   };
   nextEvent: ReturnType<typeof nextEventOfDay>;
   nextShopping: { title: string; iso: string; relative: string } | null;
+}
+
+export interface TodayItem {
+  id: string;
+  kind: 'tache-retard' | 'tache' | 'evenement';
+  /** Heure locale HH:MM, ou null (retard, journée entière). */
+  time: string | null;
+  title: string;
+  detail: string;
 }
 
 export interface ActivityEntry {
@@ -158,6 +169,8 @@ export function useDashboard(): DashboardData {
         .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')),
     [tasks.rows],
   );
+
+  const todayItems = useMemo(() => buildTodayItems(tasks.rows, events.rows), [tasks.rows, events.rows]);
 
   const upcomingBirthdays = useMemo(() => {
     const today = todayIso();
@@ -290,6 +303,7 @@ export function useDashboard(): DashboardData {
     routineProgress,
     city,
     setCity,
+    todayItems,
     activity,
     board,
     nextEvent,
@@ -318,6 +332,44 @@ function relativeWhen(iso: string) {
   const hours = Math.round(deltaMinutes / 60);
   if (hours < 24) return new Date(Date.now() - hours * 3_600_000).toISOString();
   return new Date(Date.now() - hours * 3_600_000).toISOString();
+}
+
+/**
+ * Tout ce qui est planifié à la date du jour : tâches en retard, tâches dues
+ * aujourd'hui, événements du jour avec leur horaire. Triés retards d'abord,
+ * puis par heure (les journées entières en dernier).
+ */
+export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], today: string = todayIso()): TodayItem[] {
+  const items: TodayItem[] = [];
+  for (const task of taskRows) {
+    if (task.status === 'fait' || !task.due_date) continue;
+    if (task.due_date < today) {
+      items.push({
+        id: `task-${task.id}`,
+        kind: 'tache-retard',
+        time: null,
+        title: task.name,
+        detail: `En retard depuis le ${task.due_date.split('-').reverse().join('/')}`,
+      });
+    } else if (task.due_date === today) {
+      items.push({ id: `task-${task.id}`, kind: 'tache', time: null, title: task.name, detail: 'Échéance aujourd’hui' });
+    }
+  }
+  for (const event of eventRows) {
+    if (toIsoDate(toLocalDate(event.start_at)) !== today) continue;
+    const time = event.all_day
+      ? null
+      : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(toLocalDate(event.start_at));
+    items.push({
+      id: `event-${event.id}`,
+      kind: 'evenement',
+      time,
+      title: event.title,
+      detail: event.all_day ? 'Toute la journée' : `À ${time}`,
+    });
+  }
+  const rank = (item: TodayItem) => (item.kind === 'tache-retard' ? 0 : item.time ? 1 : 2);
+  return items.sort((a, b) => rank(a) - rank(b) || (a.time ?? '').localeCompare(b.time ?? ''));
 }
 
 /**
