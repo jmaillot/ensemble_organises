@@ -160,9 +160,9 @@ $$;
 
 reset role;
 
--- Soldes et remplacement des parts, en propriétaire : Alice a payé 40 € pour
--- 30 € de parts (+10), Bob a payé 0 € pour 10 € de parts (−10). Les deux parts
--- d'origine (15/15) ont disparu : le remplacement ne duplique pas.
+-- Soldes et remplacement des parts, en propriétaire : le « Repas » est passé à
+-- 40 € payés par Bob pour 30 € de parts Alice et 10 € de parts Bob. Les deux
+-- parts d'origine (15/15) ont disparu : le remplacement ne duplique pas.
 do $$
 declare
   home text;
@@ -180,11 +180,11 @@ begin
     2::bigint,
     'la modification remplace les parts sans les dupliquer');
   perform testkit.eq(
-    (select balance from private.household_balances(home) where member_id = alice_m), 10.00::numeric,
-    'Alice a avancé 40 € pour 30 € de parts : crédit de 10 €');
+    (select balance from private.household_balances(home) where member_id = alice_m), (-30.00)::numeric,
+    'Alice doit 30 € de parts sans avoir avancé : débit de 30 €');
   perform testkit.eq(
-    (select balance from private.household_balances(home) where member_id = bob_m), (-10.00)::numeric,
-    'Bob doit 10 € de parts sans avoir avancé : débit de 10 €');
+    (select balance from private.household_balances(home) where member_id = bob_m), 30.00::numeric,
+    'Bob a avancé 40 € pour 10 € de parts : crédit de 30 €');
 end;
 $$;
 
