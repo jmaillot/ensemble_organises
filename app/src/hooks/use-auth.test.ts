@@ -111,6 +111,15 @@ describe("chemin d'authentification", () => {
     expect(useSessionStore.getState().user?.provider).toBe('google');
   });
 
+  it('préfère le nom du profil à l’email quand les métadonnées sont vides', async () => {
+    const bare = { ...user, email: 'jeremy@example.fr', user_metadata: {} } as unknown as User;
+    listMock.mockResolvedValueOnce([{ id: user.id, display_name: 'Jérémy Maillot' }]);
+
+    await applySession(bare);
+
+    expect(useSessionStore.getState().user?.displayName).toBe('Jérémy Maillot');
+  });
+
   it('ne recharge pas le foyer à chaque renouvellement de jeton', async () => {
     await applySession(user);
     const appelsApresPremiereApplication = listMock.mock.calls.length;

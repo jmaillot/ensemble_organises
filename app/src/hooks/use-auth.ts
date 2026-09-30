@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { data } from '@/lib/data';
 import { useSessionStore } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
-import type { HouseholdMemberRow, HouseholdRow, SessionUser } from '@/types';
+import type { HouseholdMemberRow, HouseholdRow, ProfileRow, SessionUser } from '@/types';
 
 export function useIsAuthenticated() {
   const status = useSessionStore((state) => state.status);
@@ -46,6 +47,20 @@ export async function applySession(user: User): Promise<void> {
   if (store.status === 'authenticated' && store.user?.id === sessionUser.id) {
     store.refreshUser(sessionUser);
     return;
+  }
+  // Le nom d'affichage de référence vit dans `profiles`, pas dans les
+  // métadonnées Auth (email/mot de passe n'en pose aucun : le repli serait
+  // l'email). Lecture directe, RLS : son propre profil est lisible. Uniquement
+  // sur le chemin complet : le renouvellement de jeton ne recharge rien, pas
+  // même le foyer.
+  if (supabase) {
+    try {
+      const [profile] = await data.list<ProfileRow>('profiles', { id: user.id });
+      const name = profile?.display_name?.trim();
+      if (name) sessionUser.displayName = name;
+    } catch {
+      // Hors ligne ou profil pas encore créé : le repli par métadonnées reste.
+    }
   }
   await store.signIn(sessionUser);
 }

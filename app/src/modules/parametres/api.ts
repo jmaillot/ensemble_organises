@@ -61,7 +61,23 @@ export async function fetchProfile({ userId, memberId, householdId }: ProfileTar
 
 export async function saveProfile(target: ProfileTarget, values: { displayName: string; city: string }): Promise<void> {
   const city = values.city.trim();
-  await data.update<ProfileRow>('profiles', target.userId, { display_name: values.displayName, city });
+  const displayName = values.displayName.trim();
+  await data.update<ProfileRow>('profiles', target.userId, { display_name: displayName, city });
+
+  // La ligne membre porte le nom affiché partout (listes, soldes serveur,
+  // avatars) : elle suit le profil. En mode Supabase, seul le RPC y touche —
+  // la RLS réserve l'écriture directe aux admins — et il refuse toute ligne
+  // qui n'est pas la sienne (un parent renomme un enfant depuis le panneau
+  // du foyer, via `renameMember`).
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('rename_own_member_name', {
+      p_member_id: target.memberId,
+      p_display_name: displayName,
+    });
+    if (error) throw new Error(error.message || 'Renommage impossible.');
+  } else {
+    await data.update('household_members', target.memberId, { display_name: displayName });
+  }
 
   const widgets = await data.list<DashboardWidgetRow>('dashboard_widgets', { household_id: target.householdId });
   const meteo = widgets.find((widget) => widget.widget_type === 'meteo' && widget.member_id === target.memberId);

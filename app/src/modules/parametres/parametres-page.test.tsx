@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { data } from '@/lib/data';
 import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import ParametresPage from './parametres-page';
@@ -73,5 +74,25 @@ describe('Paramètres du foyer', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     // Deux administrateurs désormais : Camille et Lina.
     expect(screen.getAllByText('Administrateur').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('la sauvegarde du profil propage le nom à la ligne membre', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ParametresPage />, { route: '/parametres' });
+
+    const nameInput = await screen.findByLabelText(/Prénom et nom/);
+    expect(nameInput).toHaveValue('Camille Martin');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Camille Dupont');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer le profil' }));
+
+    await waitFor(() => expect(screen.getByText(/Profil enregistré/)).toBeInTheDocument());
+    // Le store suit pour les avatars et la barre supérieure…
+    expect(useHouseholdStore.getState().members.find((member) => member.id === DEMO_MEMBERS.camille)?.display_name).toBe(
+      'Camille Dupont',
+    );
+    // …et la ligne membre est écrite, pas seulement le profil.
+    const rows = await data.list('household_members', { id: DEMO_MEMBERS.camille });
+    expect(rows[0]?.display_name).toBe('Camille Dupont');
   });
 });

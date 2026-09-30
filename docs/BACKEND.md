@@ -340,7 +340,9 @@ propriété (`owner_member_id`) n'est transférable que par un administrateur du
 foyer (déclencheur `guard_gift_list_ownership`).
 
 **Rôles.** `admin` : lecture, écriture, gestion des membres et des invitations.
-`membre` : lecture et écriture sur le contenu. `enfant` : **lecture seule**.
+`membre` : lecture et écriture sur le contenu. `enfant` : **lecture seule**,
+à la seule exception du renommage de sa propre ligne membre (`0040`,
+`rename_own_member_name` — `display_name` seul, jamais rôle ni foyer).
 C'est la décision retenue pour la question ouverte d'`AGENTS.md` §9.3 : un
 profil enfant n'écrit pas dans le foyer, il consulte.
 
