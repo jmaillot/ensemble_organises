@@ -115,11 +115,4 @@ describe('Accueil — rendu', () => {
     expect(checkboxes[0].getAttribute('aria-label')).toMatch(/^Terminer : /);
   });
 
-  it('ouvre le dialogue d’ajout de tâche depuis l’accueil', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<DashboardPage />);
-    await user.click(await screen.findByRole('button', { name: 'Ajouter une tâche' }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Nom de la tâche/)).toBeInTheDocument();
-  });
 });

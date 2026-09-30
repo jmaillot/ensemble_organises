@@ -19,17 +19,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
-import { Input, Select } from '@/components/ui/input';
-import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
 import { ModuleTile } from '@/components/shared/module-tile';
-import { useToast } from '@/components/ui/toast';
-import { useHouseholdStore, useMembers } from '@/stores/household-store';
+import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
@@ -52,22 +45,11 @@ import {
 import { firstName, formatDashboardEyebrow, formatNextEventDay, formatNextEventWhen } from './types';
 import { reorderPreferences, resetPreferences, toggleWidget, type WidgetKind } from './types';
 
-const taskSchema = z.object({
-  name: z.string().trim().min(2, 'Donnez un nom à la tâche.'),
-  dueDate: z.string(),
-  assignee: z.string().min(1, 'Choisissez un membre.'),
-});
-
-type TaskFormValues = z.infer<typeof taskSchema>;
-
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const toast = useToast();
   const user = useSessionUser();
-  const members = useMembers();
   const householdName = useHouseholdStore((state) => state.householdName);
   const [isEditing, setIsEditing] = useState(false);
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const dashboard = useDashboard();
 
   // Souris : déplacement immédiat. Tactile : appui long (le défilement
@@ -96,26 +78,6 @@ export default function DashboardPage() {
     const from = active.id as WidgetKind;
     const to = over.id as WidgetKind;
     void dashboard.setWidgetOrder(reorderPreferences(dashboard.widgets, from, to));
-  };
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskSchema),
-    defaultValues: { name: '', dueDate: new Date().toISOString().slice(0, 10), assignee: '' },
-  });
-
-  const onSubmit = (values: TaskFormValues) => {
-    // La création détaillée appartient au module À faire : l'accueil ouvre la
-    // même fiche, pré-remplie, plutôt que de dupliquer la logique d'écriture.
-    sessionStorage.setItem('ensemble-organises:draft-task', JSON.stringify(values));
-    setTaskDialogOpen(false);
-    reset();
-    toast('Brouillon transmis au module À faire.');
-    navigate('/taches');
   };
 
   const openTasks = dashboard.openTasks;
@@ -151,9 +113,6 @@ export default function DashboardPage() {
             aria-pressed={isEditing}
           >
             {isEditing ? 'Terminer la personnalisation' : 'Personnaliser l’accueil'}
-          </Button>
-          <Button icon="plus" onClick={() => setTaskDialogOpen(true)}>
-            Ajouter une tâche
           </Button>
         </div>
       </header>
@@ -290,46 +249,6 @@ export default function DashboardPage() {
           <ShoppingCard shopping={dashboard.nextShopping} />
         </aside>
       </div>
-
-      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <p className="eyebrow">À faire</p>
-            <DialogTitle>Ajouter une tâche</DialogTitle>
-            <DialogDescription>
-              Une échéance claire, un responsable, et c’est tout. Le formulaire complet reste dans le module À faire.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-3.5" noValidate>
-            <Field label="Nom de la tâche" error={errors.name?.message}>
-              {(props) => <Input placeholder="Ex. Choisir le menu du week-end" {...props} {...register('name')} />}
-            </Field>
-            <Field label="Échéance" error={errors.dueDate?.message}>
-              {(props) => <Input type="date" {...props} {...register('dueDate')} />}
-            </Field>
-            <Field label="Assigner à" error={errors.assignee?.message}>
-              {(props) => (
-                <Select {...props} {...register('assignee')}>
-                  <option value="">Choisir un membre</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.display_name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <DialogActions>
-              <Button variant="secondary" onClick={() => setTaskDialogOpen(false)}>
-                Annuler
-              </Button>
-              <Button type="submit" icon="arrow">
-                Continuer
-              </Button>
-            </DialogActions>
-          </form>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }
