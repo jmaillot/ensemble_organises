@@ -23,14 +23,14 @@ const today = todayIso();
 const year = Number(today.slice(0, 4));
 const month = Number(today.slice(5, 7)) - 1;
 
-/** Jours occupés par le jeu de démonstration (événements + anniversaires). */
+/** Jours occupés par le jeu de démonstration (événements + anniversaires, en ISO). */
 const busyDays = [0, 2, 4]
   .map((offset) => addDays(today, offset))
   .concat([
-    `${today.slice(0, 4)}-07-10`,
-    `${today.slice(0, 4)}-19-10`,
-    `${today.slice(0, 4)}-03-11`,
-    `${today.slice(0, 4)}-29-09`,
+    `${today.slice(0, 4)}-10-07`,
+    `${today.slice(0, 4)}-10-19`,
+    `${today.slice(0, 4)}-11-03`,
+    `${today.slice(0, 4)}-09-29`,
   ]);
 
 /** Jour libre le plus proche, toujours dans le mois affiché par la grille. */
