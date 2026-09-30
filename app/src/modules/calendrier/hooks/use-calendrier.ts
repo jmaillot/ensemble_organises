@@ -6,6 +6,7 @@ import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/househ
 import { toCalendarBirthday, toCalendarEvent, toColorTag } from '../types';
 import type { CalendarBirthday, CalendarEvent, CalendarTask, EventFormValues, EventReminder } from '../types';
 import { deleteEvent, listEventReminders, saveEvent } from '../api';
+import { listTaskAssignees } from '@/modules/taches/api';
 import type { EventInput } from '../api';
 import type { QueryClient } from '@tanstack/react-query';
 import type { BirthdayRow, EventRow, TaskRow } from '@/types';
@@ -60,14 +61,20 @@ export function useCalendrier(): CalendrierResource {
   const birthdaysResource = useResource<BirthdayRow>('birthdays');
 
   const eventIds = useMemo(() => eventsResource.rows.map((row) => row.id), [eventsResource.rows]);
+  const taskIds = useMemo(() => tasksResource.rows.map((row) => row.id), [tasksResource.rows]);
   const remindersQuery = useQuery({
     queryKey: ['all', 'event_reminders', eventIds],
     enabled: eventIds.length > 0,
     queryFn: async () => listEventReminders(eventIds),
   });
+  const assigneesQuery = useQuery({
+    queryKey: ['all', 'task_assignees', taskIds],
+    enabled: taskIds.length > 0,
+    queryFn: async () => listTaskAssignees(taskIds),
+  });
 
   const refresh = useCallback(
-    () => invalidateTables(queryClient, ['events', 'tasks', 'event_reminders']),
+    () => invalidateTables(queryClient, ['events', 'tasks', 'task_assignees', 'event_reminders']),
     [queryClient],
   );
 
@@ -75,9 +82,11 @@ export function useCalendrier(): CalendrierResource {
   useEffect(() => {
     const unsubscribeEvents = data.subscribe('events', refresh);
     const unsubscribeTasks = data.subscribe('tasks', refresh);
+    const unsubscribeAssignees = data.subscribe('task_assignees', refresh);
     return () => {
       unsubscribeEvents();
       unsubscribeTasks();
+      unsubscribeAssignees();
     };
   }, [refresh]);
 
@@ -108,14 +117,27 @@ export function useCalendrier(): CalendrierResource {
     [birthdaysResource.rows, members],
   );
 
-  const tasks = useMemo<CalendarTask[]>(
-    () =>
-      tasksResource.rows.map((row) => {
-        const task = toTask(row);
-        return { id: task.id, name: task.name, dueDate: task.dueDate, status: task.status, isLate: task.isLate, lateDays: task.lateDays };
-      }),
-    [tasksResource.rows],
-  );
+  const tasks = useMemo<CalendarTask[]>(() => {
+    const membersById = new Map(members.map((member) => [member.id, member]));
+    return tasksResource.rows.map((row) => {
+      const assignees = (assigneesQuery.data ?? [])
+        .filter((assignee) => assignee.task_id === row.id)
+        .map((assignee) => ({ memberId: assignee.member_id, member: membersById.get(assignee.member_id) }))
+        .filter((assignee): assignee is { memberId: string; member: (typeof members)[number] } =>
+          Boolean(assignee.member),
+        );
+      const task = toTask(row, { priority: 'normale', assignees, reminderAt: null });
+      return {
+        id: task.id,
+        name: task.name,
+        dueDate: task.dueDate,
+        status: task.status,
+        isLate: task.isLate,
+        lateDays: task.lateDays,
+        assignees: task.assignees,
+      };
+    });
+  }, [tasksResource.rows, assigneesQuery.data, members]);
 
   const reminders = useMemo(() => {
     const map: Record<string, EventReminder> = {};

@@ -1,6 +1,7 @@
 import type { FrenchHoliday } from '@/hooks/use-french-holidays';
 import { formatLongDate, formatShortDate, pluralize } from '@/lib/utils';
 import type { BirthdayRow, EventReminderRow, EventRow, HouseholdMemberRow, MemberColorTag, TaskStatus } from '@/types';
+import type { TaskAssignee } from '@/modules/taches/types';
 
 /** Couleurs de membre acceptées par `events.color` (pastille du calendrier). */
 const COLOR_TAGS = ['accent', 'ink', 'coral', 'amber', 'violet'] as const satisfies readonly MemberColorTag[];
@@ -119,6 +120,7 @@ export type AgendaItem =
       subtitle: string | null;
       colorTag: MemberColorTag;
       chipLabel: string;
+      assignees: TaskAssignee[];
     }
   | {
       kind: 'anniversaire';
@@ -138,7 +140,7 @@ export type AgendaItem =
       chipLabel: string;
     };
 
-/** Tâche vue depuis le calendrier : échéance et retard suffisent. */
+/** Tâche vue depuis le calendrier : échéance, retard et assignataires. */
 export interface CalendarTask {
   id: string;
   name: string;
@@ -146,6 +148,7 @@ export interface CalendarTask {
   status: TaskStatus;
   isLate: boolean;
   lateDays: number;
+  assignees: TaskAssignee[];
 }
 
 /** Tâches dues au plus tard le jour affiché, terminées exclues. */
@@ -194,6 +197,7 @@ export function buildAgenda(
         : `Échéance le ${formatShortDate(task.dueDate as string)}`,
     colorTag: 'violet',
     chipLabel: task.isLate ? 'En retard' : 'Tâche',
+    assignees: task.assignees,
   }));
 
   const birthdaysOfDay = birthdays

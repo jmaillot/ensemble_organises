@@ -93,6 +93,9 @@ describe('CalendrierPage', () => {
     expect(
       screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
     ).toBeInTheDocument();
+    // Le membre affecté suit la tâche, comme l’auteur suit l’événement.
+    expect(await screen.findByText('Camille')).toBeInTheDocument();
+    expect(await screen.findByText('Thomas')).toBeInTheDocument();
   });
 
   it('signale les jours avec tâches par une pastille violette', async () => {
