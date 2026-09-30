@@ -469,6 +469,17 @@ export function NotificationsPanel() {
               aria-label="Rappels de routines"
             />
           </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border py-3">
+            <label htmlFor="notif-messages" className="text-xs">
+              Messages reçus
+            </label>
+            <Switch
+              id="notif-messages"
+              checked={preferences.messageNotifications}
+              onCheckedChange={(checked) => void update({ messageNotifications: checked })}
+              aria-label="Messages reçus"
+            />
+          </div>
         </div>
         <div className="mt-3">
           <Field label="Fréquence des rappels" hint="Appliquée aux rappels automatiques du foyer.">

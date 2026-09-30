@@ -304,7 +304,7 @@ describe('désactivation', () => {
 
 describe('préférences', () => {
   it('aller-retour entre les colonnes du profil et l’interface', () => {
-    const preferences = { frequency: 'matin', taskReminders: false, eventReminders: true, routineReminders: false } as const;
+    const preferences = { frequency: 'matin', taskReminders: false, eventReminders: true, routineReminders: false, messageNotifications: true } as const;
     expect(fromProfileColumns(toProfileColumns(preferences))).toEqual(preferences);
   });
 

@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { QrCode } from '@/components/shared/qr-code';
+import { BarCode } from '@/components/shared/barcode';
 import { cn } from '@/lib/utils';
 import { CardCodeDialog } from './components/card-code-dialog';
 import { CardFormDialog } from './components/card-form-dialog';
@@ -159,7 +160,11 @@ export default function FidelitePage() {
                   <QrCode value={card.codeValue} size={116} label={`QR code de fidélité de ${card.name}`} />
                 </span>
               ) : (
-                <span className="barcode-stripes mt-[18px] mb-[9px] block" aria-hidden="true" />
+                <BarCode
+                  value={card.codeValue}
+                  label={`Code-barres de fidélité de ${card.name}`}
+                  className="mt-[18px] mb-[9px] block overflow-hidden rounded-[7px]"
+                />
               )}
 
               <span className="block font-mono text-[11px] tracking-[0.1em] break-all text-muted">{card.codeValue}</span>

@@ -685,6 +685,7 @@ authorization: Bearer <JWT>        # mode `user` — test uniquement
 |---|---|
 | `rappels` | rappels de tâche, d'événement et de routine dus dans la fenêtre |
 | `anniversaires` | anniversaires du jour |
+| `messages` | messages non distribués (file `message_notifications`, 24 h) |
 | `test` | message de test, sur les seuls appareils du demandeur |
 
 Réponse `200` : `{ notifications, delivered, failed, dropped, consumed }`.

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/shared/icon';
+import { compressImage, describeFile, type CompressedImage } from '@/modules/cercle/lib/media';
 import { formatClock, type ConversationSummary, type Message } from '../types';
 
 export interface ChatPanelProps {
@@ -11,6 +12,7 @@ export interface ChatPanelProps {
   messages: Message[];
   isSending?: boolean;
   onSend: (content: string) => void;
+  onSendMedia?: (content: string, image: CompressedImage) => void;
   /** Ouvre le dialogue d'ajout de membre ; absent, le bouton est masqué. */
   onAddMember?: () => void;
   /** Sur petit écran : revient à la liste pour ne pas écraser la discussion. */
@@ -19,14 +21,22 @@ export interface ChatPanelProps {
   className?: string;
 }
 
-/** Zone de discussion : journal accessible, bulles et zone de saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onAddMember, onBackToList, composerRef, className }: ChatPanelProps) {
+/** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<CompressedImage | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const conversationId = conversation?.id ?? null;
 
   useEffect(() => {
     setDraft('');
+    setAttachment((current) => {
+      if (current) URL.revokeObjectURL(current.previewUrl);
+      return null;
+    });
+    setAttachError(null);
   }, [conversationId]);
 
   // Le fil suit toujours le dernier message (envoi optimiste compris).
@@ -48,11 +58,31 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
   }
 
   const participants = conversation.participants.length;
+  const canSubmit = draft.trim() !== '' || attachment !== null;
   const submit = () => {
     const content = draft.trim();
-    if (!content) return;
-    onSend(content);
+    if (!content && !attachment) return;
+    if (attachment && onSendMedia) onSendMedia(content, attachment);
+    else onSend(content);
     setDraft('');
+    setAttachment((current) => {
+      if (current) URL.revokeObjectURL(current.previewUrl);
+      return null;
+    });
+  };
+
+  const attach = async (file: File | undefined) => {
+    if (!file) return;
+    setAttachError(null);
+    try {
+      const image = await compressImage(file);
+      setAttachment((current) => {
+        if (current) URL.revokeObjectURL(current.previewUrl);
+        return image;
+      });
+    } catch (error) {
+      setAttachError(error instanceof Error ? error.message : 'Image illisible.');
+    }
   };
 
   return (
@@ -113,6 +143,11 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
               }`}
             >
               {!message.isMine ? <span className="mb-1 block text-[10px] font-extrabold text-muted">{message.senderName}</span> : null}
+              {message.mediaUrl ? (
+                <a href={message.mediaUrl} target="_blank" rel="noreferrer" aria-label={`Ouvrir l’image de ${message.senderName}`}>
+                  <img src={message.mediaUrl} alt="" loading="lazy" className="mb-1.5 max-h-48 w-auto rounded-[10px]" />
+                </a>
+              ) : null}
               <span className="whitespace-pre-wrap break-words">{message.content}</span>
               <time
                 dateTime={message.createdAt}
@@ -126,6 +161,31 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         )}
       </div>
 
+      {attachment ? (
+        <div className="flex items-center gap-2 border-t border-border px-3 pt-2.5">
+          <img src={attachment.previewUrl} alt="" className="h-11 w-auto rounded-[8px]" />
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+            {describeFile(attachment.originalName, attachment.size)}
+          </span>
+          <Button
+            type="button"
+            variant="quiet"
+            size="sm"
+            onClick={() => {
+              URL.revokeObjectURL(attachment.previewUrl);
+              setAttachment(null);
+            }}
+            aria-label="Retirer l’image jointe"
+          >
+            Retirer
+          </Button>
+        </div>
+      ) : null}
+      {attachError ? (
+        <p role="alert" className="m-0 border-t border-border px-3 pt-2 text-[11px] font-semibold text-coral">
+          {attachError}
+        </p>
+      ) : null}
       <form
         className="flex gap-2 border-t border-border p-3"
         noValidate
@@ -134,6 +194,25 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           submit();
         }}
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          aria-label="Joindre une image"
+          onChange={(event) => {
+            void attach(event.target.files?.[0]);
+            event.target.value = '';
+          }}
+        />
+        <Button
+          type="button"
+          variant="quiet"
+          size="sm"
+          icon="image"
+          onClick={() => fileRef.current?.click()}
+          aria-label="Joindre une image"
+        />
         <Input
           ref={composerRef}
           value={draft}
@@ -144,7 +223,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           maxLength={4000}
           className="flex-1"
         />
-        <Button type="submit" icon="send" aria-label="Envoyer" disabled={!draft.trim() || isSending} />
+        <Button type="submit" icon="send" aria-label="Envoyer" disabled={!canSubmit || isSending} />
       </form>
       <p className="m-0 flex items-center gap-1.5 border-t border-border px-3 py-2 text-[10px] text-muted">
         <Icon name="wifi" size="sm" />

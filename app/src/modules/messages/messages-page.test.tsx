@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -92,5 +92,27 @@ describe('Messages', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Ajouter' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('joint une image au message et l’affiche dans le fil', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: () => 'blob:testapercu',
+      revokeObjectURL: () => undefined,
+    });
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const file = new File(['pixels'], 'parc.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Joindre une image', { selector: 'input' }), file);
+    expect(await screen.findByText(/parc\.png/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Écrire un message'), 'La photo du parc');
+    await user.click(screen.getByRole('button', { name: 'Envoyer' }));
+
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    await waitFor(() => expect(within(log).getByText('La photo du parc')).toBeInTheDocument(), { timeout: 5000 });
+    expect(within(log).getByRole('link', { name: /Ouvrir l’image/ })).toBeInTheDocument();
   });
 });

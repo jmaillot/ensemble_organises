@@ -42,6 +42,7 @@ export interface ReminderPreferences {
   taskReminders: boolean;
   eventReminders: boolean;
   routineReminders: boolean;
+  messageNotifications: boolean;
 }
 
 export const pushPermissionLabels: Record<PushPermissionState, string> = {
@@ -63,6 +64,7 @@ export const defaultReminderPreferences: ReminderPreferences = {
   taskReminders: true,
   eventReminders: true,
   routineReminders: true,
+  messageNotifications: true,
 };
 
 /**
@@ -675,6 +677,7 @@ export function toProfileColumns(preferences: ReminderPreferences) {
     task_reminders_enabled: preferences.taskReminders,
     event_reminders_enabled: preferences.eventReminders,
     routine_reminders_enabled: preferences.routineReminders,
+    message_notifications_enabled: preferences.messageNotifications,
   };
 }
 
@@ -683,11 +686,13 @@ export function fromProfileColumns(row: {
   task_reminders_enabled?: boolean | null;
   event_reminders_enabled?: boolean | null;
   routine_reminders_enabled?: boolean | null;
+  message_notifications_enabled?: boolean | null;
 }): ReminderPreferences {
   return {
     frequency: row.reminder_frequency ?? defaultReminderPreferences.frequency,
     taskReminders: row.task_reminders_enabled ?? defaultReminderPreferences.taskReminders,
     eventReminders: row.event_reminders_enabled ?? defaultReminderPreferences.eventReminders,
     routineReminders: row.routine_reminders_enabled ?? defaultReminderPreferences.routineReminders,
+    messageNotifications: row.message_notifications_enabled ?? defaultReminderPreferences.messageNotifications,
   };
 }

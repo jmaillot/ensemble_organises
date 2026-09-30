@@ -26,6 +26,7 @@ export interface ProfileRow {
   task_reminders_enabled: boolean;
   event_reminders_enabled: boolean;
   routine_reminders_enabled: boolean;
+  message_notifications_enabled: boolean;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
 }
