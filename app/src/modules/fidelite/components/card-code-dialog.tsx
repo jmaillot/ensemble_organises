@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Icon } from '@/components/shared/icon';
 import { QrCode } from '@/components/shared/qr-code';
+import { BarCode } from '@/components/shared/barcode';
 import { cn } from '@/lib/utils';
 import { loyaltyBrandChip, loyaltyBrandColors, loyaltyCodeTypeLabel, type LoyaltyCard } from '../types';
 
@@ -54,7 +55,7 @@ export function CardCodeDialog({
                   <QrCode value={card.codeValue} size={248} label={`QR code de fidélité de ${card.name}`} />
                 </div>
               ) : (
-                <div className="barcode-stripes my-1" aria-hidden="true" />
+                <BarCode value={card.codeValue} label={`Code-barres de fidélité de ${card.name}`} className="my-1" />
               )}
               <p className="mt-3 mb-0 break-all text-center font-mono text-[clamp(15px,2.4vw,22px)] tracking-[0.16em] text-fg">
                 {card.codeValue}

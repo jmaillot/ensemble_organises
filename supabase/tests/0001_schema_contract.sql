@@ -6,7 +6,7 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Les 41 tables du contrat existent, avec exactement les colonnes attendues
+-- 1. Les 43 tables du contrat existent, avec exactement les colonnes attendues
 --
 -- L'inventaire est la seule chose qui rattrape un oubli de colonne : la RLS et
 -- les contraintes ne les voient pas. `push_subscriptions` y figure depuis la
@@ -32,6 +32,7 @@ begin
           ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'created_by', 'created_at']::text[]),
           ('event_reminders', ARRAY['id', 'event_id', 'remind_at']::text[]),
           ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('note_attachments', ARRAY['id', 'note_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'created_by', 'created_at']::text[]),
           ('task_assignees', ARRAY['task_id', 'member_id']::text[]),
           ('task_reminders', ARRAY['id', 'task_id', 'remind_at']::text[]),
@@ -48,6 +49,7 @@ begin
           ('birthdays', ARRAY['id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[]),
           ('pets', ARRAY['id', 'household_id', 'name', 'species', 'breed', 'weight_kg', 'birth_date', 'identification_number', 'photo_url', 'created_at']::text[]),
           ('pet_records', ARRAY['id', 'pet_id', 'household_id', 'type', 'name', 'record_date', 'next_due_date', 'notes', 'attachment_url']::text[]),
+          ('pet_attachments', ARRAY['id', 'pet_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('provider_types', ARRAY['id', 'household_id', 'name', 'icon', 'created_at']::text[]),
           ('providers', ARRAY['id', 'household_id', 'provider_type_id', 'name', 'email', 'phone', 'address', 'postal_code', 'city', 'notes', 'created_at']::text[]),
           ('loyalty_cards', ARRAY['id', 'household_id', 'member_id', 'name', 'code_type', 'code_value', 'brand_color', 'created_at']::text[]),

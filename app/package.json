@@ -48,6 +48,7 @@
     "date-fns": "4.4.0",
     "dexie": "4.4.6",
     "html5-qrcode": "2.3.8",
+    "jsbarcode": "3.12.3",
     "qrcode": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
