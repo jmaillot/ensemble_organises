@@ -59,6 +59,7 @@ describe('CalendrierPage', () => {
   it('propose un raccourci vers la création de tâche du jour affiché', async () => {
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
 
+    expect(await screen.findByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Ajouter une tâche à cette journée' })).toBeInTheDocument();
   });
 
