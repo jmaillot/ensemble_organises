@@ -11,6 +11,8 @@ export interface ChatPanelProps {
   messages: Message[];
   isSending?: boolean;
   onSend: (content: string) => void;
+  /** Ouvre le dialogue d'ajout de membre ; absent, le bouton est masqué. */
+  onAddMember?: () => void;
   /** Sur petit écran : revient à la liste pour ne pas écraser la discussion. */
   onBackToList?: () => void;
   composerRef?: RefObject<HTMLInputElement | null>;
@@ -18,7 +20,7 @@ export interface ChatPanelProps {
 }
 
 /** Zone de discussion : journal accessible, bulles et zone de saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onAddMember, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
   const conversationId = conversation?.id ?? null;
@@ -75,6 +77,18 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             {conversation.type === 'direct' ? 'Échange privé' : `${participants} participants`} · Foyer
           </small>
         </div>
+        {onAddMember ? (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon="plus"
+            onClick={onAddMember}
+            aria-label={`Ajouter un membre à ${conversation.title}`}
+            className="shrink-0"
+          >
+            Ajouter
+          </Button>
+        ) : null}
       </div>
 
       <div
@@ -127,7 +141,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           placeholder="Écrire un message…"
           aria-label="Écrire un message"
           autoComplete="off"
-          maxLength={1000}
+          maxLength={4000}
           className="flex-1"
         />
         <Button type="submit" icon="send" aria-label="Envoyer" disabled={!draft.trim() || isSending} />

@@ -44,4 +44,53 @@ describe('Messages', () => {
     expect(screen.getByLabelText('Écrire un message')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Envoyer' })).toBeInTheDocument();
   });
+
+  it('crée un échange privé avec un membre et le sélectionne', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+    await screen.findByRole('button', { name: /^Lina/ });
+
+    await user.click(screen.getByRole('button', { name: 'Nouveau message' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Inviter Thomas Martin' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Démarrer' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // Le direct avec Thomas apparaît dans la liste et devient actif.
+    expect(await screen.findByRole('log', { name: 'Messages de Thomas' })).toBeInTheDocument();
+  });
+
+  it('exige un titre pour un groupe', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+    await screen.findByRole('button', { name: /^Lina/ });
+
+    await user.click(screen.getByRole('button', { name: 'Nouveau message' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('radio', { name: 'Groupe' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Inviter Thomas Martin' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Inviter Lina Martin' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Démarrer' }));
+
+    expect(await within(dialog).findByText('Un groupe exige un titre.')).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText(/Titre du groupe/), 'Projet cabane');
+    await user.click(within(dialog).getByRole('button', { name: 'Démarrer' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByRole('log', { name: 'Messages de Projet cabane' })).toBeInTheDocument();
+  });
+
+  it('fait entrer un membre manquant, enfant compris', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(await screen.findByRole('button', { name: /Ajouter un membre/ }));
+    const dialog = await screen.findByRole('dialog');
+    // Noé est enfant : il converse comme les autres, y compris ici.
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Ajouter Noé Martin' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
 });

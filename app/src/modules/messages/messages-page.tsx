@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,15 @@ import { useToast } from '@/components/ui/toast';
 import { useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
 import { ConversationList } from './components/conversation-list';
+import { AddMembersDialog, ConversationFormDialog } from './components/conversation-form-dialog';
 import { useMessagesFeed, useMessagesRealtime } from './hooks/use-messages';
 
 export default function MessagesPage() {
   const feed = useMessagesFeed();
   const members = useMembers();
   const toast = useToast();
-  const composerRef = useRef<HTMLInputElement>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listVisible, setListVisible] = useState(true);
   const { markRead } = feed;
@@ -50,26 +52,40 @@ export default function MessagesPage() {
             icon="message"
             title="Aucune conversation"
             description="Les échanges de votre foyer apparaîtront ici dès qu’une conversation sera ouverte. Les messages privés restent dans le périmètre du foyer."
+            actionLabel="Démarrer une conversation"
+            onAction={() => setCreateOpen(true)}
           />
         )}
+        <ConversationFormDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          members={members}
+          currentMemberId={feed.currentMemberId}
+          isSaving={feed.isCreating}
+          onSubmit={async (values) => {
+            try {
+              const id = await feed.createConversation(values);
+              setCreateOpen(false);
+              setSelectedId(id);
+              toast('Conversation démarrée.');
+            } catch (error) {
+              toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être créée.', 'error');
+            }
+          }}
+        />
       </ModuleShell>
     );
   }
+
+  const eligible = members.filter(
+    (member) => active && !active.participants.some((participant) => participant.id === member.id),
+  );
 
   return (
     <ModuleShell
       module="messages"
       actions={
-        <Button
-          icon="edit"
-          onClick={() => {
-            if (!active) {
-              toast('Choisissez d’abord une conversation.');
-              return;
-            }
-            composerRef.current?.focus();
-          }}
-        >
+        <Button icon="edit" onClick={() => setCreateOpen(true)}>
           Nouveau message
         </Button>
       }
@@ -107,14 +123,50 @@ export default function MessagesPage() {
               toast(error instanceof Error ? error.message : 'Message non envoyé.', 'error');
             });
           }}
+          onAddMember={active ? () => setAddOpen(true) : undefined}
           onBackToList={() => setListVisible(true)}
-          composerRef={composerRef}
           className={cn(
             'flex min-h-[460px] flex-col overflow-hidden rounded-[16px] border border-border bg-surface',
             listVisible ? 'max-[650px]:hidden' : '',
           )}
         />
       </div>
+
+      <ConversationFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        members={members}
+        currentMemberId={feed.currentMemberId}
+        isSaving={feed.isCreating}
+        onSubmit={async (values) => {
+          try {
+            const id = await feed.createConversation(values);
+            setCreateOpen(false);
+            setSelectedId(id);
+            toast('Conversation démarrée.');
+          } catch (error) {
+            toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être créée.', 'error');
+          }
+        }}
+      />
+      {active ? (
+        <AddMembersDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          eligible={eligible}
+          conversationTitle={active.title}
+          isSaving={feed.isCreating}
+          onSubmit={async (memberIds) => {
+            try {
+              await feed.addMembers(active.id, memberIds);
+              setAddOpen(false);
+              toast('Membre ajouté à la conversation.');
+            } catch (error) {
+              toast(error instanceof Error ? error.message : 'Ajout impossible.', 'error');
+            }
+          }}
+        />
+      ) : null}
     </ModuleShell>
   );
 }

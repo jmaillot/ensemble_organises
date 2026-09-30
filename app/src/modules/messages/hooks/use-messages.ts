@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createMessage, fetchConversationParticipants, fetchConversations, fetchMessages } from '../api';
+import { createConversation, addConversationMembers, createMessage, fetchConversationParticipants, fetchConversations, fetchMessages, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { MessageRow } from '@/types';
 
@@ -58,6 +58,8 @@ export interface MessagesFeed {
   messagesByConversation: Map<string, Message[]>;
   totalMessages: number;
   unreadTotal: number;
+  householdId: string | null;
+  currentMemberId: string;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -66,6 +68,9 @@ export interface MessagesFeed {
   markRead: (conversationId: string) => void;
   send: (conversationId: string, content: string) => Promise<void>;
   isSending: boolean;
+  createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
+  addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
+  isCreating: boolean;
 }
 
 /** Conversations, participants et messages du foyer, assemblés pour l'écran. */
@@ -185,9 +190,43 @@ export function useMessagesFeed(): MessagesFeed {
     async (conversationId: string, content: string) => {
       const trimmed = content.trim();
       if (!trimmed) return;
+      if (trimmed.length > MAX_MESSAGE_LENGTH) {
+        throw new Error(`Un message fait ${MAX_MESSAGE_LENGTH} caractères au maximum.`);
+      }
       await sendMutation.mutateAsync({ conversationId, content: trimmed });
     },
     [sendMutation],
+  );
+
+  const createMutation = useMutation({
+    mutationFn: async (draft: Omit<ConversationDraft, 'householdId'>) => {
+      if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      if (!currentMemberId) throw new Error('Aucun membre courant pour créer la conversation.');
+      // Le créateur participe toujours à sa conversation (exigé côté base).
+      const memberIds = [...new Set([currentMemberId, ...draft.memberIds].filter((id) => id.trim() !== ''))];
+      const row = await createConversation({ householdId, type: draft.type, title: draft.title, memberIds });
+      return row.id;
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  const addMembersMutation = useMutation({
+    mutationFn: (input: { conversationId: string; memberIds: string[] }) =>
+      addConversationMembers(input.conversationId, input.memberIds),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  const createConversationAndSelect = useCallback(
+    async (draft: Omit<ConversationDraft, 'householdId'>) => createMutation.mutateAsync(draft),
+    [createMutation],
+  );
+  const addMembers = useCallback(
+    async (conversationId: string, memberIds: string[]) => addMembersMutation.mutateAsync({ conversationId, memberIds }),
+    [addMembersMutation],
   );
 
   const refetch = useCallback(() => {
@@ -200,6 +239,8 @@ export function useMessagesFeed(): MessagesFeed {
     messagesByConversation,
     totalMessages: rows.length,
     unreadTotal: conversations.reduce((total, conversation) => total + conversation.unread, 0),
+    householdId,
+    currentMemberId,
     isLoading: conversationsQuery.isLoading || messagesQuery.isLoading,
     isError: conversationsQuery.isError || messagesQuery.isError,
     error: (conversationsQuery.error ?? messagesQuery.error ?? null) as Error | null,
@@ -208,6 +249,9 @@ export function useMessagesFeed(): MessagesFeed {
     markRead,
     send,
     isSending: sendMutation.isPending,
+    createConversation: createConversationAndSelect,
+    addMembers,
+    isCreating: createMutation.isPending || addMembersMutation.isPending,
   };
 }
 
