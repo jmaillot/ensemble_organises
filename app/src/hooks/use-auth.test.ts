@@ -120,6 +120,31 @@ describe("chemin d'authentification", () => {
     expect(useSessionStore.getState().user?.displayName).toBe('Jérémy Maillot');
   });
 
+  it('conserve le nom du profil au renouvellement de jeton', async () => {
+    // Sans cette garde, le second appel (TOKEN_REFRESHED, métadonnées seules)
+    // écrasait le nom du profil par l'email pour les utilisateurs qui ne
+    // resaisissent jamais leur prénom et leur nom.
+    const bare = { ...user, email: 'jeremy@example.fr', user_metadata: {} } as unknown as User;
+    listMock.mockResolvedValueOnce([{ id: user.id, display_name: 'Jérémy Maillot' }]);
+
+    await applySession(bare);
+    expect(useSessionStore.getState().user?.displayName).toBe('Jérémy Maillot');
+
+    await applySession(bare);
+    expect(useSessionStore.getState().user?.displayName).toBe('Jérémy Maillot');
+  });
+
+  it('rattrape un nom vide persisté dès que la session apporte un nom', async () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: user.id, email: 'alice@example.fr', displayName: '  ', avatarUrl: null, provider: 'email' },
+    });
+
+    await applySession(user);
+
+    expect(useSessionStore.getState().user?.displayName).toBe('Alice Martin');
+  });
+
   it('ne recharge pas le foyer à chaque renouvellement de jeton', async () => {
     await applySession(user);
     const appelsApresPremiereApplication = listMock.mock.calls.length;

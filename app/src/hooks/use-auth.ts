@@ -47,6 +47,13 @@ export async function applySession(user: User): Promise<void> {
   const sessionUser = toSessionUser(user);
   const store = useSessionStore.getState();
   if (store.status === 'authenticated' && store.user?.id === sessionUser.id) {
+    // Le nom de référence vit dans `profiles` (chemin complet ci-dessous) :
+    // un renouvellement de jeton n'apporte que les métadonnées Auth et
+    // écraserait le nom du profil par l'email. On garde le nom déjà connu ;
+    // un nom vide persisté, lui, prend le frais.
+    if (store.user.displayName?.trim()) {
+      sessionUser.displayName = store.user.displayName;
+    }
     store.refreshUser(sessionUser);
     return;
   }
@@ -85,6 +92,15 @@ export function useAuthBootstrap() {
             { id: DEMO_HOUSEHOLD_ID, name: 'Foyer Martin', avatar_color: 'accent' } as HouseholdRow,
             demoMembers as HouseholdMemberRow[],
           );
+        }
+        // Une session persistée par une ancienne version peut porter un nom
+        // vide : on la répare depuis la ligne membre (miroir du profil en
+        // local), sans exiger une resaisie du prénom et du nom.
+        if (!persisted.displayName?.trim()) {
+          const ownName =
+            useHouseholdStore.getState().members.find((member) => member.user_id === persisted.id)?.display_name?.trim() ||
+            (persisted.id === demoProfile.id ? demoProfile.display_name : '');
+          if (ownName) useSessionStore.getState().refreshUser({ ...persisted, displayName: ownName });
         }
         setStatus('authenticated');
         setReady(true);
