@@ -42,10 +42,15 @@ export function ProfileForm() {
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
-  const target = useMemo(
-    () => ({ userId: user?.id ?? DEMO_USER_ID, memberId: currentMemberId, householdId: householdId ?? '' }),
-    [currentMemberId, householdId, user?.id],
-  );
+  const target = useMemo(() => {
+    // « Mon profil » agit sur le membre lié à la session, jamais sur le profil
+    // courant (un parent peut agir au nom d'un enfant) : écrire le widget
+    // météo d'un autre membre est refusé par la RLS (`dashboard_widgets`
+    // est strictement personnel), et renommer localement une autre ligne
+    // divergerait du serveur au rechargement.
+    const ownMemberId = members.find((member) => member.user_id === user?.id)?.id ?? currentMemberId;
+    return { userId: user?.id ?? DEMO_USER_ID, memberId: ownMemberId, householdId: householdId ?? '' };
+  }, [currentMemberId, householdId, members, user?.id]);
 
   const profileQuery = useQuery({
     queryKey: [...profileKeys.all, target.userId, target.memberId],

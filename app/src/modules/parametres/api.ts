@@ -1,12 +1,14 @@
 import { data } from '@/lib/data';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
-import type { DashboardWidgetRow, HouseholdRow, ProfileRow } from '@/types';
+import type { DashboardWidgetRow, HouseholdRow, ProfileRow, Role } from '@/types';
 import type { HouseholdColor } from './types';
 
 /**
  * Préférences : profil, foyer, membres. Tout passe par l'adaptateur de données,
- * donc par la RLS côté Supabase. Les changements de rôle ne sont jamais écrits
- * depuis le client (AGENTS.md §2.6) : ils relèvent d'une Edge Function.
+ * donc par la RLS côté Supabase. Les changements de rôle passent par le RPC
+ * serveur `set_member_role` (migration 0036), jamais par une écriture directe :
+ * seule la fonction protège le dernier administrateur.
  */
 
 /**
@@ -98,4 +100,34 @@ export async function saveHousehold(
 /** Retire un membre du foyer : action réservée à l'administrateur. */
 export async function removeMember(memberId: string): Promise<void> {
   await data.remove('household_members', memberId);
+}
+
+/**
+ * Change le rôle d'un membre : opération serveur (`public.set_member_role`,
+ * migration 0036), jamais une écriture directe — seule la fonction vérifie
+ * qu'on ne rétrograde pas le dernier administrateur. En mode local, écriture
+ * directe (pas de RLS).
+ */
+export async function setMemberRole(memberId: string, role: Role): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase.rpc('set_member_role', { p_member_id: memberId, p_role: role });
+      if (error) throw new Error(error.message || 'Changement de rôle impossible.');
+      return;
+    } catch (requestError) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('Hors ligne : reconnectez-vous pour changer un rôle.');
+      }
+      throw requestError instanceof Error ? requestError : new Error('Changement de rôle impossible.');
+    }
+  }
+  await data.update('household_members', memberId, { role });
+}
+
+/** Renomme la ligne foyer d'un membre : réservé à l'administrateur par la RLS. */
+export async function renameMember(memberId: string, displayName: string): Promise<void> {
+  const name = displayName.trim();
+  if (name.length < 2) throw new Error('Indiquez au moins deux caractères.');
+  if (name.length > 120) throw new Error('120 caractères maximum.');
+  await data.update('household_members', memberId, { display_name: name });
 }
