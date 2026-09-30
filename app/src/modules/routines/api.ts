@@ -31,6 +31,25 @@ export function toReminderIso(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/** Liste de `datetime-local` → ISO triés, avec doublon J-1 optionnel. */
+export function toReminderIsos(values: string[], autoMinus1: boolean): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const push = (iso: string) => {
+    if (seen.has(iso)) return;
+    seen.add(iso);
+    result.push(iso);
+  };
+  values.forEach((value) => {
+    const iso = toReminderIso(value);
+    if (iso) push(iso);
+  });
+  if (autoMinus1) {
+    [...result].forEach((iso) => push(new Date(new Date(iso).getTime() - 24 * 60 * 60 * 1000).toISOString()));
+  }
+  return result.sort();
+}
+
 /** Assignataires d'un ensemble de routines (table de jointure, sans `id`). */
 export async function listRoutineAssignees(routineIds: string[]): Promise<RoutineAssigneeRecord[]> {
   if (routineIds.length === 0) return [];
@@ -60,12 +79,19 @@ export async function setRoutineAssignees(routineId: string, memberIds: string[]
   );
 }
 
-/** Un seul rappel par routine : il est remplacé plutôt qu'accumulé. */
+/** Rappels d'une routine : remplacés plutôt qu'accumulés (zéro, un ou plusieurs). */
 export async function setRoutineReminder(routineId: string, remindAt: string | null): Promise<void> {
+  await setRoutineReminders(routineId, remindAt === null ? [] : [remindAt]);
+}
+
+/** Remplace l'ensemble des rappels d'une routine. */
+export async function setRoutineReminders(routineId: string, remindAts: string[]): Promise<void> {
   await data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: routineId });
-  if (remindAt !== null) {
-    await data.create<RoutineReminderRecord>(ROUTINE_REMINDERS_TABLE, { routine_id: routineId, remind_at: remindAt });
-  }
+  await Promise.all(
+    remindAts.map((remindAt) =>
+      data.create<RoutineReminderRecord>(ROUTINE_REMINDERS_TABLE, { routine_id: routineId, remind_at: remindAt }),
+    ),
+  );
 }
 
 /** Occurrence enregistrée d'un jour donné, si elle existe. */

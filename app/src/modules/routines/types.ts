@@ -25,6 +25,8 @@ export const CALENDAR_MARGIN_DAYS = 45;
 /* ------------------------------------------------------------------ */
 
 const WEEKDAY_CODES: Record<string, number> = { MO: 0, TU: 1, WE: 2, TH: 3, FR: 4, SA: 5, SU: 6 };
+const WEEKDAY_TOKENS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
+export type WeekdayToken = (typeof WEEKDAY_TOKENS)[number];
 const WEEKDAY_LABELS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] as const;
 const MONTH_LABELS = [
   'janvier',
@@ -144,23 +146,72 @@ export function nextOccurrenceAfter(rule: string, fromIso: string): string | nul
   return occurrencesBetweenIso(rule, addDays(fromIso, 1), addDays(fromIso, MAX_OCCURRENCE_DAYS))[0] ?? null;
 }
 
-/** Liste triée des codes de jours (0 = lundi) portés par un `BYDAY`. */
-function weekdayCodes(value: ByWeekday | ByWeekday[] | null | undefined): number[] {
+/** Jours portés par un `BYDAY`, rang ordinal conservé (`n = null` = sans rang). */
+export interface OrdinalWeekday {
+  code: number;
+  token: string;
+  n: number | null;
+}
+
+export function ordinalWeekdays(value: ByWeekday | ByWeekday[] | null | undefined): OrdinalWeekday[] {
   if (value === null || value === undefined) return [];
   const entries = Array.isArray(value) ? value : [value];
   return entries
-    .map((entry) => {
-      if (typeof entry === 'number') return entry % 7;
-      if (typeof entry === 'string') {
-        const match = /^(\d+)?(MO|TU|WE|TH|FR|SA|SU)$/.exec(entry.toUpperCase());
-        return match ? WEEKDAY_CODES[match[2]] : null;
+    .map((entry): OrdinalWeekday | null => {
+      if (typeof entry === 'number') {
+        const code = entry % 7;
+        return { code, token: WEEKDAY_TOKENS[code] ?? '', n: null };
       }
-      if (typeof entry === 'object' && typeof entry.weekday === 'number') return entry.weekday % 7;
+      if (typeof entry === 'string') {
+        const match = /^(-?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/.exec(entry.toUpperCase());
+        if (!match) return null;
+        const code = WEEKDAY_CODES[match[2]];
+        const n = match[1] === undefined ? null : Number(match[1]);
+        return { code, token: match[2], n: Number.isNaN(n as number) ? null : n };
+      }
+      if (typeof entry === 'object' && typeof entry.weekday === 'number') {
+        const code = entry.weekday % 7;
+        const n = typeof entry.n === 'number' ? entry.n : null;
+        return { code, token: WEEKDAY_TOKENS[code] ?? '', n };
+      }
       return null;
     })
-    .filter((code): code is number => code !== null)
-    .sort((a, b) => a - b);
+    .filter((entry): entry is OrdinalWeekday => entry !== null)
+    .sort((a, b) => a.code - b.code);
 }
+
+/** « 1er », « 2e », …, « dernier ». */
+export function nthRankLabel(n: number | null): string {
+  if (n === null) return '';
+  if (n === -1) return 'dernier';
+  if (n === 1) return '1er';
+  return `${n}e`;
+}
+
+/** Choix du formulaire : jour de semaine, rang et mois. */
+export const weekdayOptions: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'MO', label: 'lundi' },
+  { value: 'TU', label: 'mardi' },
+  { value: 'WE', label: 'mercredi' },
+  { value: 'TH', label: 'jeudi' },
+  { value: 'FR', label: 'vendredi' },
+  { value: 'SA', label: 'samedi' },
+  { value: 'SU', label: 'dimanche' },
+];
+
+export const nthRankOptions: ReadonlyArray<{ value: number; label: string }> = [
+  { value: 1, label: '1er' },
+  { value: 2, label: '2e' },
+  { value: 3, label: '3e' },
+  { value: 4, label: '4e' },
+  { value: 5, label: '5e' },
+  { value: -1, label: 'dernier' },
+];
+
+export const monthOptions: ReadonlyArray<{ value: number; label: string }> = MONTH_LABELS.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
 
 const joinList = (items: string[]) =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} et ${items[items.length - 1]}`;
@@ -180,9 +231,15 @@ export function describeRecurrence(rule: string): string {
   const parsed = parseRRule(rule);
   if (!parsed) return 'Récurrence à vérifier';
   const interval = typeof parsed.interval === 'number' && parsed.interval > 1 ? parsed.interval : 1;
-  const codes = weekdayCodes(parsed.byweekday);
+  const ordinals = ordinalWeekdays(parsed.byweekday);
+  const codes = ordinals.map((entry) => entry.code);
   const dayPart = codes.length > 0 ? describeDays(codes, false) : '';
   const daysPart = codes.length > 0 ? describeDays(codes, true) : '';
+  const singleOrdinal = ordinals.length === 1 ? ordinals[0] : null;
+  const ordinalDay =
+    singleOrdinal && singleOrdinal.n !== null
+      ? `${nthRankLabel(singleOrdinal.n)} ${WEEKDAY_LABELS[singleOrdinal.code] ?? ''}`
+      : null;
 
   switch (parsed.freq as Frequency) {
     case RRule.DAILY:
@@ -193,6 +250,9 @@ export function describeRecurrence(rule: string): string {
     case RRule.MONTHLY: {
       const monthDay = toNumberList(parsed.bymonthday)[0];
       if (monthDay) return `Le ${monthDay} de chaque mois`;
+      if (ordinalDay) {
+        return interval === 1 ? `Le ${ordinalDay} de chaque mois` : `Tous les ${interval} mois, le ${ordinalDay}`;
+      }
       if (codes.length > 0) {
         return interval === 1 ? `Chaque mois, le ${dayPart}` : `Tous les ${interval} mois, le ${dayPart}`;
       }
@@ -202,6 +262,8 @@ export function describeRecurrence(rule: string): string {
       const month = toNumberList(parsed.bymonth)[0];
       const monthDay = toNumberList(parsed.bymonthday)[0];
       if (month && monthDay) return `Chaque ${monthDay} ${MONTH_LABELS[month - 1]}`;
+      if (ordinalDay && month) return `Le ${ordinalDay} de ${MONTH_LABELS[month - 1]}`;
+      if (ordinalDay) return `Chaque année, le ${ordinalDay}`;
       if (month) return `Chaque ${MONTH_LABELS[month - 1]}`;
       if (codes.length > 0) return `Chaque année, le ${dayPart}`;
       return interval === 1 ? 'Chaque année' : `Tous les ${interval} ans`;
@@ -235,10 +297,153 @@ export function ruleForPreset(preset: FrequencyPreset, customRule: string): stri
   return frequencyPresets.find((entry) => entry.value === preset)?.rule ?? 'FREQ=DAILY';
 }
 
+/** Trie des tokens de jours selon l'ordre lundi → dimanche. */
+function sortWeekdayTokens(tokens: string[]): string[] {
+  return [...new Set(tokens.map((token) => token.toUpperCase()))]
+    .filter((token) => token in WEEKDAY_CODES)
+    .sort((a, b) => WEEKDAY_CODES[a] - WEEKDAY_CODES[b]);
+}
+
+/** `FREQ=WEEKLY;BYDAY=MO,WE` à partir des jours cochés. */
+export function buildWeeklyRule(days: string[]): string {
+  const sorted = sortWeekdayTokens(days);
+  return `FREQ=WEEKLY;BYDAY=${sorted.length > 0 ? sorted.join(',') : 'MO'}`;
+}
+
+/** `FREQ=MONTHLY;BYDAY=1MO` (ou `-1FR` pour le dernier). */
+export function buildMonthlyNthRule(rank: number, weekday: string): string {
+  const token = weekday.toUpperCase() in WEEKDAY_CODES ? weekday.toUpperCase() : 'MO';
+  return `FREQ=MONTHLY;BYDAY=${rank}${token}`;
+}
+
+/** `FREQ=MONTHLY;BYMONTHDAY=15`. */
+export function buildMonthlyDayRule(day: number): string {
+  const safe = Math.min(31, Math.max(1, Math.round(day) || 1));
+  return `FREQ=MONTHLY;BYMONTHDAY=${safe}`;
+}
+
+/** `FREQ=YEARLY;BYDAY=2TU;BYMONTH=3` ou `FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=15`. */
+export function buildYearlyNthRule(rank: number, weekday: string, month: number): string {
+  const token = weekday.toUpperCase() in WEEKDAY_CODES ? weekday.toUpperCase() : 'MO';
+  const safeMonth = Math.min(12, Math.max(1, Math.round(month) || 1));
+  return `FREQ=YEARLY;BYMONTH=${safeMonth};BYDAY=${rank}${token}`;
+}
+
+export function buildYearlyDayRule(month: number, day: number): string {
+  const safeMonth = Math.min(12, Math.max(1, Math.round(month) || 1));
+  const safeDay = Math.min(31, Math.max(1, Math.round(day) || 1));
+  return `FREQ=YEARLY;BYMONTH=${safeMonth};BYMONTHDAY=${safeDay}`;
+}
+
+/** Sélection structurée du formulaire de récurrence. */
+export interface RoutineRecurrenceSelection {
+  weeklyDays: string[];
+  monthlyMode: 'day' | 'nth';
+  monthlyDay: number;
+  nthRank: number;
+  nthWeekday: string;
+  yearlyMode: 'day' | 'nth';
+  yearlyMonth: number;
+  yearlyDay: number;
+  yearlyNthRank: number;
+  yearlyNthWeekday: string;
+}
+
+export const defaultRecurrenceSelection = (): RoutineRecurrenceSelection => ({
+  weeklyDays: ['MO'],
+  monthlyMode: 'nth',
+  monthlyDay: 15,
+  nthRank: 1,
+  nthWeekday: 'MO',
+  yearlyMode: 'nth',
+  yearlyMonth: new Date().getMonth() + 1,
+  yearlyDay: 15,
+  yearlyNthRank: 1,
+  yearlyNthWeekday: 'MO',
+});
+
+/** RRULE composée depuis la sélection structurée du formulaire. */
+export function ruleForSelection(preset: FrequencyPreset, selection: RoutineRecurrenceSelection, customRule: string): string {
+  switch (preset) {
+    case 'quotidien':
+      return 'FREQ=DAILY';
+    case 'hebdomadaire':
+      return buildWeeklyRule(selection.weeklyDays);
+    case 'mensuel':
+      return selection.monthlyMode === 'nth'
+        ? buildMonthlyNthRule(selection.nthRank, selection.nthWeekday)
+        : buildMonthlyDayRule(selection.monthlyDay);
+    case 'annuel':
+      return selection.yearlyMode === 'nth'
+        ? buildYearlyNthRule(selection.yearlyNthRank, selection.yearlyNthWeekday, selection.yearlyMonth)
+        : buildYearlyDayRule(selection.yearlyMonth, selection.yearlyDay);
+    case 'personnalise':
+      return normaliseRule(customRule);
+  }
+}
+
+/** Relit une RRULE enregistrée vers le formulaire (édition). */
+export function selectionForRule(rule: string): { preset: FrequencyPreset; selection: RoutineRecurrenceSelection } {
+  const selection = defaultRecurrenceSelection();
+  const cleaned = normaliseRule(rule);
+  const exact = frequencyPresets.find((entry) => entry.rule === cleaned)?.value;
+  if (exact && exact !== 'personnalise') {
+    if (exact === 'hebdomadaire') selection.weeklyDays = ['MO'];
+    return { preset: exact, selection };
+  }
+  const parsed = parseRRule(cleaned);
+  if (!parsed) return { preset: 'personnalise', selection };
+  const ordinals = ordinalWeekdays(parsed.byweekday);
+  const tokens = sortWeekdayTokens(ordinals.map((entry) => entry.token));
+  const month = toNumberList(parsed.bymonth)[0] ?? selection.yearlyMonth;
+  const monthDay = toNumberList(parsed.bymonthday)[0];
+
+  switch (parsed.freq as Frequency) {
+    case RRule.DAILY:
+      return { preset: 'quotidien', selection };
+    case RRule.WEEKLY:
+      selection.weeklyDays = tokens.length > 0 ? tokens : ['MO'];
+      return { preset: 'hebdomadaire', selection };
+    case RRule.MONTHLY:
+      if (monthDay) {
+        selection.monthlyMode = 'day';
+        selection.monthlyDay = monthDay;
+      } else if (ordinals.length === 1 && ordinals[0].n !== null) {
+        selection.monthlyMode = 'nth';
+        selection.nthRank = ordinals[0].n;
+        selection.nthWeekday = ordinals[0].token;
+      } else if (tokens.length > 0) {
+        selection.monthlyMode = 'nth';
+        selection.nthRank = 1;
+        selection.nthWeekday = tokens[0];
+      }
+      return { preset: 'mensuel', selection };
+    case RRule.YEARLY:
+      selection.yearlyMonth = month;
+      if (monthDay) {
+        selection.yearlyMode = 'day';
+        selection.yearlyDay = monthDay;
+      } else if (ordinals.length === 1 && ordinals[0].n !== null) {
+        selection.yearlyMode = 'nth';
+        selection.yearlyNthRank = ordinals[0].n;
+        selection.yearlyNthWeekday = ordinals[0].token;
+      } else if (tokens.length > 0) {
+        selection.yearlyMode = 'nth';
+        selection.yearlyNthRank = 1;
+        selection.yearlyNthWeekday = tokens[0];
+      }
+      return { preset: 'annuel', selection };
+    default:
+      return { preset: 'personnalise', selection };
+  }
+}
+
 /** Preset correspondant à une règle déjà enregistrée. */
 export function presetForRule(rule: string): FrequencyPreset {
   const cleaned = normaliseRule(rule);
-  return frequencyPresets.find((entry) => entry.rule === cleaned)?.value ?? 'personnalise';
+  const exact = frequencyPresets.find((entry) => entry.rule === cleaned)?.value;
+  if (exact) return exact;
+  return selectionForRule(rule).preset;
 }
 
 /* ------------------------------------------------------------------ */
@@ -251,10 +456,48 @@ export interface RoutineFormValues {
   frequency: FrequencyPreset;
   /** RRULE libre, utilisée uniquement par le preset « Personnalisé ». */
   customRule: string;
+  weeklyDays: string[];
+  monthlyMode: 'day' | 'nth';
+  monthlyDay: number;
+  nthRank: number;
+  nthWeekday: string;
+  yearlyMode: 'day' | 'nth';
+  yearlyMonth: number;
+  yearlyDay: number;
+  yearlyNthRank: number;
+  yearlyNthWeekday: string;
   description: string;
   assigneeIds: string[];
-  /** Valeur d'un `datetime-local`, chaîne vide pour « pas de rappel ». */
-  reminderAt: string;
+  /** Valeurs de `datetime-local`, une entrée vide = pas de rappel à cet index. */
+  reminders: string[];
+  /** Coche « aussi 1 jour avant » : chaque rappel gagne un doublon à −24 h. */
+  autoMinus1: boolean;
+}
+
+/** Valeurs `datetime-local` → ISO triés, dédupliqués, invalides écartés. */
+export function remindersToIso(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values.forEach((value) => {
+    const trimmed = value.trim();
+    if (trimmed === '') return;
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return;
+    const iso = date.toISOString();
+    if (seen.has(iso)) return;
+    seen.add(iso);
+    result.push(iso);
+  });
+  return result.sort();
+}
+
+/** Ajoute à chaque rappel son doublon à −24 h (sans doublon). */
+export function withAutoMinus1(isoReminders: string[]): string[] {
+  const seen = new Set(isoReminders);
+  const extra = isoReminders
+    .map((iso) => new Date(new Date(iso).getTime() - 24 * 60 * 60 * 1000).toISOString())
+    .filter((iso) => !seen.has(iso));
+  return [...isoReminders, ...extra].sort();
 }
 
 /** `routine_assignees` n'a pas de colonne `id` : clé primaire composite. */
@@ -277,6 +520,14 @@ export interface Routine {
   assignees: RoutineAssignee[];
   reminderAt: string | null;
   reminderLabel: string | null;
+  /** Tous les rappels triés (ISO) ; `reminderAt` reste le plus tôt pour compat. */
+  reminders: string[];
+  /** Vrai quand au moins une occurrence due n'a pas été cochée. */
+  isLate: boolean;
+  /** Nombre d'occurrences à rattraper. */
+  lateCount: number;
+  /** « En retard · 2 » ou `null` quand rien n'est en retard. */
+  lateLabel: string | null;
   createdBy: string | null;
   createdAt: string;
   /** La routine tombe aujourd'hui d'après sa RRULE. */
@@ -299,6 +550,7 @@ export interface Routine {
 export interface RoutineContext {
   assignees: RoutineAssignee[];
   reminderAt: string | null;
+  reminders: string[];
   isDueToday: boolean;
   isDoneToday: boolean;
   streak: number;
@@ -309,6 +561,7 @@ export interface RoutineContext {
 const emptyContext: RoutineContext = {
   assignees: [],
   reminderAt: null,
+  reminders: [],
   isDueToday: false,
   isDoneToday: false,
   streak: 0,
@@ -325,7 +578,10 @@ const streakLabel = (streak: number) =>
 
 /** Conversion d'une ligne `routines` en type métier. */
 export function toRoutine(row: RoutineRow, context: RoutineContext = emptyContext): Routine {
-  const reminderTime = context.reminderAt ? formatClockTime(context.reminderAt) : null;
+  const sortedReminders = [...context.reminders].sort();
+  const earliest = context.reminderAt ?? sortedReminders[0] ?? null;
+  const reminderTime = earliest ? formatClockTime(earliest) : null;
+  const lateCount = context.missedDates.length;
   return {
     id: row.id,
     name: row.name,
@@ -334,8 +590,12 @@ export function toRoutine(row: RoutineRow, context: RoutineContext = emptyContex
     frequencyLabel: describeRecurrence(row.recurrence_rule),
     preset: presetForRule(row.recurrence_rule),
     assignees: context.assignees,
-    reminderAt: context.reminderAt,
+    reminderAt: earliest,
     reminderLabel: reminderTime ? `Rappel ${reminderTime}` : null,
+    reminders: sortedReminders.length > 0 ? sortedReminders : earliest ? [earliest] : [],
+    isLate: lateCount > 0,
+    lateCount,
+    lateLabel: lateCount > 0 ? `En retard · ${lateCount}` : null,
     createdBy: row.created_by,
     createdAt: row.created_at,
     isDueToday: context.isDueToday,
@@ -378,10 +638,9 @@ export function buildRoutines(
   assigneeRows.forEach((row) =>
     assigneesByRoutine.set(row.routine_id, [...(assigneesByRoutine.get(row.routine_id) ?? []), row]),
   );
-  const remindersByRoutine = new Map<string, string>();
+  const remindersByRoutine = new Map<string, string[]>();
   reminderRows.forEach((row) => {
-    const current = remindersByRoutine.get(row.routine_id);
-    if (current === undefined || row.remind_at < current) remindersByRoutine.set(row.routine_id, row.remind_at);
+    remindersByRoutine.set(row.routine_id, [...(remindersByRoutine.get(row.routine_id) ?? []), row.remind_at]);
   });
 
   return rows.map((row) => {
@@ -406,12 +665,14 @@ export function buildRoutines(
     const nextDate =
       isDueToday && isDoneToday ? nextOccurrenceAfter(row.recurrence_rule, today) : nextOccurrence(row.recurrence_rule, today);
 
+    const allReminders = [...(remindersByRoutine.get(row.id) ?? [])].sort();
     return toRoutine(row, {
       assignees: (assigneesByRoutine.get(row.id) ?? [])
         .map((assignee) => ({ memberId: assignee.member_id, member: membersById.get(assignee.member_id) }))
         .filter((assignee): assignee is RoutineAssignee => Boolean(assignee.member))
         .sort((a, b) => a.member.display_name.localeCompare(b.member.display_name, 'fr')),
-      reminderAt: remindersByRoutine.get(row.id) ?? null,
+      reminderAt: allReminders[0] ?? null,
+      reminders: allReminders,
       isDueToday,
       isDoneToday,
       streak,
@@ -435,12 +696,19 @@ export function todayOccurrences(routines: Routine[]): Routine[] {
   return sortRoutines(routines.filter((routine) => routine.isDueToday));
 }
 
-export function filterRoutines(routines: Routine[], query: string): Routine[] {
+export function filterRoutines(routines: Routine[], query: string, lateOnly = false): Routine[] {
   const needle = query.trim().toLowerCase();
-  if (needle === '') return routines;
-  return routines.filter(
-    (routine) =>
-      routine.name.toLowerCase().includes(needle) || (routine.description ?? '').toLowerCase().includes(needle),
+  return routines.filter((routine) => {
+    if (lateOnly && !routine.isLate) return false;
+    if (needle === '') return true;
+    return routine.name.toLowerCase().includes(needle) || (routine.description ?? '').toLowerCase().includes(needle);
+  });
+}
+
+/** Routines avec au moins une occurrence à rattraper, les plus en retard d'abord. */
+export function lateRoutines(routines: Routine[]): Routine[] {
+  return [...routines.filter((routine) => routine.isLate)].sort(
+    (a, b) => b.lateCount - a.lateCount || a.name.localeCompare(b.name, 'fr'),
   );
 }
 

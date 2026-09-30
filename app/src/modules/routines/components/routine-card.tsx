@@ -77,11 +77,14 @@ export function RoutineCard({ routine, onToggle, showStreakBadge = false, classN
           )}
         </span>
 
-        {showStreakBadge && routine.streak > 0 ? (
-          <Badge tone="accent">{routine.streakLabel}</Badge>
-        ) : (
-          <span className="text-[11px] text-muted">{routine.streakLabel}</span>
-        )}
+        <span className="flex flex-wrap items-center gap-1.5">
+          {routine.isLate ? <Badge tone="coral">{routine.lateLabel ?? 'En retard'}</Badge> : null}
+          {showStreakBadge && routine.streak > 0 ? (
+            <Badge tone="accent">{routine.streakLabel}</Badge>
+          ) : (
+            <span className="text-[11px] text-muted">{routine.streakLabel}</span>
+          )}
+        </span>
       </div>
     </article>
   );

@@ -8,13 +8,24 @@ import type { RoutineAssigneeRow, RoutineRow } from '@/types';
 import RoutinesPage from './routines-page';
 import {
   MAX_OCCURRENCE_DAYS,
+  buildMonthlyNthRule,
+  buildWeeklyRule,
+  buildYearlyNthRule,
+  buildRoutines,
   describeRecurrence,
+  filterRoutines,
   isDueOn,
   occurrencesBetween,
   occurrencesBetweenIso,
+  remindersToIso,
   ruleForPreset,
+  ruleForSelection,
+  selectionForRule,
+  toRoutine,
   validateRRule,
+  withAutoMinus1,
 } from './types';
+import { toReminderIsos } from './api';
 
 const TODAY = todayIso();
 
@@ -97,6 +108,93 @@ describe('occurrencesBetween', () => {
     expect(validateRRule('FREQ=WEEKLY;BYDAY=MO')).toBeNull();
     expect(validateRRule('FREQ=WEEKLY;BYDAY=XX')).toMatch(/Règle invalide/);
     expect(validateRRule('')).toMatch(/Saisissez une règle RRULE/);
+  });
+
+  it('compose et décrit les rangs ordinaux (1er, 2e, dernier)', () => {
+    expect(buildWeeklyRule(['WE', 'MO'])).toBe('FREQ=WEEKLY;BYDAY=MO,WE');
+    expect(buildWeeklyRule([])).toBe('FREQ=WEEKLY;BYDAY=MO');
+    expect(buildMonthlyNthRule(1, 'MO')).toBe('FREQ=MONTHLY;BYDAY=1MO');
+    expect(buildMonthlyNthRule(-1, 'FR')).toBe('FREQ=MONTHLY;BYDAY=-1FR');
+    expect(buildYearlyNthRule(2, 'TU', 3)).toBe('FREQ=YEARLY;BYMONTH=3;BYDAY=2TU');
+
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=1MO')).toBe('Le 1er lundi de chaque mois');
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=-1FR')).toBe('Le dernier vendredi de chaque mois');
+    expect(describeRecurrence('FREQ=YEARLY;BYMONTH=3;BYDAY=2TU')).toBe('Le 2e mardi de mars');
+    expect(validateRRule('FREQ=MONTHLY;BYDAY=1MO')).toBeNull();
+    expect(validateRRule('FREQ=YEARLY;BYMONTH=3;BYDAY=2TU')).toBeNull();
+  });
+
+  it('compose depuis la sélection et relit une règle vers le formulaire', () => {
+    const monthly = ruleForSelection(
+      'mensuel',
+      {
+        weeklyDays: ['MO'],
+        monthlyMode: 'nth',
+        monthlyDay: 15,
+        nthRank: 2,
+        nthWeekday: 'TU',
+        yearlyMode: 'nth',
+        yearlyMonth: 3,
+        yearlyDay: 15,
+        yearlyNthRank: 1,
+        yearlyNthWeekday: 'MO',
+      },
+      '',
+    );
+    expect(monthly).toBe('FREQ=MONTHLY;BYDAY=2TU');
+
+    const { preset, selection } = selectionForRule('FREQ=MONTHLY;BYDAY=2TU');
+    expect(preset).toBe('mensuel');
+    expect(selection.monthlyMode).toBe('nth');
+    expect(selection.nthRank).toBe(2);
+    expect(selection.nthWeekday).toBe('TU');
+
+    const yearly = selectionForRule('FREQ=YEARLY;BYMONTH=3;BYDAY=2TU');
+    expect(yearly.preset).toBe('annuel');
+    expect(yearly.selection.yearlyMonth).toBe(3);
+    expect(yearly.selection.yearlyNthRank).toBe(2);
+
+    const weekly = selectionForRule('FREQ=WEEKLY;BYDAY=MO,WE');
+    expect(weekly.preset).toBe('hebdomadaire');
+    expect(weekly.selection.weeklyDays).toEqual(['MO', 'WE']);
+  });
+
+  it('énumère les occurrences ordinales sur des lundis', () => {
+    // Fenêtre plafonnée à 90 jours : janvier → mars tient dans le cap.
+    const mondays = occurrencesBetweenIso('FREQ=MONTHLY;BYDAY=1MO', '2026-01-01', '2026-04-30');
+    expect(mondays).toEqual(['2026-01-05', '2026-02-02', '2026-03-02']);
+    mondays.forEach((iso) => expect(toLocalDate(iso).getDay()).toBe(1));
+  });
+
+  it('convertit plusieurs rappels et ajoute le doublon J-1 sans doublon', () => {
+    expect(remindersToIso(['', '2026-10-05T10:00', 'nawak'])).toHaveLength(1);
+    expect(remindersToIso(['2026-10-05T10:00', '2026-10-05T10:00'])).toHaveLength(1);
+    const base = toReminderIsos(['2026-10-05T10:00', '2026-10-10T10:00'], false);
+    expect(base).toHaveLength(2);
+    const withMinus = toReminderIsos(['2026-10-05T10:00'], true);
+    expect(withMinus).toHaveLength(2);
+    expect(new Date(withMinus[1]).getTime() - new Date(withMinus[0]).getTime()).toBe(24 * 60 * 60 * 1000);
+    expect(withAutoMinus1(base)).toHaveLength(4);
+    // Pas de doublon si le J-1 existe déjà : le 04/10 n'apparaît qu'une fois.
+    const already = [...base, new Date(new Date(base[0]).getTime() - 24 * 60 * 60 * 1000).toISOString()].sort();
+    const expanded = withAutoMinus1(already);
+    expect(expanded.filter((iso) => iso === already[0])).toHaveLength(1);
+    expect(expanded.length).toBeGreaterThan(already.length);
+  });
+
+  it('marque le retard et filtre en retard uniquement', () => {
+    const rows = [
+      { id: 'r1', name: 'Quotidienne', description: null, recurrence_rule: 'FREQ=DAILY', created_by: null, created_at: `${addDays(TODAY, -10)}T08:00:00.000Z`, household_id: 'h1' },
+      // Créée aujourd'hui : aucune occurrence passée postérieure à la création.
+      { id: 'r2', name: 'Hebdo', description: null, recurrence_rule: 'FREQ=DAILY', created_by: null, created_at: `${TODAY}T08:00:00.000Z`, household_id: 'h1' },
+    ] as never as Parameters<typeof buildRoutines>[0];
+    const routines = buildRoutines(rows, [], [], [], [], TODAY);
+    const late = routines.find((routine) => routine.id === 'r1');
+    expect(late?.isLate).toBe(true);
+    expect(late?.lateLabel).toMatch(/En retard/);
+    expect(filterRoutines(routines, '', true).map((routine) => routine.id)).toEqual(['r1']);
+    expect(filterRoutines(routines, 'hebdo', true)).toHaveLength(0);
+    expect(toRoutine(rows[0]).isLate).toBe(false);
   });
 });
 

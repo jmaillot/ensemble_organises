@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { SearchInput } from '@/components/ui/input';
+import { Badge } from '@/components/ui/primitives';
+import { Checkbox } from '@/components/ui/primitives';
 import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
@@ -46,11 +48,17 @@ export default function RoutinesPage() {
   const [dialog, setDialog] = useState<{ open: boolean; routine: Routine | null }>({ open: false, routine: null });
   const [pendingDelete, setPendingDelete] = useState<Routine | null>(null);
   const [pendingOccurrence, setPendingOccurrence] = useState<HistoryEntry | null>(null);
+  const [lateOnly, setLateOnly] = useState(false);
   const routinesPanelRef = useRef<HTMLDivElement>(null);
   const today = new Date();
   const grid = useCalendarGrid(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const monthLabel = useMemo(() => formatMonthLabel(new Date(grid.year, grid.month, 1)), [grid.month, grid.year]);
+  const lateCount = useMemo(() => visibleRoutines.filter((routine) => routine.isLate).length, [visibleRoutines]);
+  const filteredRoutines = useMemo(
+    () => (lateOnly ? visibleRoutines.filter((routine) => routine.isLate) : visibleRoutines),
+    [lateOnly, visibleRoutines],
+  );
   const openCreate = () => setDialog({ open: true, routine: null });
   const openEdit = (routine: Routine) => setDialog({ open: true, routine });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
@@ -157,15 +165,34 @@ export default function RoutinesPage() {
                   />
                 }
               >
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-coral has-[:checked]:bg-coral-soft">
+                    <Checkbox
+                      checked={lateOnly}
+                      onCheckedChange={(value) => setLateOnly(value === true)}
+                      aria-label="Afficher uniquement les routines en retard"
+                    />
+                    En retard uniquement
+                  </label>
+                  {lateCount > 0 ? (
+                    <span className="text-[11px] text-muted">
+                      {lateCount} routine{lateCount > 1 ? 's' : ''} à rattraper
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted">Aucun retard</span>
+                  )}
+                </div>
                 {isLoading ? (
                   <LoadingRows rows={3} />
-                ) : visibleRoutines.length === 0 ? (
+                ) : filteredRoutines.length === 0 ? (
                   <p className="m-0 text-xs text-muted">
-                    Aucune routine ne correspond à « {query.trim()} ». Modifiez la recherche ou créez un nouveau rituel.
+                    {lateOnly
+                      ? 'Aucune routine en retard. Tout est à jour.'
+                      : `Aucune routine ne correspond à « ${query.trim()} ». Modifiez la recherche ou créez un nouveau rituel.`}
                   </p>
                 ) : (
                   <div role="list" aria-label="Routines du foyer" className="grid">
-                    {visibleRoutines.map((routine) => (
+                    {filteredRoutines.map((routine) => (
                       <div
                         key={routine.id}
                         role="listitem"
@@ -191,6 +218,7 @@ export default function RoutinesPage() {
                         ) : null}
 
                         <span className="text-[11px] text-muted">{routine.streakLabel}</span>
+                        {routine.isLate ? <Badge tone="coral">{routine.lateLabel ?? 'En retard'}</Badge> : null}
 
                         <div className="ml-auto flex items-center gap-1">
                           <button

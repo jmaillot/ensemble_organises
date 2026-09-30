@@ -16,8 +16,8 @@ import {
   markOccurrenceDone,
   markOccurrenceMissed,
   setRoutineAssignees,
-  setRoutineReminder,
-  toReminderIso,
+  setRoutineReminders,
+  toReminderIsos,
   toRoutinePayload,
 } from '../api';
 import {
@@ -27,7 +27,7 @@ import {
   routineDayStatuses,
   routineHistory,
   routineMetrics,
-  ruleForPreset,
+  ruleForSelection,
   todayOccurrences as todayOccurrencesOf,
   type DayStatusMap,
   type HistoryEntry,
@@ -158,13 +158,25 @@ export function useRoutines(): UseRoutinesResult {
   const saveRoutine = useCallback(
     async (routine: Routine | null, values: RoutineFormValues) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
-      const payload = toRoutinePayload(values, ruleForPreset(values.frequency, values.customRule));
+      const selection = {
+        weeklyDays: values.weeklyDays,
+        monthlyMode: values.monthlyMode,
+        monthlyDay: values.monthlyDay,
+        nthRank: values.nthRank,
+        nthWeekday: values.nthWeekday,
+        yearlyMode: values.yearlyMode,
+        yearlyMonth: values.yearlyMonth,
+        yearlyDay: values.yearlyDay,
+        yearlyNthRank: values.yearlyNthRank,
+        yearlyNthWeekday: values.yearlyNthWeekday,
+      };
+      const payload = toRoutinePayload(values, ruleForSelection(values.frequency, selection, values.customRule));
       const saved = routine
         ? await update(routine.id, payload)
         : await create({ ...payload, household_id: householdId, created_by: currentMember?.id ?? null });
       await Promise.all([
         setRoutineAssignees(saved.id, values.assigneeIds),
-        setRoutineReminder(saved.id, toReminderIso(values.reminderAt)),
+        setRoutineReminders(saved.id, toReminderIsos(values.reminders, values.autoMinus1)),
       ]);
       await refresh();
     },
