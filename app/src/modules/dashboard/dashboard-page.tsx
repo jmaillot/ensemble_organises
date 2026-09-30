@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import { restrictToParentElement } from '@dnd-kit/modifiers';
 import {
@@ -80,8 +81,16 @@ export default function DashboardPage() {
   );
 
   const visibleKinds = useMemo(() => dashboard.placements.map((placement) => placement.kind), [dashboard.placements]);
+  // Pendant un drag, le curseur passe en « main fermée » sur toute la grille :
+  // au tactile la carte soulevée suffit, à la souris il faut le curseur.
+  const [draggingKind, setDraggingKind] = useState<WidgetKind | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggingKind(event.active.id as WidgetKind);
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setDraggingKind(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const from = active.id as WidgetKind;
@@ -218,7 +227,9 @@ export default function DashboardPage() {
               sensors={sensors}
               collisionDetection={closestCenter}
               modifiers={[restrictToParentElement]}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragCancel={() => setDraggingKind(null)}
             >
               <SortableContext
                 items={visibleKinds}
@@ -228,6 +239,7 @@ export default function DashboardPage() {
                   className={cn(
                     'grid gap-3.5',
                     WIDGET_COLUMNS === 2 ? 'sm:grid-cols-2' : 'grid-cols-1',
+                    draggingKind !== null && 'widgets-dragging',
                   )}
                 >
                   {dashboard.placements.map((placement) => (
@@ -371,7 +383,7 @@ function SortableWidget({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn('min-w-0', isDragging && 'relative z-10 opacity-55')}
+      className={cn('min-w-0', isDragging && 'relative z-10 cursor-grabbing opacity-55')}
       data-widget={kind}
     >
       {body()}

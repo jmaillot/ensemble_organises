@@ -263,4 +263,26 @@ test.describe('Mises en page', () => {
       .poll(async () => widgets.first().getAttribute('data-widget'), { timeout: 5000 })
       .not.toBe(before);
   });
+
+  test('pendant le drag souris, le curseur montre la main fermée', async ({ page }) => {
+    test.skip(viewportIsMobile(page), 'curseur souris : bureau uniquement');
+
+    await openDemoSession(page);
+
+    const handle = page.getByRole('button', { name: /Réordonner : / }).first();
+    await handle.scrollIntoViewIfNeeded();
+    const from = (await handle.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    // Au-delà du seuil d'activation (6 px), dnd-kit démarre le drag : la
+    // grille bascule en `widgets-dragging` et tout passe en `grabbing`.
+    await page.mouse.move(from.x + 30, from.y + 30, { steps: 5 });
+    await expect
+      .poll(async () => page.evaluate(() => document.querySelector('.widgets-dragging') !== null), { timeout: 5000 })
+      .toBe(true);
+    const cursor = await handle.evaluate((element) => getComputedStyle(element).cursor);
+    expect(cursor).toBe('grabbing');
+    await page.mouse.up();
+    await expect(page.locator('.widgets-dragging')).toHaveCount(0);
+  });
 });

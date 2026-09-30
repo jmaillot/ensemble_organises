@@ -50,7 +50,7 @@ export function WidgetCard({ placement, isEditing, dragHandleProps, children }: 
         <button
           type="button"
           {...dragHandleProps}
-          className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-[9px] text-muted select-none transition-colors [-webkit-touch-callout:none] hover:bg-accent-faint hover:text-fg"
+          className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-[9px] text-muted select-none transition-colors [-webkit-touch-callout:none] hover:bg-accent-faint hover:text-fg active:cursor-grabbing"
           aria-label={`Réordonner : ${label}`}
         >
           <Icon name="drag" size="sm" />

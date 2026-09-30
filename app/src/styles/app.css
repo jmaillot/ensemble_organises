@@ -235,6 +235,13 @@
   }
 }
 
+/* Pendant un drag à la souris, tout ce qui est sous le curseur affiche la
+   « main fermée », même hors de la poignée ou de la carte déplacée. */
+.widgets-dragging,
+.widgets-dragging * {
+  cursor: grabbing !important;
+}
+
 @utility scrollbar-slim {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
