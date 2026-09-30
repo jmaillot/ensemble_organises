@@ -69,6 +69,16 @@ describe('ArdoisePage', () => {
     expect(screen.getByText('Café du marché')).toBeInTheDocument();
   });
 
+  it('le payeur par défaut est le membre courant', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une dépense' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    // Sans session en test : repli sur le profil courant (Camille).
+    expect(within(dialog).getByLabelText(/Payé par/)).toHaveValue(DEMO_MEMBERS.camille);
+  });
+
   it('supprimer une dépense demande confirmation', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ArdoisePage />, { route: '/ardoise' });

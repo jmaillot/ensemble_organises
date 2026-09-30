@@ -8,6 +8,8 @@ import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, pluralize, relativeDayLabel } from '@/lib/utils';
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
+import { useSessionUser } from '@/hooks/use-auth';
+import { useMembers } from '@/stores/household-store';
 import { useAddExpense, useArdoise, useDeleteExpense, useSendInvitation, useUpdateExpense } from './hooks/use-ardoise';
 import type { Expense, NewExpenseInput } from './types';
 import { BalanceCard, MemberBalances } from './components/balance-panel';
@@ -41,6 +43,12 @@ export default function ArdoisePage() {
   const deleteExpense = useDeleteExpense();
   const sendInvitation = useSendInvitation();
   const toast = useToast();
+  const sessionUser = useSessionUser();
+  const members = useMembers();
+
+  // Payeur par défaut : le membre lié à la session, pas le profil courant
+  // (un parent peut saisir au nom d'un enfant). Repli : profil courant.
+  const selfMemberId = sessionUser ? (members.find((member) => member.user_id === sessionUser.id)?.id ?? null) : null;
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -296,7 +304,11 @@ export default function ArdoisePage() {
         }}
         members={sharingMembers}
         externalParticipants={externalParticipants}
-        defaultPayerId={currentMember?.id ?? null}
+        defaultPayerId={
+          selfMemberId && sharingMembers.some((member) => member.id === selfMemberId)
+            ? selfMemberId
+            : (currentMember?.id ?? null)
+        }
         onSubmit={handleAddExpense}
         isPending={addExpense.isPending || updateExpenseMutation.isPending}
         initialExpense={editingExpense}
