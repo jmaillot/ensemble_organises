@@ -501,3 +501,78 @@ démo IndexedDB), OAuth/SMTP réels. Et `supabase-project/` n'est toujours pas
 bootstrappé sur la machine principale : `test-db.sh` y échoue sur `no
 configuration file provided`, ce qui est un manque d'infra documenté, pas un
 défaut.
+
+---
+
+# Troisième campagne — Ardoise : rôles, externes, suppressions
+
+> 30 septembre 2026 · 2 migrations (0037, 0038), 0 fonction métier modifiée
+> dans le fond · `test-db.sh` 10/10, Vitest 268/268, e2e 31 passés
+
+Audit en trois volets (frontend, serveur/RLS, couverture) avant tout code.
+Trois défauts réels, deux décisions produit, et une erreur de test commise
+puis corrigée dans la même campagne.
+
+## 8. Les défauts
+
+### 8.1 Escalade `enfant` par le RPC — autorisation
+
+`create_expense` / `update_expense` (0035) vérifiaient l'appartenance
+(`assert_household_member`), pas le rôle. `EXECUTE to authenticated` ouvrait
+donc aux `enfant` une écriture que les RLS leur refusent en direct. Même
+famille que 1.1 : une porte (le RPC) qui n'applique pas la règle des autres
+portes. Correctif 0037 : `assert_household_writer` (admin ou membre) dans les
+deux RPC, tests `0009` (création comme modification refusées, message
+`rôle insuffisant`).
+
+### 8.2 Suppression des parts ouverte aux membres — autorisation
+
+`expense_participants_delete` n'exigeait que `can_write_expense`, quand toutes
+les autres tables enfants exigent leur `can_admin_*` et que `expenses_delete`
+exige déjà un admin. Combiné à la tolérance « zéro part » (0008), un membre
+annulait l'effet financier d'une dépense sans droit sur la dépense elle-même.
+Correctif 0037 : `can_admin_expense` + politique recréée. Le garde
+anti-passage-à-zéro envisagé est devenu inutile : un admin pouvant déjà
+supprimer la dépense entière, rien de nouveau ne lui est donné — et la
+dépense sans parts reste valide (test 0005 inchangé).
+
+### 8.3 Les externes n'auraient jamais dû partager — décision produit
+
+Le serveur les ignorait dans `household_balances` pendant que le client les
+recollait : sommes non nulles, résidus jamais soldés. Plutôt que réconcilier
+deux calculs, décision : plus d'externes sur les dépenses. Correctif 0038 :
+refus en RPC **et** dans le trigger (l'écriture directe PostgREST restait
+ouverte sinon), lignes existantes toujours lisibles, formulaire et `api.ts`
+alignés sur le même message. Leçon : une règle produit qui n'existe qu'en
+frontend n'existe pas — le trigger est la seule fermeture complète.
+
+## 9. L'erreur de test de cette campagne
+
+L'ajout d'une dépense `expense_c` en fixture 0002 a fait passer un comptage
+existant de 1 à 2 (« Alice ne voit pas les dépenses du foyer B »). Tentation :
+corriger le chiffre. Fait : reformuler l'assertion (« Alice voit ses 2
+dépenses et pas celle du foyer B ») pour qu'elle dise toujours la propriété
+d'isolation, pas un total. Un total codé en dur casse à chaque fixture ; une
+propriété survit.
+
+Même vigilance sur l'ordre : le bloc Alice s'exécute avant celui de Bob, donc
+le refus de Bob n'est significatif que si la ligne existe encore — d'où deux
+dépenses (Alice supprime sur `expense_c`, Bob est refusé sur `ep_a` intacte).
+Règle 2.4 rappelée à nos dépens : une assertion négative sur une ligne
+disparue est un vert frauduleux.
+
+## 10. Chaîne de cette campagne
+
+Statique 85 fonctions OK, `migrate.sh` puis `test-db.sh` 10/10 sur la machine
+principale (stack bootstrappée sans Traefik pour l'occasion : snapshot
+`self-hosted/v0.8.2`, clés générées, override Traefik non enregistré —
+`docker-compose.local.yml` porte les VAPID de `functions`, ignoré par git).
+Vitest 268/268 (+3 : garde externe API, erreur `customShares`, date invalide),
+build et e2e verts. `test-dispatch-push.sh` non rejoué : aucune migration ne
+touche au push, et la preuve `delivered:1` de la campagne précédente reste
+valable. `docs/BACKEND.md` corrigé aux trois endroits qui affirmaient
+l'ancien régime des externes (règle I : une absence affirmée se vérifie —
+ici c'est l'inverse, une présence affirmée qui n'existe plus).
+
+Reste à prouver, inchangé : le frontend contre un vrai Supabase (les e2e
+tournent en démo IndexedDB), OAuth/SMTP réels.
