@@ -9,6 +9,7 @@ import {
   type ModuleKey,
 } from '@/lib/modules';
 import { useHouseholdStore } from '@/stores/household-store';
+import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
@@ -28,6 +29,7 @@ export function AppShell() {
   const toast = useToast();
   const [unread, setUnread] = useState(2);
   const householdName = useHouseholdStore((state) => state.householdName);
+  const householdColor = useHouseholdStore((state) => state.householdColor);
   const members = useHouseholdStore((state) => state.members);
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
@@ -137,7 +139,7 @@ export function AppShell() {
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Votre espace</p>
           <div className="mx-0.5 mb-3 rounded-[16px] border border-border bg-bg p-3.5 max-[920px]:hidden">
             <div className="flex items-center gap-2.5">
-              <span className="grid size-[30px] place-items-center rounded-[10px] bg-accent text-[11px] font-extrabold text-surface">
+              <span className={`grid size-[30px] place-items-center rounded-[10px] ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
                 {initials(householdName)}
               </span>
               <div>

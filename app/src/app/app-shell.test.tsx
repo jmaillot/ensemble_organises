@@ -3,6 +3,7 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
 import { catalogueModules } from '@/lib/modules';
 import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
@@ -58,6 +59,19 @@ describe('AppShell', () => {
   it('propose un lien d’évitement vers le contenu principal', () => {
     renderShell('/accueil');
     expect(screen.getByRole('link', { name: 'Aller au contenu principal' })).toHaveAttribute('href', '#contenu-principal');
+  });
+
+  it('teinte le badge du foyer de sa couleur', () => {
+    renderShell('/accueil');
+    act(() => {
+      useHouseholdStore.setState({ householdColor: 'coral' });
+    });
+    try {
+      const badge = screen.getAllByText('FM')[0].closest('span');
+      expect(badge?.className).toContain('bg-coral');
+    } finally {
+      useHouseholdStore.setState({ householdColor: 'accent' });
+    }
   });
 });
 

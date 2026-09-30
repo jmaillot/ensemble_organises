@@ -7,7 +7,9 @@ import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { signOut } from '@/hooks/use-auth';
 import { useToast } from '@/components/ui/toast';
 import { Icon, type IconName } from './icon';
+import { memberTagClass } from './member-avatar';
 import { Input } from '@/components/ui/input';
+import { useHouseholdStore } from '@/stores/household-store';
 
 type DrawerKey = ModuleKey | 'accueil';
 
@@ -63,6 +65,7 @@ export interface MobileDrawerProps {
  * balayage vers la gauche et le verrou de scroll sont gérés ici.
  */
 export function MobileDrawer({ open, onOpenChange, householdName, memberCount, isAdmin }: MobileDrawerProps) {
+  const householdColor = useHouseholdStore((state) => state.householdColor);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const toast = useToast();
@@ -189,7 +192,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
 
           <div className="border-t border-border pt-3">
             <div className="mb-2.5 flex items-center gap-2.5 px-1">
-              <span className="grid size-[30px] shrink-0 place-items-center rounded-[10px] bg-accent text-[11px] font-extrabold text-surface">
+              <span className={`grid size-[30px] shrink-0 place-items-center rounded-[10px] ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
                 {initials(householdName)}
               </span>
               <div className="min-w-0">

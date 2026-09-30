@@ -9,8 +9,10 @@ const tagClass: Record<MemberColorTag, string> = {
   violet: 'bg-[oklch(55%_0.13_300)]',
 };
 
-export function memberTagClass(tag: MemberColorTag | null | undefined) {
-  return tagClass[tag ?? 'accent'];
+export function memberTagClass(tag: MemberColorTag | string | null | undefined) {
+  // Le foyer porte sa couleur en texte libre (`households.avatar_color`) : une
+  // valeur inconnue retombe sur l'accent plutôt que de casser le rendu.
+  return tag !== null && tag !== undefined && tag in tagClass ? tagClass[tag as MemberColorTag] : tagClass.accent;
 }
 
 export interface MemberAvatarProps {
