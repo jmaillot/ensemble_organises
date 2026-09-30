@@ -305,7 +305,7 @@ export function RoutineFormDialog({
                   <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Mode mensuel">
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="nth" checked={field.value === 'nth'} onChange={() => field.onChange('nth')} />
-                      Le 1er, 2e… jour de la semaine
+                      Le 1er, 2eme…
                     </label>
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="day" checked={field.value === 'day'} onChange={() => field.onChange('day')} />
@@ -369,7 +369,7 @@ export function RoutineFormDialog({
                   <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Mode annuel">
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="nth" checked={field.value === 'nth'} onChange={() => field.onChange('nth')} />
-                      Le 1er, 2e… jour de la semaine
+                      Le 1er, 2eme…
                     </label>
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="day" checked={field.value === 'day'} onChange={() => field.onChange('day')} />
