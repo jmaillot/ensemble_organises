@@ -2,7 +2,7 @@
  * Edge Function `push-notify`.
  *
  * Point d'entrée : `POST /functions/v1/push-notify`
- * Corps : `{ scope: 'rappels' | 'anniversaires' | 'test' }`
+ * Corps : `{ scope: 'rappels' | 'anniversaires' | 'messages' | 'test' }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['secret', 'user']`
@@ -74,7 +74,7 @@ class PushError extends Error {
 }
 
 const requestSchema = z.object({
-  scope: z.enum(['rappels', 'anniversaires', 'test']),
+  scope: z.enum(['rappels', 'anniversaires', 'messages', 'test']),
 });
 
 async function parseBody(request: Request): Promise<z.infer<typeof requestSchema>> {
@@ -138,10 +138,11 @@ interface DueNotification {
 }
 
 /** Type de rappel, pour la consommation : l'anniversaire n'a aucune ligne. */
-function reminderKind(tag: string): 'tache' | 'evenement' | 'routine' | null {
+function reminderKind(tag: string): 'tache' | 'evenement' | 'routine' | 'message' | null {
   if (tag.startsWith('tache-')) return 'tache';
   if (tag.startsWith('evenement-')) return 'evenement';
   if (tag.startsWith('routine-')) return 'routine';
+  if (tag.startsWith('message-')) return 'message';
   return null;
 }
 

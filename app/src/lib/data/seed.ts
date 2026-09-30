@@ -74,6 +74,7 @@ export const demoProfile: ProfileRow = {
   task_reminders_enabled: true,
   event_reminders_enabled: true,
   routine_reminders_enabled: true,
+  message_notifications_enabled: true,
   created_at: now(),
   updated_at: now(),
 };

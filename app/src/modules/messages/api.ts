@@ -1,7 +1,13 @@
 import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
+import type { CompressedImage } from '@/modules/cercle/lib/media';
 import type { ConversationMemberRow, ConversationRow, MessageRow } from '@/types';
+
+/** Bucket privé : `household-media` (0010), chemin préfixé par le foyer. */
+const MESSAGES_BUCKET = 'household-media';
+/** Durée de validité des URL signées servies par le Storage. */
+const SIGNED_URL_TTL = 60 * 60 * 24 * 30;
 
 /** Longueur maximale d'un message, comme la contrainte SQL (0004). */
 export const MAX_MESSAGE_LENGTH = 4000;
@@ -18,6 +24,8 @@ export interface MessageDraft {
   householdId: string;
   senderId: string;
   content: string;
+  /** URL du média joint (signée en mode Supabase, aperçu local en démo). */
+  mediaUrl?: string | null;
 }
 
 export async function fetchConversations(householdId: string | null): Promise<ConversationRow[]> {
@@ -37,7 +45,7 @@ export async function fetchMessages(householdId: string | null): Promise<Message
 
 export async function createMessage(draft: MessageDraft): Promise<MessageRow> {
   const content = draft.content.trim();
-  if (content.length === 0) throw new Error('Écrivez un message avant de l’envoyer.');
+  if (content.length === 0 && !draft.mediaUrl) throw new Error('Écrivez un message ou joignez une image.');
   if (content.length > MAX_MESSAGE_LENGTH) {
     throw new Error(`Un message fait ${MAX_MESSAGE_LENGTH} caractères au maximum.`);
   }
@@ -47,9 +55,31 @@ export async function createMessage(draft: MessageDraft): Promise<MessageRow> {
     household_id: draft.householdId,
     sender_id: draft.senderId,
     content,
-    media_url: null,
+    media_url: draft.mediaUrl ?? null,
     created_at: new Date().toISOString(),
   });
+}
+
+/**
+ * Dépôt d'une image jointe : bucket privé en mode Supabase (URL signée),
+ * aperçu local en mode démo. La compression a déjà été appliquée côté
+ * navigateur (module Cercle, sans dépendance).
+ */
+export async function depositMessageImage(input: {
+  householdId: string;
+  conversationId: string;
+  image: CompressedImage;
+}): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) return input.image.previewUrl;
+  const path = `${input.householdId}/messages/${input.conversationId}/${randomId('media')}.${input.image.mime === 'image/webp' ? 'webp' : 'jpg'}`;
+  const { error } = await supabase.storage.from(MESSAGES_BUCKET).upload(path, input.image.blob, {
+    contentType: input.image.mime,
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  const { data: signed, error: signError } = await supabase.storage.from(MESSAGES_BUCKET).createSignedUrl(path, SIGNED_URL_TTL);
+  if (signError) throw new Error(signError.message);
+  return signed.signedUrl;
 }
 
 export interface ConversationDraft {

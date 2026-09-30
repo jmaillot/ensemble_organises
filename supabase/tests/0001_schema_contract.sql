@@ -22,7 +22,7 @@ declare
 begin
   for r in
     select * from (values
-          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'created_at', 'updated_at']::text[]),
+          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at']::text[]),
           ('households', ARRAY['id', 'name', 'avatar_color', 'created_by', 'created_at', 'updated_at']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
@@ -139,6 +139,8 @@ $$;
 --     propriétaire du script. Même état que les précédentes, pour une raison
 --     différente — c'est bien la seule table de `public` qui ne soit pas
 --     une table métier.
+--   * `message_notifications` de même : file serveur (trigger, lecture et
+--     consommation serveur), jamais touchée par un client.
 do $$
 declare
   v_sans text;
@@ -149,7 +151,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'push_subscriptions', 'schema_migrations')
+     and c.relname not in ('household_invite_tokens', 'push_subscriptions', 'schema_migrations', 'message_notifications')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -167,6 +169,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''push_subscriptions'''),
     0::bigint,
     'push_subscriptions reste sans politique : un endpoint Push est une capacité'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''message_notifications'''),
+    0::bigint,
+    'message_notifications reste sans politique : file serveur uniquement'
   );
 end;
 $$;
@@ -223,7 +230,8 @@ do $$
 declare
   v_expected text[] := array[
     'shopping_list_items', 'routine_completions', 'gift_items',
-    'pet_records', 'post_media', 'post_comments', 'post_reactions', 'messages'
+    'pet_records', 'pet_attachments', 'note_attachments',
+    'post_media', 'post_comments', 'post_reactions', 'messages'
   ];
   r text;
 begin

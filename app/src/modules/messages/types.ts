@@ -31,6 +31,8 @@ export interface Message {
   senderName: string;
   senderColorTag: MemberColorTag;
   content: string;
+  /** URL signée (Supabase) ou aperçu local (démo) de l'image jointe. */
+  mediaUrl: string | null;
   createdAt: string;
   isMine: boolean;
   /** Message optimiste : affiché immédiatement, pas encore persisté. */
@@ -93,6 +95,7 @@ export function toMessage(
     senderName: sender?.display_name ?? 'Membre du foyer',
     senderColorTag: sender?.color_tag ?? 'accent',
     content: row.content,
+    mediaUrl: row.media_url ?? null,
     createdAt: row.created_at,
     isMine: row.sender_id === context.currentMemberId,
     // Les lignes optimistes ne sont pas encore persistées : on le signale.

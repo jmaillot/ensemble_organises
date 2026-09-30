@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, fetchConversationParticipants, fetchConversations, fetchMessages, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
+import { createConversation, addConversationMembers, createMessage, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
+import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { MessageRow } from '@/types';
 
@@ -68,6 +69,7 @@ export interface MessagesFeed {
   markRead: (conversationId: string) => void;
   send: (conversationId: string, content: string) => Promise<void>;
   isSending: boolean;
+  sendMedia: (conversationId: string, content: string, image: CompressedImage) => Promise<void>;
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
   isCreating: boolean;
@@ -151,13 +153,14 @@ export function useMessagesFeed(): MessagesFeed {
   }, [conversationRows, currentMemberId, members, messagesByConversation, participantRows, readMap, rows]);
 
   const sendMutation = useMutation({
-    mutationFn: (input: { conversationId: string; content: string }) => {
+    mutationFn: (input: { conversationId: string; content: string; mediaUrl?: string | null }) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
       return createMessage({
         conversationId: input.conversationId,
         householdId,
         senderId: currentMemberId,
         content: input.content,
+        mediaUrl: input.mediaUrl ?? null,
       });
     },
     onMutate: async (input) => {
@@ -171,7 +174,7 @@ export function useMessagesFeed(): MessagesFeed {
         household_id: householdId,
         sender_id: currentMemberId,
         content: input.content,
-        media_url: null,
+        media_url: input.mediaUrl ?? null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<MessageRow[]>(key, (current = []) => [...current, optimistic]);
@@ -196,6 +199,16 @@ export function useMessagesFeed(): MessagesFeed {
       await sendMutation.mutateAsync({ conversationId, content: trimmed });
     },
     [sendMutation],
+  );
+
+  /** Envoi avec image jointe : dépôt du média puis message, dans cet ordre. */
+  const sendMedia = useCallback(
+    async (conversationId: string, content: string, image: CompressedImage) => {
+      if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      const mediaUrl = await depositMessageImage({ householdId, conversationId, image });
+      await sendMutation.mutateAsync({ conversationId, content: content.trim(), mediaUrl });
+    },
+    [householdId, sendMutation],
   );
 
   const createMutation = useMutation({
@@ -249,6 +262,7 @@ export function useMessagesFeed(): MessagesFeed {
     markRead,
     send,
     isSending: sendMutation.isPending,
+    sendMedia,
     createConversation: createConversationAndSelect,
     addMembers,
     isCreating: createMutation.isPending || addMembersMutation.isPending,

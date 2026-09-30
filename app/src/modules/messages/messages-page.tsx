@@ -123,6 +123,15 @@ export default function MessagesPage() {
               toast(error instanceof Error ? error.message : 'Message non envoyé.', 'error');
             });
           }}
+          onSendMedia={
+            active
+              ? (content, image) => {
+                  void feed.sendMedia(active.id, content, image).catch((error: unknown) => {
+                    toast(error instanceof Error ? error.message : 'Image non envoyée.', 'error');
+                  });
+                }
+              : undefined
+          }
           onAddMember={active ? () => setAddOpen(true) : undefined}
           onBackToList={() => setListVisible(true)}
           className={cn(
