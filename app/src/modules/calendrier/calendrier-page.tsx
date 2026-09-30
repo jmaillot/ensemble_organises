@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { ModuleShell, MetricRow, Panel, CountBadge } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -18,6 +19,7 @@ const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.
 
 export default function CalendrierPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { events, birthdays, reminders, isLoading, isError, error, refetch, isMutating, saveEvent, removeEvent } =
     useCalendrier();
   // Curseur calé sur le 1er du mois courant : la grille démarre bien le lundi.
@@ -118,6 +120,17 @@ export default function CalendrierPage() {
                 onClick={() => openCreate(selected)}
               >
                 Ajouter à cette journée
+              </Button>
+            )}
+            {isLoading ? null : (
+              <Button
+                variant="quiet"
+                icon="checkCircle"
+                fullWidth
+                className="mt-2"
+                onClick={() => navigate('/taches', { state: { dueDate: selected } })}
+              >
+                Ajouter une tâche à cette journée
               </Button>
             )}
             <p className="mt-3 text-[11px] text-muted">

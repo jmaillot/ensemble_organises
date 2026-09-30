@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import {
   DndContext,
   DragOverlay,
@@ -30,6 +31,8 @@ const screenReaderInstructions = {
 
 export default function TachesPage() {
   const toast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     visibleTasks,
     reminders,
@@ -50,9 +53,29 @@ export default function TachesPage() {
     removeTask,
     reorder,
   } = useTaches();
-  const [dialog, setDialog] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null });
+  const [dialog, setDialog] = useState<{ open: boolean; task: Task | null; dueDate: string | null }>({
+    open: false,
+    task: null,
+    dueDate: null,
+  });
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [dragged, setDragged] = useState<Task | null>(null);
+
+  // Raccourci depuis le calendrier : l'échéance voyage dans l'état de
+  // navigation et ouvre la création, consommé une seule fois (sans quoi chaque
+  // retour rouvrirait le dialogue).
+  const navStateConsumed = useRef(false);
+  useEffect(() => {
+    if (navStateConsumed.current) return;
+    navStateConsumed.current = true;
+    const incoming = (location.state as { dueDate?: unknown } | null)?.dueDate;
+    if (typeof incoming === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(incoming)) {
+      setDialog({ open: true, task: null, dueDate: incoming });
+      navigate('/taches', { replace: true });
+    }
+    // Montage uniquement : l'état de navigation ne se rejoue pas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sensors = useSensors(
     // Un simple clic ne doit pas démarrer un déplacement.
@@ -60,8 +83,8 @@ export default function TachesPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const openCreate = () => setDialog({ open: true, task: null });
-  const openEdit = (task: Task) => setDialog({ open: true, task });
+  const openCreate = () => setDialog({ open: true, task: null, dueDate: null });
+  const openEdit = (task: Task) => setDialog({ open: true, task, dueDate: null });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
 
   // Les annonces du glisser-déposer citent le nom de la tâche, pas son identifiant.
@@ -245,6 +268,7 @@ export default function TachesPage() {
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         task={dialog.task}
         currentMemberId={currentMemberId}
+        initialDueDate={dialog.dueDate}
         isSaving={isMutating}
         onSubmit={async (values) => {
           const editing = dialog.task;

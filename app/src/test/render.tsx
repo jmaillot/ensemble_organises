@@ -24,7 +24,7 @@ export function seedHouseholdStore() {
 }
 
 export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
-  route?: string;
+  route?: string | { pathname: string; state?: unknown };
   queryClient?: QueryClient;
   withHousehold?: boolean;
 }

@@ -28,11 +28,11 @@ const taskSchema = z.object({
 
 const toReminderValue = (remindAt: string | null) => (remindAt ? remindAt.slice(0, 16) : '');
 
-function defaultValues(task: Task | null, currentMemberId: string): TaskFormValues {
+function defaultValues(task: Task | null, currentMemberId: string, initialDueDate: string | null = null): TaskFormValues {
   if (!task) {
     return {
       name: '',
-      dueDate: todayIso(),
+      dueDate: initialDueDate ?? todayIso(),
       description: '',
       priority: 'normale',
       assigneeIds: currentMemberId ? [currentMemberId] : [],
@@ -55,6 +55,8 @@ export interface TaskFormDialogProps {
   task: Task | null;
   /** Membre coché par défaut à la création. */
   currentMemberId: string;
+  /** Échéance pré-remplie à la création (raccourci depuis le calendrier). */
+  initialDueDate?: string | null;
   isSaving?: boolean;
   onSubmit: (values: TaskFormValues) => Promise<void> | void;
 }
@@ -65,6 +67,7 @@ export function TaskFormDialog({
   onOpenChange,
   task,
   currentMemberId,
+  initialDueDate = null,
   isSaving = false,
   onSubmit,
 }: TaskFormDialogProps) {
@@ -77,11 +80,11 @@ export function TaskFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(task, currentMemberId));
+    reset(defaultValues(task, currentMemberId, initialDueDate));
     // `task` identifie une ouverture : le formulaire n'est pas réinitialisé à
     // chaque frappe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task?.id, currentMemberId]);
+  }, [open, task?.id, currentMemberId, initialDueDate]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

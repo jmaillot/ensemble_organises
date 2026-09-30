@@ -56,6 +56,12 @@ const selectDay = async (user: UserEvent, iso: string) => {
 };
 
 describe('CalendrierPage', () => {
+  it('propose un raccourci vers la création de tâche du jour affiché', async () => {
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    expect(await screen.findByRole('button', { name: 'Ajouter une tâche à cette journée' })).toBeInTheDocument();
+  });
+
   it('sélectionner une date met à jour l’agenda du jour', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });

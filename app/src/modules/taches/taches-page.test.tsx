@@ -98,4 +98,20 @@ describe('TachesPage', () => {
     // Le foyer compte désormais une tâche de plus.
     expect(screen.getByText('dans la liste').previousElementSibling).toHaveTextContent('5');
   });
+
+  it('ouvre la création pré-remplie depuis l’état de navigation (raccourci calendrier)', async () => {
+    supportDialogEnvironment();
+    renderWithProviders(<TachesPage />, { route: { pathname: '/taches', state: { dueDate: '2026-10-15' } } });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Ajouter une tâche')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Échéance/)).toHaveValue('2026-10-15');
+  });
+
+  it('ignore un état de navigation invalide sans ouvrir le dialogue', async () => {
+    renderWithProviders(<TachesPage />, { route: { pathname: '/taches', state: { dueDate: 'n’importe quoi' } } });
+
+    await findTaskList();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
