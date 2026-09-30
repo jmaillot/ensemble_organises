@@ -88,12 +88,13 @@ begin
     ' values (%L, %L, ''membre'', %L, 5.00)',
     private.new_id('expense-participant'), cinema, lina_m));
 
-  -- Un participant externe doit être rattaché au même foyer.
+  -- Un participant externe est refusé sur une dépense (0038 : partage entre
+  -- membres uniquement), quel que soit son foyer de rattachement.
   perform testkit.expect_denied(format(
     'insert into public.expense_participants (id, expense_id, participant_type, external_participant_id, share_amount)'
     ' values (%L, %L, ''externe'', %L, 10.00)',
     private.new_id('expense-participant'), cinema, private.new_id('external')),
-    'un participant externe doit exister dans le foyer de la dépense');
+    'un participant externe ne peut pas partager une dépense');
 
   -- Un membre ne peut pas être à la fois `membre` et `externe`.
   perform testkit.expect_denied(format(

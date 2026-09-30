@@ -9,7 +9,17 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, todayIso } from '@/lib/utils';
-import { EXTERNAL_KEY_PREFIX, MEMBER_KEY_PREFIX, externalKey, memberKey, roundCents, type Expense, type ExternalParticipant, type MemberOption, type NewExpenseInput, type SplitType } from '../types';
+import { MEMBER_KEY_PREFIX, memberKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type SplitType } from '../types';
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Date calendaire réelle (`2026-02-30` est refusé), passée ou future. */
+const isRealDate = (value: string) => {
+  if (!DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+};
 
 const schema = z
   .object({
@@ -20,10 +30,9 @@ const schema = z
       .min(1, 'Indiquez un montant.')
       .refine((value) => parseAmount(value) > 0, 'Le montant doit être supérieur à zéro.'),
     paidBy: z.string().min(1, 'Choisissez qui a payé.'),
-    date: z.string().min(1, 'Indiquez une date.'),
+    date: z.string().refine(isRealDate, 'Indiquez une date valide (AAAA-MM-JJ).'),
     splitType: z.enum(['egal', 'personnalise']),
     participants: z.array(z.string()).min(1, 'Choisissez au moins une personne qui partage.'),
-    externalIds: z.array(z.string()),
     customShares: z.record(z.string(), z.string()),
   })
   .refine(
@@ -48,7 +57,6 @@ export interface ExpenseFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: MemberOption[];
-  externalParticipants: ExternalParticipant[];
   defaultPayerId: string | null;
   onSubmit: (values: NewExpenseInput) => void;
   isPending?: boolean;
@@ -58,15 +66,15 @@ export interface ExpenseFormDialogProps {
 
 /**
  * Ajout et modification d'une dépense : libellé, montant, payeur et
- * participants restent visibles ; date, type de partage, participants
- * externes et montants personnalisés sont repliés pour rester lisible sur
- * mobile. En édition, le formulaire est pré-rempli de la dépense visée.
+ * participants restent visibles ; date, type de partage et montants
+ * personnalisés sont repliés pour rester lisible sur mobile. Le partage se
+ * fait entre membres du foyer uniquement (décision 0038). En édition, le
+ * formulaire est pré-rempli de la dépense visée.
  */
 export function ExpenseFormDialog({
   open,
   onOpenChange,
   members,
-  externalParticipants,
   defaultPayerId,
   onSubmit,
   isPending = false,
@@ -84,7 +92,6 @@ export function ExpenseFormDialog({
         date: todayIso(),
         splitType: 'egal',
         participants: members.map((member) => member.id),
-        externalIds: [],
         customShares: {},
       };
     }
@@ -95,7 +102,6 @@ export function ExpenseFormDialog({
       date: expense.date,
       splitType: expense.splitType,
       participants: expense.participants.filter((participant) => participant.kind === 'membre').map((participant) => participant.key.slice(MEMBER_KEY_PREFIX.length)),
-      externalIds: expense.participants.filter((participant) => participant.kind === 'externe').map((participant) => participant.key.slice(EXTERNAL_KEY_PREFIX.length)),
       customShares: Object.fromEntries(expense.participants.map((participant) => [participant.key, String(participant.shareAmount)])),
     };
   };
@@ -119,9 +125,8 @@ export function ExpenseFormDialog({
 
   const splitType = watch('splitType');
   const participants = watch('participants') ?? [];
-  const externalIds = watch('externalIds') ?? [];
   const amount = parseAmount(watch('amount'));
-  const shareCount = participants.length + externalIds.length;
+  const shareCount = participants.length;
 
   const submit = (values: FormValues) => {
     onSubmit({
@@ -130,7 +135,7 @@ export function ExpenseFormDialog({
       paidBy: values.paidBy,
       date: values.date,
       splitType: values.splitType as SplitType,
-      participants: [...values.participants.map(memberKey), ...values.externalIds.map(externalKey)],
+      participants: values.participants.map(memberKey),
       customShares:
         values.splitType === 'personnalise'
           ? Object.fromEntries(
@@ -220,29 +225,17 @@ export function ExpenseFormDialog({
                 </Field>
               </div>
 
-              {externalParticipants.length > 0 ? (
-                <fieldset className="grid gap-1.5">
-                  <legend className="text-[11px] font-extrabold text-muted">Participants externes</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {externalParticipants.map((participant) => (
-                      <label key={participant.id} className={checkOption}>
-                        <input type="checkbox" value={participant.id} className="accent-accent" {...register('externalIds')} />
-                        <span className="grid size-[23px] shrink-0 place-items-center rounded-[8px] bg-muted text-[9px] font-extrabold text-surface">
-                          {participant.name.slice(0, 2).toUpperCase()}
-                        </span>
-                        {participant.name}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ) : null}
-
               {splitType === 'personnalise' ? (
                 <fieldset className="grid gap-2">
                   <legend className="text-[11px] font-extrabold text-muted">Montants personnalisés</legend>
                   <p className="m-0 text-[10px] text-muted">
                     Le dernier participant absorbe l’écart pour que la somme corresponde au montant.
                   </p>
+                  {typeof errors.customShares?.message === 'string' ? (
+                    <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+                      {errors.customShares.message}
+                    </p>
+                  ) : null}
                   {members
                     .filter((member) => participants.includes(member.id))
                     .map((member) => (

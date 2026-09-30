@@ -23,6 +23,13 @@ export interface ArdoiseSnapshot {
   participants: ExpenseParticipantRow[];
   externalParticipants: ExternalParticipantRow[];
 }
+
+/** Les dépenses ne se partagent qu'entre membres (décision 0038, même message que le serveur). */
+function assertMembersOnly(participants: string[]): void {
+  if (participants.some((key) => !key.startsWith(MEMBER_KEY_PREFIX))) {
+    throw new Error('Les participants externes ne sont plus acceptés sur une dépense : partagez entre membres du foyer.');
+  }
+}
 export async function fetchArdoiseSnapshot(householdId: string): Promise<ArdoiseSnapshot> {
   const [expenses, participants, externalParticipants] = await Promise.all([
     data.list<ExpenseRow>('expenses', { household_id: householdId }),
@@ -45,6 +52,7 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
   if (input.participants.length === 0) {
     throw new Error('Choisissez au moins une personne qui partage la dépense.');
   }
+  assertMembersOnly(input.participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');
@@ -107,6 +115,7 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
   if (input.participants.length === 0) {
     throw new Error('Choisissez au moins une personne qui partage la dépense.');
   }
+  assertMembersOnly(input.participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');

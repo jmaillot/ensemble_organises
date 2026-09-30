@@ -57,6 +57,16 @@ describe('createExpense par RPC', () => {
     await expect(createExpense('household_1', { ...input, participants: [] })).rejects.toThrow('au moins une personne');
     expect(mockRpc).not.toHaveBeenCalled();
   });
+
+  it('refuse les participants externes avant tout appel réseau', async () => {
+    await expect(
+      createExpense('household_1', { ...input, participants: ['membre:alice', 'externe:e1'] }),
+    ).rejects.toThrow('ne sont plus acceptés');
+    await expect(
+      updateExpense('expense_1', { ...input, participants: ['externe:e1'] }),
+    ).rejects.toThrow('ne sont plus acceptés');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
 });
 
 describe('updateExpense par RPC', () => {

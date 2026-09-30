@@ -96,4 +96,36 @@ describe('ArdoisePage', () => {
     await waitFor(() => expect(screen.queryByText('Café du marché')).not.toBeInTheDocument());
     await waitFor(() => expectAmount('balance-total', seedTotal - 8.5));
   });
+
+  it('affiche le refus des montants personnalisés négatifs', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une dépense' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Libellé/), 'Repas');
+    await user.type(within(dialog).getByLabelText(/Montant/), '30');
+    await user.click(within(dialog).getByRole('button', { name: 'Options avancées' }));
+    await user.selectOptions(within(dialog).getByLabelText(/Type de partage/), 'personnalise');
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Camille Martin' }), '-5');
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter la dépense' }));
+
+    expect(await within(dialog).findByText('Les montants personnalisés doivent être positifs.')).toBeInTheDocument();
+    expect(screen.queryByText('Repas')).not.toBeInTheDocument();
+  });
+
+  it('refuse une date invalide', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une dépense' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Libellé/), 'Repas');
+    await user.type(within(dialog).getByLabelText(/Montant/), '30');
+    await user.click(within(dialog).getByRole('button', { name: 'Options avancées' }));
+    await user.clear(within(dialog).getByLabelText(/Date/));
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter la dépense' }));
+
+    expect(await within(dialog).findByText('Indiquez une date valide (AAAA-MM-JJ).')).toBeInTheDocument();
+  });
 });

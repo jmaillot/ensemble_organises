@@ -20,20 +20,24 @@ do $$
 declare
   alice uuid := testkit.auth_user('rpc-alice@example.fr', 'Alice Martin');
   bob uuid := testkit.auth_user('rpc-bob@example.fr', 'Bob Martin');
+  kid uuid := testkit.auth_user('rpc-kid@example.fr', 'Noé Martin');
   outsider uuid := testkit.auth_user('rpc-outsider@example.fr', 'Olivier Fantome');
   home text := testkit.household(alice, 'Foyer RPC');
   alice_m text;
   bob_m text;
+  kid_m text;
   victime text := private.new_id('expense');
 begin
   alice_m := testkit.member(home, alice, 'Alice Martin', 'admin', 'accent');
   bob_m := testkit.member(home, bob, 'Bob Martin', 'membre', 'ink');
+  kid_m := testkit.member(home, kid, 'Noé Martin', 'enfant', 'amber');
   insert into testkit.fx (key, user_id) values
-    ('alice', alice), ('bob', bob), ('outsider', outsider);
+    ('alice', alice), ('bob', bob), ('kid', kid), ('outsider', outsider);
   insert into testkit.fx (key, household_id) values ('home', home);
   insert into testkit.fx (key, row_id) values
     ('alice_m', alice_m),
-    ('bob_m', bob_m);
+    ('bob_m', bob_m),
+    ('kid_m', kid_m);
 
   -- Dépense « victime » pour le test outsider-update : payée par Alice pour
   -- sa seule part, donc solde nul et sans effet sur les assertions finales.
@@ -122,8 +126,53 @@ begin
   exception when others then
     perform testkit.ok(sqlerrm like '%introuvable%', 'le refus dit l''absence : ' || sqlerrm);
   end;
+
+  -- Part externe : refusée depuis 0038, même rattachée au foyer.
+  begin
+    perform public.create_expense(home, 'Avec un ami', 20.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'externe', 'member_id', null, 'external_participant_id', 'external_x', 'share_amount', 20)));
+    perform testkit.ok(false, 'une part externe doit être refusée par le RPC');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%ne sont plus acceptés%', 'le refus dit l''exclusion : ' || sqlerrm);
+  end;
 end;
 $$;
+
+-- Enfant du foyer : lecture seule, y compris par RPC (0037).
+select testkit.as_user(user_id, 'rpc-kid@example.fr') from testkit.fx where key = 'kid';
+
+do $$
+declare
+  home text;
+  alice_m text;
+begin
+  select household_id into home from testkit.fx where key = 'home';
+  select row_id into alice_m from testkit.fx where key = 'alice_m';
+
+  begin
+    perform public.create_expense(home, 'Goûter', 10.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+    perform testkit.ok(false, 'un enfant ne crée pas de dépense par RPC');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
+  end;
+
+  begin
+    perform public.update_expense(
+      (select row_id from testkit.fx where key = 'victime'),
+      'Goûter détourné', 10.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+    perform testkit.ok(false, 'un enfant ne modifie pas de dépense par RPC');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
+  end;
+end;
+$$;
+
+reset role;
 
 -- Acteur extérieur au foyer : création comme modification sont refusées.
 select testkit.as_user(user_id, 'rpc-outsider@example.fr') from testkit.fx where key = 'outsider';

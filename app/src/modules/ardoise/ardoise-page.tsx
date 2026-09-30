@@ -18,7 +18,7 @@ import { ExpenseFormDialog } from './components/expense-form-dialog';
 import { InviteMemberDialog } from './components/invite-member-dialog';
 
 const rowAction =
-  'grid size-[31px] shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';
+  'grid size-11 shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';
 
 export default function ArdoisePage() {
   const {
@@ -27,7 +27,6 @@ export default function ArdoisePage() {
     settlements,
     settlementSource,
     sharingMembers,
-    externalParticipants,
     currentMember,
     total,
     monthTotal,
@@ -303,7 +302,6 @@ export default function ArdoisePage() {
           if (!open) setEditingExpense(null);
         }}
         members={sharingMembers}
-        externalParticipants={externalParticipants}
         defaultPayerId={
           selfMemberId && sharingMembers.some((member) => member.id === selfMemberId)
             ? selfMemberId

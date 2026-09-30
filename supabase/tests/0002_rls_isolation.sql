@@ -40,6 +40,7 @@ declare
   conv_b text := private.new_id('conversation');
   expense_a text := private.new_id('expense');
   expense_b text := private.new_id('expense');
+  expense_c text := private.new_id('expense');
   private_list text := private.new_id('gift-list');
   transfer_list text := private.new_id('gift-list');
   shared_list text := private.new_id('gift-list');
@@ -61,13 +62,21 @@ begin
 
   insert into public.expenses (id, household_id, title, amount, paid_by, expense_date)
   values (expense_a, home_a, 'Courses', 30.00, alice_m, current_date),
-         (expense_b, home_b, 'Essence', 40.00, carol_m, current_date);
+         (expense_b, home_b, 'Essence', 40.00, carol_m, current_date),
+         (expense_c, home_a, 'Extra', 10.00, alice_m, current_date);
 
   insert into public.conversations (id, household_id, type, title)
   values (conv_a, home_a, 'groupe', 'Foyer A'), (conv_b, home_b, 'direct', null);
 
   insert into public.conversation_members (conversation_id, member_id)
   values (conv_a, alice_m), (conv_a, bob_m), (conv_b, carol_m);
+
+  -- Parts uniques : suppression totale tolérée (0008), ce qui permet de
+  -- prouver le droit de suppression sans casser la somme. `ep_a` reste
+  -- intacte pour le test de refus de Bob, qui s'exécute après.
+  insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)
+  values ('ep_a', expense_a, 'membre', alice_m, 30.00),
+         ('ep_c', expense_c, 'membre', alice_m, 10.00);
 
   insert into public.messages (id, conversation_id, household_id, sender_id, content)
   values (private.new_id('message'), conv_a, home_a, alice_m, 'Bonjour'),
@@ -101,6 +110,9 @@ begin
     ('conv_b', null, home_b, conv_b),
     ('expense_a', null, home_a, expense_a),
     ('expense_b', null, home_b, expense_b),
+    ('expense_c', null, home_a, expense_c),
+    ('ep_a', null, home_a, 'ep_a'),
+    ('ep_c', null, home_a, 'ep_c'),
     ('private_list', null, home_a, private_list),
     ('shared_list', null, home_a, shared_list),
     ('transfer_list', null, home_a, transfer_list);
@@ -137,8 +149,8 @@ select testkit.eq(testkit.count('select 1 from public.shopping_lists'), 1::bigin
   'Alice ne voit pas les listes du foyer B');
 select testkit.eq(testkit.count('select 1 from public.shopping_list_items'), 1::bigint,
   'les articles enfants suivent le parent');
-select testkit.eq(testkit.count('select 1 from public.expenses'), 1::bigint,
-  'Alice ne voit pas les dépenses du foyer B');
+select testkit.eq(testkit.count('select 1 from public.expenses'), 2::bigint,
+  'Alice voit ses 2 dépenses et pas celle du foyer B');
 select testkit.eq(testkit.count('select 1 from public.conversations'), 1::bigint,
   'Alice ne voit pas les conversations du foyer B');
 select testkit.eq(testkit.count('select 1 from public.messages'), 1::bigint,
@@ -222,6 +234,9 @@ select testkit.expect_denied(format(
   'insert into public.routine_assignees (routine_id, member_id) values (%L, %L)',
   'routine_a', (select row_id from testkit.fx where key = 'dave')),
   'un assignataire de routine doit appartenir au foyer de la routine');
+select testkit.eq(testkit.affected(format(
+  'delete from public.expense_participants where id = %L', (select row_id from testkit.fx where key = 'ep_c'))), 1::bigint,
+  'une administratrice peut retirer une part de dépense');
 
 -- --- Intégrité des colonnes dénormalisées et références ---------------------
 select testkit.expect_denied(format(
@@ -355,6 +370,9 @@ select testkit.eq(testkit.affected(format(
 select testkit.eq(testkit.affected(format(
   'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 0::bigint,
   'la suppression d''une tâche est réservée aux administrateurs');
+select testkit.eq(testkit.affected(format(
+  'delete from public.expense_participants where id = %L', (select row_id from testkit.fx where key = 'ep_a'))), 0::bigint,
+  'la suppression d''une part de dépense est réservée aux administrateurs');
 
 -- En revanche il écrit dans le contenu de son foyer.
 select testkit.ok(
@@ -382,6 +400,13 @@ select testkit.eq(testkit.affected(format(
 select testkit.eq(testkit.affected(format(
   'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 0::bigint,
   'un enfant ne supprime pas les tâches du foyer');
+select testkit.expect_denied(format(
+  'insert into public.expenses (id, household_id, title, amount, paid_by, expense_date) values (%L, %L, %L, 10, %L, current_date)',
+  'expense_kid', (select household_id from testkit.fx where key = 'alice'), 'Goûter', (select row_id from testkit.fx where key = 'alice')),
+  'un enfant ne crée pas de dépense');
+select testkit.eq(testkit.affected(format(
+  'delete from public.expense_participants where id = %L', (select row_id from testkit.fx where key = 'ep_a'))), 0::bigint,
+  'un enfant ne supprime pas les parts de dépense');
 
 reset role;
 

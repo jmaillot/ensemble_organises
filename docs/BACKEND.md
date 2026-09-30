@@ -1033,9 +1033,12 @@ L'intégrité de la répartition est garantie par le schéma et par la base, pas
 le client :
 
 * `expense_participants` impose `membre` ⇒ `member_id` rempli et
-  `external_participant_id` nul, et l'inverse pour `externe` ;
-* un déclencheur vérifie que le membre **et** le participant externe
-  appartiennent au foyer de la dépense ;
+  `external_participant_id` nul, et l'inverse pour `externe` (contrainte de
+  forme, inchangée) ;
+* depuis la migration 0038, les parts `externe` sont **refusées** : le RPC
+  comme le déclencheur `validate_expense_participant` n'acceptent que des
+  membres du foyer — les lignes existantes restent lisibles, aucune nouvelle
+  ne peut être créée, en RPC comme en écriture directe ;
 * une contrainte **différée** vérifie que la somme des parts correspond au
   montant de la dépense. Elle est contrôlée au `COMMIT` de chaque transaction :
   des appels PostgREST séparés sont donc des transactions séparées, et la
@@ -1060,9 +1063,11 @@ en base, puis agrégat JSON des soldes et des transferts. Le pont est
 > Le frontend affiche les soldes du serveur quand il est connecté
 > (`useServerSettlement`, même requête partagée par la page Ardoise et le
 > résumé de l'accueil) : le calcul local de `types.ts` ne sert que de repli
-> (démo, hors ligne, fonction injoignable) et pour les participants externes,
-> que le serveur ignore. Le panneau des soldes dit sa source (« Soldes
-> calculés côté serveur. ») plutôt que de la laisser deviner.
+> (démo, hors ligne, fonction injoignable). Les participants externes ne
+> peuvent plus être ajoutés aux dépenses (0038) ; les affichages qui les
+> nomment encore ne concernent que des lignes antérieures. Le panneau des
+> soldes dit sa source (« Soldes calculés côté serveur. ») plutôt que de la
+> laisser deviner.
 
 ---
 
@@ -1111,7 +1116,7 @@ RLS ne lève pas d'erreur : elle n'est simplement pas visible.
 | `0002_rls_isolation.sql` | lecture et écriture inter-foyers, escalade de rôle, dernier administrateur, rôle `enfant` en lecture seule, accès dérivés du parent, intégrité des références de membre et des `household_id` dénormalisés, visibilité des listes privées et partagées, widgets personnels, profils sans liste globale, `anon` sans accès |
 | `0003_invites.sql` | cycle de vie complet des tokens : empreintes 64 hex, jamais de token brut en base, régénération, révocation, expiration, plafond 90 jours, `max_uses`, idempotence, rôle `admin` refusé, refus des non-administrateurs, comparaison à temps constant |
 | `0004_cron.sql` | prédicat RRULE, génération idempotente des occurrences, escalade en `manque`, protection des occurrences validées, présence des **cinq** jobs et de leurs horaires, `database_name` courant, absence de secret (y compris VAPID) dans `cron.job.command`, job n'appelant qu'une fonction privée sans paramètre, point d'entrée d'envoi unique |
-| `0005_ardoise.sql` | soldes par membre, somme des soldes nulle, compensation minimale des dettes, intégrité de la répartition (somme des parts, participant externe rattaché au même foyer), pont `public.expense_settlement` (contrat de réponse, acteur non membre refusé, privilèges `service_role` uniquement) |
+| `0005_ardoise.sql` | soldes par membre, somme des soldes nulle, compensation minimale des dettes, intégrité de la répartition (somme des parts, participant externe refusé depuis 0038), pont `public.expense_settlement` (contrat de réponse, acteur non membre refusé, privilèges `service_role` uniquement) |
 | `0006_birthdays.sql` | prochaine occurrence d'un anniversaire (29 février compris), périmètre « mois + 7 jours », isolation entre foyers, job `eo-birthday-alerts` planifié sur la base courante sans secret, privilèges `service_role` uniquement |
 | `0007_push.sql` | `push_subscriptions` inaccessible au client **et** aux fonctions serveur pour un client, enregistrement / renouvellement / transfert d'un endpoint, révocation par son seul propriétaire, clés de chiffrement absentes des réponses, fenêtre de 24 h, destinataires par type de rappel, préférences appliquées, message de test produit par la base, consommation sans doublon, `404`/`410` supprimant l'abonnement, seuil d'échecs, purge des inactifs, jobs inoffensifs sans destinataire |
 

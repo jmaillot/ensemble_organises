@@ -49,7 +49,7 @@ export function SettlementsPanel({ settlements, className }: SettlementsPanelPro
               </span>
               <button
                 type="button"
-                className="grid size-[31px] shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+                className="grid size-11 shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
                 aria-label={`Copier le règlement : ${settlement.fromName} vers ${settlement.toName}`}
                 onClick={() => void copy(settlement)}
               >
