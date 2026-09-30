@@ -22,13 +22,26 @@ declare
   bob uuid := testkit.auth_user('rpc-bob@example.fr', 'Bob Martin');
   outsider uuid := testkit.auth_user('rpc-outsider@example.fr', 'Olivier Fantome');
   home text := testkit.household(alice, 'Foyer RPC');
+  alice_m text;
+  bob_m text;
+  victime text := private.new_id('expense');
 begin
+  alice_m := testkit.member(home, alice, 'Alice Martin', 'admin', 'accent');
+  bob_m := testkit.member(home, bob, 'Bob Martin', 'membre', 'ink');
   insert into testkit.fx (key, user_id) values
     ('alice', alice), ('bob', bob), ('outsider', outsider);
   insert into testkit.fx (key, household_id) values ('home', home);
   insert into testkit.fx (key, row_id) values
-    ('alice_m', testkit.member(home, alice, 'Alice Martin', 'admin', 'accent')),
-    ('bob_m', testkit.member(home, bob, 'Bob Martin', 'membre', 'ink'));
+    ('alice_m', alice_m),
+    ('bob_m', bob_m);
+
+  -- Dépense « victime » pour le test outsider-update : payée par Alice pour
+  -- sa seule part, donc solde nul et sans effet sur les assertions finales.
+  insert into public.expenses (id, household_id, title, amount, paid_by, expense_date, split_type)
+  values (victime, home, 'Victime', 10.00, alice_m, current_date, 'egal');
+  insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)
+  values (private.new_id('expense-participant'), victime, 'membre', alice_m, 10.00);
+  insert into testkit.fx (key, row_id) values ('victime', victime);
 end;
 $$;
 
@@ -42,25 +55,28 @@ declare
   alice_m text;
   bob_m text;
   v_result jsonb;
+  v_repas text;
 begin
   select household_id into home from testkit.fx where key = 'home';
   select row_id into alice_m from testkit.fx where key = 'alice_m';
   select row_id into bob_m from testkit.fx where key = 'bob_m';
 
   -- Le cas du 30/09 : 30 €, deux parts de 15 €, en UN appel.
+  -- L'identifiant créé reste en variable : `testkit.fx` n'est pas inscriptible
+  -- en `authenticated` (lecture seule, cf. _setup.sql).
   v_result := public.create_expense(home, 'Repas', 30.00, alice_m, current_date, 'egal',
     jsonb_build_array(
       jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 15),
       jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'external_participant_id', null, 'share_amount', 15)));
-  insert into testkit.fx (key, row_id) values ('repas', v_result ->> 'id');
+  v_repas := v_result ->> 'id';
 
-  perform testkit.ok((v_result ->> 'id') like 'expense\_%', 'la réponse porte l''identifiant créé');
+  perform testkit.ok(v_repas like 'expense\_%', 'la réponse porte l''identifiant créé');
   perform testkit.eq(v_result ->> 'title', 'Repas', 'la réponse reprend le libellé');
   perform testkit.eq(v_result ->> 'household_id', home, 'la réponse porte le foyer');
 
   -- Modification : nouveau montant, nouvelles parts, mêmes deux lignes.
   v_result := public.update_expense(
-    (select row_id from testkit.fx where key = 'repas'),
+    v_repas,
     'Repas corrigé', 40.00, bob_m, current_date, 'egal',
     jsonb_build_array(
       jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 30),
@@ -131,7 +147,7 @@ begin
 
   begin
     perform public.update_expense(
-      (select row_id from testkit.fx where key = 'repas'),
+      (select row_id from testkit.fx where key = 'victime'),
       'Détourné', 10.00, alice_m, current_date, 'egal',
       jsonb_build_array(
         jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
@@ -157,7 +173,7 @@ begin
   select household_id into home from testkit.fx where key = 'home';
   select row_id into alice_m from testkit.fx where key = 'alice_m';
   select row_id into bob_m from testkit.fx where key = 'bob_m';
-  select row_id into repas from testkit.fx where key = 'repas';
+  select e.id into repas from public.expenses e where e.title = 'Repas corrigé';
 
   perform testkit.eq(
     testkit.count(format('select 1 from public.expense_participants where expense_id = %L', repas)),
