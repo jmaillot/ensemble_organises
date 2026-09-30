@@ -1,5 +1,5 @@
 import { formatMediumDate, toLocalDate } from '@/lib/utils';
-import type { NoteRow } from '@/types';
+import type { NoteAttachmentRow, NoteRow } from '@/types';
 
 /**
  * Catégories proposées par l'export, complétées d'une catégorie libre saisie
@@ -56,6 +56,31 @@ export interface Note {
   updatedAt: string;
   /** « À l'instant », « Il y a 2 j », ou la date complète. */
   ageLabel: string;
+  /** Pièces jointes de la note, comme pour le Cercle. */
+  attachments: NoteAttachment[];
+}
+
+/** Pièce jointe d'une note : photo ou PDF. */
+export interface NoteAttachment {
+  id: string;
+  noteId: string;
+  url: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  createdAt: string;
+}
+
+export function toNoteAttachment(row: NoteAttachmentRow): NoteAttachment {
+  return {
+    id: row.id,
+    noteId: row.note_id,
+    url: row.file_url,
+    fileName: row.file_name,
+    mime: row.mime_type,
+    size: row.size_bytes,
+    createdAt: row.created_at,
+  };
 }
 
 export interface NoteFormValues {
@@ -89,7 +114,7 @@ export function ageLabel(iso: string): string {
  * en sert de porteuse (`accent` = partagée, `null` = privée). Une migration
  * backend devra remplacer ce porteur par une colonne `visibility` dédiée.
  */
-export function toNote(row: NoteRow): Note {
+export function toNote(row: NoteRow, attachments: NoteAttachment[] = []): Note {
   const shared = Boolean(row.color);
   return {
     id: row.id,
@@ -102,6 +127,7 @@ export function toNote(row: NoteRow): Note {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ageLabel: ageLabel(row.updated_at),
+    attachments,
   };
 }
 

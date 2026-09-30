@@ -2,17 +2,29 @@ import { useCallback, useMemo } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
-import type { PetRecordRow, PetRow } from '@/types';
+import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
 import {
   createPet,
+  createPetAttachment,
   createPetRecord,
+  depositPetPhoto,
   removePet as removePetRow,
+  removePetAttachment as removePetAttachmentRow,
   removePetRecord as removePetRecordRow,
   savePetSummary,
   updatePet,
   updatePetRecord,
 } from '../api';
-import { toPet, toPetRecord, type Pet, type PetDraft, type PetRecord, type PetRecordDraft } from '../types';
+import {
+  toPet,
+  toPetAttachment,
+  toPetRecord,
+  type Pet,
+  type PetAttachment,
+  type PetDraft,
+  type PetRecord,
+  type PetRecordDraft,
+} from '../types';
 
 /**
  * Invalidation par table. `useResource` indexe ses requêtes par
@@ -54,7 +66,19 @@ export function usePets(): UsePetsResult {
   const savePet = useCallback(
     async (id: string | null, draft: PetDraft) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
-      const saved = id ? await updatePet(id, draft) : await createPet(householdId, draft);
+      const { photoFile, ...values } = draft;
+      const saved = id ? await updatePet(id, values) : await createPet(householdId, values);
+      // La photo part après la ligne : son dossier de stockage porte
+      // l'identifiant de la fiche, inconnu avant la création.
+      if (photoFile) {
+        try {
+          await depositPetPhoto(householdId, saved.id, photoFile);
+        } catch (photoError) {
+          // Fiche conservée, photo perdue : l'erreur remonte pour être dite.
+          await invalidate();
+          throw photoError;
+        }
+      }
       await savePetSummary(householdId, saved.id, {
         notes: draft.notes,
         nextReminderDate: draft.nextReminderDate,
@@ -144,5 +168,58 @@ export function usePetRecords(petId: string | null): UsePetRecordsResult {
     isMutating: resource.isMutating,
     saveRecord,
     deleteRecord,
+  };
+}
+
+export interface UsePetAttachmentsResult {
+  attachments: PetAttachment[];
+  isLoading: boolean;
+  isMutating: boolean;
+  addFiles: (files: File[]) => Promise<void>;
+  removeAttachment: (id: string) => Promise<void>;
+}
+
+/** Pièces jointes d'une fiche animal, des plus récentes aux plus anciennes. */
+export function usePetAttachments(petId: string | null): UsePetAttachmentsResult {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const filter = useMemo(() => ({ pet_id: petId ?? '' }), [petId]);
+  const resource = useResource<PetAttachmentRow>('pet_attachments', { filter, enabled: Boolean(petId) });
+  const queryClient = useQueryClient();
+
+  const attachments = useMemo(
+    () => resource.rows.map(toPetAttachment).sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [resource.rows],
+  );
+
+  const invalidate = useCallback(async () => {
+    await invalidateTables(queryClient, ['pet_attachments']);
+  }, [queryClient]);
+
+  const addFiles = useCallback(
+    async (files: File[]) => {
+      if (!petId) throw new Error('Aucun animal sélectionné.');
+      if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      for (const file of files) {
+        await createPetAttachment(householdId, petId, file);
+      }
+      await invalidate();
+    },
+    [householdId, invalidate, petId],
+  );
+
+  const removeAttachment = useCallback(
+    async (id: string) => {
+      await removePetAttachmentRow(id);
+      await invalidate();
+    },
+    [invalidate],
+  );
+
+  return {
+    attachments,
+    isLoading: resource.isLoading,
+    isMutating: resource.isMutating,
+    addFiles,
+    removeAttachment,
   };
 }

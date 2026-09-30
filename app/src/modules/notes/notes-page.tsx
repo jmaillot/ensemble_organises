@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
+import { formatBytes, isImageMime } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useMembers } from '@/stores/household-store';
 import { NoteFormDialog } from './components/note-form-dialog';
@@ -191,6 +192,35 @@ export default function NotesPage() {
                   <h3 className="mt-[15px] mb-1.5 font-display text-[17px] tracking-[-0.035em]">{note.title}</h3>
                   <p className="mb-4 text-xs leading-[1.55] text-muted">{noteExcerpt(note.content)}</p>
 
+                  {note.attachments.length > 0 ? (
+                    <ul className="m-0 mb-3 grid list-none gap-1.5 p-0" aria-label={`Fichiers joints à ${note.title}`}>
+                      {note.attachments.map((attachment) => (
+                        <li key={attachment.id}>
+                          <a
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 rounded-[9px] bg-bg px-2.5 py-2 text-xs transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint"
+                          >
+                            {isImageMime(attachment.mime) ? (
+                              <img
+                                src={attachment.url}
+                                alt={`Aperçu de ${attachment.fileName}`}
+                                className="size-8 shrink-0 rounded-[7px] border border-border object-cover"
+                              />
+                            ) : (
+                              <span className="grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-surface text-muted">
+                                <Icon name="receipt" size="sm" />
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
+                            <span className="shrink-0 text-[10px] text-muted">{formatBytes(attachment.size)}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+
                   <div className="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted">
                     <span>{noteVisibilityLabels[note.visibility]}</span>
                     <span className="flex items-center gap-1">
@@ -225,11 +255,11 @@ export default function NotesPage() {
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         note={dialog.note}
         isSaving={isMutating}
-        onSubmit={async (values) => {
+        onSubmit={async (values, files, removedAttachmentIds) => {
           const editing = dialog.note;
           try {
-            if (editing) await editNote(editing, values);
-            else await addNote(values);
+            if (editing) await editNote(editing, values, files, removedAttachmentIds);
+            else await addNote(values, files);
             closeDialog();
             toast(editing ? 'Note mise à jour.' : 'Note enregistrée dans votre espace.');
           } catch (submissionError) {

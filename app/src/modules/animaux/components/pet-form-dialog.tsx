@@ -27,17 +27,11 @@ const schema = z.object({
   identificationNumber: optionalText(60, 'Numéro trop long.'),
   nextReminderDate: z.string().refine((value) => value === '' || isIsoDate(value), { message: 'Date de rappel invalide.' }),
   notes: optionalText(2000, 'Ces notes sont trop longues.'),
-  photoUrl: z
-    .string()
-    .trim()
-    .refine((value) => value === '' || value.startsWith('/') || /^https?:\/\//.test(value), {
-      message: 'Indiquez un chemin commençant par « / » ou une URL https.',
-    }),
 });
 
 type PetFormValues = z.infer<typeof schema>;
 
-function toDraft(values: PetFormValues): PetDraft {
+function toDraft(values: PetFormValues, currentPhotoUrl: string | null, photoFile: File | null): PetDraft {
   return {
     name: values.name,
     species: values.species,
@@ -45,7 +39,8 @@ function toDraft(values: PetFormValues): PetDraft {
     weightKg: values.weightKg ? Number(values.weightKg) : null,
     birthDate: values.birthDate || null,
     identificationNumber: values.identificationNumber || null,
-    photoUrl: values.photoUrl || null,
+    photoUrl: currentPhotoUrl,
+    photoFile,
     notes: values.notes || null,
     nextReminderDate: values.nextReminderDate || null,
   };
@@ -60,7 +55,6 @@ const emptyValues: PetFormValues = {
   identificationNumber: '',
   nextReminderDate: '',
   notes: '',
-  photoUrl: '',
 };
 
 function defaultsFor(pet: Pet | null, summary: PetSummary | null): PetFormValues {
@@ -74,7 +68,6 @@ function defaultsFor(pet: Pet | null, summary: PetSummary | null): PetFormValues
     identificationNumber: pet.identificationNumber ?? '',
     nextReminderDate: summary?.nextReminderDate ?? '',
     notes: summary?.notes ?? '',
-    photoUrl: pet.photoUrl ?? '',
   };
 }
 
@@ -125,6 +118,9 @@ export interface PetFormDialogProps {
 export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false, onSubmit }: PetFormDialogProps) {
   const wasOpen = useRef(false);
   const defaults = useMemo(() => defaultsFor(pet, summary), [pet, summary]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -133,11 +129,41 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
   } = useForm<PetFormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
 
   useEffect(() => {
-    if (open && !wasOpen.current) reset(defaults);
+    if (open && !wasOpen.current) {
+      reset(defaults);
+      setPhotoFile(null);
+      setPhotoPreview((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setPhotoError(null);
+    }
     wasOpen.current = open;
   }, [open, defaults, reset]);
 
   const editing = Boolean(pet);
+
+  const onSelectPhoto = (file: File | undefined) => {
+    setPhotoError(null);
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Sélectionnez une image (JPEG, PNG ou HEIC).');
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const discardPhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,7 +175,7 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
             Les informations de santé et de suivi restent accessibles au foyer.
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3.5" noValidate onSubmit={handleSubmit((values) => onSubmit(toDraft(values)))}>
+        <form className="grid gap-3.5" noValidate onSubmit={handleSubmit((values) => onSubmit(toDraft(values, pet?.photoUrl ?? null, photoFile)))}>
           <FormSection title="Identité" description="Le minimum pour reconnaître l’animal dans le foyer.">
             <Field label="Nom" error={errors.name?.message}>
               {(props) => <Input placeholder="Ex. Nala" {...props} {...register('name')} />}
@@ -191,8 +217,42 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
               <Field label="Prochain rappel" optional error={errors.nextReminderDate?.message}>
                 {(props) => <Input type="date" {...props} {...register('nextReminderDate')} />}
               </Field>
-              <Field label="Photo" optional error={errors.photoUrl?.message}>
-                {(props) => <Input placeholder="/assets/animaux.jpg" {...props} {...register('photoUrl')} />}
+              <Field label="Photo" optional error={photoError ?? undefined}>
+                {(props) => (
+                  <div className="grid gap-2" {...props}>
+                    {(photoPreview ?? pet?.photoUrl) ? (
+                      <img
+                        src={photoPreview ?? pet?.photoUrl ?? ''}
+                        alt={photoFile ? 'Aperçu de la photo choisie' : `Portrait actuel de ${pet?.name ?? 'l’animal'}`}
+                        className="h-24 w-full rounded-[11px] border border-border object-cover"
+                      />
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-border bg-surface px-[11px] text-[12px] font-[760] text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint">
+                        <Icon name="image" size="sm" />
+                        {photoFile ? 'Changer de photo' : 'Choisir une photo'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(event) => {
+                            onSelectPhoto(event.target.files?.[0]);
+                            event.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {photoFile ? (
+                        <button
+                          type="button"
+                          onClick={discardPhoto}
+                          className="inline-flex min-h-9 items-center px-1 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral"
+                        >
+                          Retirer
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               </Field>
             </div>
             <Field label="Informations" optional error={errors.notes?.message}>

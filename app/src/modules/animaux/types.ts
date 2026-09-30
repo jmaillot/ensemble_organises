@@ -1,6 +1,6 @@
 import type { IconName } from '@/components/shared/icon';
 import { daysBetween, todayIso } from '@/lib/utils';
-import type { PetRecordRow, PetRecordType, PetRow } from '@/types';
+import type { PetAttachmentRow, PetRecordRow, PetRecordType, PetRow } from '@/types';
 
 /** Espèces proposées par le formulaire, dans l'ordre de l'export de design. */
 export const PET_SPECIES = ['Chien', 'Chat', 'Lapin', 'Oiseau', 'Autre'] as const;
@@ -44,6 +44,8 @@ export interface PetDraft {
   birthDate: string | null;
   identificationNumber: string | null;
   photoUrl: string | null;
+  /** Fichier choisi dans le dialogue : déposé au enregistrement, jamais persisté tel quel. */
+  photoFile?: File | null;
   notes: string | null;
   nextReminderDate: string | null;
 }
@@ -157,4 +159,27 @@ export interface PetSummary {
 export function petSummaryOf(records: PetRecord[]): PetSummary {
   const summary = records.find((record) => record.name === PET_SUMMARY_RECORD_NAME);
   return { notes: summary?.notes ?? null, nextReminderDate: summary?.nextDueDate ?? null };
+}
+
+/** Pièce jointe d'une fiche animal : ordonnance, facture, compte rendu. */
+export interface PetAttachment {
+  id: string;
+  petId: string;
+  url: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  createdAt: string;
+}
+
+export function toPetAttachment(row: PetAttachmentRow): PetAttachment {
+  return {
+    id: row.id,
+    petId: row.pet_id,
+    url: row.file_url,
+    fileName: row.file_name,
+    mime: row.mime_type,
+    size: row.size_bytes,
+    createdAt: row.created_at,
+  };
 }

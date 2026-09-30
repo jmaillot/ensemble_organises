@@ -9,9 +9,10 @@ import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { assetUrl } from '@/lib/modules';
 import { cn, formatLongDate, formatMediumDate } from '@/lib/utils';
-import { usePetRecords, usePets } from './hooks/use-animaux';
+import { usePetRecords, usePetAttachments, usePets } from './hooks/use-animaux';
 import { PetFormDialog } from './components/pet-form-dialog';
 import { PetRecordDialog } from './components/pet-record-dialog';
+import { PetAttachmentsPanel } from './components/pet-attachments-panel';
 import { PetRecordsTimeline } from './components/pet-records-timeline';
 import {
   PET_RECORD_TABS,
@@ -21,6 +22,7 @@ import {
   petWeightLabel,
   reminderAlert,
   type Pet,
+  type PetAttachment,
   type PetDraft,
   type PetRecord,
   type PetRecordDraft,
@@ -86,6 +88,14 @@ export default function AnimauxPage() {
 
   const pet = useMemo(() => pets.find((entry) => entry.id === selectedId) ?? pets[0] ?? null, [pets, selectedId]);
   const { records, isLoading: recordsLoading, saveRecord, deleteRecord } = usePetRecords(pet?.id ?? null);
+  const {
+    attachments,
+    isLoading: attachmentsLoading,
+    isMutating: attachmentsMutating,
+    addFiles,
+    removeAttachment,
+  } = usePetAttachments(pet?.id ?? null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const recordsByKind = useMemo(() => {
     const grouped = new Map<PetRecord['kind'], PetRecord[]>();
@@ -140,6 +150,25 @@ export default function AnimauxPage() {
       toast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.', 'error');
     } finally {
       setPendingPetDeletion(null);
+    }
+  };
+
+  const handleAddAttachments = async (files: File[]) => {
+    setAttachmentError(null);
+    try {
+      await addFiles(files);
+      toast('Fichiers joints à la fiche.', 'success');
+    } catch (addError) {
+      setAttachmentError(addError instanceof Error ? addError.message : 'Envoi impossible.');
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: PetAttachment) => {
+    try {
+      await removeAttachment(attachment.id);
+      toast('Fichier supprimé.', 'success');
+    } catch (deleteError) {
+      toast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.', 'error');
     }
   };
 
@@ -278,6 +307,16 @@ export default function AnimauxPage() {
               <PetRecordsTimeline records={records} busyId={busyRecordId} onDelete={handleDeleteRecord} />
             )}
           </Panel>
+
+          <PetAttachmentsPanel
+            petName={pet.name}
+            attachments={attachments}
+            isLoading={attachmentsLoading}
+            uploading={attachmentsMutating}
+            uploadError={attachmentError}
+            onAdd={handleAddAttachments}
+            onDelete={handleDeleteAttachment}
+          />
 
           <PetRecordDialog
             open={recordDialogOpen}
