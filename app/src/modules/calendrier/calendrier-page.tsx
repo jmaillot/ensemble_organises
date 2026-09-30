@@ -116,27 +116,25 @@ export default function CalendrierPage() {
                 onDelete={(event) => setPendingDelete(event)}
               />
             </div>
-            {isLoading || agenda.length === 0 ? null : (
-              <Button
-                variant="secondary"
-                icon="plus"
-                fullWidth
-                className="mt-4"
-                onClick={() => openCreate(selected)}
-              >
-                Ajouter à cette journée
-              </Button>
-            )}
             {isLoading ? null : (
-              <Button
-                variant="quiet"
-                icon="checkCircle"
-                fullWidth
-                className="mt-2"
-                onClick={() => navigate('/taches', { state: { dueDate: selected } })}
-              >
-                Ajouter une tâche à cette journée
-              </Button>
+              <div className="mt-4 grid gap-2">
+                <Button
+                  variant="secondary"
+                  icon="plus"
+                  fullWidth
+                  onClick={() => openCreate(selected)}
+                >
+                  Ajouter un événement
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon="plus"
+                  fullWidth
+                  onClick={() => navigate('/taches', { state: { dueDate: selected } })}
+                >
+                  Ajouter une tâche
+                </Button>
+              </div>
             )}
             <p className="mt-3 text-[11px] text-muted">
               {pluralize(events.length, 'événement')}

@@ -59,8 +59,9 @@ describe('CalendrierPage', () => {
   it('propose un raccourci vers la création de tâche du jour affiché', async () => {
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
 
-    expect(await screen.findByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Ajouter une tâche à cette journée' })).toBeInTheDocument();
+    const panel = document.getElementById('calendar-agenda-panel')!;
+    expect(await within(panel).findByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Ajouter un événement' })).toBeInTheDocument();
   });
 
   it('sélectionner une date met à jour l’agenda du jour', async () => {
@@ -84,7 +85,7 @@ describe('CalendrierPage', () => {
     await selectDay(user, freeDay);
     expect(await screen.findByText('Journée libre')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Ajouter à cette journée' }));
+    await user.click(within(document.getElementById('calendar-agenda-panel')!).getByRole('button', { name: 'Ajouter un événement' }));
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText(/^Titre/)).toBeInTheDocument();
