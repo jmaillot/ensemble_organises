@@ -405,3 +405,99 @@ au reste du projet.
    token mal formée doit être refusée, un solde nul doit disparaître de la
    compensation des dettes. Dans les trois cas, la correction a été dans le
    test.
+
+---
+
+# Seconde campagne — frontend et première chaîne complète
+
+> 30 septembre 2026 · 8 commits frontend, 0 migration · 265 tests Vitest,
+> 31 e2e, 10 suites SQL, 1 dispatch push réel (`delivered:1`)
+
+Trois chantiers frontend et, pour la première fois, la chaîne de vérification
+au complet sur une machine Docker : typecheck, Vitest, build, e2e, contrôle
+statique, `test-db.sh`, `test-dispatch-push.sh`. Aucune migration n'a changé :
+le SQL n'avait rien de nouveau à prouver, et il est resté vert.
+
+## 6. Les trois chantiers
+
+### 6.1 Routines : le rang ordinal existait, l'interface l'effaçait
+
+`rrule.js` gérait déjà `BYDAY=1MO` : `parseString` rend `{ weekday: 0, n: 1 }`,
+et le calcul d'occurrences le respectait. Mais `weekdayCodes()` ne gardait que
+le jour — `1MO` devenait « lundi » — et `describeRecurrence()` ne savait pas
+dire « 1er ». Le formulaire n'offrait que Quotidien / Hebdo (lundi imposé) /
+Mensuel / Annuel / RRULE libre.
+
+Ajoutés : sélecteur de jours pour l'hebdo, sélecteur rang + jour
+(`1er…5e, dernier`) pour le mensuel et l'annuel, libellés
+(`Le 2e mardi de mars`), relecture d'une règle vers le formulaire à l'édition
+(`selectionForRule`), et 5 tests (round-trip, occurrences ordinales).
+
+Même pattern pour les rappels : la table `routine_reminders` acceptait déjà
+plusieurs lignes par routine, sans contrainte d'unicité — c'est le code qui
+imposait un rappel unique (`setRoutineReminder` supprimait tout puis recréait
+un). Le multi-rappel et le doublon J-1 n'ont demandé aucune migration, et le
+dispatch push les consomme déjà ligne par ligne. **Règle** : avant d'étendre un
+schéma, vérifier que la limitation n'est pas déjà seulement dans le code.
+
+Le badge et le filtre « En retard » dérivent de `missedDates`, déjà calculé :
+aucune donnée nouvelle, seulement un affichage conditionnel.
+
+### 6.2 Widgets : le drag marchait, seule la main manquait
+
+Symptôme annoncé : « le déplacement ne fonctionne pas sur Windows, que depuis
+mobile ». Vérifications, dans l'ordre : `PointerSensor` couvre la souris
+(`distance: 6`, confirmé dans le source installé de `@dnd-kit/core` 6.3.1),
+poignée permanente de 44 px avec `touch-action: none`, icône en SVG inline
+(pas de drag natif parasite), aucune divergence bureau/mobile dans la
+persistance. Puis preuve : le test e2e de drag souris passe sous Chromium
+**et** Firefox. Le mécanisme était sain ; l'hypothèse « bug Windows » est
+tombée, et l'utilisateur a précisé : le réordonnancement fonctionne, c'est le
+retour visuel qui manque — au tactile la carte soulevée suffit, à la souris il
+faut le curseur.
+
+Correctif : état `draggingKind` (`onDragStart`/`onDragEnd`/`onDragCancel`),
+classe `widgets-dragging` qui force `cursor: grabbing` sur toute la grille,
+`active:cursor-grabbing` sur la poignée, et un test e2e qui mesure le curseur
+calculé en cours de drag (`grabbing`, état nettoyé au relâcher).
+
+**Règle** : un symptôme se reproduit avant de se corriger. Sans le passage
+e2e préalable, ce chantier serait parti à la chasse d'un défaut Windows qui
+n'existait pas — et sans la reformulation de l'utilisateur, il serait resté
+bloqué sur cette chasse.
+
+### 6.3 Calendrier : le test écrivait jour-mois en ISO
+
+Trois échecs `Journée libre`, pré-existants et dépendants de la date : le 30
+septembre, `freeDay` tombait sur le 29 — anniversaire réel de Noé
+(`2016-09-29` en démo). La liste `busyDays` du test contenait quatre dates en
+**jour-mois** au lieu d'ISO : `-07-10` au lieu de `-10-07`, `-03-11` au lieu de
+`-11-03`, et deux mois impossibles (`-19-10`, `-29-09`) qui ne filtraient
+jamais rien. Correction dans le test, pas dans les données : supprimer les
+événements aurait cassé les autres suites (`Courses du samedi`, dashboard,
+e2e). Quatrième occurrence de la règle 3 ci-dessus : l'assertion était fausse
+et la production juste.
+
+## 7. Ce que la chaîne complète a prouvé
+
+Sur la machine Docker, après `git pull` (l'échec initial venait d'un code
+antérieur au correctif, pas d'une régression) :
+
+| Étape | Résultat |
+|---|---|
+| `typecheck` | vert |
+| `npm test` | 265/265, 38 fichiers |
+| `npm run build` | vert, PWA 61 entrées |
+| `test:e2e` | 31 passés, 5 skippés (bureau/mobile mutuellement exclus) |
+| `check-sql-statique.py` | 83 fonctions, aucun défaut |
+| `test-db.sh` | 10/10 fichiers verts |
+| `test-dispatch-push.sh` | `delivered:1`, rappel consommé, abonnement Firefox réel |
+
+Cela lève la réserve « Web Push absent » du §4 : abonnement réel, envoi via
+l'Edge Function, accusé `200`, consommation du rappel — `dropped:0`.
+
+Reste à prouver : le frontend contre un vrai Supabase (les e2e tournent en
+démo IndexedDB), OAuth/SMTP réels. Et `supabase-project/` n'est toujours pas
+bootstrappé sur la machine principale : `test-db.sh` y échoue sur `no
+configuration file provided`, ce qui est un manque d'infra documenté, pas un
+défaut.
