@@ -31,6 +31,8 @@ export interface UseResourceOptions {
   optimistic?: boolean;
   /** Ajoute automatiquement le filtre `household_id` du foyer courant. */
   scoped?: boolean;
+  /** Re-interroge la ressource à intervalle régulier (ms). `false` = désactivé. */
+  refetchInterval?: number | false;
 }
 
 const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'string';
@@ -41,7 +43,7 @@ const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'stri
  */
 export function useResource<T = Row>(
   table: string,
-  { filter, enabled = true, select, optimistic = true, scoped = true }: UseResourceOptions = {},
+  { filter, enabled = true, select, optimistic = true, scoped = true, refetchInterval = false }: UseResourceOptions = {},
 ): ResourceResult<T> {
   const queryClient = useQueryClient();
   const householdId = useHouseholdStore((state) => state.householdId);
@@ -55,6 +57,7 @@ export function useResource<T = Row>(
     queryKey: key,
     enabled: enabled && (scoped ? Boolean(householdId) : true),
     placeholderData: keepPreviousData,
+    refetchInterval,
     queryFn: async () => {
       const rows = await data.list<T>(table, effectiveFilter);
       return (select ? select(rows as unknown as Row[]) : (rows as unknown as Row[])) as T[];

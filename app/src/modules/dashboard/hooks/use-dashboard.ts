@@ -75,6 +75,13 @@ export interface ActivityEntry {
 }
 
 /**
+ * Le point du jour dérive de `tasks` + `events` : ces deux ressources sont
+ * ré-interrogées chaque minute pour que l'accueil resté ouvert suive les
+ * ajouts des autres membres sans rechargement manuel.
+ */
+export const POINT_DU_JOUR_REFETCH_MS = 60_000;
+
+/**
  * Une seule interrogation par ressource, un rendu dérivé : l'accueil ne fait
  * jamais de requête à la demande depuis ses widgets.
  */
@@ -85,8 +92,8 @@ export function useDashboard(): DashboardData {
   const year = new Date().getFullYear();
   const holidays = useFrenchHolidays(year);
 
-  const tasks = useResource<TaskRow>('tasks');
-  const events = useResource<EventRow>('events');
+  const tasks = useResource<TaskRow>('tasks', { refetchInterval: POINT_DU_JOUR_REFETCH_MS });
+  const events = useResource<EventRow>('events', { refetchInterval: POINT_DU_JOUR_REFETCH_MS });
   const birthdays = useResource<BirthdayRow>('birthdays');
   const expenses = useResource<ExpenseRow>('expenses');
   const posts = useResource<PostRow>('posts');
