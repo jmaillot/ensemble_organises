@@ -57,4 +57,24 @@ describe('AnimauxPage', () => {
 
     expect(await within(dialog).findByText('La prochaine échéance doit suivre la date du suivi.')).toBeInTheDocument();
   });
+
+  it('affiche la section pièces jointes sous le carnet de santé', async () => {
+    renderWithProviders(<AnimauxPage />, { route: '/animaux' });
+
+    await screen.findByRole('tabpanel');
+    expect(await screen.findByRole('heading', { name: 'Pièces jointes' })).toBeInTheDocument();
+    expect(screen.getByText('Aucun document pour cette fiche. Les ordonnances et factures du vétérinaire restent à portée de main.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Joindre des fichiers/)).toBeInTheDocument();
+  });
+
+  it('propose de choisir une photo locale dans le dialogue de fiche', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AnimauxPage />, { route: '/animaux' });
+
+    await screen.findByRole('tabpanel');
+    await user.click(screen.getByRole('button', { name: 'Modifier la fiche' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/Choisir une photo/)).toBeInTheDocument();
+  });
 });

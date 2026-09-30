@@ -196,6 +196,43 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
                 {(props) => <Input placeholder="Ex. Golden retriever" {...props} {...register('breed')} />}
               </Field>
             </div>
+            <Field label="Photo" optional error={photoError ?? undefined}>
+              {(props) => (
+                <div className="grid gap-2" {...props}>
+                  {(photoPreview ?? pet?.photoUrl) ? (
+                    <img
+                      src={photoPreview ?? pet?.photoUrl ?? ''}
+                      alt={photoFile ? 'Aperçu de la photo choisie' : `Portrait actuel de ${pet?.name ?? 'l’animal'}`}
+                      className="h-24 w-full rounded-[11px] border border-border object-cover"
+                    />
+                  ) : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-border bg-surface px-[11px] text-[12px] font-[760] text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint">
+                      <Icon name="image" size="sm" />
+                      {photoFile ? 'Changer de photo' : 'Choisir une photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => {
+                          onSelectPhoto(event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {photoFile ? (
+                      <button
+                        type="button"
+                        onClick={discardPhoto}
+                        className="inline-flex min-h-9 items-center px-1 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral"
+                      >
+                        Retirer
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </Field>
           </FormSection>
 
           <FormSection title="Santé" description="Les repères du carnet de santé.">
@@ -212,49 +249,10 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
             </Field>
           </FormSection>
 
-          <FormSection title="Suivi" description="Prochain rappel, notes libres et photo de la fiche." defaultOpen={false}>
-            <div className="grid grid-cols-2 gap-3 max-[650px]:grid-cols-1">
-              <Field label="Prochain rappel" optional error={errors.nextReminderDate?.message}>
-                {(props) => <Input type="date" {...props} {...register('nextReminderDate')} />}
-              </Field>
-              <Field label="Photo" optional error={photoError ?? undefined}>
-                {(props) => (
-                  <div className="grid gap-2" {...props}>
-                    {(photoPreview ?? pet?.photoUrl) ? (
-                      <img
-                        src={photoPreview ?? pet?.photoUrl ?? ''}
-                        alt={photoFile ? 'Aperçu de la photo choisie' : `Portrait actuel de ${pet?.name ?? 'l’animal'}`}
-                        className="h-24 w-full rounded-[11px] border border-border object-cover"
-                      />
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-border bg-surface px-[11px] text-[12px] font-[760] text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint">
-                        <Icon name="image" size="sm" />
-                        {photoFile ? 'Changer de photo' : 'Choisir une photo'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={(event) => {
-                            onSelectPhoto(event.target.files?.[0]);
-                            event.target.value = '';
-                          }}
-                        />
-                      </label>
-                      {photoFile ? (
-                        <button
-                          type="button"
-                          onClick={discardPhoto}
-                          className="inline-flex min-h-9 items-center px-1 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral"
-                        >
-                          Retirer
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-              </Field>
-            </div>
+          <FormSection title="Suivi" description="Prochain rappel et notes libres." defaultOpen={false}>
+            <Field label="Prochain rappel" optional error={errors.nextReminderDate?.message}>
+              {(props) => <Input type="date" {...props} {...register('nextReminderDate')} />}
+            </Field>
             <Field label="Informations" optional error={errors.notes?.message}>
               {(props) => (
                 <Textarea

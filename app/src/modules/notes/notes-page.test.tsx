@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NotesPage from './notes-page';
 import { renderWithProviders } from '@/test/render';
@@ -62,5 +62,36 @@ describe('NotesPage', () => {
 
     expect(await screen.findByText('Courses de la semaine')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('joint un PDF à la création et l’affiche sur la carte', async () => {
+    supportScrollIntoView();
+    // Mode démo : le dépôt renvoie un aperçu local.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:piece-jointe' });
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<NotesPage />, { route: '/notes' });
+
+      expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Créer une note' }));
+
+      const dialog = await screen.findByRole('dialog');
+      await user.type(within(dialog).getByLabelText(/Titre/), 'Note avec pièce jointe');
+      await user.type(within(dialog).getByLabelText(/Contenu/), 'Voir le document joint.');
+      await user.upload(
+        within(dialog).getByLabelText(/Joindre des fichiers/),
+        new File(['%PDF'], 'devis.pdf', { type: 'application/pdf' }),
+      );
+      expect(await within(dialog).findByText(/devis\.pdf/)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Créer la note' }));
+
+      expect(await screen.findByText('Note avec pièce jointe')).toBeInTheDocument();
+      // Le dialogue ne se referme qu'après le dépôt : attendre sa fermeture
+      // prouve le circuit complet, pas seulement la création de la note.
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.getByText('devis.pdf')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
