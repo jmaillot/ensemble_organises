@@ -8,7 +8,7 @@ import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, pluralize, relativeDayLabel } from '@/lib/utils';
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
-import { useAddExpense, useArdoise, useDeleteExpense, useSendInvitation } from './hooks/use-ardoise';
+import { useAddExpense, useArdoise, useDeleteExpense, useSendInvitation, useUpdateExpense } from './hooks/use-ardoise';
 import type { Expense, NewExpenseInput } from './types';
 import { BalanceCard, MemberBalances } from './components/balance-panel';
 import { SettlementsPanel } from './components/settlements-panel';
@@ -37,11 +37,13 @@ export default function ArdoisePage() {
     refetch,
   } = useArdoise();
   const addExpense = useAddExpense();
+  const updateExpenseMutation = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
   const sendInvitation = useSendInvitation();
   const toast = useToast();
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<Expense | null>(null);
   // Une seule variante est montée : tableau sur bureau, cartes empilées sur
@@ -49,6 +51,18 @@ export default function ArdoisePage() {
   const isMobileLayout = useIsMobileLayout();
 
   const handleAddExpense = async (values: NewExpenseInput) => {
+    // Même dialogue en création et en édition : la cible distingue les deux.
+    if (editingExpense) {
+      try {
+        await updateExpenseMutation.mutateAsync({ expenseId: editingExpense.id, input: values });
+        setExpenseDialogOpen(false);
+        setEditingExpense(null);
+        toast('Dépense mise à jour, les soldes sont à jour.');
+      } catch (updateError) {
+        toast(updateError instanceof Error ? updateError.message : 'Modification impossible.', 'error');
+      }
+      return;
+    }
     try {
       await addExpense.mutateAsync(values);
       setExpenseDialogOpen(false);
@@ -56,6 +70,16 @@ export default function ArdoisePage() {
     } catch (creationError) {
       toast(creationError instanceof Error ? creationError.message : 'Dépense impossible.', 'error');
     }
+  };
+
+  const openCreator = () => {
+    setEditingExpense(null);
+    setExpenseDialogOpen(true);
+  };
+
+  const openEditor = (expense: Expense) => {
+    setEditingExpense(expense);
+    setExpenseDialogOpen(true);
   };
 
   const handleDeleteExpense = async () => {
@@ -76,7 +100,7 @@ export default function ArdoisePage() {
     <ModuleShell
       module="ardoise"
       actions={
-        <Button icon="plus" onClick={() => setExpenseDialogOpen(true)}>
+        <Button icon="plus" onClick={openCreator}>
           Ajouter une dépense
         </Button>
       }
@@ -84,7 +108,7 @@ export default function ArdoisePage() {
       <BalanceCard
         total={total}
         monthLabel={monthLabel}
-        onAddExpense={() => setExpenseDialogOpen(true)}
+        onAddExpense={openCreator}
         onInvite={() => setInviteDialogOpen(true)}
       />
 
@@ -151,15 +175,26 @@ export default function ArdoisePage() {
                       ) : null}
                       <span className="sr-only">{pluralize(expense.participants.length, 'participant')}</span>
                     </div>
-                    <button
-                      type="button"
-                      className={`${rowAction} hover:bg-coral-soft hover:text-coral max-[650px]:size-11`}
-                      aria-label={`Supprimer la dépense ${expense.title}`}
-                      onClick={() => setPendingDeletion(expense)}
-                    >
-                      <span className="sr-only">Supprimer</span>
-                      <Icon name="trash" size="sm" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        className={rowAction}
+                        aria-label={`Modifier la dépense ${expense.title}`}
+                        onClick={() => openEditor(expense)}
+                      >
+                        <span className="sr-only">Modifier</span>
+                        <Icon name="edit" size="sm" />
+                      </button>
+                      <button
+                        type="button"
+                        className={`${rowAction} hover:bg-coral-soft hover:text-coral max-[650px]:size-11`}
+                        aria-label={`Supprimer la dépense ${expense.title}`}
+                        onClick={() => setPendingDeletion(expense)}
+                      >
+                        <span className="sr-only">Supprimer</span>
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -189,15 +224,26 @@ export default function ArdoisePage() {
                             <strong className="block truncate font-bold">{expense.title}</strong>
                             <small className="block text-[10px] text-muted">{relativeDayLabel(expense.date)}</small>
                           </div>
-                          <button
-                            type="button"
-                            className={`${rowAction} hover:bg-coral-soft hover:text-coral`}
-                            aria-label={`Supprimer la dépense ${expense.title}`}
-                            onClick={() => setPendingDeletion(expense)}
-                          >
-                            <span className="sr-only">Supprimer</span>
-                            <Icon name="trash" size="sm" />
-                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              className={rowAction}
+                              aria-label={`Modifier la dépense ${expense.title}`}
+                              onClick={() => openEditor(expense)}
+                            >
+                              <span className="sr-only">Modifier</span>
+                              <Icon name="edit" size="sm" />
+                            </button>
+                            <button
+                              type="button"
+                              className={`${rowAction} hover:bg-coral-soft hover:text-coral`}
+                              aria-label={`Supprimer la dépense ${expense.title}`}
+                              onClick={() => setPendingDeletion(expense)}
+                            >
+                              <span className="sr-only">Supprimer</span>
+                              <Icon name="trash" size="sm" />
+                            </button>
+                          </div>
                         </div>
                       </td>
                       <td>{expense.paidByName}</td>
@@ -244,12 +290,16 @@ export default function ArdoisePage() {
 
       <ExpenseFormDialog
         open={expenseDialogOpen}
-        onOpenChange={setExpenseDialogOpen}
+        onOpenChange={(open) => {
+          setExpenseDialogOpen(open);
+          if (!open) setEditingExpense(null);
+        }}
         members={sharingMembers}
         externalParticipants={externalParticipants}
         defaultPayerId={currentMember?.id ?? null}
         onSubmit={handleAddExpense}
-        isPending={addExpense.isPending}
+        isPending={addExpense.isPending || updateExpenseMutation.isPending}
+        initialExpense={editingExpense}
       />
 
       <InviteMemberDialog

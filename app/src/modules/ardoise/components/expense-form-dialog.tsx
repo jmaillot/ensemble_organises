@@ -9,7 +9,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, todayIso } from '@/lib/utils';
-import { externalKey, memberKey, roundCents, type ExternalParticipant, type MemberOption, type NewExpenseInput, type SplitType } from '../types';
+import { EXTERNAL_KEY_PREFIX, MEMBER_KEY_PREFIX, externalKey, memberKey, roundCents, type Expense, type ExternalParticipant, type MemberOption, type NewExpenseInput, type SplitType } from '../types';
 
 const schema = z
   .object({
@@ -52,12 +52,15 @@ export interface ExpenseFormDialogProps {
   defaultPayerId: string | null;
   onSubmit: (values: NewExpenseInput) => void;
   isPending?: boolean;
+  /** Dépense à modifier ; absente, le dialogue crée. */
+  initialExpense?: Expense | null;
 }
 
 /**
- * Ajout d'une dépense : libellé, montant, payeur et participants restent
- * visibles ; date, type de partage, participants externes et montants
- * personnalisés sont repliés pour rester lisible sur mobile.
+ * Ajout et modification d'une dépense : libellé, montant, payeur et
+ * participants restent visibles ; date, type de partage, participants
+ * externes et montants personnalisés sont repliés pour rester lisible sur
+ * mobile. En édition, le formulaire est pré-rempli de la dépense visée.
  */
 export function ExpenseFormDialog({
   open,
@@ -67,19 +70,35 @@ export function ExpenseFormDialog({
   defaultPayerId,
   onSubmit,
   isPending = false,
+  initialExpense = null,
 }: ExpenseFormDialogProps) {
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const editing = initialExpense !== null;
 
-  const defaultValues = (): FormValues => ({
-    title: '',
-    amount: '',
-    paidBy: defaultPayerId ?? members[0]?.id ?? '',
-    date: todayIso(),
-    splitType: 'egal',
-    participants: members.map((member) => member.id),
-    externalIds: [],
-    customShares: {},
-  });
+  const defaultValues = (expense: Expense | null): FormValues => {
+    if (!expense) {
+      return {
+        title: '',
+        amount: '',
+        paidBy: defaultPayerId ?? members[0]?.id ?? '',
+        date: todayIso(),
+        splitType: 'egal',
+        participants: members.map((member) => member.id),
+        externalIds: [],
+        customShares: {},
+      };
+    }
+    return {
+      title: expense.title,
+      amount: String(expense.amount),
+      paidBy: expense.paidBy,
+      date: expense.date,
+      splitType: expense.splitType,
+      participants: expense.participants.filter((participant) => participant.kind === 'membre').map((participant) => participant.key.slice(MEMBER_KEY_PREFIX.length)),
+      externalIds: expense.participants.filter((participant) => participant.kind === 'externe').map((participant) => participant.key.slice(EXTERNAL_KEY_PREFIX.length)),
+      customShares: Object.fromEntries(expense.participants.map((participant) => [participant.key, String(participant.shareAmount)])),
+    };
+  };
 
   const {
     register,
@@ -87,15 +106,16 @@ export function ExpenseFormDialog({
     watch,
     reset,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaultValues() });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaultValues(initialExpense) });
 
+  const initialId = initialExpense?.id ?? null;
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues());
+    reset(defaultValues(initialExpense));
     setOptionsOpen(false);
-    // `defaultValues` est recalculé à chaque rendu : on ne dépend que de l'ouverture.
+    // Se rouvre avec une autre dépense : le pré-remplissage suit la cible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, reset]);
+  }, [open, initialId, reset]);
 
   const splitType = watch('splitType');
   const participants = watch('participants') ?? [];
@@ -127,7 +147,7 @@ export function ExpenseFormDialog({
       <DialogContent>
         <DialogHeader>
           <p className="eyebrow mb-2">Ardoise</p>
-          <DialogTitle>Ajouter une dépense</DialogTitle>
+          <DialogTitle>{editing ? 'Modifier la dépense' : 'Ajouter une dépense'}</DialogTitle>
           <DialogDescription>Le partage se calcule automatiquement pour les membres choisis.</DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={handleSubmit(submit)} className="grid gap-3.5">
@@ -250,7 +270,7 @@ export function ExpenseFormDialog({
               Annuler
             </Button>
             <Button type="submit" icon="arrow" disabled={isPending}>
-              {isPending ? 'Enregistrement…' : 'Ajouter la dépense'}
+              {isPending ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Ajouter la dépense'}
             </Button>
           </DialogActions>
         </form>

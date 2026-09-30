@@ -1,0 +1,175 @@
+-- supabase/tests/0009_expense_write_rpc.sql
+-- RPC d'écriture de l'Ardoise (migration 0035) : dépense + parts en UNE
+-- transaction, appelables par un membre connecté.
+--
+-- Reproduit le défaut constaté en usage le 30/09/2026 : 30 € partagés en deux
+-- parts de 15 € via N appels PostgREST échouaient à la deuxième part
+-- (« la somme des parts (15.00)… », 23514), le contrôle différé étant vérifié
+-- au COMMIT de chaque transaction. Seules les dépenses à part unique
+-- passaient, ce qui a masqué le défaut jusqu'au premier partage réel.
+--
+-- Méthode : les appels RPC passent en `authenticated` (comme PostgREST), les
+-- assertions de soldes en propriétaire (les fonctions privées de calcul ne
+-- sont pas exécutables par un client, cf. 0009). Les identifiants transitent
+-- par `testkit.fx`, lisible des deux rôles.
+
+begin;
+
+-- Fixtures en propriétaire : trois comptes, un foyer, deux membres.
+do $$
+declare
+  alice uuid := testkit.auth_user('rpc-alice@example.fr', 'Alice Martin');
+  bob uuid := testkit.auth_user('rpc-bob@example.fr', 'Bob Martin');
+  outsider uuid := testkit.auth_user('rpc-outsider@example.fr', 'Olivier Fantome');
+  home text := testkit.household(alice, 'Foyer RPC');
+begin
+  insert into testkit.fx (key, user_id) values
+    ('alice', alice), ('bob', bob), ('outsider', outsider);
+  insert into testkit.fx (key, household_id) values ('home', home);
+  insert into testkit.fx (key, row_id) values
+    ('alice_m', testkit.member(home, alice, 'Alice Martin', 'admin', 'accent')),
+    ('bob_m', testkit.member(home, bob, 'Bob Martin', 'membre', 'ink'));
+end;
+$$;
+
+-- Appels RPC en `authenticated`, comme PostgREST les exécuterait.
+select testkit.as_user(user_id, 'rpc-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+do $$
+declare
+  home text;
+  alice_m text;
+  bob_m text;
+  v_result jsonb;
+begin
+  select household_id into home from testkit.fx where key = 'home';
+  select row_id into alice_m from testkit.fx where key = 'alice_m';
+  select row_id into bob_m from testkit.fx where key = 'bob_m';
+
+  -- Le cas du 30/09 : 30 €, deux parts de 15 €, en UN appel.
+  v_result := public.create_expense(home, 'Repas', 30.00, alice_m, current_date, 'egal',
+    jsonb_build_array(
+      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 15),
+      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'external_participant_id', null, 'share_amount', 15)));
+  insert into testkit.fx (key, row_id) values ('repas', v_result ->> 'id');
+
+  perform testkit.ok((v_result ->> 'id') like 'expense\_%', 'la réponse porte l''identifiant créé');
+  perform testkit.eq(v_result ->> 'title', 'Repas', 'la réponse reprend le libellé');
+  perform testkit.eq(v_result ->> 'household_id', home, 'la réponse porte le foyer');
+
+  -- Modification : nouveau montant, nouvelles parts, mêmes deux lignes.
+  v_result := public.update_expense(
+    (select row_id from testkit.fx where key = 'repas'),
+    'Repas corrigé', 40.00, bob_m, current_date, 'egal',
+    jsonb_build_array(
+      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 30),
+      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'external_participant_id', null, 'share_amount', 10)));
+
+  perform testkit.eq(v_result ->> 'title', 'Repas corrigé', 'la réponse reprend le libellé modifié');
+  perform testkit.eq(v_result ->> 'paid_by', bob_m, 'le payeur est modifiable');
+
+  -- Somme partielle : refusée avec le message du trigger, pas un autre.
+  begin
+    perform public.create_expense(home, 'Raté', 30.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 15)));
+    perform testkit.ok(false, 'une somme partielle doit être refusée');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%somme des parts%', 'le refus dit la somme : ' || sqlerrm);
+  end;
+
+  -- Sans parts : refusé avant même la somme.
+  begin
+    perform public.create_expense(home, 'Seul', 10.00, alice_m, current_date, 'egal', '[]'::jsonb);
+    perform testkit.ok(false, 'une dépense sans parts doit être refusée');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%au moins une personne%', 'le refus dit le minimum : ' || sqlerrm);
+  end;
+
+  -- Montant nul : refusé par la fonction, pas seulement par la contrainte.
+  begin
+    perform public.create_expense(home, 'Gratuit', 0.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 0)));
+    perform testkit.ok(false, 'un montant nul doit être refusé');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%supérieur à zéro%', 'le refus dit le montant : ' || sqlerrm);
+  end;
+
+  -- Dépense inexistante : introuvable, pas silencieuse.
+  begin
+    perform public.update_expense('expense_introuvable', 'X', 10.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+    perform testkit.ok(false, 'une dépense inexistante doit être refusée');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%introuvable%', 'le refus dit l''absence : ' || sqlerrm);
+  end;
+end;
+$$;
+
+-- Acteur extérieur au foyer : création comme modification sont refusées.
+select testkit.as_user(user_id, 'rpc-outsider@example.fr') from testkit.fx where key = 'outsider';
+
+do $$
+declare
+  home text;
+  alice_m text;
+begin
+  select household_id into home from testkit.fx where key = 'home';
+  select row_id into alice_m from testkit.fx where key = 'alice_m';
+
+  begin
+    perform public.create_expense(home, 'Intrus', 10.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+    perform testkit.ok(false, 'un extérieur ne crée pas dans le foyer');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%appartenez%', 'le refus dit l''appartenance : ' || sqlerrm);
+  end;
+
+  begin
+    perform public.update_expense(
+      (select row_id from testkit.fx where key = 'repas'),
+      'Détourné', 10.00, alice_m, current_date, 'egal',
+      jsonb_build_array(
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+    perform testkit.ok(false, 'un extérieur ne modifie pas le foyer');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%appartenez%', 'le refus dit l''appartenance : ' || sqlerrm);
+  end;
+end;
+$$;
+
+reset role;
+
+-- Soldes et remplacement des parts, en propriétaire : Alice a payé 40 € pour
+-- 30 € de parts (+10), Bob a payé 0 € pour 10 € de parts (−10). Les deux parts
+-- d'origine (15/15) ont disparu : le remplacement ne duplique pas.
+do $$
+declare
+  home text;
+  alice_m text;
+  bob_m text;
+  repas text;
+begin
+  select household_id into home from testkit.fx where key = 'home';
+  select row_id into alice_m from testkit.fx where key = 'alice_m';
+  select row_id into bob_m from testkit.fx where key = 'bob_m';
+  select row_id into repas from testkit.fx where key = 'repas';
+
+  perform testkit.eq(
+    testkit.count(format('select 1 from public.expense_participants where expense_id = %L', repas)),
+    2::bigint,
+    'la modification remplace les parts sans les dupliquer');
+  perform testkit.eq(
+    (select balance from private.household_balances(home) where member_id = alice_m), 10.00::numeric,
+    'Alice a avancé 40 € pour 30 € de parts : crédit de 10 €');
+  perform testkit.eq(
+    (select balance from private.household_balances(home) where member_id = bob_m), (-10.00)::numeric,
+    'Bob doit 10 € de parts sans avoir avancé : débit de 10 €');
+end;
+$$;
+
+rollback;

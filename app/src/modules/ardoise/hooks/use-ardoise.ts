@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatMonthLabel, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, MemberColorTag } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot, toServerBalances, toServerSettlements } from '../api';
+import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot, toServerBalances, toServerSettlements, updateExpense } from '../api';
 import { ardoiseKeys, useServerSettlement } from './use-settlement';
 import {
   computeBalances,
@@ -182,6 +182,12 @@ function useArdoiseMutation<TVariables>(mutationFn: (variables: TVariables) => P
 export function useAddExpense() {
   const householdId = useHouseholdStore((state) => state.householdId);
   return useArdoiseMutation((input: NewExpenseInput) => createExpense(householdId as string, input));
+}
+
+export function useUpdateExpense() {
+  return useArdoiseMutation(({ expenseId, input }: { expenseId: string; input: NewExpenseInput }) =>
+    updateExpense(expenseId, input),
+  );
 }
 
 export function useDeleteExpense() {

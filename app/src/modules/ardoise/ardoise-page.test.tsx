@@ -50,6 +50,25 @@ describe('ArdoisePage', () => {
     expectAmount(balanceOf(DEMO_MEMBERS.camille), seedCamille + 20 - 10);
   });
 
+  it('modifier une dépense pré-remplit le dialogue et recalcule les soldes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+
+    await user.click(await screen.findByRole('button', { name: 'Modifier la dépense Café du marché' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Modifier la dépense')).toBeInTheDocument();
+    // Pré-remplissage : le libellé et le montant de la dépense visée.
+    expect(within(dialog).getByLabelText(/Libellé/)).toHaveValue('Café du marché');
+    expect(within(dialog).getByLabelText(/Montant/)).toHaveValue(8.5);
+
+    await user.clear(within(dialog).getByLabelText(/Montant/));
+    await user.type(within(dialog).getByLabelText(/Montant/), '10');
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => expectAmount('balance-total', seedTotal - 8.5 + 10));
+    expect(screen.getByText('Café du marché')).toBeInTheDocument();
+  });
+
   it('supprimer une dépense demande confirmation', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ArdoisePage />, { route: '/ardoise' });

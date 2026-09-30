@@ -1037,8 +1037,14 @@ le client :
 * un déclencheur vérifie que le membre **et** le participant externe
   appartiennent au foyer de la dépense ;
 * une contrainte **différée** vérifie que la somme des parts correspond au
-  montant de la dépense, ce qui permet au client d'insérer la dépense puis ses
-  participants dans une même transaction, sans ordre imposé.
+  montant de la dépense. Elle est contrôlée au `COMMIT` de chaque transaction :
+  des appels PostgREST séparés sont donc des transactions séparées, et la
+  deuxième part d'un partage échouait systématiquement (constaté le 30/09 :
+  « la somme des parts (15.00)… » sur 30 € en deux parts — seules les dépenses
+  à part unique passaient). Les écritures passent donc par `public.create_expense`
+  / `public.update_expense` (migration 0035, RPC transactionnel, `authenticated`
+  uniquement), qui écrivent dépense et parts dans la même transaction ; le
+  trigger reste le filet de sécurité.
 
 Ces trois règles, ainsi que le pont serveur et le contrat de réponse, sont
 couvertes par `supabase/tests/0005_ardoise.sql`.

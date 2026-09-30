@@ -1,4 +1,4 @@
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import type { ExpenseParticipantRow, ExpenseRow, ExternalParticipantRow, HouseholdMemberRow, InvitationRow } from '@/types';
 import {
@@ -35,6 +35,11 @@ export async function fetchArdoiseSnapshot(householdId: string): Promise<Ardoise
 /**
  * Écriture logique en deux temps : la dépense, puis ses parts. En cas d'échec
  * sur une part, la dépense est retirée pour ne pas laisser de ligne orpheline.
+ *
+ * Ce chemin multi-appels ne vaut qu'en mode local : contre un vrai Supabase,
+ * le contrôle différé de la somme est vérifié au COMMIT de chaque transaction
+ * et le deuxième appel échoue toujours (migration 0035). Le mode configuré
+ * passe donc par le RPC transactionnel ci-dessous.
  */
 export async function createExpense(householdId: string, input: NewExpenseInput): Promise<ExpenseRow> {
   if (input.participants.length === 0) {
@@ -45,6 +50,17 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
     throw new Error('Le montant doit être supérieur à zéro.');
   }
   const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  if (isSupabaseConfigured) {
+    return callExpenseRpc('create_expense', {
+      p_household_id: householdId,
+      p_title: input.title.trim(),
+      p_amount: amount,
+      p_paid_by: input.paidBy,
+      p_expense_date: input.date,
+      p_split_type: input.splitType,
+      p_parts: expensePartsPayload(input.participants, shares),
+    });
+  }
   const expense = await data.create<ExpenseRow>('expenses', {
     household_id: householdId,
     title: input.title.trim(),
@@ -79,6 +95,128 @@ export async function deleteExpense(expenseId: string): Promise<void> {
   const participants = await data.list<ExpenseParticipantRow>('expense_participants', { expense_id: expenseId });
   await Promise.all(participants.map((participant) => data.remove('expense_participants', participant.id)));
   await data.remove('expenses', expenseId);
+}
+
+/**
+ * Modification d'une dépense : la ligne puis ses parts, remplacées en bloc.
+ * En mode local uniquement (même raison transactionnelle qu'à la création) ;
+ * en mode configuré, le RPC atomique ci-dessus. En cas d'échec sur les parts,
+ * restauration best-effort de l'ancien état.
+ */
+export async function updateExpense(expenseId: string, input: NewExpenseInput): Promise<ExpenseRow> {
+  if (input.participants.length === 0) {
+    throw new Error('Choisissez au moins une personne qui partage la dépense.');
+  }
+  const amount = roundCents(input.amount);
+  if (amount <= 0) {
+    throw new Error('Le montant doit être supérieur à zéro.');
+  }
+  const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  if (isSupabaseConfigured) {
+    return callExpenseRpc('update_expense', {
+      p_expense_id: expenseId,
+      p_title: input.title.trim(),
+      p_amount: amount,
+      p_paid_by: input.paidBy,
+      p_expense_date: input.date,
+      p_split_type: input.splitType,
+      p_parts: expensePartsPayload(input.participants, shares),
+    });
+  }
+
+  const [old] = await data.list<ExpenseRow>('expenses', { id: expenseId });
+  if (!old) throw new Error('Dépense introuvable.');
+  const oldParts = await data.list<ExpenseParticipantRow>('expense_participants', { expense_id: expenseId });
+
+  const updated = await data.update<ExpenseRow>('expenses', expenseId, {
+    title: input.title.trim(),
+    amount,
+    paid_by: input.paidBy,
+    expense_date: input.date,
+    split_type: input.splitType,
+  });
+
+  try {
+    await Promise.all(oldParts.map((participant) => data.remove('expense_participants', participant.id)));
+    for (const [index, key] of input.participants.entries()) {
+      const isMember = key.startsWith(MEMBER_KEY_PREFIX);
+      await data.create<ExpenseParticipantRow>('expense_participants', {
+        expense_id: expenseId,
+        participant_type: isMember ? 'membre' : 'externe',
+        member_id: isMember ? key.slice(MEMBER_KEY_PREFIX.length) : null,
+        external_participant_id: isMember ? null : key.slice(EXTERNAL_KEY_PREFIX.length),
+        share_amount: roundCents(shares[index] ?? 0),
+      });
+    }
+  } catch (error) {
+    await restoreExpense(old, oldParts);
+    throw error;
+  }
+  return updated;
+}
+
+/** Restauration best-effort après un remplacement de parts avorté. */
+async function restoreExpense(old: ExpenseRow, oldParts: ExpenseParticipantRow[]): Promise<void> {  await data
+    .update('expenses', old.id, {
+      title: old.title,
+      amount: old.amount,
+      paid_by: old.paid_by,
+      expense_date: old.expense_date,
+      split_type: old.split_type,
+    })
+    .catch(() => undefined);
+  const current = await data.list<ExpenseParticipantRow>('expense_participants', { expense_id: old.id }).catch(() => []);
+  await Promise.all(current.map((participant) => data.remove('expense_participants', participant.id)).map((promise) => promise.catch(() => undefined)));
+  for (const part of oldParts) {
+    await data
+      .create('expense_participants', {
+        expense_id: part.expense_id,
+        participant_type: part.participant_type,
+        member_id: part.member_id,
+        external_participant_id: part.external_participant_id,
+        share_amount: part.share_amount,
+      })
+      .catch(() => undefined);
+  }
+}
+
+/**
+ * Parts au format du RPC : même contrainte SQL qu'en base (`membre` exige
+ * `member_id`, `externe` l'inverse), vérifiée par la fonction avant écriture.
+ */
+export function expensePartsPayload(keys: string[], shares: number[]) {
+  return keys.map((key, index) => {
+    const isMember = key.startsWith(MEMBER_KEY_PREFIX);
+    return {
+      participant_type: isMember ? 'membre' : 'externe',
+      member_id: isMember ? key.slice(MEMBER_KEY_PREFIX.length) : null,
+      external_participant_id: isMember ? null : key.slice(EXTERNAL_KEY_PREFIX.length),
+      share_amount: roundCents(shares[index] ?? 0),
+    };
+  });
+}
+
+/**
+ * Écriture atomique via PostgREST RPC : UNE transaction, donc le contrôle
+ * différé de la somme ne voit que l'état final, complet (migration 0035).
+ * Le message d'erreur vient de la base et est écrit pour l'utilisateur.
+ */
+async function callExpenseRpc(functionName: 'create_expense' | 'update_expense', payload: Record<string, unknown>): Promise<ExpenseRow> {
+  if (!supabase) throw new DataError('Supabase n’est pas configuré sur cet environnement.');
+  try {
+    const { data: row, error } = await supabase.rpc(functionName, payload);
+    if (error) throw new DataError(error.message || 'Écriture refusée.', error);
+    return row as ExpenseRow;
+  } catch (requestError) {
+    // Hors ligne, une écriture multi-lignes ne peut pas être mise en file :
+    // chaque mutation rejouée serait sa propre transaction et retomberait sur
+    // le contrôle différé. Échec franc, dialogue conservé — pas de fausse
+    // promesse de synchronisation.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new DataError('Hors ligne : reconnectez-vous pour enregistrer la dépense.', requestError);
+    }
+    throw requestError instanceof DataError ? requestError : new DataError('Écriture refusée.', requestError);
+  }
 }
 
 async function callInvitationFunction(payload: InvitationInput): Promise<InvitationRow> {
