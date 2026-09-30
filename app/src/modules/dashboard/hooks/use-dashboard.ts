@@ -13,7 +13,7 @@ import { todayIso, toLocalDate, toIsoDate, daysBetween } from '@/lib/utils';
 import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, TaskRow } from '@/types';
 import {
   layoutWidgets,
-  nextEventOfDay,
+  nextUpcomingEvent,
   resetPreferences,
   toWidgetPreferences,
   type WidgetPlacement,
@@ -52,7 +52,7 @@ export interface DashboardData {
     monthLabel: string;
     members: { memberId: string; displayName: string; amount: number }[];
   };
-  nextEvent: ReturnType<typeof nextEventOfDay>;
+  nextEvent: ReturnType<typeof nextUpcomingEvent>;
   nextShopping: { title: string; iso: string; relative: string } | null;
 }
 
@@ -275,7 +275,7 @@ export function useDashboard(): DashboardData {
 
   const board = useBoardSummary(expenses.rows, participants, members);
 
-  const nextEvent = useMemo(() => nextEventOfDay(events.rows), [events.rows]);
+  const nextEvent = useMemo(() => nextUpcomingEvent(events.rows), [events.rows]);
 
   const nextShopping = useMemo(() => {
     const event = events.rows

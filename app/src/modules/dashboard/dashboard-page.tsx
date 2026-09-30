@@ -47,7 +47,7 @@ import {
   WeatherWidget,
   WIDGET_COLUMNS,
 } from './components/widgets';
-import { firstName, formatDashboardEyebrow } from './types';
+import { firstName, formatDashboardEyebrow, formatNextEventDay, formatNextEventWhen } from './types';
 import { reorderPreferences, resetPreferences, toggleWidget, type WidgetKind } from './types';
 
 const taskSchema = z.object({
@@ -110,6 +110,7 @@ export default function DashboardPage() {
 
   const openTasks = dashboard.openTasks;
   const nextEvent = dashboard.nextEvent;
+  const nextEventDay = nextEvent ? formatNextEventDay(nextEvent) : null;
 
   return (
     <section className="mx-auto w-[min(1480px,100%)]" data-module="accueil">
@@ -153,7 +154,7 @@ export default function DashboardPage() {
           {dashboard.todayItems.length === 0 ? (
             <p className="m-0 text-[13px] text-ink-soft">
               {nextEvent
-                ? `Le rendez-vous de ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))} approche.`
+                ? `Prochain rendez-vous : ${nextEvent.title}, ${formatNextEventWhen(nextEvent)}.`
                 : 'Aucune échéance aujourd’hui : la journée est à vous.'}{' '}
               Les courses, elles, sont presque prêtes.
             </p>
@@ -178,10 +179,14 @@ export default function DashboardPage() {
           <span className="block text-[11px] text-muted">Prochain rendez-vous</span>
           <strong className="my-0.5 block font-display text-[25px] tracking-[-0.04em]">
             {nextEvent
-              ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))
+              ? nextEvent.all_day
+                ? 'Journée'
+                : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))
               : '—'}
           </strong>
-          <small className="text-[11px] text-muted">{nextEvent ? nextEvent.title : 'Rien de planifié'}</small>
+          <small className="text-[11px] text-muted">
+            {nextEvent ? `${nextEvent.title}${nextEventDay ? ` · ${nextEventDay}` : ''}` : 'Rien de planifié'}
+          </small>
         </div>
       </section>
 
