@@ -111,7 +111,6 @@ export default function CalendrierPage() {
                 date={selected}
                 items={agenda}
                 isLoading={isLoading}
-                onAdd={() => openCreate(selected)}
                 onEdit={openEdit}
                 onDelete={(event) => setPendingDelete(event)}
               />

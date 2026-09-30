@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
-import { Button } from '@/components/ui/button';
 import { LoadingRows } from '@/components/ui/empty-state';
 import type { AgendaItem, CalendarEvent } from '../types';
 
@@ -16,25 +15,21 @@ export interface AgendaListProps {
   date: string;
   items: AgendaItem[];
   isLoading?: boolean;
-  onAdd: () => void;
   onEdit?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
 }
 
 /** Journée sélectionnée : événements, anniversaires et jours fériés. */
-export function AgendaList({ date, items, isLoading = false, onAdd, onEdit, onDelete }: AgendaListProps) {
+export function AgendaList({ date, items, isLoading = false, onEdit, onDelete }: AgendaListProps) {
   if (isLoading) return <LoadingRows rows={3} />;
 
   if (items.length === 0) {
+    // Sans bouton : le panneau affiche déjà « Ajouter un événement » et
+    // « Ajouter une tâche » juste en dessous, dans tous les cas.
     return (
       <div className="grid gap-1 py-3 text-[11px] text-muted">
         <strong className="text-[13px] text-fg">Journée libre</strong>
         <span>Profitez de cette journée, ou ajoutez un événement pour la partager au foyer.</span>
-        <div className="pt-2">
-          <Button variant="secondary" size="sm" icon="plus" onClick={onAdd}>
-            Ajouter à cette journée
-          </Button>
-        </div>
       </div>
     );
   }
