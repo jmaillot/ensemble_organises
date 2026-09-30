@@ -562,8 +562,11 @@ n'en est qu'un résumé de contexte.
   produit tourne sur l'adaptateur IndexedDB. C'est la réserve la plus lourde de
   la rétrospective, et elle est entière.
 - **Compensation de l'Ardoise** : l'algorithme de référence est côté serveur
-  (Edge Function `expense-settlement`) ; le frontend calcule encore ses soldes
-  localement pour l'affichage immédiat.
+  (Edge Function `expense-settlement`) et le frontend l'affiche quand il est
+  connecté (`useServerSettlement`, page Ardoise + résumé de l'accueil) ; le
+  calcul local reste le repli (démo, hors ligne, erreur) et couvre les
+  participants externes, ignorés par le serveur. À valider en usage : comparer
+  les soldes affichés avec un foyer comportant un externe.
 - **Messages** : accusés de lecture et pièces jointes restent hors périmètre.
 
 Voir [`docs/BACKEND.md`](docs/BACKEND.md) pour le détail opératoire et

@@ -212,3 +212,14 @@ export function simplifyDebts(balances: Balance[]): Settlement[] {
   }
   return settlements;
 }
+
+/**
+ * Jambes impliquant un participant externe. Le serveur ne produit que des
+ * transferts entre membres : quand les soldes membres viennent du serveur,
+ * ces jambes sont le complément local qui évite de perdre les dettes des
+ * externes. Les jambes entre membres sont écartées (référence serveur).
+ */
+export function externalSettlements(balances: Balance[]): Settlement[] {
+  const isExternal = (key: string) => key.startsWith(EXTERNAL_KEY_PREFIX);
+  return simplifyDebts(balances).filter((settlement) => isExternal(settlement.fromKey) || isExternal(settlement.toKey));
+}

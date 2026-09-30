@@ -6,8 +6,11 @@ import { useSessionUser } from '@/hooks/use-auth';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useFrenchHolidays } from '@/hooks/use-french-holidays';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
+import { useServerSettlement } from '@/modules/ardoise/hooks/use-settlement';
+import { toServerBalances } from '@/modules/ardoise/api';
+import { MEMBER_KEY_PREFIX } from '@/modules/ardoise/types';
 import { todayIso, toLocalDate, toIsoDate, daysBetween } from '@/lib/utils';
-import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, PostRow, ProfileRow, TaskRow } from '@/types';
+import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, TaskRow } from '@/types';
 import {
   layoutWidgets,
   nextEventOfDay,
@@ -250,32 +253,7 @@ export function useDashboard(): DashboardData {
     return entries.sort((a, b) => (a.when < b.when ? 1 : -1)).slice(0, 6);
   }, [events.rows, expenses.rows, members, posts.rows, tasks.rows]);
 
-  const board = useMemo(() => {
-    const balances = new Map<string, number>();
-    for (const member of members) balances.set(member.id, 0);
-    for (const expense of expenses.rows) {
-      const shares = (participants ?? []).filter((participant) => participant.expense_id === expense.id);
-      const equal = shares.length === 0 ? members.length : shares.length;
-      balances.set(expense.paid_by, (balances.get(expense.paid_by) ?? 0) + expense.amount);
-      if (shares.length === 0) {
-        for (const member of members) balances.set(member.id, (balances.get(member.id) ?? 0) - expense.amount / equal);
-        continue;
-      }
-      const total = shares.reduce((sum, share) => sum + share.share_amount, 0) || expense.amount;
-      for (const share of shares) {
-        if (!share.member_id) continue;
-        const amount = total === expense.amount ? expense.amount / equal : share.share_amount;
-        balances.set(share.member_id, (balances.get(share.member_id) ?? 0) - amount);
-      }
-    }
-    return {
-      total: expenses.rows.reduce((sum, expense) => sum + expense.amount, 0),
-      monthLabel: new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date()),
-      members: members
-        .filter((member) => member.role !== 'enfant')
-        .map((member) => ({ memberId: member.id, displayName: member.display_name, amount: balances.get(member.id) ?? 0 })),
-    };
-  }, [expenses.rows, members, participants]);
+  const board = useBoardSummary(expenses.rows, participants, members);
 
   const nextEvent = useMemo(() => nextEventOfDay(events.rows), [events.rows]);
 
@@ -340,4 +318,59 @@ function relativeWhen(iso: string) {
   const hours = Math.round(deltaMinutes / 60);
   if (hours < 24) return new Date(Date.now() - hours * 3_600_000).toISOString();
   return new Date(Date.now() - hours * 3_600_000).toISOString();
+}
+
+/**
+ * Résumé de l'Ardoise pour l'accueil : totaux locaux (sommes directes, pas de
+ * calcul de répartition), soldes par membre depuis la même requête serveur
+ * que la page Ardoise quand elle répond, calcul local sinon.
+ */
+function useBoardSummary(
+  expenseRows: ExpenseRow[],
+  participants: ExpenseParticipantRow[] | undefined,
+  members: HouseholdMemberRow[],
+) {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const settlementQuery = useServerSettlement(householdId);
+
+  return useMemo(() => {
+    const total = expenseRows.reduce((sum, expense) => sum + expense.amount, 0);
+    const monthLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date());
+    const server = settlementQuery.data;
+    if (server) {
+      return {
+        total,
+        monthLabel,
+        members: toServerBalances(server, members).map((balance) => ({
+          memberId: balance.key.slice(MEMBER_KEY_PREFIX.length),
+          displayName: balance.name,
+          amount: balance.amount,
+        })),
+      };
+    }
+    const balances = new Map<string, number>();
+    for (const member of members) balances.set(member.id, 0);
+    for (const expense of expenseRows) {
+      const shares = (participants ?? []).filter((participant) => participant.expense_id === expense.id);
+      const equal = shares.length === 0 ? members.length : shares.length;
+      balances.set(expense.paid_by, (balances.get(expense.paid_by) ?? 0) + expense.amount);
+      if (shares.length === 0) {
+        for (const member of members) balances.set(member.id, (balances.get(member.id) ?? 0) - expense.amount / equal);
+        continue;
+      }
+      const shared = shares.reduce((sum, share) => sum + share.share_amount, 0) || expense.amount;
+      for (const share of shares) {
+        if (!share.member_id) continue;
+        const amount = shared === expense.amount ? expense.amount / equal : share.share_amount;
+        balances.set(share.member_id, (balances.get(share.member_id) ?? 0) - amount);
+      }
+    }
+    return {
+      total,
+      monthLabel,
+      members: members
+        .filter((member) => member.role !== 'enfant')
+        .map((member) => ({ memberId: member.id, displayName: member.display_name, amount: balances.get(member.id) ?? 0 })),
+    };
+  }, [expenseRows, participants, members, settlementQuery.data]);
 }

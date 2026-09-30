@@ -39,12 +39,17 @@ export function BalanceCard({ total, monthLabel, onAddExpense, onInvite }: Balan
 
 export interface MemberBalancesProps {
   balances: Balance[];
+  /** Origine des soldes : le libellé le dit plutôt que de le laisser deviner. */
+  source?: 'serveur' | 'local';
 }
 
 /** Solde signé de chaque participant : ce que le foyer lui doit, ou l'inverse. */
-export function MemberBalances({ balances }: MemberBalancesProps) {
+export function MemberBalances({ balances, source = 'local' }: MemberBalancesProps) {
   return (
-    <Panel title="Qui doit quoi ?" description="Calcul automatique à chaque ajout.">
+    <Panel
+      title="Qui doit quoi ?"
+      description={source === 'serveur' ? 'Soldes calculés côté serveur.' : 'Calcul automatique à chaque ajout.'}
+    >
       <div aria-live="polite">
         {balances.map((balance) => {
           const positive = balance.amount > 0.005;

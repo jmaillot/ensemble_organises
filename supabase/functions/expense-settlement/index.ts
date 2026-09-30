@@ -12,9 +12,11 @@
  *   La compilation des soldes et la compensation des dettes sont faites
  *   EN BASE par `private.household_balances()` et
  *   `private.simplify_household_debts()` (migration 0006), via le pont
- *   `public.expense_settlement()` (migration 0013). Cet algorithme n'est
- *   réimplémenté nulle part ailleurs : le client ne doit jamais recalculer un
- *   solde, sinon l'affichage divergerait de la vérité serveur (AGENTS.md §2.2).
+ *   `public.expense_settlement()` (migration 0013). C'est la référence que le
+ *   client affiche quand il est connecté (`useServerSettlement`) ; le calcul
+ *   local de `app/src/modules/ardoise/types.ts` ne sert que de repli (démo,
+ *   hors ligne, fonction injoignable) et pour les participants externes, que
+ *   le serveur ignore.
  *
  * CONTRAT DE RÉPONSE
  *   {

@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatMonthLabel, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, MemberColorTag } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot } from '../api';
+import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot, toServerBalances, toServerSettlements } from '../api';
+import { ardoiseKeys, useServerSettlement } from './use-settlement';
 import {
   computeBalances,
   externalKey,
+  externalSettlements,
   memberKey,
   roundCents,
   simplifyDebts,
@@ -22,11 +24,6 @@ import {
   type Settlement,
 } from '../types';
 
-export const ardoiseKeys = {
-  all: ['ardoise'] as const,
-  snapshot: (householdId: string | null) => ['ardoise', householdId] as const,
-};
-
 /** Membres qui partagent réellement l'ardoise : les enfants en sont exclus. */
 const sharingMembers = (members: MemberOption[]) => members.filter((member) => member.role !== 'enfant');
 
@@ -34,6 +31,8 @@ export interface ArdoiseData {
   expenses: Expense[];
   balances: Balance[];
   settlements: Settlement[];
+  /** `serveur` quand `expense-settlement` répond, `local` sinon (démo, hors ligne, erreur). */
+  settlementSource: 'serveur' | 'local';
   sharingMembers: MemberOption[];
   externalParticipants: ExternalParticipant[];
   currentMember: HouseholdMemberRow | null;
@@ -111,7 +110,38 @@ export function useArdoise(): ArdoiseData {
   );
 
   const balances = useMemo(() => computeBalances(expenses, seeds), [expenses, seeds]);
-  const settlements = useMemo(() => simplifyDebts(balances), [balances]);
+  const localSettlements = useMemo(() => simplifyDebts(balances), [balances]);
+
+  // Référence serveur quand elle répond : les soldes membres et leurs
+  // transferts viennent de la base, les externes restent calculés localement
+  // (le serveur les ignore). Sinon, calcul local intégral — démo, hors ligne,
+  // ou fonction injoignable : jamais un écran d'erreur pour des soldes.
+  const settlementQuery = useServerSettlement(householdId);
+  const serverPayload = settlementQuery.data ?? null;
+
+  useEffect(() => {
+    if (settlementQuery.isError) {
+      console.warn('Ardoise : soldes serveur injoignables, repli sur le calcul local.', settlementQuery.error);
+    }
+  }, [settlementQuery.isError, settlementQuery.error]);
+
+  const externalBalances = useMemo(
+    () => computeBalances(expenses, seeds.filter((seed) => seed.kind === 'externe')),
+    [expenses, seeds],
+  );
+
+  const { displayBalances, displaySettlements, settlementSource } = useMemo(() => {
+    if (!serverPayload) {
+      return { displayBalances: balances, displaySettlements: localSettlements, settlementSource: 'local' as const };
+    }
+    const memberBalances = toServerBalances(serverPayload, members);
+    const combined = [...memberBalances, ...externalBalances];
+    return {
+      displayBalances: combined,
+      displaySettlements: [...toServerSettlements(serverPayload), ...externalSettlements(combined)],
+      settlementSource: 'serveur' as const,
+    };
+  }, [serverPayload, balances, localSettlements, members, externalBalances]);
 
   const total = useMemo(() => roundCents(expenses.reduce((sum, expense) => sum + expense.amount, 0)), [expenses]);
   const monthTotal = useMemo(() => {
@@ -121,8 +151,9 @@ export function useArdoise(): ArdoiseData {
 
   return {
     expenses,
-    balances,
-    settlements,
+    balances: displayBalances,
+    settlements: displaySettlements,
+    settlementSource,
     sharingMembers: sharers,
     externalParticipants,
     currentMember,
@@ -133,7 +164,10 @@ export function useArdoise(): ArdoiseData {
     isLoading: query.isLoading,
     isError: query.isError,
     error: (query.error as Error | null) ?? null,
-    refetch: () => void query.refetch(),
+    refetch: () => {
+      void query.refetch();
+      void settlementQuery.refetch();
+    },
   };
 }
 

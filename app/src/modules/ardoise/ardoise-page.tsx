@@ -23,6 +23,7 @@ export default function ArdoisePage() {
     expenses,
     balances,
     settlements,
+    settlementSource,
     sharingMembers,
     externalParticipants,
     currentMember,
@@ -236,7 +237,7 @@ export default function ArdoisePage() {
         </Panel>
 
         <div>
-          <MemberBalances balances={balances} />
+          <MemberBalances balances={balances} source={settlementSource} />
           <SettlementsPanel settlements={settlements} className="mt-[18px]" />
         </div>
       </div>

@@ -1051,10 +1051,12 @@ en base, puis agrégat JSON des soldes et des transferts. Le pont est
 `SECURITY DEFINER`, son `EXECUTE` n'est accordé qu'à `service_role`, et
 `authenticated` ne peut ni l'appeler ni lire les fonctions privées.
 
-> Le frontend calcule encore ses soldes **localement**
-> (`app/src/modules/ardoise/types.ts`) : le basculement vers la fonction serveur
-> est un travail frontend, à faire avant la mise en production. Tant que ce
-> n'est pas fait, l'affichage peut diverger du serveur — voir §13.
+> Le frontend affiche les soldes du serveur quand il est connecté
+> (`useServerSettlement`, même requête partagée par la page Ardoise et le
+> résumé de l'accueil) : le calcul local de `types.ts` ne sert que de repli
+> (démo, hors ligne, fonction injoignable) et pour les participants externes,
+> que le serveur ignore. Le panneau des soldes dit sa source (« Soldes
+> calculés côté serveur. ») plutôt que de la laisser deviner.
 
 ---
 
