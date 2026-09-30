@@ -2,16 +2,26 @@ import { useCallback, useMemo } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
-import type { ProviderRow, ProviderTypeRow } from '@/types';
+import type { ProviderAttachmentRow, ProviderRow, ProviderTypeRow } from '@/types';
 import {
   createProvider,
+  createProviderAttachment,
   createProviderType,
   removeProvider as removeProviderRow,
+  removeProviderAttachment as removeProviderAttachmentRow,
   removeProviderType as removeProviderTypeRow,
   updateProvider,
   updateProviderType,
 } from '../api';
-import { toProvider, toProviderType, type Provider, type ProviderDraft, type ProviderType } from '../types';
+import {
+  toProvider,
+  toProviderAttachment,
+  toProviderType,
+  type Provider,
+  type ProviderAttachment,
+  type ProviderDraft,
+  type ProviderType,
+} from '../types';
 
 /**
  * Invalidation par table. `useResource` indexe ses requêtes par
@@ -32,7 +42,7 @@ export interface UsePrestatairesResult {
   error: Error | null;
   refetch: () => void;
   isMutating: boolean;
-  saveProvider: (id: string | null, draft: ProviderDraft) => Promise<void>;
+  saveProvider: (id: string | null, draft: ProviderDraft, files?: File[], removedAttachmentIds?: string[]) => Promise<void>;
   deleteProvider: (id: string) => Promise<void>;
   saveProviderType: (id: string | null, values: { name: string; icon: string }) => Promise<void>;
   deleteProviderType: (id: string) => Promise<number>;
@@ -43,6 +53,7 @@ export function usePrestataires(): UsePrestatairesResult {
   const householdId = useHouseholdStore((state) => state.householdId);
   const providersResource = useResource<ProviderRow>('providers');
   const typesResource = useResource<ProviderTypeRow>('provider_types');
+  const attachmentsResource = useResource<ProviderAttachmentRow>('provider_attachments');
   const queryClient = useQueryClient();
 
   const types = useMemo(
@@ -50,23 +61,50 @@ export function usePrestataires(): UsePrestatairesResult {
     [typesResource.rows],
   );
 
+  const attachmentsByProvider = useMemo(() => {
+    const grouped = new Map<string, ProviderAttachment[]>();
+    for (const row of attachmentsResource.rows) {
+      const attachment = toProviderAttachment(row);
+      const list = grouped.get(attachment.providerId) ?? [];
+      list.push(attachment);
+      grouped.set(attachment.providerId, list);
+    }
+    for (const list of grouped.values()) {
+      list.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    }
+    return grouped;
+  }, [attachmentsResource.rows]);
+
   const providers = useMemo(
     () =>
       providersResource.rows
-        .map((row) => toProvider(row, types))
+        .map((row) => toProvider(row, types, attachmentsByProvider.get(row.id) ?? []))
         .sort((left, right) => left.name.localeCompare(right.name, 'fr')),
-    [providersResource.rows, types],
+    [providersResource.rows, types, attachmentsByProvider],
   );
 
   const invalidate = useCallback(async () => {
-    await invalidateTables(queryClient, ['providers', 'provider_types']);
+    await invalidateTables(queryClient, ['providers', 'provider_types', 'provider_attachments']);
   }, [queryClient]);
 
   const saveProvider = useCallback(
-    async (id: string | null, draft: ProviderDraft) => {
+    async (id: string | null, draft: ProviderDraft, files: File[] = [], removedAttachmentIds: string[] = []) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
-      if (id) await updateProvider(id, draft);
-      else await createProvider(householdId, draft);
+      const saved = id ? await updateProvider(id, draft) : await createProvider(householdId, draft);
+      for (const attachmentId of removedAttachmentIds) {
+        await removeProviderAttachmentRow(attachmentId);
+      }
+      // La fiche existe : son identifiant sert de dossier de stockage.
+      if (files.length > 0) {
+        try {
+          for (const file of files) {
+            await createProviderAttachment(householdId, saved.id, file);
+          }
+        } catch (filesError) {
+          await invalidate();
+          throw filesError;
+        }
+      }
       await invalidate();
     },
     [householdId, invalidate],

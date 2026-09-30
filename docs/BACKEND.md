@@ -316,7 +316,7 @@ transaction et casserait le principe de « migration transactionnelle » ; le
 **`household_id` dénormalisé, justifié et contraint.** Ces tables le portent
 pour éviter une jointure sur chaque requête de tableau de bord :
 `shopping_list_items`, `routine_completions`, `gift_items`, `pet_records`,
-`pet_attachments`, `note_attachments`,
+`pet_attachments`, `note_attachments`, `provider_attachments`,
 `post_media`, `post_comments`, `post_reactions`, `messages`. Elles sont
 alignées sur leur parent par le déclencheur `align_household`
 (`migration 0008`), qui refuse tout écart et met à jour la colonne si elle est
@@ -1115,7 +1115,7 @@ RLS ne lève pas d'erreur : elle n'est simplement pas visible.
 
 | Fichier | Couverture |
 |---|---|
-| `0001_schema_contract.sql` | les 43 tables du contrat `database.ts` avec exactement leurs colonnes, RLS active partout, clé primaire ou unicité partout, déclencheurs d'alignement présents, tables inatteignables (`household_invite_tokens`, `push_subscriptions`) sans politique **ni privilège** et `message_notifications` sans politique (file serveur uniquement), fonctions serveur non exécutables par un client, profil créé par le trigger et préférences de rappel lui appartenant, buckets privés |
+| `0001_schema_contract.sql` | les 44 tables du contrat `database.ts` avec exactement leurs colonnes, RLS active partout, clé primaire ou unicité partout, déclencheurs d'alignement présents, tables inatteignables (`household_invite_tokens`, `push_subscriptions`) sans politique **ni privilège** et `message_notifications` sans politique (file serveur uniquement), fonctions serveur non exécutables par un client, profil créé par le trigger et préférences de rappel lui appartenant, buckets privés |
 | `0002_rls_isolation.sql` | lecture et écriture inter-foyers, escalade de rôle, dernier administrateur, rôle `enfant` en lecture seule, accès dérivés du parent, intégrité des références de membre et des `household_id` dénormalisés, visibilité des listes privées et partagées, widgets personnels, profils sans liste globale, `anon` sans accès |
 | `0003_invites.sql` | cycle de vie complet des tokens : empreintes 64 hex, jamais de token brut en base, régénération, révocation, expiration, plafond 90 jours, `max_uses`, idempotence, rôle `admin` refusé, refus des non-administrateurs, comparaison à temps constant |
 | `0004_cron.sql` | prédicat RRULE, génération idempotente des occurrences, escalade en `manque`, protection des occurrences validées, présence des **cinq** jobs et de leurs horaires, `database_name` courant, absence de secret (y compris VAPID) dans `cron.job.command`, job n'appelant qu'une fonction privée sans paramètre, point d'entrée d'envoi unique |

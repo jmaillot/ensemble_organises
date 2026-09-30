@@ -1,5 +1,5 @@
 import type { IconName } from '@/components/shared/icon';
-import type { ProviderRow, ProviderTypeRow } from '@/types';
+import type { ProviderAttachmentRow, ProviderRow, ProviderTypeRow } from '@/types';
 
 /**
  * Icônes proposés pour un type de prestataire. Le catalogue est volontairement
@@ -140,6 +140,31 @@ export interface Provider {
   notes: string | null;
   fullAddress: string;
   createdAt: string;
+  /** Pièces jointes de la fiche : devis, factures, attestations. */
+  attachments: ProviderAttachment[];
+}
+
+/** Pièce jointe d'une fiche prestataire : devis, facture, attestation. */
+export interface ProviderAttachment {
+  id: string;
+  providerId: string;
+  url: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  createdAt: string;
+}
+
+export function toProviderAttachment(row: ProviderAttachmentRow): ProviderAttachment {
+  return {
+    id: row.id,
+    providerId: row.provider_id,
+    url: row.file_url,
+    fileName: row.file_name,
+    mime: row.mime_type,
+    size: row.size_bytes,
+    createdAt: row.created_at,
+  };
 }
 
 export interface ProviderDraft {
@@ -153,7 +178,7 @@ export interface ProviderDraft {
   notes: string | null;
 }
 
-export function toProvider(row: ProviderRow, types: ProviderType[]): Provider {
+export function toProvider(row: ProviderRow, types: ProviderType[], attachments: ProviderAttachment[] = []): Provider {
   const type = row.provider_type_id ? types.find((entry) => entry.id === row.provider_type_id) : undefined;
   return {
     id: row.id,
@@ -169,6 +194,7 @@ export function toProvider(row: ProviderRow, types: ProviderType[]): Provider {
     notes: row.notes,
     fullAddress: [row.address, row.postal_code, row.city].filter(Boolean).join(', '),
     createdAt: row.created_at,
+    attachments,
   };
 }
 

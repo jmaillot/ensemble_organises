@@ -1,5 +1,7 @@
 import { data } from '@/lib/data';
-import type { ProviderRow, ProviderTypeRow } from '@/types';
+import { depositHouseholdFile } from '@/lib/storage';
+import { randomId } from '@/lib/utils';
+import type { ProviderAttachmentRow, ProviderRow, ProviderTypeRow } from '@/types';
 import type { ProviderDraft } from './types';
 
 function providerValues(draft: ProviderDraft) {
@@ -24,7 +26,31 @@ export async function updateProvider(id: string, draft: ProviderDraft): Promise<
 }
 
 export async function removeProvider(id: string): Promise<void> {
+  // En ligne la cascade SQL emporte les pièces jointes ; en local
+  // l'adaptateur n'a pas de cascade implicite, on retire explicitement.
+  await data.removeWhere('provider_attachments', { provider_id: id }).catch(() => undefined);
   await data.remove('providers', id);
+}
+
+export async function createProviderAttachment(
+  householdId: string,
+  providerId: string,
+  file: File,
+): Promise<ProviderAttachmentRow> {
+  const deposited = await depositHouseholdFile({ householdId, folder: `providers/${providerId}`, file });
+  return data.create<ProviderAttachmentRow>('provider_attachments', {
+    id: randomId('provider-attachment'),
+    provider_id: providerId,
+    household_id: householdId,
+    file_url: deposited.url,
+    file_name: deposited.name,
+    mime_type: deposited.mime,
+    size_bytes: deposited.size,
+  });
+}
+
+export async function removeProviderAttachment(id: string): Promise<void> {
+  await data.remove('provider_attachments', id);
 }
 
 export async function createProviderType(householdId: string, values: { name: string; icon: string }): Promise<ProviderTypeRow> {

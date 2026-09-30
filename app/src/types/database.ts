@@ -364,6 +364,17 @@ export interface ProviderRow {
   created_at: IsoDateTime;
 }
 
+export interface ProviderAttachmentRow {
+  id: Uuid;
+  provider_id: Uuid;
+  household_id: Uuid;
+  file_url: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: IsoDateTime;
+}
+
 export interface LoyaltyCardRow {
   id: Uuid;
   household_id: Uuid;

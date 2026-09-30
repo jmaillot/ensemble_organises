@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import PrestatairesPage from './prestataires-page';
@@ -67,6 +67,37 @@ describe('PrestatairesPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Ajouter le contact' }));
 
     expect(await within(dialog).findByText('Adresse e-mail invalide.')).toBeInTheDocument();
+  });
+
+  it('joint un devis à la création et l’affiche sur la carte', async () => {
+    // Mode démo : le dépôt renvoie un aperçu local.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:piece-jointe' });
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<PrestatairesPage />, { route: '/prestataires' });
+
+      await screen.findByRole('heading', { name: 'Cabinet du Dr Morel' });
+      await user.click(screen.getByRole('button', { name: 'Ajouter un prestataire' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Ajouter un prestataire' });
+      await user.type(within(dialog).getByLabelText(/^Nom/), 'Électricien Lumen');
+      await user.upload(
+        within(dialog).getByLabelText(/Joindre des fichiers/),
+        new File(['%PDF'], 'devis.pdf', { type: 'application/pdf' }),
+      );
+      expect(await within(dialog).findByText(/devis\.pdf/)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Ajouter le contact' }));
+
+      // Le dialogue ne se referme qu'après le dépôt : attendre sa fermeture
+      // prouve le circuit complet, pas seulement la création de la fiche.
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const card = await screen.findByRole('heading', { name: 'Électricien Lumen' });
+      const article = card.closest('article');
+      expect(article).not.toBeNull();
+      expect(within(article as HTMLElement).getByText('devis.pdf')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('gère les types depuis le dialogue dédié', async () => {
