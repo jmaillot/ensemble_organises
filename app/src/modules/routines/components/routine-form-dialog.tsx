@@ -309,7 +309,7 @@ export function RoutineFormDialog({
                     </label>
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="day" checked={field.value === 'day'} onChange={() => field.onChange('day')} />
-                      Le même quantième
+                      Jour du mois
                     </label>
                   </div>
                 )}
@@ -373,7 +373,7 @@ export function RoutineFormDialog({
                     </label>
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[11px] border border-border bg-surface px-3 text-[12px] has-[:checked]:border-accent has-[:checked]:bg-accent-faint">
                       <input type="radio" value="day" checked={field.value === 'day'} onChange={() => field.onChange('day')} />
-                      Le même quantième
+                      Jour de l'année
                     </label>
                   </div>
                 )}
