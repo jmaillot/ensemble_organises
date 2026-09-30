@@ -163,7 +163,9 @@ export function formatDashboardEyebrow(now: Date, householdName: string) {
 }
 
 export function firstName(displayName: string) {
-  return displayName.split(' ')[0] ?? displayName;
+  const trimmed = displayName.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
 /**

@@ -63,6 +63,9 @@ export default function DashboardPage() {
   );
 
   const visibleKinds = useMemo(() => dashboard.placements.map((placement) => placement.kind), [dashboard.placements]);
+  // `??` ne rattrape pas une chaîne vide : un displayName vidé (profil sans
+  // nom, session persistée) affichait « Bonjour  ». Le repli couvre aussi ce cas.
+  const displayName = user?.displayName?.trim() ? user.displayName.trim() : 'Camille';
   // Pendant un drag, le curseur passe en « main fermée » sur toute la grille :
   // au tactile la carte soulevée suffit, à la souris il faut le curseur.
   const [draggingKind, setDraggingKind] = useState<WidgetKind | null>(null);
@@ -98,7 +101,7 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow mb-2">{formatDashboardEyebrow(new Date(), householdName)}</p>
           <h1 className="mb-2 text-[clamp(30px,3.2vw,47px)] leading-[1.02]">
-            Bonjour {firstName(user?.displayName ?? 'Camille')}
+            Bonjour {firstName(displayName)}
             <span className="text-coral">.</span>
           </h1>
           <p className="lede mb-0 text-[15px]">

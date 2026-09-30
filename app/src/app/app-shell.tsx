@@ -212,14 +212,14 @@ export function AppShell() {
               {unread > 0 ? <span className="absolute top-[9px] right-[9px] size-[7px] rounded-full border-2 border-surface bg-coral" /> : null}
             </button>
             <div className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1">
-              <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName ?? 'Profil'}</span>
+              <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName?.trim() ? user.displayName : 'Profil'}</span>
               <button
                 type="button"
                 onClick={() => navigate('/parametres')}
                 className="grid size-8 place-items-center rounded-full bg-fg text-[11px] font-extrabold text-surface"
                 aria-label="Ouvrir les préférences du foyer"
               >
-                {initials(user?.displayName ?? 'Profil')}
+                {initials(user?.displayName?.trim() ? user.displayName : 'Profil')}
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ import { Panel } from '@/components/shared/module-shell';
 import { LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { signOut, useSessionUser } from '@/hooks/use-auth';
+import { useSessionStore } from '@/stores/session-store';
 import { DEMO_USER_ID } from '@/lib/data/seed';
 import { useHouseholdStore, useMemberRole } from '@/stores/household-store';
 import { fetchProfile, saveProfile, type ProfileSettings } from '../api';
@@ -81,6 +82,13 @@ export function ProfileForm() {
       await saveProfile(target, values);
       // Le nom affiché dans la barre supérieure et les avatars suit le foyer,
       // la ville suit l'accueil (repli local avant le retour du profil).
+      // La salutation « Bonjour » de la Maison lit la session, pas le foyer :
+      // sans cette synchronisation elle gardait l'ancien nom.
+      const trimmedName = values.displayName.trim();
+      const session = useSessionStore.getState();
+      if (session.user && session.user.id === target.userId && session.user.displayName !== trimmedName) {
+        session.refreshUser({ ...session.user, displayName: trimmedName });
+      }
       setCity(values.city.trim());
       setMembers(members.map((member) => (member.id === target.memberId ? { ...member, display_name: values.displayName } : member)));
       await queryClient.invalidateQueries({ queryKey: profileKeys.all });

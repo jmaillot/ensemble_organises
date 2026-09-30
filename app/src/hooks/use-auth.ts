@@ -19,10 +19,12 @@ export function useSessionUser(): SessionUser | null {
 /** Traduit un utilisateur Supabase Auth en utilisateur de session. */
 function toSessionUser(user: User): SessionUser {
   const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
+  const email = typeof user.email === 'string' ? user.email.trim() : '';
   return {
     id: user.id,
     email: user.email ?? '',
-    displayName: (metadata.full_name as string | undefined) ?? (user.email ?? 'Membre du foyer'),
+    displayName: fullName || email || 'Membre du foyer',
     avatarUrl: (metadata.avatar_url as string | undefined) ?? null,
     provider: ((user.app_metadata?.provider as SessionUser['provider'] | undefined) ?? 'email') as SessionUser['provider'],
   };
