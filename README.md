@@ -542,11 +542,11 @@ n'en est qu'un résumé de contexte.
 - **Accusés de lecture des messages** suivis côté client : il faudrait une
   colonne `read_at` et une mise à jour serveur.
 - **Ville du profil** : `profiles.city` (migration 0034, contrainte 2–60
-  caractères) est désormais la source de vérité du widget météo ; le formulaire
-  la lit en premier et réécrit l'ancien `dashboard_widgets.settings.city` en
-  repli. Migration **écrite mais non appliquée** : `supabase-project/` n'est
-  pas amorcé ici, donc `migrate.sh` + `test-db.sh` restent à passer avant
-  déploiement.
+  caractères) est la source de vérité du widget météo ; le formulaire la lit en
+  premier et réécrit l'ancien `dashboard_widgets.settings.city` en repli.
+  **Validé en usage le 30/09** (ville enregistrée → température réelle Open-Meteo
+  affichée), `migrate.sh` + `test-db.sh` verts sur l'hôte, CSP Traefik avec
+  `connect-src` Open-Meteo en place.
 - **Colonnes suggérées par les modules** : `notes.visibility`
 (remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
 `pets.next_reminder_date`, `trips.status`.
