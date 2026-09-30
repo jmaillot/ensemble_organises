@@ -66,10 +66,12 @@ describe('Accueil — rendu', () => {
     expect(within(screen.getByRole('article', { name: 'Widget Calendrier' })).getByText(/septembre/)).toBeInTheDocument();
     // Service simulé injoignable : le widget météo affiche son état d'erreur.
     expect(await within(screen.getByRole('article', { name: 'Widget Météo' })).findByText(/vérifiez la connexion/)).toBeInTheDocument();
-    // Le point du jour liste le programme : retards, échéances et horaires.
-    const programme = screen.getByRole('list', { name: 'Programme du jour' });
-    expect(within(programme).getByText(/Rendez-vous chez le médecin/)).toBeInTheDocument();
-    expect(within(programme).getByText(/À 19:30/)).toBeInTheDocument();
+    // Le point du jour sépare tâches et événements en deux colonnes.
+    const taches = screen.getByRole('list', { name: 'Tâches du jour' });
+    const evenements = screen.getByRole('list', { name: 'Événements du jour' });
+    expect(within(taches).getByText(/Choisir le menu du week-end/)).toBeInTheDocument();
+    expect(within(evenements).getByText(/Rendez-vous chez le médecin/)).toBeInTheDocument();
+    expect(within(evenements).getByText(/À 19:30/)).toBeInTheDocument();
   });
 
   it('propose les seize espaces du foyer dans la grille', async () => {

@@ -34,6 +34,7 @@ import { modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { useDashboard } from './hooks/use-dashboard';
+import type { TodayItem } from './hooks/use-dashboard';
 import { useWeather } from './hooks/use-weather';
 import {
   ActivityCard,
@@ -111,6 +112,14 @@ export default function DashboardPage() {
   const openTasks = dashboard.openTasks;
   const nextEvent = dashboard.nextEvent;
   const nextEventDay = nextEvent ? formatNextEventDay(nextEvent) : null;
+  // Le point du jour mélange deux natures : les tâches (retards, échéances)
+  // et les événements (horaires). Deux colonnes plutôt qu'une liste unique.
+  const todayTasks = dashboard.todayItems.filter((item) => item.kind !== 'evenement');
+  const todayEvents = dashboard.todayItems.filter((item) => item.kind === 'evenement');
+  const todayGroups = [
+    { title: 'Tâches', listLabel: 'Tâches du jour', items: todayTasks },
+    { title: 'Événements', listLabel: 'Événements du jour', items: todayEvents },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <section className="mx-auto w-[min(1480px,100%)]" data-module="accueil">
@@ -159,20 +168,11 @@ export default function DashboardPage() {
               Les courses, elles, sont presque prêtes.
             </p>
           ) : (
-            <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Programme du jour">
-              {dashboard.todayItems.slice(0, 5).map((item) => (
-                <li key={item.id} className="flex items-baseline gap-2 text-[13px] text-ink-soft">
-                  <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
-                  <span className="min-w-0 truncate">
-                    <strong className="font-semibold text-fg">{item.title}</strong>
-                    <span> · {item.detail}</span>
-                  </span>
-                </li>
+            <div className={cn('grid gap-4', todayGroups.length > 1 && 'min-[650px]:grid-cols-2')}>
+              {todayGroups.map((group) => (
+                <TodayGroup key={group.listLabel} title={group.title} listLabel={group.listLabel} items={group.items} />
               ))}
-              {dashboard.todayItems.length > 5 ? (
-                <li className="text-[12px] text-muted">…et {dashboard.todayItems.length - 5} autre{dashboard.todayItems.length - 5 > 1 ? 's' : ''}.</li>
-              ) : null}
-            </ul>
+            </div>
           )}
         </div>
         <div className="relative z-1 mt-0 min-w-[132px] border-l-0 border-t border-accent/25 pt-3.5 pl-0 min-[650px]:mt-0 min-[650px]:border-t-0 min-[650px]:border-l min-[650px]:pt-0 min-[650px]:pl-5">
@@ -393,6 +393,33 @@ function MeteoSlot({
 }) {
   const weather = useWeather(city);
   return <WeatherWidget placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps} city={city} weather={weather} />;
+}
+
+/** Colonne du point du jour : tâches ou événements, 5 lignes max puis le reste. */
+const TODAY_GROUP_LIMIT = 5;
+
+function TodayGroup({ title, listLabel, items }: { title: string; listLabel: string; items: TodayItem[] }) {
+  const visible = items.slice(0, TODAY_GROUP_LIMIT);
+  const extra = items.length - visible.length;
+  return (
+    <div className="min-w-0">
+      <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{title}</h3>
+      <ul className="m-0 grid list-none gap-1.5 p-0" aria-label={listLabel}>
+        {visible.map((item) => (
+          <li key={item.id} className="flex items-baseline gap-2 text-[13px] text-ink-soft">
+            <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
+            <span className="min-w-0 truncate">
+              <strong className="font-semibold text-fg">{item.title}</strong>
+              <span> · {item.detail}</span>
+            </span>
+          </li>
+        ))}
+        {extra > 0 ? (
+          <li className="text-[12px] text-muted">…et {extra} autre{extra > 1 ? 's' : ''}.</li>
+        ) : null}
+      </ul>
+    </div>
+  );
 }
 
 function BirthdayPreview({
