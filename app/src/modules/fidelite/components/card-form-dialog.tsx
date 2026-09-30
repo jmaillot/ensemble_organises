@@ -9,9 +9,11 @@ import { Icon } from '@/components/shared/icon';
 import { useHouseholdStore } from '@/stores/household-store';
 import {
   loyaltyBrandColors,
+  loyaltyCategories,
   loyaltyCodeTypes,
   type LoyaltyCard,
   type LoyaltyCardInput,
+  type LoyaltyCategory,
 } from '../types';
 
 const schema = z.object({
@@ -19,6 +21,9 @@ const schema = z.object({
   codeType: z.enum(['barcode', 'qr']),
   codeValue: z.string().trim().min(3, 'Saisissez ou scannez le code de la carte.'),
   brandColor: z.enum(['accent', 'coral', 'amber', 'ink']),
+  category: z
+    .string()
+    .refine((value) => value === '' || loyaltyCategories.some((option) => option.value === value), 'Catégorie inconnue.'),
   memberId: z.string(),
 });
 
@@ -44,12 +49,14 @@ export function CardFormDialog({ open, onOpenChange, card, prefill, isSaving, on
       codeType: card?.codeType ?? prefill?.codeType ?? 'barcode',
       codeValue: card?.codeValue ?? prefill?.codeValue ?? '',
       brandColor: card?.brandColor ?? prefill?.brandColor ?? 'accent',
+      category: card?.category ?? prefill?.category ?? '',
       memberId: card?.memberId ?? prefill?.memberId ?? '',
     },
   });
 
   const submit = handleSubmit(async (values) => {
-    await onSubmit({ ...values, memberId: values.memberId || null });
+    const category: LoyaltyCategory | null = values.category === '' ? null : (values.category as LoyaltyCategory);
+    await onSubmit({ ...values, category, memberId: values.memberId || null });
     onOpenChange(false);
   });
 
@@ -119,6 +126,19 @@ export function CardFormDialog({ open, onOpenChange, card, prefill, isSaving, on
                 placeholder="Ex. 6284 1190 3312"
                 className="font-mono tracking-[0.06em]"
               />
+            )}
+          </Field>
+
+          <Field label="Catégorie d’enseigne" error={errors.category?.message} hint="Optionnel : sert à filtrer les cartes.">
+            {(props) => (
+              <Select {...props} {...register('category')}>
+                <option value="">Non renseignée</option>
+                {loyaltyCategories.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
             )}
           </Field>
 

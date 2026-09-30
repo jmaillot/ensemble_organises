@@ -61,4 +61,37 @@ describe('Fidélité', () => {
       expect(screen.queryByRole('button', { name: 'Afficher le code de Librairie du parc en plein écran' })).toBeNull(),
     );
   });
+
+  it('filtre les cartes par catégorie d’enseigne', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<FidelitePage />);
+
+    await screen.findByRole('button', { name: 'Afficher le code de Marché de proximité en plein écran' });
+    const filter = screen.getByLabelText(/catégorie/i);
+
+    await user.selectOptions(filter, 'alimentaire');
+    expect(screen.getByRole('button', { name: 'Afficher le code de Marché de proximité en plein écran' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Afficher le code de Librairie du parc en plein écran' })).toBeNull();
+
+    await user.selectOptions(filter, 'sport');
+    expect(await screen.findByText('Aucune carte dans cette catégorie')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Toutes les catégories' }));
+    expect(screen.getByRole('button', { name: 'Afficher le code de Librairie du parc en plein écran' })).toBeInTheDocument();
+  });
+
+  it('enregistre la catégorie choisie dans le formulaire', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<FidelitePage />);
+
+    await user.click(await screen.findByRole('button', { name: /ajouter une carte/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /ajouter une carte/i });
+    await user.type(within(dialog).getByLabelText(/nom de la carte/i), 'Garage Central');
+    await user.type(within(dialog).getByLabelText(/^code/i), '44556677');
+    await user.selectOptions(within(dialog).getByLabelText(/catégorie/i), 'auto_carburant');
+    await user.click(within(dialog).getByRole('button', { name: /enregistrer la carte/i }));
+
+    expect(await screen.findByText('Auto & Carburant')).toBeInTheDocument();
+  });
 });

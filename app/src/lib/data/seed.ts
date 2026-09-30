@@ -597,6 +597,7 @@ export const demoLoyaltyCards: LoyaltyCardRow[] = [
     code_type: 'barcode',
     code_value: '628411903312',
     brand_color: 'accent',
+    category: 'alimentaire',
     created_at: now(),
   },
   {
@@ -607,6 +608,7 @@ export const demoLoyaltyCards: LoyaltyCardRow[] = [
     code_type: 'qr',
     code_value: 'LIB-4821-076',
     brand_color: 'coral',
+    category: 'culture_loisirs',
     created_at: now(),
   },
 ];

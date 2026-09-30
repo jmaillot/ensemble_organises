@@ -14,6 +14,7 @@ export function toLoyaltyCardPayload(input: LoyaltyCardInput, householdId: strin
     code_type: input.codeType,
     code_value: input.codeValue.trim(),
     brand_color: input.brandColor,
+    category: input.category,
   };
 }
 

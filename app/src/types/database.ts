@@ -372,6 +372,7 @@ export interface LoyaltyCardRow {
   code_type: 'barcode' | 'qr';
   code_value: string;
   brand_color: string | null;
+  category: string | null;
   created_at: IsoDateTime;
 }
 

@@ -4,7 +4,7 @@ import { Icon } from '@/components/shared/icon';
 import { QrCode } from '@/components/shared/qr-code';
 import { BarCode } from '@/components/shared/barcode';
 import { cn } from '@/lib/utils';
-import { loyaltyBrandChip, loyaltyBrandColors, loyaltyCodeTypeLabel, type LoyaltyCard } from '../types';
+import { loyaltyBrandChip, loyaltyBrandColors, loyaltyCategoryLabel, loyaltyCodeTypeLabel, type LoyaltyCard } from '../types';
 
 export interface CardCodeDialogProps {
   card: LoyaltyCard | null;
@@ -46,6 +46,12 @@ export function CardCodeDialog({
                 <span>{loyaltyCodeTypeLabel[card.codeType]}</span>
                 <span aria-hidden="true">·</span>
                 <span>{card.memberName ?? 'Foyer entier'}</span>
+                {card.category ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{loyaltyCategoryLabel[card.category]}</span>
+                  </>
+                ) : null}
               </DialogDescription>
             </DialogHeader>
 

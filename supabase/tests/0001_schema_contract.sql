@@ -52,7 +52,7 @@ begin
           ('pet_attachments', ARRAY['id', 'pet_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('provider_types', ARRAY['id', 'household_id', 'name', 'icon', 'created_at']::text[]),
           ('providers', ARRAY['id', 'household_id', 'provider_type_id', 'name', 'email', 'phone', 'address', 'postal_code', 'city', 'notes', 'created_at']::text[]),
-          ('loyalty_cards', ARRAY['id', 'household_id', 'member_id', 'name', 'code_type', 'code_value', 'brand_color', 'created_at']::text[]),
+          ('loyalty_cards', ARRAY['id', 'household_id', 'member_id', 'name', 'code_type', 'code_value', 'brand_color', 'category', 'created_at']::text[]),
           ('places', ARRAY['id', 'household_id', 'type', 'photo_url', 'name', 'street', 'postal_code', 'city', 'phone', 'rating', 'visited', 'note', 'created_at']::text[]),
           ('posts', ARRAY['id', 'household_id', 'author_id', 'text', 'created_at']::text[]),
           ('post_media', ARRAY['id', 'post_id', 'household_id', 'media_type', 'url']::text[]),

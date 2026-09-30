@@ -8,12 +8,13 @@ import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { QrCode } from '@/components/shared/qr-code';
 import { BarCode } from '@/components/shared/barcode';
+import { Select } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { CardCodeDialog } from './components/card-code-dialog';
 import { CardFormDialog } from './components/card-form-dialog';
 import { useFidelite } from './hooks/use-fidelite';
 import { useBarcodeScanner } from './hooks/use-barcode-scanner';
-import { loyaltyCodeTypeLabel, loyaltyIconTone, type LoyaltyCard, type LoyaltyCardInput } from './types';
+import { loyaltyCategories, loyaltyCategoryLabel, loyaltyCodeTypeLabel, loyaltyIconTone, type LoyaltyCard, type LoyaltyCardInput } from './types';
 
 export default function FidelitePage() {
   const { cards, total, barcodes, qrCodes, isLoading, isFetching, isError, error, isMutating, refetch, addCard, editCard, removeCard, markUsed } =
@@ -27,6 +28,8 @@ export default function FidelitePage() {
   const [pendingDelete, setPendingDelete] = useState<LoyaltyCard | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const visibleCards = categoryFilter === '' ? cards : cards.filter((card) => card.category === categoryFilter);
 
   const openCreate = useCallback((values?: Partial<LoyaltyCardInput>) => {
     setEditing(null);
@@ -111,10 +114,33 @@ export default function FidelitePage() {
         description="Touchez une carte pour l’afficher en plein écran, prête à présenter en caisse."
         action={
           <span className="text-[11px] text-muted" aria-live="polite">
-            {isFetching ? 'Actualisation…' : `${cards.length} carte${cards.length > 1 ? 's' : ''}`}
+            {isFetching ? 'Actualisation…' : `${visibleCards.length} carte${visibleCards.length > 1 ? 's' : ''}`}
           </span>
         }
       />
+
+      {cards.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="grid gap-1.5 max-[650px]:w-full">
+            <label htmlFor="loyalty-category-filter" className="text-[11px] font-extrabold text-muted">
+              Catégorie
+            </label>
+            <Select
+              id="loyalty-category-filter"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
+            >
+              <option value="">Toutes les catégories</option>
+              {loyaltyCategories.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <LoadingRows rows={4} />
@@ -130,9 +156,17 @@ export default function FidelitePage() {
           secondaryActionLabel="Scanner une carte"
           onSecondaryAction={() => setScannerOpen(true)}
         />
+      ) : visibleCards.length === 0 ? (
+        <EmptyState
+          icon="wallet"
+          title="Aucune carte dans cette catégorie"
+          description="Aucune carte du foyer ne correspond à ce filtre."
+          actionLabel="Toutes les catégories"
+          onAction={() => setCategoryFilter('')}
+        />
       ) : (
         <div className="grid grid-cols-2 gap-3.5 max-[650px]:grid-cols-1" aria-busy={isFetching}>
-          {cards.map((card, index) => (
+          {visibleCards.map((card, index) => (
             <button
               key={card.id}
               type="button"
@@ -151,6 +185,7 @@ export default function FidelitePage() {
                   <span className="mb-0.5 block truncate font-display text-[17px] tracking-[-0.035em]">{card.name}</span>
                   <span className="block text-[11px] text-muted">
                     {loyaltyCodeTypeLabel[card.codeType]} · {card.memberName ?? 'Foyer entier'}
+                    {card.category ? ` · ${loyaltyCategoryLabel[card.category]}` : null}
                   </span>
                 </span>
               </div>

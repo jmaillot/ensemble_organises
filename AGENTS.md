@@ -466,7 +466,7 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 - `providers` (id, household_id, provider_type_id, name, email, phone, address, postal_code, city, notes)
 
 ### Fidélité
-- `loyalty_cards` (id, household_id, member_id nullable, name, code_type [barcode/qr], code_value, brand_color)
+- `loyalty_cards` (id, household_id, member_id nullable, name, code_type [barcode/qr], code_value, brand_color, category nullable parmi 11 slugs fermés)
 
 ### Adresses
 - `places` (id, household_id, type [restaurant/café/bar/hôtel/boutique/parc/musée/cinéma/théâtre/bien-être/lieu phare/tourisme/autre], photo_url, name, street, postal_code, city, phone, rating 1-5, visited boolean)

@@ -17,6 +17,43 @@ export const loyaltyCodeTypeLabel: Record<LoyaltyCodeType, string> = {
   qr: 'QR Code',
 };
 
+/** Catégorie d'enseigne d'une carte (colonne `category`, slugs stables). */
+export type LoyaltyCategory =
+  | 'alimentaire'
+  | 'vetements'
+  | 'beaute_sante'
+  | 'maison_brico'
+  | 'culture_loisirs'
+  | 'hightech'
+  | 'sport'
+  | 'jouets_enfants'
+  | 'auto_carburant'
+  | 'animalerie'
+  | 'autre';
+
+export const loyaltyCategories: ReadonlyArray<{ value: LoyaltyCategory; label: string }> = [
+  { value: 'alimentaire', label: 'Alimentaire' },
+  { value: 'vetements', label: 'Vêtements & Chaussures' },
+  { value: 'beaute_sante', label: 'Beauté & Santé' },
+  { value: 'maison_brico', label: 'Maison, Jardin & Brico' },
+  { value: 'culture_loisirs', label: 'Culture & Loisirs' },
+  { value: 'hightech', label: 'High-tech & Électroménager' },
+  { value: 'sport', label: 'Sport' },
+  { value: 'jouets_enfants', label: 'Jouets & Enfants' },
+  { value: 'auto_carburant', label: 'Auto & Carburant' },
+  { value: 'animalerie', label: 'Animalerie' },
+  { value: 'autre', label: 'Autre' },
+];
+
+/** Libellé français d'une catégorie, `null` quand non renseignée. */
+export const loyaltyCategoryLabel: Record<LoyaltyCategory, string> = Object.fromEntries(
+  loyaltyCategories.map((option) => [option.value, option.label]),
+) as Record<LoyaltyCategory, string>;
+
+export function isLoyaltyCategory(value: unknown): value is LoyaltyCategory {
+  return loyaltyCategories.some((option) => option.value === value);
+}
+
 export const loyaltyBrandColors: ReadonlyArray<{ value: LoyaltyBrandColor; label: string; swatch: string }> = [
   { value: 'accent', label: 'Pétrole', swatch: 'bg-accent' },
   { value: 'coral', label: 'Corail', swatch: 'bg-coral' },
@@ -55,6 +92,8 @@ export interface LoyaltyCard {
   codeType: LoyaltyCodeType;
   codeValue: string;
   brandColor: LoyaltyBrandColor | null;
+  /** Catégorie d'enseigne, `null` quand non renseignée. */
+  category: LoyaltyCategory | null;
   memberId: string | null;
   /** Nom du membre propriétaire, ou `null` pour une carte du foyer entier. */
   memberName: string | null;
@@ -68,6 +107,7 @@ export interface LoyaltyCardInput {
   codeType: LoyaltyCodeType;
   codeValue: string;
   brandColor: LoyaltyBrandColor;
+  category: LoyaltyCategory | null;
   memberId: string | null;
 }
 
@@ -78,6 +118,7 @@ export function toLoyaltyCard(row: LoyaltyCardRow, memberNames?: ReadonlyMap<str
     codeType: isLoyaltyCodeType(row.code_type) ? row.code_type : 'barcode',
     codeValue: row.code_value,
     brandColor: isLoyaltyBrandColor(row.brand_color) ? row.brand_color : null,
+    category: isLoyaltyCategory(row.category) ? row.category : null,
     memberId: row.member_id,
     memberName: row.member_id ? (memberNames?.get(row.member_id) ?? null) : null,
     lastUsedAt: row.created_at,
