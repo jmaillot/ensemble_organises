@@ -36,7 +36,7 @@ export default function CalendrierPage() {
   const selected = grid.selected;
 
   const agenda = useMemo(
-    () => buildAgenda(selected, { events, tasks, birthdays, holidays }),
+    () => buildAgenda(selected, { events, tasks, birthdays, holidays, today: todayIso() }),
     [selected, events, tasks, birthdays, holidays],
   );
   const markers = useMemo(

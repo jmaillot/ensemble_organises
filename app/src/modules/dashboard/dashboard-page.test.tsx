@@ -63,7 +63,11 @@ describe('Accueil — rendu', () => {
 
     const widgets = screen.getAllByRole('article', { name: /^Widget / });
     expect(widgets).toHaveLength(5);
-    expect(within(screen.getByRole('article', { name: 'Widget Calendrier' })).getByText(/septembre/)).toBeInTheDocument();
+    // Mois courant, jamais codé en dur : le 1er octobre a déjà fait échouer ce test.
+    const currentMonth = new Intl.DateTimeFormat('fr-FR', { month: 'long' }).format(new Date());
+    expect(
+      within(screen.getByRole('article', { name: 'Widget Calendrier' })).getByText(new RegExp(currentMonth)),
+    ).toBeInTheDocument();
     // Service simulé injoignable : le widget météo affiche son état d'erreur.
     expect(await within(screen.getByRole('article', { name: 'Widget Météo' })).findByText(/vérifiez la connexion/)).toBeInTheDocument();
     // Le point du jour sépare tâches et événements en deux colonnes.

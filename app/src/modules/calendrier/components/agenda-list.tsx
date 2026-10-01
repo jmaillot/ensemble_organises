@@ -2,7 +2,6 @@ import { cn } from '@/lib/utils';
 import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
 import { LoadingRows } from '@/components/ui/empty-state';
-import { memberFirstName } from '@/modules/taches/types';
 import type { AgendaItem, CalendarEvent } from '../types';
 
 /** Libellé français du type d'entrée d'agenda. */
@@ -70,7 +69,7 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
                   {item.assignees.slice(0, 2).map((assignee) => (
                     <MemberAvatar key={assignee.memberId} member={assignee.member} size="sm" />
                   ))}
-                  {item.assignees.map((assignee) => memberFirstName(assignee.member.display_name)).join(', ')}
+                  {item.assignees.map((assignee) => assignee.member.display_name).join(', ')}
                 </span>
               ) : null}
             </div>

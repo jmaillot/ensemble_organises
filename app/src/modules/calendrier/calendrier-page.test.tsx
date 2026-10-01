@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import CalendrierPage from './calendrier-page';
@@ -23,8 +23,8 @@ const today = todayIso();
 const year = Number(today.slice(0, 4));
 const month = Number(today.slice(5, 7)) - 1;
 
-/** Jours occupés par le jeu de démonstration (événements + anniversaires, en ISO). */
-const busyDays = [0, 2, 4]
+/** Jours occupés par le jeu de démonstration (événements, tâches dues et anniversaires, en ISO). */
+const busyDays = [-1, 0, 1, 2, 4]
   .map((offset) => addDays(today, offset))
   .concat([
     `${today.slice(0, 4)}-10-07`,
@@ -93,9 +93,16 @@ describe('CalendrierPage', () => {
     expect(
       screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
     ).toBeInTheDocument();
-    // Le membre affecté suit la tâche, comme l’auteur suit l’événement.
-    expect(await screen.findByText('Camille')).toBeInTheDocument();
-    expect(await screen.findByText('Thomas')).toBeInTheDocument();
+    // Le membre affecté suit la tâche, nom complet comme l’auteur de l’événement.
+    const openLateTask = screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' });
+    const lateRow = openLateTask.closest('div.grid');
+    expect(lateRow).not.toBeNull();
+    // Les assignataires arrivent une requête après les tâches.
+    expect(await within(lateRow as HTMLElement).findByText('Thomas Martin')).toBeInTheDocument();
+    const openTodayTask = screen.getByRole('button', { name: 'Ouvrir Valider les rendez-vous du carnet dans les tâches' });
+    const todayRow = openTodayTask.closest('div.grid');
+    expect(todayRow).not.toBeNull();
+    expect(await within(todayRow as HTMLElement).findByText('Camille Martin')).toBeInTheDocument();
   });
 
   it('signale les jours avec tâches par une pastille violette', async () => {
@@ -146,10 +153,8 @@ describe('CalendrierPage', () => {
     const alert = await screen.findByRole('alertdialog');
     await user.click(within(alert).getByRole('button', { name: 'Supprimer l’événement' }));
 
-    expect(await screen.findByText('Choisir le menu du week-end')).toBeInTheDocument();
-    // L’événement est parti, mais la tâche en retard du foyer reste affichée.
-    expect(screen.queryByText('Journée libre')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText('Courses du samedi')).not.toBeInTheDocument());
+    expect(await screen.findByText('Journée libre')).toBeInTheDocument();
+    expect(screen.queryByText('Courses du samedi')).not.toBeInTheDocument();
   });
 
   it('distingue un jour férié d’un événement du foyer dans l’agenda', async () => {

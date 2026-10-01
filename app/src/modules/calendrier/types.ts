@@ -151,10 +151,17 @@ export interface CalendarTask {
   assignees: TaskAssignee[];
 }
 
-/** Tâches dues au plus tard le jour affiché, terminées exclues. */
-export function tasksOfDay(tasks: readonly CalendarTask[], date: string): CalendarTask[] {
+/** Tâches visibles un jour donné : dues ce jour-là, plus les en retard
+ * rappelées aujourd'hui. Sans la seconde condition, une tâche en retard
+ * hanterait chaque jour futur et l'état « Journée libre » disparaîtrait. */
+export function tasksOfDay(tasks: readonly CalendarTask[], date: string, today: string): CalendarTask[] {
   return tasks
-    .filter((task) => task.status !== 'fait' && task.dueDate !== null && task.dueDate <= date)
+    .filter(
+      (task) =>
+        task.status !== 'fait' &&
+        task.dueDate !== null &&
+        (task.dueDate === date || (task.isLate && date === today)),
+    )
     .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
 }
 
@@ -166,9 +173,10 @@ export function buildAgenda(
     tasks: readonly CalendarTask[];
     birthdays: readonly CalendarBirthday[];
     holidays: readonly FrenchHoliday[];
+    today: string;
   },
 ): AgendaItem[] {
-  const { events, tasks, birthdays, holidays } = sources;
+  const { events, tasks, birthdays, holidays, today } = sources;
   const eventsOfDay = events
     .filter((event) => event.date === date)
     .map<AgendaItem>((event) => ({
@@ -184,7 +192,7 @@ export function buildAgenda(
     }))
     .sort((a, b) => a.time.localeCompare(b.time));
 
-  const tasksOfTheDay = tasksOfDay(tasks, date).map<AgendaItem>((task) => ({
+  const tasksOfTheDay = tasksOfDay(tasks, date, today).map<AgendaItem>((task) => ({
     kind: 'tache',
     key: `tache-${task.id}`,
     taskId: task.id,
