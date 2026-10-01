@@ -264,12 +264,14 @@ export function useNotifications(): NotificationsSummary {
   ]);
 
   /** Lus récents : dernières conversations et publications soldées, pour
-   * l'onglet « Toutes ». Sans pastille, sans marquage. */
+   * l'onglet « Toutes ». Sans pastille, sans marquage. Les éléments écartés
+   * (croix, tout effacer) en sont exclus : écarté = caché jusqu'à demain. */
   const recentRead = useMemo<NotificationItem[]>(() => {
     const read: NotificationItem[] = [];
     if (showMessages) {
       for (const conversation of feed.conversations) {
         if (conversation.unread !== 0 || !conversation.lastMessageAt) continue;
+        if (isMasked(`message:${conversation.id}`)) continue;
         read.push({
           id: `message:${conversation.id}`,
           ref: conversation.id,
@@ -285,6 +287,7 @@ export function useNotifications(): NotificationsSummary {
     }
     for (const post of cercle.feed) {
       if (post.unreadComments !== 0 || post.comments.length === 0) continue;
+      if (isMasked(`cercle:${post.id}`)) continue;
       const latest = [...post.comments].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
       read.push({
         id: `cercle:${post.id}`,
@@ -299,7 +302,7 @@ export function useNotifications(): NotificationsSummary {
       });
     }
     return read.sort((a, b) => b.at.localeCompare(a.at)).slice(0, RECENT_READ_LIMIT);
-  }, [cercle.feed, feed.conversations, showMessages]);
+  }, [cercle.feed, feed.conversations, masked, showMessages]);
 
   const markItem = (item: NotificationItem) => {
     if (!item.markable) return;
@@ -317,16 +320,15 @@ export function useNotifications(): NotificationsSummary {
   };
 
   const dismissItem = (item: NotificationItem) => {
-    if (item.markable) {
-      markItem(item);
-      return;
-    }
+    // Marquer lu ne suffit pas : sans masquage, l'élément resterait visible
+    // dans « Toutes » via les lus récents. Écarté = caché jusqu'à demain.
+    if (item.markable) markItem(item);
     maskIds([item.id]);
   };
 
   const clearAll = () => {
     markAllRead();
-    maskIds(items.filter((item) => !item.markable).map((item) => item.id));
+    maskIds(items.map((item) => item.id));
   };
 
   const messagesUnread = feed.unreadTotal;

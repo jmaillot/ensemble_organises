@@ -27,8 +27,10 @@ export const DialogContent = forwardRef<
       >
         {children}
         {hideClose ? null : (
+          // Calée sur le padding du contenu (23px / 16px mobile) : son bord
+          // droit s'aligne avec celui du contenu (badge, titres).
           <DialogPrimitive.Close
-            className="absolute top-3 right-3 grid size-8 place-items-center rounded-[10px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+            className="absolute top-[23px] right-[23px] grid size-8 place-items-center rounded-[10px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg max-[650px]:top-4 max-[650px]:right-4"
             aria-label="Fermer"
           >
             <Icon name="close" size="sm" />

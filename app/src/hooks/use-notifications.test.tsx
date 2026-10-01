@@ -67,6 +67,27 @@ describe('centre de notifications', () => {
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
     await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+
+    // Écarter un message non lu le solde ET le cache : il disparaît des deux
+    // onglets (ni pastille, ni lu récent). On vise le dernier message le plus
+    // ancien (conversation-2, 09h18) : comme pour conversation-3 dans le test
+    // précédent, un message seed encore futur à l'heure d'exécution resterait
+    // non soldable.
+    const unreadMessage = result.current.items
+      .filter((item) => item.markable && item.kind === 'message')
+      .sort((a, b) => a.at.localeCompare(b.at))[0];
+    expect(unreadMessage).toBeDefined();
+    await act(async () => {
+      result.current.dismissItem(unreadMessage!);
+    });
+    await waitFor(() => expect(result.current.items.some((item) => item.id === unreadMessage!.id)).toBe(false));
+    expect(result.current.recentRead.some((item) => item.id === unreadMessage!.id)).toBe(false);
+    const messageMarks = JSON.parse(localStorage.getItem('ensemble-organises-messages-read') ?? '{}');
+    expect(messageMarks[unreadMessage!.ref]).toBeDefined();
+    expect(Object.keys(JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}'))).toContain(
+      unreadMessage!.id,
+    );
+
     // Tout marquer comme lu fait basculer conversations et publications en lus récents.
     await act(async () => {
       result.current.markAllRead();
@@ -84,14 +105,12 @@ describe('centre de notifications', () => {
     expect(Object.keys(masked)).toContain(computed!.id);
     await waitFor(() => expect(result.current.items.some((item) => item.id === computed!.id)).toBe(false));
 
-    // Tout effacer solde les marquables et masque les rappels restants.
+    // Tout effacer solde les marquables et masque les rappels restants : plus
+    // aucun calculé ne subsiste (les marquables dépendent de l'heure, cf. ci-dessus).
     await act(async () => {
       result.current.clearAll();
     });
-    await waitFor(() =>
-      expect(result.current.items.every((item) => item.markable && item.id === 'message:conversation-3')).toBe(true),
-    );
-    expect(result.current.items.some((item) => !item.markable)).toBe(false);
+    await waitFor(() => expect(result.current.items.some((item) => !item.markable)).toBe(false));
   });
 
   it('isole le feed messages : marquage direct de conversation-1', async () => {
