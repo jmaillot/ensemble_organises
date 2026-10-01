@@ -138,13 +138,10 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           messages.map((message) => (
             <div
               key={message.id}
-              // Une seule couleur de fond par branche : `bg-surface` et `bg-fg`
-              // cohabitaient ici, et l'ordre de la feuille (pas celui des
-              // classes) donnait raison au clair — texte blanc invisible.
-              className={`max-w-[72%] rounded-[14px_14px_14px_4px] px-3 py-2.5 text-xs ${
-                message.isMine
-                  ? 'self-end rounded-[14px_14px_4px_14px] border border-fg bg-fg text-surface'
-                  : 'self-start border border-border bg-surface'
+              // Un seul fond pour les deux camps (écriture sombre sur fond
+              // clair) : seul l'alignement distingue envoyés et reçus.
+              className={`max-w-[72%] rounded-[14px_14px_14px_4px] border border-border bg-surface px-3 py-2.5 text-xs ${
+                message.isMine ? 'self-end rounded-[14px_14px_4px_14px]' : 'self-start'
               }`}
             >
               <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>
@@ -156,7 +153,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
               <span className="whitespace-pre-wrap break-words">{message.content}</span>
               <time
                 dateTime={message.createdAt}
-                className={`mt-1 block text-[10px] ${message.isMine ? 'text-on-dark' : 'text-muted'}`}
+                className="mt-1 block text-[10px] text-muted"
               >
                 {formatClock(message.createdAt)}
                 {message.pending ? ' · envoi…' : ''}

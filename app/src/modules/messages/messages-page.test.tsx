@@ -31,10 +31,10 @@ describe('Messages', () => {
     await waitFor(() => expect(screen.getByLabelText('Écrire un message')).toHaveValue(''), { timeout: 4000 });
   });
 
-  it('ne mélange jamais les fonds clair et sombre d’une même bulle', async () => {
-    // Régression : `bg-surface` et `bg-fg` cohabitaient sur la bulle, et
-    // l'ordre de la feuille donnait raison au clair — texte blanc invisible.
-    // RTL ne voit pas les contrastes : on verrouille les classes elles-mêmes.
+  it('affiche toutes les bulles en fond clair, texte sombre', async () => {
+    // Écriture sombre sur fond blanc des deux côtés : seul l'alignement
+    // distingue envoyés et reçus. RTL ne voit pas les contrastes : on
+    // verrouille l'absence de tout fond sombre dans le fil.
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);
 
@@ -44,7 +44,6 @@ describe('Messages', () => {
 
     const received = within(log).getByText('Tu as vu le nouveau parc ?').closest('div');
     expect(received?.className).toMatch(/bg-surface/);
-    expect(received?.className).not.toMatch(/bg-fg/);
 
     await user.type(screen.getByLabelText('Écrire un message'), 'Je passe ce soir');
     await user.click(screen.getByRole('button', { name: 'Envoyer' }));
@@ -53,10 +52,10 @@ describe('Messages', () => {
     await waitFor(() => {
       const text = within(log).getByText('Je passe ce soir');
       const current = text.closest('div');
-      expect(current?.className).toMatch(/bg-fg/);
-      expect(current?.className).not.toMatch(/bg-surface/);
+      expect(current?.className).toMatch(/bg-surface/);
       expect(within(current as HTMLElement).getByText('Camille Martin :')).toBeInTheDocument();
     });
+    expect(log.querySelectorAll('.bg-fg').length).toBe(0);
   });
 
   it('expose la conversation active et le fil de discussion de façon accessible', async () => {
