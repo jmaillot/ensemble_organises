@@ -51,6 +51,18 @@ export interface PushDevice {
   failure_count: number;
 }
 
+/** Portée d'un état de lecture synchronisé (migration 0046). */
+export type NotificationReadScope = 'conversation' | 'post';
+
+/** Horodatage de lecture d'une conversation ou publication, par utilisateur. */
+export interface NotificationReadRow {
+  id: Uuid;
+  user_id: Uuid;
+  scope: NotificationReadScope;
+  scope_id: string;
+  read_at: IsoDateTime;
+}
+
 export interface HouseholdRow {
   id: Uuid;
   name: string;

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
+import { isUnseen } from '@/lib/notification-reads';
+import { useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { createConversation, addConversationMembers, createMessage, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, removeConversationCascade, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
@@ -17,40 +19,13 @@ export const messageKeys = {
 
 const READ_STORAGE_KEY = 'ensemble-organises-messages-read';
 
-function readStoredReadMap(): ReadMap {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    return JSON.parse(localStorage.getItem(READ_STORAGE_KEY) ?? '{}') as ReadMap;
-  } catch {
-    // Un cache local corrompu ne doit pas empêcher l'affichage des messages.
-    return {};
-  }
-}
-
 /**
  * Suivi de lecture. Le modèle ne contient pas encore d'horodatage de lecture
  * par message : la référence est conservée localement et sera remplacée par un
  * accusé de lecture serveur (table dédiée ou colonne `read_at`).
  */
 export function useReadConversations() {
-  const [readMap, setReadMap] = useState<ReadMap>(readStoredReadMap);
-
-  const markRead = useCallback((conversationId: string) => {
-    setReadMap((current) => {
-      const at = new Date().toISOString();
-      if (current[conversationId] === at) return current;
-      const next = { ...current, [conversationId]: at };
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // Stockage plein ou refusé : la lecture reste valable pour la session.
-        }
-      }
-      return next;
-    });
-  }, []);
-
+  const { readMap, markRead } = useSyncedReads('conversation', READ_STORAGE_KEY);
   return { readMap, markRead } as const;
 }
 
@@ -143,7 +118,7 @@ export function useMessagesFeed(): MessagesFeed {
         lastMessage: last?.content ?? null,
         lastMessageAt: last?.createdAt ?? null,
         lastMessageMine: last?.isMine ?? false,
-        unread: thread.filter((message) => !message.isMine && (!readAt || message.createdAt > readAt)).length,
+        unread: thread.filter((message) => !message.isMine && isUnseen(message.createdAt, readAt)).length,
       } satisfies ConversationSummary;
     });
     // Les conversations les plus récentes d'abord ; celles sans message restent en fin de liste.

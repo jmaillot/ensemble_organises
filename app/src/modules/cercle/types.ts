@@ -4,6 +4,7 @@
  */
 
 import { daysBetween, formatMediumDate, todayIso, toIsoDate } from '@/lib/utils';
+import { isUnseen } from '@/lib/notification-reads';
 import type { HouseholdMemberRow, PostCommentRow, PostMediaRow, PostReactionRow, PostRow } from '@/types';
 import type { CompressedImage } from './lib/media';
 
@@ -116,15 +117,15 @@ export interface FeedInput {
   reactions: PostReactionRow[];
   members: HouseholdMemberRow[];
   currentMemberId: string;
-  /** Date de la dernière visite : les commentaires plus récents sont « non lus ». */
-  lastVisitAt: string;
+  /** Lecture par publication : les commentaires plus récents sont « non lus ». */
+  readAt: (postId: string) => string;
 }
 
 /**
  * Assemble le fil à partir des quatre tables. Les publications sont triées du
  * plus récent au plus ancien ; les commentaires restent en ordre chronologique.
  */
-export function composeFeed({ posts, media, comments, reactions, members, currentMemberId, lastVisitAt }: FeedInput): FeedPost[] {
+export function composeFeed({ posts, media, comments, reactions, members, currentMemberId, readAt }: FeedInput): FeedPost[] {
   const memberById = new Map(members.map((member) => [member.id, member]));
   const mediaByPost = groupBy(media, (row) => row.post_id);
   const commentsByPost = groupBy(comments, (row) => row.post_id);
@@ -149,7 +150,7 @@ export function composeFeed({ posts, media, comments, reactions, members, curren
         reactionCount: postReactions.length,
         liked: postReactions.some((reaction) => reaction.authorId === currentMemberId),
         unreadComments: postComments.filter(
-          (comment) => comment.createdAt > lastVisitAt && comment.authorId !== currentMemberId,
+          (comment) => comment.authorId !== currentMemberId && isUnseen(comment.createdAt, readAt(row.id)),
         ).length,
         mine: row.author_id === currentMemberId,
       };

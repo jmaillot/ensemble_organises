@@ -6,7 +6,7 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Les 44 tables du contrat existent, avec exactement les colonnes attendues
+-- 1. Les 45 tables du contrat existent, avec exactement les colonnes attendues
 --
 -- L'inventaire est la seule chose qui rattrape un oubli de colonne : la RLS et
 -- les contraintes ne les voient pas. `push_subscriptions` y figure depuis la
@@ -64,7 +64,8 @@ begin
           ('conversation_members', ARRAY['conversation_id', 'member_id']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
-          ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[])
+          ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[]),
+          ('notification_reads', ARRAY['id', 'user_id', 'scope', 'scope_id', 'read_at']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(

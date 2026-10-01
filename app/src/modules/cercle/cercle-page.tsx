@@ -14,7 +14,7 @@ import { ROLE_LABELS } from './types';
 const MAX_STACK = 3;
 
 export default function CerclePage() {
-  const { feed, members, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, deletePost, canDelete } =
+  const { feed, members, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, deletePost, canDelete, markPostRead } =
     useCercleFeed();
   const [focusSignal, setFocusSignal] = useState(0);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -81,6 +81,7 @@ export default function CerclePage() {
                   onOpenComments={() => {
                     setActivePostId(post.id);
                     setCommentsPostId(post.id);
+                    markPostRead(post.id);
                   }}
                   onRequestDelete={() => setPendingDeleteId(post.id)}
                 />

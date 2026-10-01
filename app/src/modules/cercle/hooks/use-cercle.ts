@@ -24,6 +24,7 @@ import {
   removeReaction,
 } from '../api';
 import { composeFeed, type FeedPost, type PublishInput } from '../types';
+import { useSyncedReads } from '@/lib/notification-reads';
 
 export const cercleKeys = {
   all: ['cercle'] as const,
@@ -50,7 +51,12 @@ export interface CercleFeed {
   toggleReaction: (postId: string) => Promise<void>;
   deletePost: (postId: string) => Promise<void>;
   canDelete: (post: FeedPost) => boolean;
+  /** Marque les commentaires d'une publication comme lus, sur tous les appareils. */
+  markPostRead: (postId: string) => void;
 }
+
+/** Clé du miroir local des lectures du Cercle (repli hors ligne). */
+export const CERCLE_READ_KEY = 'ensemble-organises-cercle-read';
 
 export function useCercleFeed(): CercleFeed {
   const queryClient = useQueryClient();
@@ -61,11 +67,14 @@ export function useCercleFeed(): CercleFeed {
   const isAdmin = useIsAdmin();
   const enabled = Boolean(householdId);
 
-  // La visite courante sert de référence : tout commentaire postérieur est « non lu ».
-  const [lastVisitAt, setLastVisitAt] = useState(() => new Date().toISOString());
+  // La visite courante sert de référence par défaut : sans marque explicite,
+  // tout commentaire postérieur est « non lu », comme avant la synchronisation.
+  const [mountAt, setMountAt] = useState(() => new Date().toISOString());
   useEffect(() => {
-    setLastVisitAt(new Date().toISOString());
+    setMountAt(new Date().toISOString());
   }, [householdId]);
+  const { readMap: postReads, markRead: markPostRead } = useSyncedReads('post', CERCLE_READ_KEY);
+  const readAt = useCallback((postId: string) => postReads[postId] ?? mountAt, [postReads, mountAt]);
 
   const posts = useQuery({
     queryKey: cercleKeys.posts(householdId),
@@ -126,9 +135,9 @@ export function useCercleFeed(): CercleFeed {
         reactions: reactions.data ?? [],
         members,
         currentMemberId,
-        lastVisitAt,
+        readAt,
       }),
-    [posts.data, media.data, comments.data, reactions.data, members, currentMemberId, lastVisitAt],
+    [posts.data, media.data, comments.data, reactions.data, members, currentMemberId, readAt],
   );
 
   const unreadTotal = useMemo(
@@ -324,5 +333,6 @@ export function useCercleFeed(): CercleFeed {
     toggleReaction,
     deletePost,
     canDelete,
+    markPostRead,
   };
 }

@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
+import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
+import { NotificationsDialog } from '@/components/shared/notifications-dialog';
 import { useResource } from '@/lib/data/useResource';
 import type { TaskRow } from '@/types';
 
@@ -27,7 +29,6 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
-  const [unread, setUnread] = useState(2);
   const householdName = useHouseholdStore((state) => state.householdName);
   const householdColor = useHouseholdStore((state) => state.householdColor);
   const members = useHouseholdStore((state) => state.members);
@@ -36,6 +37,9 @@ export function AppShell() {
   const { online, pending, syncing, syncNow } = useOfflineSync();
   const [showOffline, setShowOffline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notifications = useNotifications();
+  const unread = notifications.total;
   const { rows: openTasks } = useResource<TaskRow>('tasks', { filter: { status: 'a_faire' } });
   const openTaskCount = openTasks.length;
 
@@ -118,9 +122,9 @@ export function AppShell() {
                           {openTaskCount}
                         </span>
                       ) : null}
-                      {key === 'cercle' ? (
-                        <span className="ml-auto text-xs text-muted max-[920px]:hidden" aria-label="2 notifications">
-                          2
+                      {key === 'cercle' && notifications.cercleUnread > 0 ? (
+                        <span className="ml-auto text-xs text-muted max-[920px]:hidden" aria-label={`${notifications.cercleUnread} notifications`}>
+                          {notifications.cercleUnread}
                         </span>
                       ) : null}
                     </NavLink>
@@ -203,14 +207,24 @@ export function AppShell() {
               type="button"
               className="relative grid min-h-11 min-w-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-[background,border-color,transform] duration-[var(--duration-quick)] hover:-translate-y-px hover:border-accent hover:bg-accent-faint"
               aria-label={unread > 0 ? `Notifications : ${unread} nouvelles` : 'Notifications'}
-              onClick={() => {
-                setUnread(0);
-                toast('2 nouvelles notifications du Cercle.');
-              }}
+              onClick={() => setNotificationsOpen(true)}
             >
               <Icon name="message" />
               {unread > 0 ? <span className="absolute top-[9px] right-[9px] size-[7px] rounded-full border-2 border-surface bg-coral" /> : null}
             </button>
+            <NotificationsDialog
+              open={notificationsOpen}
+              onOpenChange={setNotificationsOpen}
+              items={notifications.items}
+              total={notifications.total}
+              hasMarkable={notifications.items.some((item) => item.markable)}
+              onMarkAllRead={notifications.markAllRead}
+              onOpenItem={(item: NotificationItem) => {
+                notifications.markItem(item);
+                setNotificationsOpen(false);
+                navigate(item.href);
+              }}
+            />
             <div className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1">
               <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName?.trim() ? user.displayName : 'Profil'}</span>
               <button
