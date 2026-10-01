@@ -147,7 +147,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
                   : 'self-start border border-border bg-surface'
               }`}
             >
-              {!message.isMine ? <span className="mb-1 block text-[10px] font-extrabold text-muted">{message.senderName}</span> : null}
+              <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>
               {message.mediaUrl ? (
                 <a href={message.mediaUrl} target="_blank" rel="noreferrer" aria-label={`Ouvrir l’image de ${message.senderName}`}>
                   <img src={message.mediaUrl} alt="" loading="lazy" className="mb-1.5 max-h-48 w-auto rounded-[10px]" />

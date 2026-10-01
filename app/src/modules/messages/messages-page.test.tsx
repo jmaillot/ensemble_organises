@@ -48,10 +48,15 @@ describe('Messages', () => {
 
     await user.type(screen.getByLabelText('Écrire un message'), 'Je passe ce soir');
     await user.click(screen.getByRole('button', { name: 'Envoyer' }));
-    const mine = await within(log).findByText('Je passe ce soir');
-    const bubble = mine.closest('div');
-    expect(bubble?.className).toMatch(/bg-fg/);
-    expect(bubble?.className).not.toMatch(/bg-surface/);
+    // La bulle optimiste est remplacée par la confirmée au retour du réseau :
+    // on réévalue depuis le journal à chaque tour, jamais sur un nœud périmé.
+    await waitFor(() => {
+      const text = within(log).getByText('Je passe ce soir');
+      const current = text.closest('div');
+      expect(current?.className).toMatch(/bg-fg/);
+      expect(current?.className).not.toMatch(/bg-surface/);
+      expect(within(current as HTMLElement).getByText('Camille Martin :')).toBeInTheDocument();
+    });
   });
 
   it('expose la conversation active et le fil de discussion de façon accessible', async () => {
