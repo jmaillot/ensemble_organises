@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -27,10 +27,16 @@ export interface NotificationItem {
   /** Faux pour les éléments calculés (tâche, événement, routine) : ils se
    * résorbent d'eux-mêmes une fois traités, sans état de lecture. */
   markable: boolean;
+  /** Faux pour les lus récents (onglet « Toutes ») : ni pastille, ni filtre
+   * « Non lues ». Les rappels calculés non masqués restent `true`. */
+  unread: boolean;
 }
 
 export interface NotificationsSummary {
   items: NotificationItem[];
+  /** Lus récents (messages, Cercle), sans pastille : visibles dans l'onglet
+   * « Toutes » uniquement. */
+  recentRead: NotificationItem[];
   /** Badge de la cloche : non lus + restes à faire. */
   total: number;
   messagesUnread: number;
@@ -38,6 +44,11 @@ export interface NotificationsSummary {
   isLoading: boolean;
   markAllRead: () => void;
   markItem: (item: NotificationItem) => void;
+  /** Retire un élément du centre : marquage lu (marquable) ou masquage
+   * jusqu'à demain (rappel calculé). Ne supprime jamais la donnée source. */
+  dismissItem: (item: NotificationItem) => void;
+  /** Vide le centre : lus partout + rappels masqués jusqu'à demain. */
+  clearAll: () => void;
 }
 
 const KIND_META: Record<NotificationKind, { label: string; icon: IconName; href: string }> = {
@@ -49,6 +60,44 @@ const KIND_META: Record<NotificationKind, { label: string; icon: IconName; href:
 };
 
 export { KIND_META };
+
+/** Masquage des rappels calculés (« effacer ») : ni table, ni serveur, un
+ * simple sursis local `{ id: échéance ISO }`. Expiré = réaffiché. */
+const MASKED_STORAGE_KEY = 'eo-notifications-masquees-v1';
+/** Lus récents affichés dans l'onglet « Toutes » (au-delà, c'est l'historique des modules). */
+export const RECENT_READ_LIMIT = 5;
+
+function cleanMasked(entries: Record<string, string>, now = new Date().toISOString()): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(entries).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] > now),
+  );
+}
+
+function loadMasked(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(MASKED_STORAGE_KEY);
+    if (!raw) return {};
+    return cleanMasked(JSON.parse(raw) as Record<string, string>);
+  } catch {
+    return {};
+  }
+}
+
+function saveMasked(entries: Record<string, string>) {
+  try {
+    localStorage.setItem(MASKED_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Stockage indisponible : le masquage ne survit pas au rechargement.
+  }
+}
+
+/** Fin de demain (heure locale) : le rappel masqué revient au plus tard après-demain. */
+export function maskExpiryIso(from = new Date()): string {
+  const end = new Date(from);
+  end.setDate(end.getDate() + 1);
+  end.setHours(23, 59, 59, 999);
+  return end.toISOString();
+}
 
 /**
  * Centre de notifications : unread synchronisés (messages, Cercle) puis
@@ -84,6 +133,20 @@ export function useNotifications(): NotificationsSummary {
   const showEvents = preferences?.eventReminders ?? true;
   const showRoutines = preferences?.routineReminders ?? true;
 
+  const [masked, setMasked] = useState<Record<string, string>>(loadMasked);
+  const nowIso = new Date().toISOString();
+  const maskIds = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const expiry = maskExpiryIso();
+    setMasked((previous) => {
+      const next = cleanMasked(previous);
+      for (const id of ids) next[id] = expiry;
+      saveMasked(next);
+      return next;
+    });
+  }, []);
+  const isMasked = (id: string) => masked[id] !== undefined && masked[id] > nowIso;
+
   const items = useMemo<NotificationItem[]>(() => {
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -101,6 +164,7 @@ export function useNotifications(): NotificationsSummary {
           at: conversation.lastMessageAt,
           href: KIND_META.message.href,
           markable: true,
+          unread: true,
         });
       }
     }
@@ -117,6 +181,7 @@ export function useNotifications(): NotificationsSummary {
         at: latest?.createdAt ?? post.createdAt,
         href: KIND_META.cercle.href,
         markable: true,
+        unread: true,
       });
     }
 
@@ -126,6 +191,7 @@ export function useNotifications(): NotificationsSummary {
         .filter((task) => task.status !== 'fait' && task.dueDate !== null)
         .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
       for (const task of open.slice(0, 5)) {
+        if (isMasked(`tache:${task.id}`)) continue;
         list.push({
           id: `tache:${task.id}`,
           ref: task.id,
@@ -135,6 +201,7 @@ export function useNotifications(): NotificationsSummary {
           at: task.dueDate as string,
           href: KIND_META.tache.href,
           markable: false,
+          unread: true,
         });
       }
     }
@@ -148,6 +215,7 @@ export function useNotifications(): NotificationsSummary {
         })
         .sort((a, b) => a.start_at.localeCompare(b.start_at));
       for (const event of upcoming.slice(0, 5)) {
+        if (isMasked(`evenement:${event.id}`)) continue;
         list.push({
           id: `evenement:${event.id}`,
           ref: event.id,
@@ -157,6 +225,7 @@ export function useNotifications(): NotificationsSummary {
           at: event.start_at,
           href: KIND_META.evenement.href,
           markable: false,
+          unread: true,
         });
       }
     }
@@ -164,6 +233,7 @@ export function useNotifications(): NotificationsSummary {
     if (showRoutines) {
       const pending = routinesFeed.dueToday.filter((routine) => !routine.isDoneToday).slice(0, 5);
       for (const routine of pending) {
+        if (isMasked(`routine:${routine.id}`)) continue;
         list.push({
           id: `routine:${routine.id}`,
           ref: routine.id,
@@ -173,6 +243,7 @@ export function useNotifications(): NotificationsSummary {
           at: new Date().toISOString(),
           href: KIND_META.routine.href,
           markable: false,
+          unread: true,
         });
       }
     }
@@ -183,6 +254,7 @@ export function useNotifications(): NotificationsSummary {
     eventsResource.rows,
     feed.conversations,
     householdId,
+    masked,
     routinesFeed.dueToday,
     showEvents,
     showMessages,
@@ -190,6 +262,44 @@ export function useNotifications(): NotificationsSummary {
     showTasks,
     tasksResource.rows,
   ]);
+
+  /** Lus récents : dernières conversations et publications soldées, pour
+   * l'onglet « Toutes ». Sans pastille, sans marquage. */
+  const recentRead = useMemo<NotificationItem[]>(() => {
+    const read: NotificationItem[] = [];
+    if (showMessages) {
+      for (const conversation of feed.conversations) {
+        if (conversation.unread !== 0 || !conversation.lastMessageAt) continue;
+        read.push({
+          id: `message:${conversation.id}`,
+          ref: conversation.id,
+          kind: 'message',
+          title: conversation.title,
+          detail: conversation.lastMessage,
+          at: conversation.lastMessageAt,
+          href: KIND_META.message.href,
+          markable: false,
+          unread: false,
+        });
+      }
+    }
+    for (const post of cercle.feed) {
+      if (post.unreadComments !== 0 || post.comments.length === 0) continue;
+      const latest = [...post.comments].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      read.push({
+        id: `cercle:${post.id}`,
+        ref: post.id,
+        kind: 'cercle',
+        title: post.author?.display_name ?? 'Cercle',
+        detail: latest ? latest.content : null,
+        at: latest?.createdAt ?? post.createdAt,
+        href: KIND_META.cercle.href,
+        markable: false,
+        unread: false,
+      });
+    }
+    return read.sort((a, b) => b.at.localeCompare(a.at)).slice(0, RECENT_READ_LIMIT);
+  }, [cercle.feed, feed.conversations, showMessages]);
 
   const markItem = (item: NotificationItem) => {
     if (!item.markable) return;
@@ -206,11 +316,25 @@ export function useNotifications(): NotificationsSummary {
     }
   };
 
+  const dismissItem = (item: NotificationItem) => {
+    if (item.markable) {
+      markItem(item);
+      return;
+    }
+    maskIds([item.id]);
+  };
+
+  const clearAll = () => {
+    markAllRead();
+    maskIds(items.filter((item) => !item.markable).map((item) => item.id));
+  };
+
   const messagesUnread = feed.unreadTotal;
   const cercleUnread = cercle.unreadTotal;
 
   return {
     items,
+    recentRead,
     total: items.length,
     messagesUnread,
     cercleUnread,
@@ -218,5 +342,7 @@ export function useNotifications(): NotificationsSummary {
       feed.isLoading || cercle.isLoading || routinesFeed.isLoading || tasksResource.isLoading || eventsResource.isLoading,
     markAllRead,
     markItem,
+    dismissItem,
+    clearAll,
   };
 }

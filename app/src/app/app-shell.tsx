@@ -216,6 +216,7 @@ export function AppShell() {
               open={notificationsOpen}
               onOpenChange={setNotificationsOpen}
               items={notifications.items}
+              recentRead={notifications.recentRead}
               total={notifications.total}
               hasMarkable={notifications.items.some((item) => item.markable)}
               onMarkAllRead={notifications.markAllRead}
@@ -224,6 +225,8 @@ export function AppShell() {
                 setNotificationsOpen(false);
                 navigate(item.href);
               }}
+              onDismissItem={(item: NotificationItem) => notifications.dismissItem(item)}
+              onClearAll={notifications.clearAll}
             />
             <div className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1">
               <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName?.trim() ? user.displayName : 'Profil'}</span>

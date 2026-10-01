@@ -59,6 +59,41 @@ describe('centre de notifications', () => {
     expect(result.current.total).toBeLessThan(before);
   });
 
+  it('expose lus récents, masquage et effacement sans suppression', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    // Tout marquer comme lu fait basculer conversations et publications en lus récents.
+    await act(async () => {
+      result.current.markAllRead();
+    });
+    await waitFor(() => expect(result.current.recentRead.length).toBeGreaterThan(0));
+    expect(result.current.recentRead.every((item) => item.unread === false)).toBe(true);
+
+    // Retirer un rappel calculé le masque (sursis local), sans toucher la donnée.
+    const computed = result.current.items.find((item) => !item.markable);
+    expect(computed).toBeDefined();
+    await act(async () => {
+      result.current.dismissItem(computed!);
+    });
+    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    expect(Object.keys(masked)).toContain(computed!.id);
+    await waitFor(() => expect(result.current.items.some((item) => item.id === computed!.id)).toBe(false));
+
+    // Tout effacer solde les marquables et masque les rappels restants.
+    await act(async () => {
+      result.current.clearAll();
+    });
+    await waitFor(() =>
+      expect(result.current.items.every((item) => item.markable && item.id === 'message:conversation-3')).toBe(true),
+    );
+    expect(result.current.items.some((item) => !item.markable)).toBe(false);
+  });
+
   it('isole le feed messages : marquage direct de conversation-1', async () => {
     localStorage.removeItem('ensemble-organises-messages-read');
     seedHouseholdStore();
