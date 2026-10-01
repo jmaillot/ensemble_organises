@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { useMembers } from '@/stores/household-store';
+import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
 import { ConversationList } from './components/conversation-list';
 import { AddMembersDialog, ConversationFormDialog } from './components/conversation-form-dialog';
@@ -17,8 +18,10 @@ export default function MessagesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
   const [listVisible, setListVisible] = useState(true);
   const { markRead } = feed;
+  const isAdmin = useIsAdmin();
 
   useMessagesRealtime();
 
@@ -133,6 +136,7 @@ export default function MessagesPage() {
               : undefined
           }
           onAddMember={active ? () => setAddOpen(true) : undefined}
+          onDeleteConversation={active && isAdmin ? () => setPendingDeletion(active.id) : undefined}
           onBackToList={() => setListVisible(true)}
           className={cn(
             'flex min-h-[460px] flex-col overflow-hidden rounded-[16px] border border-border bg-surface',
@@ -176,6 +180,28 @@ export default function MessagesPage() {
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeletion(null);
+        }}
+        title="Supprimer cette conversation ?"
+        description="Les messages et les participants disparaîtront avec elle. Cette action est définitive."
+        confirmLabel="Supprimer la conversation"
+        onConfirm={() => {
+          const target = pendingDeletion;
+          setPendingDeletion(null);
+          if (!target) return;
+          if (selectedId === target) setSelectedId(null);
+          void feed
+            .deleteConversation(target)
+            .then(() => toast('Conversation supprimée.'))
+            .catch((error: unknown) =>
+              toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être supprimée.', 'error'),
+            );
+        }}
+      />
     </ModuleShell>
   );
 }

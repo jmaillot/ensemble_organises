@@ -142,4 +142,20 @@ describe('Messages', () => {
     await waitFor(() => expect(within(log).getByText('La photo du parc')).toBeInTheDocument(), { timeout: 5000 });
     expect(within(log).getByRole('link', { name: /Ouvrir l’image/ })).toBeInTheDocument();
   });
+
+  it('supprime une conversation et son fil après confirmation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer la conversation Lina' }));
+    const alert = await screen.findByRole('alertdialog');
+    await user.click(within(alert).getByRole('button', { name: 'Supprimer la conversation' }));
+
+    await waitFor(() => expect(screen.queryByRole('log', { name: /Messages de Lina/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Lina/ })).not.toBeInTheDocument());
+    expect(screen.getByText('Conversation supprimée.')).toBeInTheDocument();
+  });
 });

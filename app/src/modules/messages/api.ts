@@ -153,3 +153,27 @@ export async function addConversationMembers(conversationId: string, memberIds: 
     ),
   );
 }
+
+/**
+ * Suppression d'une conversation et de tout son contenu (participants,
+ * messages). En ligne la cascade SQL emporte les enfants ; en local
+ * l'adaptateur n'a pas de cascade implicite, on retire explicitement.
+ * La RLS (`conversations_delete`) réserve l'opération aux administrateurs.
+ */
+export async function removeConversationCascade(input: {
+  householdId: string;
+  conversationId: string;
+}): Promise<void> {
+  const { householdId, conversationId } = input;
+  const [media, members] = await Promise.all([
+    data.list<MessageRow>('messages', { household_id: householdId, conversation_id: conversationId }),
+    data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId }),
+  ]);
+  await Promise.all([
+    ...media.map((row) => data.remove('messages', row.id)),
+    ...members.map((row) =>
+      data.removeWhere('conversation_members', { conversation_id: row.conversation_id, member_id: row.member_id }),
+    ),
+    data.remove('conversations', conversationId),
+  ]);
+}

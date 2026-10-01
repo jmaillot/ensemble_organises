@@ -15,6 +15,8 @@ export interface ChatPanelProps {
   onSendMedia?: (content: string, image: CompressedImage) => void;
   /** Ouvre le dialogue d'ajout de membre ; absent, le bouton est masqué. */
   onAddMember?: () => void;
+  /** Demande la suppression de la conversation (admin) ; absent, le bouton est masqué. */
+  onDeleteConversation?: () => void;
   /** Sur petit écran : revient à la liste pour ne pas écraser la discussion. */
   onBackToList?: () => void;
   composerRef?: RefObject<HTMLInputElement | null>;
@@ -22,7 +24,7 @@ export interface ChatPanelProps {
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -118,6 +120,16 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           >
             Ajouter
           </Button>
+        ) : null}
+        {onDeleteConversation ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            icon="trash"
+            onClick={onDeleteConversation}
+            aria-label={`Supprimer la conversation ${conversation.title}`}
+            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+          />
         ) : null}
       </div>
 

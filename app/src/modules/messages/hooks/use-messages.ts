@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
+import { createConversation, addConversationMembers, createMessage, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, removeConversationCascade, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { MessageRow } from '@/types';
@@ -72,7 +72,9 @@ export interface MessagesFeed {
   sendMedia: (conversationId: string, content: string, image: CompressedImage) => Promise<void>;
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
   isCreating: boolean;
+  isDeleting: boolean;
 }
 
 /** Conversations, participants et messages du foyer, assemblés pour l'écran. */
@@ -233,6 +235,16 @@ export function useMessagesFeed(): MessagesFeed {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (conversationId: string) => {
+      if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      return removeConversationCascade({ householdId, conversationId });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
   const createConversationAndSelect = useCallback(
     async (draft: Omit<ConversationDraft, 'householdId'>) => createMutation.mutateAsync(draft),
     [createMutation],
@@ -240,6 +252,10 @@ export function useMessagesFeed(): MessagesFeed {
   const addMembers = useCallback(
     async (conversationId: string, memberIds: string[]) => addMembersMutation.mutateAsync({ conversationId, memberIds }),
     [addMembersMutation],
+  );
+  const deleteConversation = useCallback(
+    async (conversationId: string) => deleteMutation.mutateAsync(conversationId),
+    [deleteMutation],
   );
 
   const refetch = useCallback(() => {
@@ -265,7 +281,9 @@ export function useMessagesFeed(): MessagesFeed {
     sendMedia,
     createConversation: createConversationAndSelect,
     addMembers,
+    deleteConversation,
     isCreating: createMutation.isPending || addMembersMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   };
 }
 
