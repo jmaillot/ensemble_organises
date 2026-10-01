@@ -160,7 +160,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
               </strong>
             </span>
             <DialogPrimitive.Close
-              className="grid size-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint"
+              className="grid size-8 shrink-0 place-items-center rounded-[10px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
               aria-label="Fermer le menu"
             >
               <Icon name="close" size="sm" />

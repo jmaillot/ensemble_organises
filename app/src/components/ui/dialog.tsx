@@ -28,7 +28,7 @@ export const DialogContent = forwardRef<
         {children}
         {hideClose ? null : (
           <DialogPrimitive.Close
-            className="absolute top-4 right-4 grid size-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint max-[650px]:top-3 max-[650px]:right-3"
+            className="absolute top-3 right-3 grid size-8 place-items-center rounded-[10px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
             aria-label="Fermer"
           >
             <Icon name="close" size="sm" />
