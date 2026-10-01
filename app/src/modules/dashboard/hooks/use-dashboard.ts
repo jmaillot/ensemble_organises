@@ -9,7 +9,7 @@ import { useRoutines } from '@/modules/routines/hooks/use-routines';
 import { useServerSettlement } from '@/modules/ardoise/hooks/use-settlement';
 import { toServerBalances } from '@/modules/ardoise/api';
 import { MEMBER_KEY_PREFIX } from '@/modules/ardoise/types';
-import { todayIso, toLocalDate, toIsoDate, daysBetween } from '@/lib/utils';
+import { todayIso, daysBetween, eventWallDate, eventWallTime } from '@/lib/utils';
 import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, TaskRow } from '@/types';
 import {
   layoutWidgets,
@@ -155,11 +155,11 @@ export function useDashboard(): DashboardData {
     await widgets.refetch();
   }, [currentMember, householdId, widgets]);
 
-  const eventDates = useMemo(() => new Set(events.rows.map((event) => toIsoDate(toLocalDate(event.start_at)))), [events.rows]);
+  const eventDates = useMemo(() => new Set(events.rows.map((event) => eventWallDate(event.start_at))), [events.rows]);
   const eventCountByDate = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of events.rows) {
-      const iso = toIsoDate(toLocalDate(event.start_at));
+      const iso = eventWallDate(event.start_at);
       counts.set(iso, (counts.get(iso) ?? 0) + 1);
     }
     for (const birthday of birthdays.rows) {
@@ -280,7 +280,7 @@ export function useDashboard(): DashboardData {
   const nextShopping = useMemo(() => {
     const event = events.rows
       .filter((row) => /cours/i.test(row.title))
-      .map((row) => ({ row, iso: toIsoDate(toLocalDate(row.start_at)) }))
+      .map((row) => ({ row, iso: eventWallDate(row.start_at) }))
       .filter((entry) => daysBetween(todayIso(), entry.iso) >= 0)
       .sort((a, b) => a.iso.localeCompare(b.iso))[0];
     if (!event) return null;
@@ -345,6 +345,9 @@ function relativeWhen(iso: string) {
  * Tout ce qui est planifié à la date du jour : tâches en retard, tâches dues
  * aujourd'hui, événements du jour avec leur horaire. Triés retards d'abord,
  * puis par heure (les journées entières en dernier).
+ * L'heure et la date des événements sont lues en heure murale (`slice`),
+ * comme le calendrier : un `timestamptz` renvoyé avec offset ne doit pas
+ * subir une seconde conversion locale (+2h à Paris).
  */
 export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], today: string = todayIso()): TodayItem[] {
   const items: TodayItem[] = [];
@@ -363,16 +366,17 @@ export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], toda
     }
   }
   for (const event of eventRows) {
-    if (toIsoDate(toLocalDate(event.start_at)) !== today) continue;
-    const time = event.all_day
-      ? null
-      : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(toLocalDate(event.start_at));
+    if (eventWallDate(event.start_at) !== today) continue;
+    // `time` porte déjà l'horaire : `detail` affiche le lieu (ou reste vide)
+    // pour ne pas répéter « 21:30 Courses · À 21:30 ».
+    const time = event.all_day ? null : eventWallTime(event.start_at);
+    const location = event.location?.trim() ?? '';
     items.push({
       id: `event-${event.id}`,
       kind: 'evenement',
       time,
       title: event.title,
-      detail: event.all_day ? 'Toute la journée' : `À ${time}`,
+      detail: event.all_day ? 'Toute la journée' : location,
     });
   }
   const rank = (item: TodayItem) => (item.kind === 'tache-retard' ? 0 : item.time ? 1 : 2);

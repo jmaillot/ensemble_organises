@@ -1,5 +1,5 @@
 import type { DashboardWidgetRow, DashboardWidgetType } from '@/types';
-import { daysBetween, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
+import { daysBetween, eventWallDate, eventWallLocalDate, eventWallTime, toIsoDate, todayIso } from '@/lib/utils';
 
 /** Type de widget et son état d'affichage. */
 export type WidgetKind = DashboardWidgetType;
@@ -184,33 +184,33 @@ export function nextUpcomingEvent<
 ): T | null {
   const today = toIsoDate(now);
   const upcoming = events
-    .map((event) => ({ event, start: toLocalDate(event.start_at) }))
+    .map((event) => ({ event, start: eventWallLocalDate(event.start_at) }))
     .filter(({ event, start }) => {
-      if (event.all_day) return toIsoDate(start) >= today;
-      const end = event.end_at ? toLocalDate(event.end_at) : null;
+      if (event.all_day) return eventWallDate(event.start_at) >= today;
+      const end = event.end_at ? eventWallLocalDate(event.end_at) : null;
       return (end ?? start).getTime() > now.getTime();
     })
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   return upcoming[0]?.event ?? null;
 }
 
-const nextEventTime = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const nextEventDay = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 
 /**
  * « aujourd'hui à 19:30 », « demain à 18:30 », « sam. 4 oct. à 18:30 »,
  * « aujourd'hui, toute la journée » ou « en cours jusqu'à 20:15 ».
+ * L'heure est l'heure murale (`slice`), comme le calendrier.
  */
 export function formatNextEventWhen<
   T extends { start_at: string; end_at: string | null; all_day: boolean },
 >(event: T, now = new Date()): string {
-  const start = toLocalDate(event.start_at);
-  const time = event.all_day ? 'toute la journée' : `à ${nextEventTime.format(start)}`;
+  const start = eventWallLocalDate(event.start_at);
+  const time = event.all_day ? 'toute la journée' : `à ${eventWallTime(event.start_at)}`;
   if (!event.all_day && start.getTime() <= now.getTime()) {
-    const end = event.end_at ? toLocalDate(event.end_at) : null;
-    return end ? `en cours jusqu'à ${nextEventTime.format(end)}` : 'en cours';
+    const end = event.end_at ? eventWallLocalDate(event.end_at) : null;
+    return end ? `en cours jusqu'à ${eventWallTime(event.end_at as string)}` : 'en cours';
   }
-  const diff = daysBetween(toIsoDate(now), toIsoDate(start));
+  const diff = daysBetween(toIsoDate(now), eventWallDate(event.start_at));
   if (diff <= 0) return event.all_day ? "aujourd'hui, toute la journée" : `aujourd'hui ${time}`;
   if (diff === 1) return `demain ${time}`;
   return `${nextEventDay.format(start)} ${time}`;
@@ -218,8 +218,8 @@ export function formatNextEventWhen<
 
 /** Suffixe de date pour l'encadré : null aujourd'hui, « demain » ou « sam. 4 oct. » sinon. */
 export function formatNextEventDay<T extends { start_at: string }>(event: T, now = new Date()): string | null {
-  const diff = daysBetween(toIsoDate(now), toIsoDate(toLocalDate(event.start_at)));
+  const diff = daysBetween(toIsoDate(now), eventWallDate(event.start_at));
   if (diff <= 0) return null;
   if (diff === 1) return 'demain';
-  return nextEventDay.format(toLocalDate(event.start_at));
+  return nextEventDay.format(eventWallLocalDate(event.start_at));
 }

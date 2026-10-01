@@ -75,7 +75,9 @@ describe('Accueil — rendu', () => {
     const evenements = screen.getByRole('list', { name: 'Événements du jour' });
     expect(within(taches).getByText(/Choisir le menu du week-end/)).toBeInTheDocument();
     expect(within(evenements).getByText(/Rendez-vous chez le médecin/)).toBeInTheDocument();
-    expect(within(evenements).getByText(/À 19:30/)).toBeInTheDocument();
+    // L'horaire est en colonne temps, sans répétition « · À 19:30 ».
+    expect(within(evenements).getByText(/^19:30$/)).toBeInTheDocument();
+    expect(within(evenements).queryByText(/À 19:30/)).not.toBeInTheDocument();
   });
 
   it('propose les seize espaces du foyer dans la grille', async () => {

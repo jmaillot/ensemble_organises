@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/primitives';
 import { Progress } from '@/components/ui/primitives';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, formatEuro, initials, relativeDayLabel, toLocalDate } from '@/lib/utils';
+import { cn, formatEuro, initials, relativeDayLabel } from '@/lib/utils';
 import type { BirthdayRow, EventRow, TaskRow } from '@/types';
 import { priorityFromRank } from '@/modules/taches/types';
 import { PriorityTag } from '@/components/shared/module-shell';
@@ -72,7 +72,8 @@ export function CalendarWidget({
   dragHandleProps,
 }: WidgetBase & { events: EventRow[]; holidays: FrenchHoliday[] }) {
   const cursor = new Date();
-  const eventDates = new Set(events.map((event) => toLocalDate(event.start_at).toISOString().slice(0, 10)));
+  // Heure murale, comme le calendrier : pas de conversion UTC → locale.
+  const eventDates = new Set(events.map((event) => event.start_at.slice(0, 10)));
   const holidayDates = new Set(holidays.map((holiday) => holiday.date));
   const { days, monthLabel } = buildMiniCalendar(cursor, eventDates, holidayDates);
   return (

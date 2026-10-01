@@ -45,6 +45,20 @@ export function toLocalDate(iso: string) {
   return new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
 }
 
+/**
+ * Heure murale des événements : `events.start_at` est un `timestamptz` mais
+ * l'heure saisie est une heure locale (mur du foyer). PostgREST renvoie
+ * `2026-09-30T19:30:00+00:00` : un `new Date()` + format local ajouterait le
+ * décalage Paris (+2h) et afficherait 21:30 alors que le calendrier (slice)
+ * affiche 19:30. On lit donc la partie murale, comme le calendrier.
+ */
+export const eventWallDate = (iso: string) => iso.slice(0, 10);
+export const eventWallTime = (iso: string) => iso.slice(11, 16);
+/** Date locale construite sur l'heure murale (offset ignoré). */
+export function eventWallLocalDate(iso: string) {
+  return toLocalDate(iso.length > 19 ? iso.slice(0, 19) : iso);
+}
+
 export const pad = (value: number) => String(value).padStart(2, '0');
 
 export const toIsoDate = (date: Date) =>

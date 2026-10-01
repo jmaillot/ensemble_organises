@@ -43,6 +43,7 @@ import {
   WIDGET_COLUMNS,
 } from './components/widgets';
 import { firstName, formatDashboardEyebrow, formatNextEventDay, formatNextEventWhen } from './types';
+import { eventWallTime } from '@/lib/utils';
 import { reorderPreferences, resetPreferences, toggleWidget, type WidgetKind } from './types';
 
 export default function DashboardPage() {
@@ -152,7 +153,7 @@ export default function DashboardPage() {
             {nextEvent
               ? nextEvent.all_day
                 ? 'Journée'
-                : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(nextEvent.start_at))
+                : eventWallTime(nextEvent.start_at)
               : '—'}
           </strong>
           <small className="text-[11px] text-muted">
@@ -344,7 +345,7 @@ function TodayGroup({ title, listLabel, items }: { title: string; listLabel: str
             <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
             <span className="min-w-0 truncate">
               <strong className="font-semibold text-fg">{item.title}</strong>
-              <span> · {item.detail}</span>
+              {item.detail ? <span> · {item.detail}</span> : null}
             </span>
           </li>
         ))}

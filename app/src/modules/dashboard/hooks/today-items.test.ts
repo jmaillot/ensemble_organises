@@ -52,8 +52,23 @@ describe('buildTodayItems', () => {
     );
     expect(items.map((item) => item.title)).toEqual(['Retard', 'Tôt', 'Tard', 'Dernier', 'Journée']);
     expect(items[0]).toMatchObject({ kind: 'tache-retard', time: null });
-    expect(items[1]).toMatchObject({ kind: 'evenement', time: '08:00', detail: 'À 08:00' });
+    // L'horaire vit dans `time` : `detail` reste vide sans lieu (pas de « · À 08:00 »).
+    expect(items[1]).toMatchObject({ kind: 'evenement', time: '08:00', detail: '' });
     expect(items[4]).toMatchObject({ kind: 'evenement', time: null, detail: 'Toute la journée' });
+  });
+
+  it('affiche le lieu en détail et lit l’heure murale malgré l’offset', () => {
+    const items = buildTodayItems(
+      [],
+      [
+        event({ id: 'lieu', title: 'Courses', start_at: '2026-09-30T19:30:00', location: 'Marché' }),
+        event({ id: 'offset', title: 'Soir', start_at: '2026-09-30T19:30:00+00:00' }),
+      ],
+      TODAY,
+    );
+    expect(items.find((item) => item.title === 'Courses')).toMatchObject({ time: '19:30', detail: 'Marché' });
+    // `timestamptz` renvoyé avec offset : même heure murale que le calendrier, pas +2h.
+    expect(items.find((item) => item.title === 'Soir')).toMatchObject({ time: '19:30', detail: '' });
   });
 
   it('ignore les événements des autres jours', () => {
