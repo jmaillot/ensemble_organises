@@ -29,11 +29,13 @@ vi.mock('@/lib/data', () => ({
 
 const { loadHousehold } = await import('./session-store');
 const { useHouseholdStore } = await import('./household-store');
+const { useSessionStore } = await import('./session-store');
 
 describe('loadHousehold et membre courant', () => {
   beforeEach(() => {
     listMock.mockClear();
     useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
   });
 
   it('conserve le membre persisté quand le serveur le renvoie', async () => {
@@ -53,5 +55,28 @@ describe('loadHousehold et membre courant', () => {
 
     expect(useHouseholdStore.getState().householdId).toBe('h1');
     expect(useHouseholdStore.getState().currentMemberId).toBe('m1');
+  });
+
+  it('désigne la ligne liée à l’utilisateur connecté, pas la première ni la persistée', async () => {
+    // Régression : un second compte du même foyer (membre existant, session
+    // persistée d'un autre membre ou premier de liste) répondait au nom
+    // d'autrui, et la RLS refusait l'insertion (`messages` : « new row
+    // violates row-level security policy »).
+    const duo = [
+      { id: 'm1', household_id: 'h1', user_id: 'u1', display_name: 'Alice', role: 'admin' },
+      { id: 'm2', household_id: 'h1', user_id: 'u2', display_name: 'Bob', role: 'membre' },
+    ] as HouseholdMemberRow[];
+    listMock
+      .mockImplementationOnce(async () => duo)
+      .mockImplementationOnce(async () => households);
+    useHouseholdStore.setState({ currentMemberId: 'm1' });
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: 'u2', email: 'bob@example.fr', displayName: 'Bob', avatarUrl: null, provider: 'email' },
+    });
+
+    await loadHousehold();
+
+    expect(useHouseholdStore.getState().currentMemberId).toBe('m2');
   });
 });

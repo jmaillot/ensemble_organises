@@ -58,13 +58,22 @@ export async function loadHousehold() {
     return null;
   }
   const members = memberships.filter((membership) => membership.household_id === active.id) as HouseholdMemberRow[];
+  // Le membre courant est la ligne liée à l'utilisateur connecté, jamais la
+  // première de la liste : un second compte (ou une session persistée d'un
+  // autre membre) écrivait sinon au nom d'autrui, et la RLS refusait
+  // l'insertion (`can_send_message` exige l'égalité des deux) — dont la
+  // réponse dans une conversation. Sans ligne liée (démo, incohérence), on
+  // retombe sur le comportement historique : persisté s'il existe, sinon
+  // premier membre (le membre persisté fantôme reste exclu, cf. ci-dessous).
+  const sessionUserId = useSessionStore.getState().user?.id ?? null;
+  const ownMemberId = sessionUserId ? members.find((member) => member.user_id === sessionUserId)?.id : undefined;
   // Le membre persisté localement peut ne plus exister côté serveur (ménage
   // manuel, membre retiré, base restaurée) : un identifiant fantôme passerait
   // ensuite les écritures (`validate_member_refs` répond 23514) et masquerait
   // les listes privées. On ne garde que ce que le serveur vient de renvoyer.
-  const currentMemberId = members.some((member) => member.id === store.currentMemberId)
-    ? store.currentMemberId
-    : undefined;
+  const currentMemberId =
+    ownMemberId ??
+    (members.some((member) => member.id === store.currentMemberId) ? store.currentMemberId : undefined);
   store.setHousehold(active, members, currentMemberId);
   return active;
 }
