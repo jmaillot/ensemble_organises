@@ -31,6 +31,29 @@ describe('Messages', () => {
     await waitFor(() => expect(screen.getByLabelText('Écrire un message')).toHaveValue(''), { timeout: 4000 });
   });
 
+  it('ne mélange jamais les fonds clair et sombre d’une même bulle', async () => {
+    // Régression : `bg-surface` et `bg-fg` cohabitaient sur la bulle, et
+    // l'ordre de la feuille donnait raison au clair — texte blanc invisible.
+    // RTL ne voit pas les contrastes : on verrouille les classes elles-mêmes.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    const lina = await screen.findByRole('button', { name: /^Lina/ });
+    await user.click(lina);
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+
+    const received = within(log).getByText('Tu as vu le nouveau parc ?').closest('div');
+    expect(received?.className).toMatch(/bg-surface/);
+    expect(received?.className).not.toMatch(/bg-fg/);
+
+    await user.type(screen.getByLabelText('Écrire un message'), 'Je passe ce soir');
+    await user.click(screen.getByRole('button', { name: 'Envoyer' }));
+    const mine = await within(log).findByText('Je passe ce soir');
+    const bubble = mine.closest('div');
+    expect(bubble?.className).toMatch(/bg-fg/);
+    expect(bubble?.className).not.toMatch(/bg-surface/);
+  });
+
   it('expose la conversation active et le fil de discussion de façon accessible', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);

@@ -138,8 +138,13 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           messages.map((message) => (
             <div
               key={message.id}
-              className={`max-w-[72%] rounded-[14px_14px_14px_4px] border border-border bg-surface px-3 py-2.5 text-xs ${
-                message.isMine ? 'self-end rounded-[14px_14px_4px_14px] border-fg bg-fg text-surface' : 'self-start'
+              // Une seule couleur de fond par branche : `bg-surface` et `bg-fg`
+              // cohabitaient ici, et l'ordre de la feuille (pas celui des
+              // classes) donnait raison au clair — texte blanc invisible.
+              className={`max-w-[72%] rounded-[14px_14px_14px_4px] px-3 py-2.5 text-xs ${
+                message.isMine
+                  ? 'self-end rounded-[14px_14px_4px_14px] border border-fg bg-fg text-surface'
+                  : 'self-start border border-border bg-surface'
               }`}
             >
               {!message.isMine ? <span className="mb-1 block text-[10px] font-extrabold text-muted">{message.senderName}</span> : null}
