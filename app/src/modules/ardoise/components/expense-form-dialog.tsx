@@ -170,7 +170,7 @@ export function ExpenseFormDialog({
             {(props) => <Input {...props} {...register('title')} placeholder="Ex. Courses du samedi" />}
           </Field>
 
-          <div className="grid grid-cols-2 items-end gap-3 max-[650px]:grid-cols-1">
+          <div className="grid grid-cols-2 items-start gap-3 max-[650px]:grid-cols-1">
             <Field label="Montant" error={errors.amount?.message} hint="En euros">
               {(props) => (
                 <Input {...props} type="number" step="0.01" min="0" inputMode="decimal" placeholder="24,90" {...register('amount')} />

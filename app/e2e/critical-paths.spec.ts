@@ -120,8 +120,8 @@ test.describe('Parcours des modules', () => {
     await page.getByLabel(/Montant/).fill('12.50');
     await page.getByRole('button', { name: /Ajouter la dépense/ }).last().click();
     await expect(page.getByText('Balade à la boulangerie')).toBeVisible();
-    await expect(page.getByTestId('shares-pie')).toBeVisible();
     await page.getByRole('tab', { name: 'Répartition' }).click();
+    await expect(page.getByTestId('spending-pie')).toBeVisible();
     await expect(page.getByText('Qui doit quoi ?')).toBeVisible();
   });
 

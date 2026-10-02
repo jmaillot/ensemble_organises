@@ -185,8 +185,8 @@ export function computeBalances(expenses: Expense[], seeds: Participant[]): Bala
 }
 
 /**
- * Part d'achat de chaque participant : somme de ses `shareAmount` sur
- * l'ardoise. Les parts nulles sont exclues (camembert lisible).
+ * Part d'un participant au camembert : clé stable, nature, nom, pastille et
+ * montant (avancé pour `computeSpent`).
  */
 export interface Share {
   key: string;
@@ -196,27 +196,29 @@ export interface Share {
   amount: number;
 }
 
-export function computeShares(expenses: Expense[]): Share[] {
+/**
+ * Dépensé par payeur : somme des montants avancés par chacun, triée du plus
+ * gros dépensier au plus petit. Sert le camembert de la Répartition.
+ */
+export function computeSpent(expenses: Expense[]): Share[] {
   const totals = new Map<string, Share>();
   for (const expense of expenses) {
-    for (const participant of expense.participants) {
-      const current = totals.get(participant.key);
-      if (current) {
-        current.amount = roundCents(current.amount + participant.shareAmount);
-      } else {
-        totals.set(participant.key, {
-          key: participant.key,
-          kind: participant.kind,
-          name: participant.name,
-          colorTag: participant.colorTag,
-          amount: roundCents(participant.shareAmount),
-        });
-      }
+    if (expense.paidBy === null) continue;
+    const key = participantKey(expense.paidByKind, expense.paidBy);
+    const current = totals.get(key);
+    if (current) {
+      current.amount = roundCents(current.amount + expense.amount);
+    } else {
+      totals.set(key, {
+        key,
+        kind: expense.paidByKind,
+        name: expense.paidByName,
+        colorTag: expense.paidByColorTag,
+        amount: roundCents(expense.amount),
+      });
     }
   }
-  return [...totals.values()]
-    .filter((share) => share.amount > 0)
-    .sort((a, b) => b.amount - a.amount);
+  return [...totals.values()].sort((a, b) => b.amount - a.amount);
 }
 
 /**

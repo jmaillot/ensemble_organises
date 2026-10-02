@@ -30,7 +30,7 @@ import { ardoiseKeys } from './hooks/use-settlement';
 import { BalanceCard, MemberBalances } from './components/balance-panel';
 import { SettlementsPanel } from './components/settlements-panel';
 import { ExpenseFormDialog } from './components/expense-form-dialog';
-import { computeShares, type Expense, type NewExpenseInput, type Share } from './types';
+import { computeSpent, type Expense, type NewExpenseInput, type Share } from './types';
 
 /** Remplissage SVG d'une part : palette membre, gris décliné pour les invités. */
 const TAG_FILL: Record<string, string> = {
@@ -54,10 +54,10 @@ function pieFill(share: Share, index: number): string {
 }
 
 /**
- * Camembert des parts d'achat par participant (SVG maison, sans dépendance).
+ * Camembert des dépensés par payeur (SVG maison, sans dépendance).
  * Donut + légende pastille + tableau `sr-only` de repli a11y.
  */
-function SharesPie({ shares, total }: { shares: Share[]; total: number }) {
+function SpendingPie({ shares, total }: { shares: Share[]; total: number }) {
   if (shares.length === 0 || total <= 0) return null;
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
@@ -70,15 +70,15 @@ function SharesPie({ shares, total }: { shares: Share[]; total: number }) {
     return segment;
   });
   return (
-    <div className="mt-4 grid gap-3">
+    <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-4">
         <svg
           width="120"
           height="120"
           viewBox="0 0 120 120"
           role="img"
-          aria-label={`Répartition des parts : ${shares.map((share) => `${share.name} ${formatEuro(share.amount)}`).join(', ')}`}
-          data-testid="shares-pie"
+          aria-label={`Qui a dépensé quoi : ${shares.map((share) => `${share.name} ${formatEuro(share.amount)}`).join(', ')}`}
+          data-testid="spending-pie"
         >
           <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--color-bg)" strokeWidth="22" />
           {segments.map((segment) => (
@@ -96,7 +96,7 @@ function SharesPie({ shares, total }: { shares: Share[]; total: number }) {
             />
           ))}
         </svg>
-        <ul className="grid min-w-[180px] flex-1 gap-1.5" aria-label="Parts par participant">
+        <ul className="grid min-w-[180px] flex-1 gap-1.5" aria-label="Dépensés par payeur">
           {shares.map((share, index) => (
             <li key={share.key} className="flex items-center gap-2 text-[12px]">
               <span
@@ -113,7 +113,7 @@ function SharesPie({ shares, total }: { shares: Share[]; total: number }) {
         </ul>
       </div>
       <table className="sr-only">
-        <caption>Parts d'achat par participant</caption>
+        <caption>Dépenses par payeur</caption>
         <tbody>
           {shares.map((share) => (
             <tr key={share.key}>
@@ -180,24 +180,7 @@ export default function ArdoiseDetailPage() {
   const sessionMemberId = useSessionMemberId();
   const defaultPayerId = sessionMemberId ?? sharingMembers[0]?.id ?? null;
 
-  const paidByMember = useMemo(() => {
-    const index = new Map<string, number>();
-    for (const expense of expenses) {
-      const key = expense.paidByKind === 'guest' ? `invite:${expense.paidBy ?? ''}` : `membre:${expense.paidBy ?? ''}`;
-      index.set(key, (index.get(key) ?? 0) + expense.amount);
-    }
-    return [...index.entries()]
-      .map(([key, amount]) => {
-        const expense = expenses.find((entry) =>
-          entry.paidByKind === 'guest' ? `invite:${entry.paidBy ?? ''}` === key : `membre:${entry.paidBy ?? ''}` === key,
-        );
-        return { key, amount, name: expense?.paidByName ?? 'Payeur' };
-      })
-      .sort((a, b) => b.amount - a.amount);
-  }, [expenses]);
-
-  const shares = useMemo(() => computeShares(expenses), [expenses]);
-  const sharesTotal = useMemo(() => shares.reduce((sum, share) => sum + share.amount, 0), [shares]);
+  const paidByMember = useMemo(() => computeSpent(expenses), [expenses]);
 
   const handleSubmitExpense = async (values: NewExpenseInput) => {
     if (editingExpense) {
@@ -297,9 +280,8 @@ export default function ArdoiseDetailPage() {
             {paidByMember.length === 0 ? (
               <p className="m-0 text-xs text-muted">Aucune dépense pour le moment.</p>
             ) : (
-              <>
-                <div className="grid gap-2" role="list" aria-label="Avances par participant">
-                  {paidByMember.map((entry) => (
+              <div className="grid gap-2" role="list" aria-label="Avances par participant">
+                {paidByMember.map((entry) => (
                   <div key={entry.key} role="listitem" className="grid gap-1">
                     <div className="flex items-baseline justify-between gap-2 text-[12px]">
                       <strong>{entry.name}</strong>
@@ -317,9 +299,7 @@ export default function ArdoiseDetailPage() {
                     </div>
                   </div>
                 ))}
-                </div>
-                <SharesPie shares={shares} total={sharesTotal} />
-              </>
+              </div>
             )}
           </Panel>
 
@@ -380,6 +360,17 @@ export default function ArdoiseDetailPage() {
         </div>
       ) : tab === 'repartition' ? (
         <div className="grid gap-[18px]">
+          <Panel
+            id="ardoise-spending-panel"
+            title="Qui a dépensé quoi"
+            description="Part de chaque payeur dans le total avancé, du plus gros au plus petit."
+          >
+            {paidByMember.length === 0 ? (
+              <p className="m-0 text-xs text-muted">Aucune dépense pour le moment.</p>
+            ) : (
+              <SpendingPie shares={paidByMember} total={total} />
+            )}
+          </Panel>
           <MemberBalances balances={balances} source={settlementSource} />
           <SettlementsPanel settlements={settlements} />
         </div>
