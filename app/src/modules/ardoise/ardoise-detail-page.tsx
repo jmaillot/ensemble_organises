@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -430,13 +430,37 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   const [description, setDescription] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [lastCode, setLastCode] = useState<string | null>(null);
+  // Le serveur ne conserve que l'empreinte du code : le brut n'est rendu
+  // qu'à sa création. On le mémorise ici pour le réafficher après navigation ;
+  // un code actif créé ailleurs reste invisible jusqu'à régénération.
+  const codeKey = `eo:ardoise-code:${ardoiseId}`;
+  const [lastCode, setLastCode] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(codeKey);
+    } catch {
+      return null;
+    }
+  });
+  const rememberCode = (code: string | null) => {
+    setLastCode(code);
+    try {
+      if (code === null) localStorage.removeItem(codeKey);
+      else localStorage.setItem(codeKey, code);
+    } catch {
+      // Stockage indisponible (navigation privée) : l'affichage en mémoire suffit.
+    }
+  };
 
   const summaryQuery = useQuery({
     queryKey: ['ardoise', 'invite-summary', ardoiseId],
     queryFn: () => fetchInviteSummary(ardoiseId),
   });
   const summary = (summaryQuery.data ?? null) as ArdoiseCodeSummary | null;
+
+  // Code arrêté depuis un autre appareil : le cache local est périmé, on le purge.
+  useEffect(() => {
+    if (summaryQuery.isSuccess && !summary?.hasCode && lastCode !== null) rememberCode(null);
+  }, [summaryQuery.isSuccess, summary?.hasCode, lastCode]);
 
   const currentName = name ?? ardoise?.name ?? '';
   const currentDescription = description ?? ardoise?.description ?? '';
@@ -546,6 +570,10 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
               <p className="m-0 rounded-[11px] bg-bg px-3 py-2.5 font-mono text-[13px] break-all" role="status">
                 {lastCode}
               </p>
+            ) : summary?.hasCode ? (
+              <p className="m-0 text-[12px] text-muted">
+                Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.
+              </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
@@ -554,7 +582,7 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
                 onClick={() => {
                   void createInviteCode(ardoiseId)
                     .then((created) => {
-                      setLastCode(created.code);
+                      rememberCode(created.code);
                       summaryQuery.refetch();
                       toast('Nouveau code généré : l’ancien est invalidé.');
                     })
@@ -581,7 +609,7 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
                   onClick={() => {
                     void revokeInviteCode(ardoiseId)
                       .then(() => {
-                        setLastCode(null);
+                        rememberCode(null);
                         summaryQuery.refetch();
                         toast('Partage arrêté : le code ne passe plus.');
                       })

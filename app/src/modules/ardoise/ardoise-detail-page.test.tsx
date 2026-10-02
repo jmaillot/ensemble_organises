@@ -205,4 +205,37 @@ describe('ArdoiseDetailPage', () => {
     expectAmount(balanceOf(DEMO_MEMBERS.camille), 100);
     expect(screen.getByText(/Thomas Martin → Camille Martin/)).toBeInTheDocument();
   });
+
+  it('réaffiche le code mémorisé après navigation (remontage)', async () => {
+    const code = 'CODE-MEMOIRE-1234567890';
+    localStorage.setItem('eo:ardoise-code:ardoise-foyer', code);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ardoiseId: 'ardoise-foyer',
+          isActive: true,
+          hasCode: true,
+          expiresAt: null,
+          maxUses: null,
+          useCount: 0,
+        }),
+      }),
+    );
+    try {
+      const user = userEvent.setup();
+      const first = renderDetail();
+      await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
+      expect(await screen.findByText(code)).toBeInTheDocument();
+      first.unmount();
+
+      renderDetail();
+      await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
+      expect(await screen.findByText(code)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+      localStorage.clear();
+    }
+  });
 });
