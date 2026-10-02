@@ -44,6 +44,7 @@ const routineSchema = z
     yearlyNthWeekday: z.string(),
     description: z.string().trim().max(400, '400 caractères maximum.'),
     assigneeIds: z.array(z.string()),
+    folderId: z.string(),
     reminders: z.array(
       z
         .string()
@@ -76,7 +77,7 @@ const routineSchema = z
 
 const toReminderValue = (remindAt: string | null) => (remindAt ? remindAt.slice(0, 16) : '');
 
-function defaultValues(routine: Routine | null, currentMemberId: string): RoutineFormValues {
+function defaultValues(routine: Routine | null, currentMemberId: string, initialFolderId: string | null = null): RoutineFormValues {
   const base = defaultRecurrenceSelection();
   if (!routine) {
     return {
@@ -95,6 +96,7 @@ function defaultValues(routine: Routine | null, currentMemberId: string): Routin
       yearlyNthWeekday: base.yearlyNthWeekday as RoutineFormValues['yearlyNthWeekday'],
       description: '',
       assigneeIds: currentMemberId ? [currentMemberId] : [],
+      folderId: initialFolderId ?? '',
       reminders: [''],
       autoMinus1: true,
     };
@@ -117,6 +119,7 @@ function defaultValues(routine: Routine | null, currentMemberId: string): Routin
     yearlyNthWeekday: selection.yearlyNthWeekday as RoutineFormValues['yearlyNthWeekday'],
     description: routine.description ?? '',
     assigneeIds: routine.assignees.map((assignee) => assignee.memberId),
+    folderId: routine.folderId ?? '',
     reminders,
     autoMinus1: false,
   };
@@ -128,6 +131,9 @@ export interface RoutineFormDialogProps {
   routine: Routine | null;
   /** Membre coché par défaut à la création. */
   currentMemberId: string;
+  /** Dossier pré-rempli à la création (onglet courant). */
+  initialFolderId?: string | null;
+  folders?: { id: string; name: string }[];
   isSaving?: boolean;
   onSubmit: (values: RoutineFormValues) => Promise<void> | void;
 }
@@ -141,6 +147,8 @@ export function RoutineFormDialog({
   onOpenChange,
   routine,
   currentMemberId,
+  initialFolderId = null,
+  folders = [],
   isSaving = false,
   onSubmit,
 }: RoutineFormDialogProps) {
@@ -164,6 +172,7 @@ export function RoutineFormDialog({
       yearlyNthWeekday: 'MO',
       description: '',
       assigneeIds: [],
+      folderId: initialFolderId ?? '',
       reminders: [''],
       autoMinus1: true,
     },
@@ -214,11 +223,11 @@ export function RoutineFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(routine, currentMemberId));
+    reset(defaultValues(routine, currentMemberId, initialFolderId));
     // `routine` identifie une ouverture : le formulaire n'est pas réinitialisé à
     // chaque frappe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, routine?.id, currentMemberId]);
+  }, [open, routine?.id, currentMemberId, initialFolderId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -536,6 +545,21 @@ export function RoutineFormDialog({
               />
             )}
           </Field>
+
+          {folders.length > 0 ? (
+            <Field label="Dossier" optional error={errors.folderId?.message}>
+              {(props) => (
+                <Select {...props} {...register('folderId')}>
+                  <option value="">Général</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          ) : null}
 
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>

@@ -1,5 +1,7 @@
 import type { FrenchHoliday } from '@/hooks/use-french-holidays';
 import { formatLongDate, formatShortDate, pluralize } from '@/lib/utils';
+import type { VacationRange } from './hooks/use-ref-days';
+import { vacationsOfDay } from './hooks/use-ref-days';
 import type { BirthdayRow, EventReminderRow, EventRow, HouseholdMemberRow, MemberColorTag, TaskStatus } from '@/types';
 import type { TaskAssignee } from '@/modules/taches/types';
 
@@ -23,6 +25,10 @@ export interface CalendarEvent {
   allDay: boolean;
   location: string | null;
   color: string | null;
+  calendarId: string;
+  categoryId: string | null;
+  /** Nom de la catégorie, résolu depuis `event_categories` (pastille catégorie). */
+  categoryName: string | null;
   createdBy: string | null;
   /** Jour local (`YYYY-MM-DD`) affiché dans la grille. */
   date: string;
@@ -31,7 +37,11 @@ export interface CalendarEvent {
   author: HouseholdMemberRow | null;
 }
 
-export function toCalendarEvent(row: EventRow, members: readonly HouseholdMemberRow[] = []): CalendarEvent {
+export function toCalendarEvent(
+  row: EventRow,
+  members: readonly HouseholdMemberRow[] = [],
+  categories: readonly { id: string; name: string }[] = [],
+): CalendarEvent {
   const author = members.find((member) => member.id === row.created_by) ?? null;
   return {
     id: row.id,
@@ -43,6 +53,9 @@ export function toCalendarEvent(row: EventRow, members: readonly HouseholdMember
     allDay: row.all_day,
     location: row.location,
     color: row.color,
+    calendarId: row.calendar_id,
+    categoryId: row.category_id,
+    categoryName: categories.find((category) => category.id === row.category_id)?.name ?? null,
     createdBy: row.created_by,
     date: row.start_at.slice(0, 10),
     timeLabel: row.all_day ? 'Toute la journée' : row.start_at.slice(11, 16),
@@ -95,6 +108,10 @@ export interface EventFormValues {
   description: string;
   /** `household_members.id` associé, ou chaîne vide pour la couleur corail. */
   memberId: string;
+  /** `event_categories.id`, ou chaîne vide pour sans catégorie. */
+  categoryId: string;
+  /** `event_calendars.id`, ou chaîne vide pour le Commun (défaut). */
+  calendarId: string;
   /** Rappel au format `datetime-local` (`2026-09-25T18:30`) ou chaîne vide. */
   remindAt: string;
 }
@@ -138,6 +155,14 @@ export type AgendaItem =
       title: string;
       subtitle: string | null;
       chipLabel: string;
+    }
+  | {
+      kind: 'vacances';
+      key: string;
+      time: string;
+      title: string;
+      subtitle: string | null;
+      chipLabel: string;
     };
 
 /** Tâche vue depuis le calendrier : échéance, retard et assignataires. */
@@ -165,7 +190,7 @@ export function tasksOfDay(tasks: readonly CalendarTask[], date: string, today: 
     .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
 }
 
-/** Journée de l'agenda : événements et tâches du foyer, anniversaires, puis jours fériés. */
+/** Journée de l'agenda : événements et tâches du foyer, anniversaires, jours fériés puis vacances. */
 export function buildAgenda(
   date: string,
   sources: {
@@ -173,10 +198,11 @@ export function buildAgenda(
     tasks: readonly CalendarTask[];
     birthdays: readonly CalendarBirthday[];
     holidays: readonly FrenchHoliday[];
+    vacations?: readonly VacationRange[];
     today: string;
   },
 ): AgendaItem[] {
-  const { events, tasks, birthdays, holidays, today } = sources;
+  const { events, tasks, birthdays, holidays, vacations = [], today } = sources;
   const eventsOfDay = events
     .filter((event) => event.date === date)
     .map<AgendaItem>((event) => ({
@@ -187,7 +213,7 @@ export function buildAgenda(
       title: event.title,
       subtitle: event.location,
       colorTag: event.colorTag,
-      chipLabel: event.allDay ? 'Journée entière' : 'Événement',
+      chipLabel: event.categoryName ?? (event.allDay ? 'Journée entière' : 'Événement'),
       author: event.author,
     }))
     .sort((a, b) => a.time.localeCompare(b.time));
@@ -232,7 +258,17 @@ export function buildAgenda(
       chipLabel: 'Jour férié',
     }));
 
-  return [...eventsOfDay, ...tasksOfTheDay, ...birthdaysOfDay, ...holidaysOfDay];
+  const vacationsOfTheDay = vacationsOfDay(vacations, date).map<AgendaItem>((range) => ({
+    kind: 'vacances',
+    key: `vacances-${range.label}-${range.start}`,
+    time: 'Toute la journée',
+    title: range.label,
+    subtitle: 'Vacances scolaires',
+    colorTag: 'ink',
+    chipLabel: 'Vacances',
+  }));
+
+  return [...eventsOfDay, ...tasksOfTheDay, ...birthdaysOfDay, ...holidaysOfDay, ...vacationsOfTheDay];
 }
 
 export interface DayMarker {
@@ -240,6 +276,7 @@ export interface DayMarker {
   colorTag: MemberColorTag;
   hasBirthday: boolean;
   hasHoliday: boolean;
+  hasVacation: boolean;
   /** Tâches dues ce jour-là (non terminées), pastille violette. */
   hasTask: boolean;
   taskCount: number;
@@ -259,6 +296,7 @@ export function buildDayMarkers(
     tasks: readonly CalendarTask[];
     birthdays: readonly CalendarBirthday[];
     holidays: readonly FrenchHoliday[];
+    vacations?: readonly VacationRange[];
   },
   today: string,
 ): DayMarkerMap {
@@ -275,12 +313,14 @@ export function buildDayMarkers(
     );
     const birthdays = sources.birthdays.filter((birthday) => isSameMonthDay(iso, birthday.monthDay));
     const holiday = sources.holidays.find((entry) => entry.date === iso);
-    if (events.length === 0 && tasks.length === 0 && birthdays.length === 0 && !holiday) return;
+    const hasVacation = vacationsOfDay(sources.vacations ?? [], iso).length > 0;
+    if (events.length === 0 && tasks.length === 0 && birthdays.length === 0 && !holiday && !hasVacation) return;
     markers[iso] = {
       count: events.length + birthdays.length,
       colorTag: holiday && events.length === 0 ? 'amber' : (events[0]?.colorTag ?? birthdays[0]?.colorTag ?? 'coral'),
       hasBirthday: birthdays.length > 0,
       hasHoliday: Boolean(holiday),
+      hasVacation,
       hasTask: tasks.length > 0,
       taskCount: tasks.length,
     };
@@ -292,11 +332,15 @@ export function buildDayMarkers(
 export function dayButtonLabel(iso: string, marker?: DayMarker) {
   const base = capitalize(formatLongDate(iso));
   if (!marker || (marker.count === 0 && marker.taskCount === 0))
-    return marker?.hasHoliday ? `${base}, jour férié` : base;
+    return marker?.hasHoliday
+      ? `${base}, jour férié`
+      : marker?.hasVacation
+        ? `${base}, vacances scolaires`
+        : base;
   const parts = [
     marker.count > 0 ? pluralize(marker.count, 'événement') : null,
     marker.taskCount > 0 ? pluralize(marker.taskCount, 'tâche') : null,
   ].filter((part): part is string => part !== null);
-  return `${base}, ${parts.join(', ')}${marker.hasHoliday ? ', jour férié' : ''}`;
+  return `${base}, ${parts.join(', ')}${marker.hasHoliday ? ', jour férié' : ''}${marker.hasVacation ? ', vacances scolaires' : ''}`;
 }
 

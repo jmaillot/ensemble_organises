@@ -1,19 +1,31 @@
 import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatMonthLabel, todayIso } from '@/lib/utils';
-import type { HouseholdMemberRow, MemberColorTag } from '@/types';
+import type { ArdoiseRow, HouseholdMemberRow, MemberColorTag } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createExpense, createInvitation, deleteExpense, fetchArdoiseSnapshot, toServerBalances, toServerSettlements, updateExpense } from '../api';
+import {
+  createArdoise,
+  createExpense,
+  deleteArdoise,
+  deleteExpense,
+  fetchArdoiseDetail,
+  fetchArdoises,
+  toServerBalances,
+  toServerSettlements,
+  updateArdoise,
+  updateExpense,
+  type NewArdoiseInput,
+} from '../api';
 import { ardoiseKeys, useServerSettlement } from './use-settlement';
 import {
   computeBalances,
+  guestKey,
   memberKey,
   roundCents,
   simplifyDebts,
   toExpense,
   type Balance,
   type Expense,
-  type InvitationInput,
   type MemberOption,
   type NewExpenseInput,
   type Participant,
@@ -21,16 +33,65 @@ import {
   type Settlement,
 } from '../types';
 
-/** Membres qui partagent réellement l'ardoise : les enfants en sont exclus. */
+/** Membres qui partagent réellement : les enfants en sont exclus. */
 const sharingMembers = (members: MemberOption[]) => members.filter((member) => member.role !== 'enfant');
 
-export interface ArdoiseData {
+export interface ArdoisesData {
+  ardoises: ArdoiseRow[];
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  refetch: () => void;
+  isMutating: boolean;
+  addArdoise: (input: NewArdoiseInput) => Promise<ArdoiseRow>;
+  removeArdoise: (id: string) => Promise<void>;
+}
+
+/** Liste des ardoises du foyer + création / suppression. */
+export function useArdoises(): ArdoisesData {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: [...ardoiseKeys.all, 'list', householdId ?? ''],
+    enabled: Boolean(householdId),
+    queryFn: () => fetchArdoises(householdId as string),
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ardoiseKeys.all });
+
+  const createMutation = useMutation({
+    mutationFn: (input: NewArdoiseInput) => createArdoise(householdId as string, input),
+    onSuccess: invalidate,
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteArdoise(id),
+    onSuccess: invalidate,
+  });
+
+  return {
+    ardoises: query.data ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: (query.error as Error | null) ?? null,
+    refetch: () => {
+      void query.refetch();
+    },
+    isMutating: createMutation.isPending || deleteMutation.isPending,
+    addArdoise: (input) => createMutation.mutateAsync(input),
+    removeArdoise: (id) => deleteMutation.mutateAsync(id),
+  };
+}
+
+export interface ArdoiseDetailData {
+  ardoise: ArdoiseRow | null;
   expenses: Expense[];
   balances: Balance[];
   settlements: Settlement[];
   /** `serveur` quand `expense-settlement` répond, `local` sinon (démo, hors ligne, erreur). */
   settlementSource: 'serveur' | 'local';
   sharingMembers: MemberOption[];
+  guestOptions: { id: string; name: string }[];
   currentMember: HouseholdMemberRow | null;
   total: number;
   monthTotal: number;
@@ -42,15 +103,26 @@ export interface ArdoiseData {
   refetch: () => void;
 }
 
-export function useArdoise(): ArdoiseData {
-  const householdId = useHouseholdStore((state) => state.householdId);
+/** Détail d'UNE ardoise : dépenses, invités, soldes (serveur puis local). */
+export function useArdoiseDetail(ardoiseId: string | null): ArdoiseDetailData {
   const members = useMembers();
   const currentMember = useCurrentMember();
 
   const query = useQuery({
-    queryKey: ardoiseKeys.snapshot(householdId),
-    enabled: Boolean(householdId),
-    queryFn: () => fetchArdoiseSnapshot(householdId as string),
+    queryKey: ardoiseKeys.detail(ardoiseId),
+    enabled: Boolean(ardoiseId),
+    queryFn: () => fetchArdoiseDetail(ardoiseId as string),
+  });
+
+  const ardoiseQuery = useQuery({
+    queryKey: [...ardoiseKeys.all, 'row', ardoiseId ?? ''],
+    enabled: Boolean(ardoiseId),
+    queryFn: async () => {
+      const householdId = useHouseholdStore.getState().householdId;
+      if (!householdId) return null;
+      const rows = await fetchArdoises(householdId);
+      return rows.find((row) => row.id === ardoiseId) ?? null;
+    },
   });
 
   const memberOptions = useMemo<MemberOption[]>(
@@ -58,12 +130,20 @@ export function useArdoise(): ArdoiseData {
     [members],
   );
   const sharers = useMemo(() => sharingMembers(memberOptions), [memberOptions]);
+  const guests = useMemo(() => query.data?.guests ?? [], [query.data]);
 
   const resolver = useMemo<ParticipantResolver>(() => {
     const memberIndex = new Map<string, { name: string; colorTag: MemberColorTag | null }>();
     members.forEach((member) => memberIndex.set(member.id, { name: member.display_name, colorTag: member.color_tag }));
-    return (kind, id) => (kind === 'membre' ? (memberIndex.get(id) ?? null) : null);
-  }, [members]);
+    const guestIndex = new Map(guests.map((guest) => [guest.id, guest.display_name]));
+    return (kind, id) => {
+      if (kind === 'guest') {
+        const name = guestIndex.get(id);
+        return name ? { name, colorTag: null } : null;
+      }
+      return memberIndex.get(id) ?? null;
+    };
+  }, [guests, members]);
 
   const expenses = useMemo<Expense[]>(() => {
     const snapshot = query.data;
@@ -83,8 +163,16 @@ export function useArdoise(): ArdoiseData {
         colorTag: member.colorTag,
         shareAmount: 0,
       })),
+      ...guests.map<Participant>((guest) => ({
+        key: guestKey(guest.id),
+        kind: 'guest',
+        memberId: guest.id,
+        name: guest.display_name,
+        colorTag: null,
+        shareAmount: 0,
+      })),
     ],
-    [sharers],
+    [guests, sharers],
   );
 
   const balances = useMemo(() => computeBalances(expenses, seeds), [expenses, seeds]);
@@ -93,7 +181,7 @@ export function useArdoise(): ArdoiseData {
   // Référence serveur quand elle répond, calcul local intégral sinon — démo,
   // hors ligne, ou fonction injoignable : jamais un écran d'erreur pour des
   // soldes.
-  const settlementQuery = useServerSettlement(householdId);
+  const settlementQuery = useServerSettlement(ardoiseId);
   const serverPayload = settlementQuery.data ?? null;
 
   useEffect(() => {
@@ -120,21 +208,24 @@ export function useArdoise(): ArdoiseData {
   }, [expenses]);
 
   return {
+    ardoise: ardoiseQuery.data ?? null,
     expenses,
     balances: displayBalances,
     settlements: displaySettlements,
     settlementSource,
     sharingMembers: sharers,
+    guestOptions: guests.map((guest) => ({ id: guest.id, name: guest.display_name })),
     currentMember,
     total,
     monthTotal,
     monthLabel: formatMonthLabel(new Date()),
     averageTicket: expenses.length === 0 ? 0 : roundCents(total / expenses.length),
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: (query.error as Error | null) ?? null,
+    isLoading: query.isLoading || ardoiseQuery.isLoading,
+    isError: query.isError || ardoiseQuery.isError,
+    error: ((query.error ?? ardoiseQuery.error) as Error | null) ?? null,
     refetch: () => {
       void query.refetch();
+      void ardoiseQuery.refetch();
       void settlementQuery.refetch();
     },
   };
@@ -148,9 +239,11 @@ function useArdoiseMutation<TVariables>(mutationFn: (variables: TVariables) => P
   });
 }
 
-export function useAddExpense() {
+export function useAddExpense(ardoiseId: string) {
   const householdId = useHouseholdStore((state) => state.householdId);
-  return useArdoiseMutation((input: NewExpenseInput) => createExpense(householdId as string, input));
+  return useArdoiseMutation((input: NewExpenseInput) =>
+    createExpense(householdId as string, { ...input, ardoiseId }),
+  );
 }
 
 export function useUpdateExpense() {
@@ -163,7 +256,8 @@ export function useDeleteExpense() {
   return useArdoiseMutation((expenseId: string) => deleteExpense(expenseId));
 }
 
-export function useSendInvitation() {
-  const householdId = useHouseholdStore((state) => state.householdId);
-  return useArdoiseMutation((input: InvitationInput) => createInvitation(householdId as string, input));
+export function useRenameArdoise() {
+  return useArdoiseMutation(({ id, name, description }: { id: string; name: string; description?: string | null }) =>
+    updateArdoise(id, { name, description: description ?? null }),
+  );
 }

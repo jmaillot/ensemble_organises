@@ -1,14 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, useResource } from '@/lib/data/useResource';
+import { data } from '@/lib/data';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
-import type { HouseholdMemberRow, TaskRow } from '@/types';
+import type { HouseholdMemberRow, TaskListRow, TaskRow } from '@/types';
 import {
   TASK_ASSIGNEES_TABLE,
+  TASK_LISTS_TABLE,
   TASK_REMINDERS_TABLE,
   TASKS_TABLE,
+  createTaskList,
   listTaskAssignees,
   listTaskReminders,
+  renameTaskList,
   setTaskAssignees,
   setTaskReminder,
   toReminderIso,
@@ -17,12 +21,15 @@ import {
 } from '../api';
 import {
   buildTasks,
+  filterByAssignee,
+  filterByFolder,
   filterTasks,
   manualRanks,
   nextPriorityOrder,
   reminderTasks,
   sortTasks,
   taskMetrics,
+  type AssigneeFilter,
   type Task,
   type TaskFilter,
   type TaskFormValues,
@@ -32,14 +39,22 @@ import {
 export interface UseTachesResult extends TaskMetrics {
   /** Toutes les tâches du foyer, priorité déduite du rang manuel comprise. */
   tasks: Task[];
-  /** Tâches du filtre courant, triées pour l'affichage. */
+  /** Tâches de l'onglet et des filtres courants, triées pour l'affichage. */
   visibleTasks: Task[];
   /** Tâches portant un rappel, pour le panneau « Rappels du jour ». */
   reminders: Task[];
   members: HouseholdMemberRow[];
   currentMemberId: string;
+  folders: TaskListRow[];
+  /** Onglet dossier : `null` = Général. */
+  activeFolderId: string | null;
+  setActiveFolderId: (id: string | null) => void;
   filter: TaskFilter;
   setFilter: (filter: TaskFilter) => void;
+  assigneeFilter: AssigneeFilter;
+  setAssigneeFilter: (filter: AssigneeFilter) => void;
+  /** Faux pour le rôle `enfant` (lecture seule). */
+  canWrite: boolean;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -52,6 +67,14 @@ export interface UseTachesResult extends TaskMetrics {
   removeTask: (task: Task) => Promise<void>;
   /** Enregistre l'ordre issu du glisser-déposer. */
   reorder: (orderedIds: string[]) => Promise<void>;
+  /** Recharge les dossiers (après création/renommage/suppression). */
+  refreshFolders: () => Promise<void>;
+  /** Crée un dossier (propriétaire = membre courant). */
+  createFolder: (name: string, visibility: TaskListRow['visibility']) => Promise<TaskListRow>;
+  /** Renomme un dossier. */
+  renameFolder: (id: string, name: string) => Promise<void>;
+  /** Supprime un dossier (contenu rangé dans Général) et replie l'onglet. */
+  deleteFolder: (id: string) => Promise<void>;
 }
 
 /** Données du module Tâches : tâches, assignataires, rappels et réordonnancement. */
@@ -61,6 +84,38 @@ export function useTaches(): UseTachesResult {
   const currentMember = useCurrentMember();
   const householdId = useHouseholdStore((state) => state.householdId);
   const [filter, setFilter] = useState<TaskFilter>('ouvertes');
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>('tous');
+  const foldersResource = useResource<TaskListRow>(TASK_LISTS_TABLE);
+  const folders = useMemo(
+    () => [...foldersResource.rows].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    [foldersResource.rows],
+  );
+
+  // Onglet dossier persistant par foyer ; replié sur Général si le dossier disparaît.
+  const folderStorageKey = `eo:taches:folder:${householdId ?? 'none'}`;
+  const [storedFolderId, setStoredFolderId] = useState<string | null>(() => {
+    try {
+      return window.localStorage.getItem(folderStorageKey);
+    } catch {
+      return null;
+    }
+  });
+  const activeFolderId =
+    storedFolderId !== null && folders.some((folder) => folder.id === storedFolderId) ? storedFolderId : null;
+  const setActiveFolderId = useCallback(
+    (id: string | null) => {
+      setStoredFolderId(id);
+      try {
+        if (id === null) window.localStorage.removeItem(folderStorageKey);
+        else window.localStorage.setItem(folderStorageKey, id);
+      } catch {
+        // Stockage indisponible : l'onglet reste en mémoire pour la session.
+      }
+    },
+    [folderStorageKey],
+  );
+
+  const canWrite = currentMember?.role !== 'enfant';
   const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<TaskRow>(TASKS_TABLE);
 
@@ -81,7 +136,10 @@ export function useTaches(): UseTachesResult {
     () => buildTasks(rows, assigneesQuery.data ?? [], remindersQuery.data ?? [], members),
     [assigneesQuery.data, members, remindersQuery.data, rows],
   );
-  const visibleTasks = useMemo(() => sortTasks(filterTasks(tasks, filter)), [filter, tasks]);
+  const visibleTasks = useMemo(
+    () => sortTasks(filterByAssignee(filterByFolder(filterTasks(tasks, filter), activeFolderId), assigneeFilter)),
+    [activeFolderId, assigneeFilter, filter, tasks],
+  );
   const reminders = useMemo(() => reminderTasks(tasks), [tasks]);
   const metrics = useMemo(() => taskMetrics(tasks), [tasks]);
 
@@ -90,6 +148,7 @@ export function useTaches(): UseTachesResult {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(TASK_ASSIGNEES_TABLE) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(TASK_REMINDERS_TABLE) }),
+      queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] }),
     ]);
   }, [queryClient]);
 
@@ -102,14 +161,16 @@ export function useTaches(): UseTachesResult {
 
   const toggleStatus = useCallback(
     async (task: Task) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       await update(task.id, { status: task.status === 'fait' ? 'a_faire' : 'fait' });
     },
-    [update],
+    [canWrite, update],
   );
 
   const saveTask = useCallback(
     async (task: Task | null, values: TaskFormValues) => {
       if (!task && !householdId) throw new Error('Aucun foyer sélectionné.');
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       const priorityOrder =
         task && task.priority === values.priority
           ? task.priorityOrder
@@ -120,7 +181,11 @@ export function useTaches(): UseTachesResult {
       const payload = toTaskPayload(values, { priorityOrder, status: task?.status ?? 'a_faire' });
       const saved = task
         ? await update(task.id, payload)
-        : await create({ ...payload, household_id: householdId ?? '', created_by: currentMember?.id ?? null });
+        : await create({
+            ...payload,
+            household_id: householdId ?? '',
+            created_by: currentMember?.id ?? null,
+          });
 
       await Promise.all([
         setTaskAssignees(saved.id, values.assigneeIds),
@@ -128,11 +193,12 @@ export function useTaches(): UseTachesResult {
       ]);
       await refresh();
     },
-    [create, currentMember?.id, householdId, refresh, tasks, update],
+    [canWrite, create, currentMember?.id, householdId, refresh, tasks, update],
   );
 
   const removeTask = useCallback(
     async (task: Task) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       await Promise.all([
         remove(task.id),
         // IndexedDB n'a pas de cascade : on nettoie les tables enfants.
@@ -141,11 +207,13 @@ export function useTaches(): UseTachesResult {
       ]);
       await refresh();
     },
-    [refresh, remove],
+    [canWrite, refresh, remove],
   );
 
   const reorder = useCallback(
     async (orderedIds: string[]) => {
+      // `orderedIds` vient de l'onglet courant : les tâches déplacées occupent
+      // les places des tâches visibles, les autres dossiers gardent leurs rangs.
       const ranks = manualRanks(tasks, orderedIds);
       const changed = Object.fromEntries(
         Object.entries(ranks).filter(([id, rank]) => tasks.find((task) => task.id === id)?.priorityOrder !== rank),
@@ -163,8 +231,36 @@ export function useTaches(): UseTachesResult {
     reminders,
     members,
     currentMemberId: currentMember?.id ?? '',
+    folders,
+    activeFolderId,
+    setActiveFolderId,
     filter,
     setFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    canWrite,
+    refreshFolders: async () => {
+      await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
+    },
+    createFolder: async (name, visibility) => {
+      if (!householdId || !currentMember) throw new Error('Aucun foyer sélectionné.');
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      const folder = await createTaskList(householdId, currentMember.id, name, visibility);
+      await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
+      return folder;
+    },
+    renameFolder: async (id, name) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      await renameTaskList(id, name);
+      await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
+    },
+    deleteFolder: async (id) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      await data.remove(TASK_LISTS_TABLE, id);
+      if (activeFolderId === id) setActiveFolderId(null);
+      await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
+      await queryClient.invalidateQueries({ queryKey: [TASKS_TABLE] });
+    },
     isLoading: isLoading || assigneesQuery.isLoading || remindersQuery.isLoading,
     isFetching: isFetching || assigneesQuery.isFetching || remindersQuery.isFetching,
     isError: isError || assigneesQuery.isError || remindersQuery.isError,

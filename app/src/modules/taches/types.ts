@@ -45,6 +45,8 @@ export interface Task {
   priority: TaskPriority;
   assignees: TaskAssignee[];
   reminderAt: string | null;
+  /** Dossier (`task_lists.id`), `null` = Général. */
+  folderId: string | null;
   createdBy: string | null;
   createdAt: string;
   isLate: boolean;
@@ -64,6 +66,8 @@ export interface TaskFormValues {
   description: string;
   priority: TaskPriority;
   assigneeIds: string[];
+  /** Dossier (`task_lists.id`), chaîne vide = Général. */
+  folderId: string;
   /** Valeur d'un `datetime-local`, chaîne vide pour « pas de rappel ». */
   reminderAt: string;
 }
@@ -102,6 +106,7 @@ export function toTask(row: TaskRow, context: TaskContext = emptyContext): Task 
     priority: context.priority,
     assignees: context.assignees,
     reminderAt: context.reminderAt,
+    folderId: row.folder_id,
     createdBy: row.created_by,
     createdAt: row.created_at,
     isLate: lateDays > 0,
@@ -167,6 +172,20 @@ export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
   if (filter === 'toutes') return tasks;
   if (filter === 'terminees') return tasks.filter((task) => task.status === 'fait');
   return tasks.filter((task) => task.status !== 'fait');
+}
+
+/** Onglet dossier : `null` = Général (tâches sans dossier). */
+export function filterByFolder(tasks: Task[], folderId: string | null): Task[] {
+  return tasks.filter((task) => (task.folderId ?? null) === folderId);
+}
+
+/** Filtre assigné : `tous`, `non-assigne`, ou un `household_members.id`. */
+export type AssigneeFilter = 'tous' | 'non-assigne' | string;
+
+export function filterByAssignee(tasks: Task[], assignee: AssigneeFilter): Task[] {
+  if (assignee === 'tous') return tasks;
+  if (assignee === 'non-assigne') return tasks.filter((task) => task.assignees.length === 0);
+  return tasks.filter((task) => task.assignees.some((entry) => entry.memberId === assignee));
 }
 
 /** Échéance croissante, tâches en retard naturellement en tête, tâches faites en dernier. */

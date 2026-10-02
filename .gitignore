@@ -49,3 +49,6 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# ── Planning local (non versionné) ───────────────────────────────────────────
+.planning/

@@ -52,6 +52,8 @@ export interface Note {
   /** `true` quand la note est un repère partagé avec le foyer. */
   shared: boolean;
   authorId: string | null;
+  /** Dossier (`note_folders.id`), `null` = Général. */
+  folderId: string | null;
   createdAt: string;
   updatedAt: string;
   /** « À l'instant », « Il y a 2 j », ou la date complète. */
@@ -89,6 +91,8 @@ export interface NoteFormValues {
   customCategory: string;
   content: string;
   visibility: NoteVisibility;
+  /** Dossier (`note_folders.id`), chaîne vide = Général. */
+  folderId: string;
 }
 
 const clockFormatter = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -124,6 +128,7 @@ export function toNote(row: NoteRow, attachments: NoteAttachment[] = []): Note {
     visibility: shared ? 'foyer' : 'privee',
     shared,
     authorId: row.created_by,
+    folderId: row.folder_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ageLabel: ageLabel(row.updated_at),
@@ -163,6 +168,11 @@ export function filterNotes(notes: Note[], filters: NoteFilters): Note[] {
     if (query === '') return true;
     return `${note.title} ${note.content} ${note.category}`.toLowerCase().includes(query);
   });
+}
+
+/** Onglet dossier : `null` = Général (notes sans dossier). */
+export function filterNotesByFolder(notes: Note[], folderId: string | null): Note[] {
+  return notes.filter((note) => (note.folderId ?? null) === folderId);
 }
 
 /** Tri par date de modification décroissante, la première note étant mise en avant. */

@@ -6,9 +6,6 @@ import { useSessionUser } from '@/hooks/use-auth';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useFrenchHolidays } from '@/hooks/use-french-holidays';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
-import { useServerSettlement } from '@/modules/ardoise/hooks/use-settlement';
-import { toServerBalances } from '@/modules/ardoise/api';
-import { MEMBER_KEY_PREFIX } from '@/modules/ardoise/types';
 import { todayIso, daysBetween, eventWallDate, eventWallTime } from '@/lib/utils';
 import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, TaskRow } from '@/types';
 import {
@@ -251,10 +248,11 @@ export function useDashboard(): DashboardData {
       });
     }
     for (const expense of expenses.rows.slice(0, 2)) {
+      const payerId = expense.paid_by_guest ?? expense.paid_by ?? '';
       entries.push({
         id: `expense-${expense.id}`,
-        actor: memberName(expense.paid_by),
-        actorColor: memberColor(expense.paid_by),
+        actor: memberName(payerId),
+        actorColor: memberColor(payerId),
         kind: 'depense',
         text: `a ajouté une dépense de ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(expense.amount)}`,
         when: relativeWhen(expense.created_at),
@@ -385,38 +383,25 @@ export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], toda
 
 /**
  * Résumé de l'Ardoise pour l'accueil : totaux locaux (sommes directes, pas de
- * calcul de répartition), soldes par membre depuis la même requête serveur
- * que la page Ardoise quand elle répond, calcul local sinon.
+ * calcul de répartition), soldes par membre en calcul local sur toutes les
+ * ardoises du foyer. Le détail par ardoise (serveur) vit sur la page Ardoise.
  */
 function useBoardSummary(
   expenseRows: ExpenseRow[],
   participants: ExpenseParticipantRow[] | undefined,
   members: HouseholdMemberRow[],
 ) {
-  const householdId = useHouseholdStore((state) => state.householdId);
-  const settlementQuery = useServerSettlement(householdId);
-
   return useMemo(() => {
     const total = expenseRows.reduce((sum, expense) => sum + expense.amount, 0);
     const monthLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date());
-    const server = settlementQuery.data;
-    if (server) {
-      return {
-        total,
-        monthLabel,
-        members: toServerBalances(server, members).map((balance) => ({
-          memberId: balance.key.slice(MEMBER_KEY_PREFIX.length),
-          displayName: balance.name,
-          amount: balance.amount,
-        })),
-      };
-    }
     const balances = new Map<string, number>();
     for (const member of members) balances.set(member.id, 0);
     for (const expense of expenseRows) {
       const shares = (participants ?? []).filter((participant) => participant.expense_id === expense.id);
       const equal = shares.length === 0 ? members.length : shares.length;
-      balances.set(expense.paid_by, (balances.get(expense.paid_by) ?? 0) + expense.amount);
+      if (expense.paid_by) {
+        balances.set(expense.paid_by, (balances.get(expense.paid_by) ?? 0) + expense.amount);
+      }
       if (shares.length === 0) {
         for (const member of members) balances.set(member.id, (balances.get(member.id) ?? 0) - expense.amount / equal);
         continue;
@@ -435,5 +420,5 @@ function useBoardSummary(
         .filter((member) => member.role !== 'enfant')
         .map((member) => ({ memberId: member.id, displayName: member.display_name, amount: balances.get(member.id) ?? 0 })),
     };
-  }, [expenseRows, participants, members, settlementQuery.data]);
+  }, [expenseRows, participants, members]);
 }

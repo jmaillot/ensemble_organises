@@ -1,8 +1,9 @@
 import { data } from '@/lib/data';
-import type { TaskRow } from '@/types';
+import type { TaskListRow, TaskRow } from '@/types';
 import type { TaskAssigneeRecord, TaskFormValues, TaskReminderRecord } from './types';
 
 export const TASKS_TABLE = 'tasks';
+export const TASK_LISTS_TABLE = 'task_lists';
 export const TASK_ASSIGNEES_TABLE = 'task_assignees';
 export const TASK_REMINDERS_TABLE = 'task_reminders';
 
@@ -19,6 +20,7 @@ export function toTaskPayload(
     due_date: values.dueDate === '' ? null : values.dueDate,
     priority_order: extra.priorityOrder,
     status: extra.status,
+    folder_id: values.folderId === '' ? null : values.folderId,
   };
 }
 
@@ -67,4 +69,31 @@ export async function updateTaskOrders(orders: Record<string, number>): Promise<
       data.update<TaskRow>(TASKS_TABLE, id, { priority_order: priorityOrder }),
     ),
   );
+}
+
+/** Dossiers de tâches : création (propriétaire = soi), renommage, déplacement, suppression. */
+export async function createTaskList(
+  householdId: string,
+  ownerMemberId: string,
+  name: string,
+  visibility: TaskListRow['visibility'],
+): Promise<TaskListRow> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) throw new Error('Nom de dossier invalide (1 à 80 caractères).');
+  return data.create<TaskListRow>(TASK_LISTS_TABLE, {
+    household_id: householdId,
+    name: trimmed,
+    visibility,
+    owner_member_id: ownerMemberId,
+  });
+}
+
+export async function renameTaskList(id: string, name: string): Promise<TaskListRow> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) throw new Error('Nom de dossier invalide (1 à 80 caractères).');
+  return data.update<TaskListRow>(TASK_LISTS_TABLE, id, { name: trimmed });
+}
+
+export async function moveTask(id: string, folderId: string | null): Promise<TaskRow> {
+  return data.update<TaskRow>(TASKS_TABLE, id, { folder_id: folderId });
 }

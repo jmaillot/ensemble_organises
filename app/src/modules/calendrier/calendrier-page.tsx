@@ -3,50 +3,146 @@ import { useNavigate } from 'react-router';
 import { ModuleShell, MetricRow, Panel, CountBadge } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { Field } from '@/components/ui/field';
+import { Select, Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useCalendarGrid } from '@/hooks/use-calendar';
-import { useFrenchHolidays } from '@/hooks/use-french-holidays';
-import { formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize, todayIso } from '@/lib/utils';
+import { useMembers, useIsAdmin, useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { addDays, formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize, todayIso } from '@/lib/utils';
 import { CalendarGrid } from './components/calendar-grid';
 import { AgendaList } from './components/agenda-list';
 import { EventFormDialog } from './components/event-form-dialog';
 import { useCalendrier } from './hooks/use-calendrier';
+import { useRefDays } from './hooks/use-ref-days';
+import { useSchoolZone } from './hooks/use-school-zone';
+import { createPersonalCalendar, createCategory, CATEGORY_COLORS } from './api';
+import { suggestZoneForCity } from './lib/zone-resolver';
 import { buildAgenda, buildDayMarkers } from './types';
 import type { CalendarEvent } from './types';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
+type CalendarView = 'mois' | 'semaine' | 'jour' | 'liste';
+
+const VIEWS: { value: CalendarView; label: string }[] = [
+  { value: 'mois', label: 'Mois' },
+  { value: 'semaine', label: 'Semaine' },
+  { value: 'jour', label: 'Jour' },
+  { value: 'liste', label: 'Liste' },
+];
+
+const VIEW_STORAGE_KEY = 'eo:calendrier:view';
+
+function readStoredView(): CalendarView {
+  try {
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return VIEWS.some((view) => view.value === stored) ? (stored as CalendarView) : 'mois';
+  } catch {
+    return 'mois';
+  }
+}
+
+/** Lundi de la semaine du jour donné (ISO). */
+function weekStartOf(iso: string): string {
+  const date = new Date(`${iso}T12:00:00`);
+  const mondayOffset = (date.getDay() + 6) % 7;
+  return addDays(iso, -mondayOffset);
+}
+
 export default function CalendrierPage() {
   const toast = useToast();
   const navigate = useNavigate();
-  const { events, tasks, birthdays, reminders, isLoading, isError, error, refetch, isMutating, saveEvent, removeEvent } =
+  const { events, tasks, birthdays, categories, calendars, reminders, isLoading, isError, error, refetch, isMutating, saveEvent, removeEvent } =
     useCalendrier();
+  const members = useMembers();
+  const isAdmin = useIsAdmin();
+  const currentMember = useCurrentMember();
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const city = useHouseholdStore((state) => state.city);
+  const [isDetectingZone, setIsDetectingZone] = useState(false);
   // Curseur calé sur le 1er du mois courant : la grille démarre bien le lundi.
   const today = new Date();
   const grid = useCalendarGrid(new Date(today.getFullYear(), today.getMonth(), 1));
-  const holidays = useFrenchHolidays(grid.year);
+  const { zone, isLoading: isZoneLoading, isSaving: isZoneSaving, saveZone } = useSchoolZone();
+  const { holidays, vacations, isError: isRefError } = useRefDays(grid.year, zone);
   const [dialog, setDialog] = useState<{ open: boolean; event: CalendarEvent | null; date: string }>({
     open: false,
     event: null,
     date: grid.selected,
   });
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
+  const [view, setView] = useState<CalendarView>(readStoredView);
+  const [categoryFilter, setCategoryFilter] = useState('toutes');
+  const [memberFilter, setMemberFilter] = useState('tous');
+  const [calendarFilter, setCalendarFilter] = useState('tous');
+  const [showHolidays, setShowHolidays] = useState(true);
+  const [showBirthdays, setShowBirthdays] = useState(true);
+  const [showVacations, setShowVacations] = useState(true);
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
+  const [calendarName, setCalendarName] = useState('');
+  const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryColor, setCategoryColor] = useState<string>(CATEGORY_COLORS[0]);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   const selected = grid.selected;
 
+  const changeView = (next: CalendarView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Stockage indisponible : la vue reste en mémoire pour la session.
+    }
+  };
+
+  // Filtres combinés catégorie × membre × calendrier, appliqués aux événements du foyer.
+  const visibleEvents = useMemo(
+    () =>
+      events.filter(
+        (event) =>
+          (categoryFilter === 'toutes' ||
+            (categoryFilter === 'sans' ? event.categoryId === null : event.categoryId === categoryFilter)) &&
+          (memberFilter === 'tous' || event.author?.id === memberFilter) &&
+          (calendarFilter === 'tous' || event.calendarId === calendarFilter),
+      ),
+    [events, categoryFilter, memberFilter, calendarFilter],
+  );
+  const visibleBirthdays = showBirthdays ? birthdays : [];
+  const visibleHolidays = showHolidays ? holidays : [];
+  const visibleVacations = showVacations ? vacations : [];
+
   const agenda = useMemo(
-    () => buildAgenda(selected, { events, tasks, birthdays, holidays, today: todayIso() }),
-    [selected, events, tasks, birthdays, holidays],
+    () => buildAgenda(selected, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() }),
+    [selected, visibleEvents, tasks, visibleBirthdays, visibleHolidays, visibleVacations],
   );
   const markers = useMemo(
-    () => buildDayMarkers(grid.days, { events, tasks, birthdays, holidays }, todayIso()),
-    [grid.days, events, tasks, birthdays, holidays],
+    () => buildDayMarkers(grid.days, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations }, todayIso()),
+    [grid.days, visibleEvents, tasks, visibleBirthdays, visibleHolidays, visibleVacations],
   );
   const eventsThisMonth = useMemo(
-    () => events.filter((event) => event.date.startsWith(`${grid.year}-${pad(grid.month + 1)}`)).length,
-    [events, grid.year, grid.month],
+    () => visibleEvents.filter((event) => event.date.startsWith(`${grid.year}-${pad(grid.month + 1)}`)).length,
+    [visibleEvents, grid.year, grid.month],
   );
+
+  const weekDays = useMemo(() => {
+    const monday = weekStartOf(selected);
+    return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+  }, [selected]);
+
+  // Liste : 30 jours à venir depuis la sélection, seuls les jours occupés.
+  const listSections = useMemo(() => {
+    const currentToday = todayIso();
+    return Array.from({ length: 30 }, (_, index) => addDays(selected, index))
+      .map((iso) => ({
+        iso,
+        items: buildAgenda(iso, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: currentToday }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [selected, visibleEvents, tasks, visibleBirthdays, visibleHolidays, visibleVacations]);
 
   const openCreate = (date: string) => setDialog({ open: true, event: null, date });
   const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
@@ -56,6 +152,49 @@ export default function CalendrierPage() {
     grid.shift(delta);
     grid.setSelected(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-01`);
   };
+
+  const agendaPanel = (
+    <Panel
+      id="calendar-agenda-panel"
+      title={titleCase(formatLongDate(selected))}
+      description="Les événements et tâches de cette journée."
+      action={<CountBadge value={agenda.length} label="éléments dans l’agenda" />}
+    >
+      <div aria-live="polite">
+        <AgendaList
+          date={selected}
+          items={agenda}
+          isLoading={isLoading}
+          onEdit={openEdit}
+          onDelete={(event) => setPendingDelete(event)}
+          onOpenTask={() => navigate('/taches')}
+        />
+      </div>
+      {isLoading ? null : (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button
+            variant="secondary"
+            icon="plus"
+            onClick={() => openCreate(selected)}
+          >
+            Ajouter un événement
+          </Button>
+          <Button
+            variant="secondary"
+            icon="plus"
+            onClick={() => navigate('/taches', { state: { dueDate: selected } })}
+          >
+            Ajouter une tâche
+          </Button>
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-muted">
+        {pluralize(events.length, 'événement')}
+        {events.length > 1 ? 's' : ''} dans le foyer. Maintenez une date dans la grille pour créer un événement
+        directement.
+      </p>
+    </Panel>
+  );
 
   return (
     <ModuleShell
@@ -80,12 +219,187 @@ export default function CalendrierPage() {
         ]}
       />
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div role="tablist" aria-label="Vues du calendrier" className="flex flex-wrap gap-1.5">
+          {VIEWS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={view === option.value}
+              onClick={() => changeView(option.value)}
+              className={
+                view === option.value
+                  ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
+                  : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select
+          aria-label="Filtrer par catégorie"
+          className="w-auto min-w-[170px]"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        >
+          <option value="toutes">Toutes catégories</option>
+          <option value="sans">Sans catégorie</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          aria-label="Filtrer par membre"
+          className="w-auto min-w-[170px]"
+          value={memberFilter}
+          onChange={(event) => setMemberFilter(event.target.value)}
+        >
+          <option value="tous">Tout le foyer</option>
+          {members.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.display_name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          aria-label="Filtrer par calendrier"
+          className="w-auto min-w-[170px]"
+          value={calendarFilter}
+          onChange={(event) => setCalendarFilter(event.target.value)}
+        >
+          <option value="tous">Tous calendriers</option>
+          {calendars.map((calendar) => (
+            <option key={calendar.id} value={calendar.id}>
+              {calendar.name}
+              {calendar.visibility === 'perso' ? ' (perso)' : ''}
+            </option>
+          ))}
+        </Select>
+        <button
+          type="button"
+          onClick={() => {
+            setCalendarName('');
+            setCalendarDialogOpen(true);
+          }}
+          className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
+        >
+          + Calendrier perso
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCategoryName('');
+            setCategoryColor(CATEGORY_COLORS[0]);
+            setCategoryDialogOpen(true);
+          }}
+          className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
+        >
+          + Catégorie
+        </button>
+        <button
+          type="button"
+          aria-pressed={showHolidays}
+          onClick={() => setShowHolidays((current) => !current)}
+          className={
+            showHolidays
+              ? 'rounded-full bg-amber-soft px-3.5 py-2 text-[12px] font-extrabold text-[oklch(52%_0.11_78)]'
+              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+          }
+        >
+          Fériés
+        </button>
+        <button
+          type="button"
+          aria-pressed={showBirthdays}
+          onClick={() => setShowBirthdays((current) => !current)}
+          className={
+            showBirthdays
+              ? 'rounded-full bg-accent-faint px-3.5 py-2 text-[12px] font-extrabold text-accent-strong'
+              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+          }
+        >
+          Anniversaires
+        </button>
+        <button
+          type="button"
+          aria-pressed={showVacations}
+          onClick={() => setShowVacations((current) => !current)}
+          className={
+            showVacations
+              ? 'rounded-full bg-[#dbe9f6] px-3.5 py-2 text-[12px] font-extrabold text-[#1f4e79]'
+              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+          }
+        >
+          Vacances
+        </button>
+        {isAdmin ? (
+          <>
+            <Select
+              aria-label="Zone scolaire du foyer"
+              className="w-auto min-w-[150px]"
+              value={zone ?? ''}
+              disabled={isZoneLoading || isZoneSaving}
+              onChange={(event) => {
+                const next = event.target.value === '' ? null : (event.target.value as 'A' | 'B' | 'C');
+                void saveZone(next)
+                  .then(() => toast(next ? `Zone ${next} enregistrée.` : 'Zone effacée.'))
+                  .catch((saveError: unknown) =>
+                    toast(saveError instanceof Error ? saveError.message : 'La zone n’a pas pu être enregistrée.', 'error'),
+                  );
+              }}
+            >
+              <option value="">Zone : à choisir</option>
+              <option value="A">Zone A</option>
+              <option value="B">Zone B</option>
+              <option value="C">Zone C</option>
+            </Select>
+            <button
+              type="button"
+              disabled={isDetectingZone || city.trim() === ''}
+              title={city.trim() === '' ? 'Indiquez une ville dans votre profil.' : `Détecter depuis ${city}.`}
+              onClick={() => {
+                setIsDetectingZone(true);
+                void suggestZoneForCity(city)
+                  .then(({ zone: detected, postcode }) => saveZone(detected).then(() => ({ detected, postcode })))
+                  .then(({ detected, postcode }) => toast(`Zone ${detected} détectée (${postcode}).`))
+                  .catch((detectError: unknown) =>
+                    toast(detectError instanceof Error ? detectError.message : 'Zone non détectée.', 'error'),
+                  )
+                  .finally(() => setIsDetectingZone(false));
+              }}
+              className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg disabled:opacity-50"
+            >
+              {isDetectingZone ? 'Détection…' : 'Détecter la zone'}
+            </button>
+          </>
+        ) : null}
+      </div>
+
+      {zone === null && showVacations ? (
+        <p className="mb-4 text-[12px] text-muted" role="status">
+          Choisissez la zone scolaire du foyer (A, B ou C) pour afficher les vacances.
+          {isAdmin ? '' : ' Un administrateur du foyer peut la régler ici.'}
+        </p>
+      ) : null}
+      {isRefError ? (
+        <p className="mb-4 text-[12px] text-muted" role="status">
+          Référentiel jours fériés / vacances indisponible : seuls les événements du foyer sont affichés.
+        </p>
+      ) : null}
+
       {isError ? (
         <ErrorState
           message={error?.message ?? 'Le calendrier du foyer n’a pas pu être chargé.'}
           onRetry={refetch}
         />
-      ) : (
+      ) : view === 'mois' ? (
         <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(270px,0.75fr)] gap-[18px] max-[920px]:grid-cols-1">
           <CalendarGrid
             days={grid.days}
@@ -100,46 +414,84 @@ export default function CalendrierPage() {
             onToday={grid.goToToday}
           />
 
+          {agendaPanel}
+        </div>
+      ) : view === 'semaine' ? (
+        <div className="grid gap-[18px]">
           <Panel
-            id="calendar-agenda-panel"
-            title={titleCase(formatLongDate(selected))}
-            description="Les événements et tâches de cette journée."
-            action={<CountBadge value={agenda.length} label="éléments dans l’agenda" />}
+            id="calendar-week-panel"
+            title={`Semaine du ${formatShortDate(weekDays[0])}`}
+            description="Sept jours, un coup d’œil."
           >
-            <div aria-live="polite">
+            <div className="grid grid-cols-7 gap-1.5 max-[650px]:grid-cols-7" role="group" aria-label="Jours de la semaine">
+              {weekDays.map((iso) => {
+                const count = buildAgenda(iso, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() }).length;
+                const isSelected = iso === selected;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    onClick={() => grid.setSelected(iso)}
+                    aria-pressed={isSelected}
+                    aria-label={`${titleCase(formatLongDate(iso))}, ${count} élément${count > 1 ? 's' : ''}`}
+                    className={
+                      isSelected
+                        ? 'grid place-items-center gap-0.5 rounded-[11px] bg-accent px-1 py-2 text-white'
+                        : 'grid place-items-center gap-0.5 rounded-[11px] border border-border bg-surface px-1 py-2 hover:border-accent'
+                    }
+                  >
+                    <span className="text-[10px] font-bold uppercase opacity-80">
+                      {titleCase(formatLongDate(iso)).slice(0, 3)}
+                    </span>
+                    <span className="text-[15px] font-extrabold">{Number(iso.slice(8, 10))}</span>
+                    <span className={count > 0 ? 'size-[5px] rounded-full bg-current' : 'size-[5px] rounded-full bg-transparent'} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+          {agendaPanel}
+        </div>
+      ) : view === 'jour' ? (
+        <div className="grid gap-[18px]">
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="secondary" icon="arrow" onClick={() => grid.setSelected(addDays(selected, -1))}>
+              Jour précédent
+            </Button>
+            <Button variant="secondary" onClick={() => grid.setSelected(todayIso())}>
+              Aujourd’hui
+            </Button>
+            <Button variant="secondary" icon="arrow" onClick={() => grid.setSelected(addDays(selected, 1))}>
+              Jour suivant
+            </Button>
+          </div>
+          {agendaPanel}
+        </div>
+      ) : (
+        <div className="grid gap-[18px]">
+          <p className="text-[12px] text-muted" role="status">
+            {listSections.length === 0
+              ? 'Rien à venir sur les 30 prochains jours avec ces filtres.'
+              : `${listSections.length} jour${listSections.length > 1 ? 's' : ''} occupé${listSections.length > 1 ? 's' : ''} sur les 30 prochains jours.`}
+          </p>
+          {listSections.map((section) => (
+            <Panel
+              key={section.iso}
+              id={`calendar-list-${section.iso}`}
+              title={titleCase(formatLongDate(section.iso))}
+              description={`${section.items.length} élément${section.items.length > 1 ? 's' : ''}`}
+              action={<CountBadge value={section.items.length} label={`éléments le ${section.iso}`} />}
+            >
               <AgendaList
-                date={selected}
-                items={agenda}
+                date={section.iso}
+                items={section.items}
                 isLoading={isLoading}
                 onEdit={openEdit}
                 onDelete={(event) => setPendingDelete(event)}
                 onOpenTask={() => navigate('/taches')}
               />
-            </div>
-            {isLoading ? null : (
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button
-                  variant="secondary"
-                  icon="plus"
-                  onClick={() => openCreate(selected)}
-                >
-                  Ajouter un événement
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon="plus"
-                  onClick={() => navigate('/taches', { state: { dueDate: selected } })}
-                >
-                  Ajouter une tâche
-                </Button>
-              </div>
-            )}
-            <p className="mt-3 text-[11px] text-muted">
-              {pluralize(events.length, 'événement')}
-              {events.length > 1 ? 's' : ''} dans le foyer. Maintenez une date dans la grille pour créer un événement
-              directement.
-            </p>
-          </Panel>
+            </Panel>
+          ))}
         </div>
       )}
 
@@ -163,6 +515,142 @@ export default function CalendrierPage() {
           }
         }}
       />
+
+      <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <p className="eyebrow mb-2">Calendrier</p>
+            <DialogTitle>Nouveau calendrier perso</DialogTitle>
+            <DialogDescription>
+              Visible uniquement par vous (et les admins en lecture). Vos événements perso n’apparaissent que dans ce calendrier.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            noValidate
+            className="grid gap-3.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!householdId || !currentMember) {
+                toast('Aucun foyer sélectionné.', 'error');
+                return;
+              }
+              setIsCreatingCalendar(true);
+              void createPersonalCalendar(householdId, currentMember.id, calendarName)
+                .then((calendar) => {
+                  setCalendarDialogOpen(false);
+                  setCalendarFilter(calendar.id);
+                  refetch();
+                  toast(`Calendrier « ${calendar.name} » créé.`);
+                })
+                .catch((createError: unknown) =>
+                  toast(createError instanceof Error ? createError.message : 'Le calendrier n’a pas pu être créé.', 'error'),
+                )
+                .finally(() => setIsCreatingCalendar(false));
+            }}
+          >
+            <Field label="Nom du calendrier">
+              {(props) => (
+                <Input
+                  {...props}
+                  value={calendarName}
+                  onChange={(change) => setCalendarName(change.target.value)}
+                  placeholder="Ex. Sport perso"
+                  autoComplete="off"
+                  maxLength={40}
+                />
+              )}
+            </Field>
+            <DialogActions>
+              <Button variant="secondary" onClick={() => setCalendarDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" icon="plus" disabled={isCreatingCalendar || calendarName.trim() === ''}>
+                Créer le calendrier
+              </Button>
+            </DialogActions>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <p className="eyebrow mb-2">Calendrier</p>
+            <DialogTitle>Nouvelle catégorie</DialogTitle>
+            <DialogDescription>
+              Repas, devoirs, sorties… une pastille colorée pour repérer les événements du foyer.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            noValidate
+            className="grid gap-3.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!householdId) {
+                toast('Aucun foyer sélectionné.', 'error');
+                return;
+              }
+              setIsCreatingCategory(true);
+              void createCategory(householdId, currentMember?.id ?? null, categoryName, categoryColor)
+                .then((category) => {
+                  setCategoryDialogOpen(false);
+                  setCategoryFilter(category.id);
+                  refetch();
+                  toast(`Catégorie « ${category.name} » créée.`);
+                })
+                .catch((createError: unknown) =>
+                  toast(createError instanceof Error ? createError.message : 'La catégorie n’a pas pu être créée.', 'error'),
+                )
+                .finally(() => setIsCreatingCategory(false));
+            }}
+          >
+            <Field label="Nom de la catégorie">
+              {(props) => (
+                <Input
+                  {...props}
+                  value={categoryName}
+                  onChange={(change) => setCategoryName(change.target.value)}
+                  placeholder="Ex. Devoirs"
+                  autoComplete="off"
+                  maxLength={40}
+                />
+              )}
+            </Field>
+            <div>
+              <span id="category-color-label" className="mb-1.5 block text-[12px] font-bold">
+                Couleur
+              </span>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="category-color-label">
+                {CATEGORY_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    role="radio"
+                    aria-checked={categoryColor === color}
+                    aria-label={color}
+                    title={color}
+                    onClick={() => setCategoryColor(color)}
+                    style={{ backgroundColor: color }}
+                    className={
+                      categoryColor === color
+                        ? 'size-[34px] rounded-full outline-3 outline-offset-2 outline-accent-strong'
+                        : 'size-[34px] rounded-full border border-border'
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <DialogActions>
+              <Button variant="secondary" onClick={() => setCategoryDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" icon="plus" disabled={isCreatingCategory || categoryName.trim() === ''}>
+                Créer la catégorie
+              </Button>
+            </DialogActions>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={pendingDelete !== null}

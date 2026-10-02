@@ -8,6 +8,8 @@ import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Switch } from '@/components/ui/primitives';
 import { useMembers } from '@/stores/household-store';
+import { useResource } from '@/lib/data/useResource';
+import type { EventCalendarRow, EventCategoryRow } from '@/types';
 import { toColorTag } from '../types';
 import type { CalendarEvent, EventFormValues } from '../types';
 
@@ -27,6 +29,8 @@ const eventSchema = z
     location: z.string().trim(),
     description: z.string().trim(),
     memberId: z.string(),
+    categoryId: z.string(),
+    calendarId: z.string(),
     remindAt: z
       .string()
       .trim()
@@ -60,6 +64,8 @@ function defaultValues(
       location: '',
       description: '',
       memberId: '',
+      categoryId: '',
+      calendarId: '',
       remindAt: toReminderValue(remindAt),
     };
   }
@@ -72,6 +78,8 @@ function defaultValues(
     location: event.location ?? '',
     description: event.description ?? '',
     memberId,
+    categoryId: event.categoryId ?? '',
+    calendarId: event.calendarId ?? '',
     remindAt: toReminderValue(remindAt),
   };
 }
@@ -90,6 +98,10 @@ export interface EventFormDialogProps {
 
 export function EventFormDialog({ open, onOpenChange, event, defaultDate, remindAt, isSaving = false, onSubmit }: EventFormDialogProps) {
   const members = useMembers();
+  const categoriesResource = useResource<EventCategoryRow>('event_categories');
+  const categories = categoriesResource.rows;
+  const calendarsResource = useResource<EventCalendarRow>('event_calendars');
+  const calendars = calendarsResource.rows;
   // Le membre est retrouvé par sa couleur : `events.color` porte le `color_tag`.
   const memberId = event
     ? (members.find((member) => toColorTag(member.color_tag) === toColorTag(event.color))?.id ?? '')
@@ -172,6 +184,37 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
           <Field label="Lieu" optional error={errors.location?.message}>
             {(props) => <Input {...props} {...register('location')} placeholder="Ex. École Jean Moulin" />}
           </Field>
+
+          <Field label="Catégorie" optional error={errors.categoryId?.message}>
+            {(props) => (
+              <Select {...props} {...register('categoryId')}>
+                <option value="">Sans catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          {calendars.length > 1 ? (
+            <Field label="Calendrier" optional error={errors.calendarId?.message}>
+              {(props) => (
+                <Select {...props} {...register('calendarId')}>
+                  <option value="">Commun du foyer</option>
+                  {calendars
+                    .filter((calendar) => !(calendar.visibility === 'commun' && calendar.name === 'Commun'))
+                    .map((calendar) => (
+                      <option key={calendar.id} value={calendar.id}>
+                        {calendar.name}
+                        {calendar.visibility === 'perso' ? ' (perso)' : ''}
+                      </option>
+                    ))}
+                </Select>
+              )}
+            </Field>
+          ) : null}
 
           <Field label="Couleur du foyer" optional error={errors.memberId?.message}>
             {(props) => (

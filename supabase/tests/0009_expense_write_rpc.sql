@@ -39,10 +39,18 @@ begin
     ('bob_m', bob_m),
     ('kid_m', kid_m);
 
+  -- Ardoise du foyer + inscription des deux membres (le monde 0055+ exige une
+  -- ardoise par dépense et des parts dans son périmètre).
+  insert into public.ardoises (id, household_id, name, created_by)
+  values ('ardoise_rpc', home, 'Foyer RPC', alice_m);
+  insert into public.ardoise_members (ardoise_id, member_id)
+  values ('ardoise_rpc', alice_m), ('ardoise_rpc', bob_m);
+  insert into testkit.fx (key, row_id) values ('ardoise', 'ardoise_rpc');
+
   -- Dépense « victime » pour le test outsider-update : payée par Alice pour
   -- sa seule part, donc solde nul et sans effet sur les assertions finales.
-  insert into public.expenses (id, household_id, title, amount, paid_by, expense_date, split_type)
-  values (victime, home, 'Victime', 10.00, alice_m, current_date, 'egal');
+  insert into public.expenses (id, household_id, ardoise_id, title, amount, paid_by, expense_date, split_type)
+  values (victime, home, 'ardoise_rpc', 'Victime', 10.00, alice_m, current_date, 'egal');
   insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)
   values (private.new_id('expense-participant'), victime, 'membre', alice_m, 10.00);
   insert into testkit.fx (key, row_id) values ('victime', victime);
@@ -68,10 +76,10 @@ begin
   -- Le cas du 30/09 : 30 €, deux parts de 15 €, en UN appel.
   -- L'identifiant créé reste en variable : `testkit.fx` n'est pas inscriptible
   -- en `authenticated` (lecture seule, cf. _setup.sql).
-  v_result := public.create_expense(home, 'Repas', 30.00, alice_m, current_date, 'egal',
+  v_result := public.create_expense(home, 'ardoise_rpc', 'Repas', 30.00, alice_m, null, current_date, 'egal',
     jsonb_build_array(
-      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 15),
-      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'external_participant_id', null, 'share_amount', 15)));
+      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 15),
+      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'share_amount', 15)));
   v_repas := v_result ->> 'id';
 
   perform testkit.ok(v_repas like 'expense\_%', 'la réponse porte l''identifiant créé');
@@ -81,19 +89,19 @@ begin
   -- Modification : nouveau montant, nouvelles parts, mêmes deux lignes.
   v_result := public.update_expense(
     v_repas,
-    'Repas corrigé', 40.00, bob_m, current_date, 'egal',
+    'Repas corrigé', 40.00, bob_m, null, current_date, 'egal',
     jsonb_build_array(
-      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 30),
-      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'external_participant_id', null, 'share_amount', 10)));
+      jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 30),
+      jsonb_build_object('participant_type', 'membre', 'member_id', bob_m, 'share_amount', 10)));
 
   perform testkit.eq(v_result ->> 'title', 'Repas corrigé', 'la réponse reprend le libellé modifié');
   perform testkit.eq(v_result ->> 'paid_by', bob_m, 'le payeur est modifiable');
 
   -- Somme partielle : refusée avec le message du trigger, pas un autre.
   begin
-    perform public.create_expense(home, 'Raté', 30.00, alice_m, current_date, 'egal',
+    perform public.create_expense(home, 'ardoise_rpc', 'Raté', 30.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 15)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 15)));
     perform testkit.ok(false, 'une somme partielle doit être refusée');
   exception when others then
     perform testkit.ok(sqlerrm like '%somme des parts%', 'le refus dit la somme : ' || sqlerrm);
@@ -101,7 +109,7 @@ begin
 
   -- Sans parts : refusé avant même la somme.
   begin
-    perform public.create_expense(home, 'Seul', 10.00, alice_m, current_date, 'egal', '[]'::jsonb);
+    perform public.create_expense(home, 'ardoise_rpc', 'Seul', 10.00, alice_m, null, current_date, 'egal', '[]'::jsonb);
     perform testkit.ok(false, 'une dépense sans parts doit être refusée');
   exception when others then
     perform testkit.ok(sqlerrm like '%au moins une personne%', 'le refus dit le minimum : ' || sqlerrm);
@@ -109,9 +117,9 @@ begin
 
   -- Montant nul : refusé par la fonction, pas seulement par la contrainte.
   begin
-    perform public.create_expense(home, 'Gratuit', 0.00, alice_m, current_date, 'egal',
+    perform public.create_expense(home, 'ardoise_rpc', 'Gratuit', 0.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 0)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 0)));
     perform testkit.ok(false, 'un montant nul doit être refusé');
   exception when others then
     perform testkit.ok(sqlerrm like '%supérieur à zéro%', 'le refus dit le montant : ' || sqlerrm);
@@ -119,9 +127,9 @@ begin
 
   -- Dépense inexistante : introuvable, pas silencieuse.
   begin
-    perform public.update_expense('expense_introuvable', 'X', 10.00, alice_m, current_date, 'egal',
+    perform public.update_expense('expense_introuvable', 'X', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'une dépense inexistante doit être refusée');
   exception when others then
     perform testkit.ok(sqlerrm like '%introuvable%', 'le refus dit l''absence : ' || sqlerrm);
@@ -129,12 +137,12 @@ begin
 
   -- Part externe : refusée (membres uniquement depuis 0039).
   begin
-    perform public.create_expense(home, 'Avec un ami', 20.00, alice_m, current_date, 'egal',
+    perform public.create_expense(home, 'ardoise_rpc', 'Avec un ami', 20.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
         jsonb_build_object('participant_type', 'externe', 'member_id', null, 'external_participant_id', 'external_x', 'share_amount', 20)));
     perform testkit.ok(false, 'une part externe doit être refusée par le RPC');
   exception when others then
-    perform testkit.ok(sqlerrm like '%seuls les membres%', 'le refus dit l''exclusion : ' || sqlerrm);
+    perform testkit.ok(sqlerrm like '%type de participant invalide%', 'le refus dit le type : ' || sqlerrm);
   end;
 end;
 $$;
@@ -151,9 +159,9 @@ begin
   select row_id into alice_m from testkit.fx where key = 'alice_m';
 
   begin
-    perform public.create_expense(home, 'Goûter', 10.00, alice_m, current_date, 'egal',
+    perform public.create_expense(home, 'ardoise_rpc', 'Goûter', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un enfant ne crée pas de dépense par RPC');
   exception when others then
     perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
@@ -162,9 +170,9 @@ begin
   begin
     perform public.update_expense(
       (select row_id from testkit.fx where key = 'victime'),
-      'Goûter détourné', 10.00, alice_m, current_date, 'egal',
+      'Goûter détourné', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un enfant ne modifie pas de dépense par RPC');
   exception when others then
     perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
@@ -186,9 +194,9 @@ begin
   select row_id into alice_m from testkit.fx where key = 'alice_m';
 
   begin
-    perform public.create_expense(home, 'Intrus', 10.00, alice_m, current_date, 'egal',
+    perform public.create_expense(home, 'ardoise_rpc', 'Intrus', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un extérieur ne crée pas dans le foyer');
   exception when others then
     perform testkit.ok(sqlerrm like '%appartenez%', 'le refus dit l''appartenance : ' || sqlerrm);
@@ -197,9 +205,9 @@ begin
   begin
     perform public.update_expense(
       (select row_id from testkit.fx where key = 'victime'),
-      'Détourné', 10.00, alice_m, current_date, 'egal',
+      'Détourné', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
-        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'external_participant_id', null, 'share_amount', 10)));
+        jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un extérieur ne modifie pas le foyer');
   exception when others then
     perform testkit.ok(sqlerrm like '%appartenez%', 'le refus dit l''appartenance : ' || sqlerrm);

@@ -10,13 +10,15 @@ export interface RoutineCardProps {
   /** Affiche la série en pastille plutôt qu'en texte. */
   showStreakBadge?: boolean;
   className?: string;
+  /** Rôle `enfant` : case désactivée, lecture seule. */
+  readOnly?: boolean;
 }
 
 /**
  * Carte d'une occurrence du jour, façon checklist : case à cocher, nom,
  * fréquence lisible, assignataires colorés et série en cours.
  */
-export function RoutineCard({ routine, onToggle, showStreakBadge = false, className }: RoutineCardProps) {
+export function RoutineCard({ routine, onToggle, showStreakBadge = false, className, readOnly = false }: RoutineCardProps) {
   const done = routine.isDoneToday;
   const people = routine.assignees.map((assignee) => assignee.member.display_name);
 
@@ -36,6 +38,7 @@ export function RoutineCard({ routine, onToggle, showStreakBadge = false, classN
         <Checkbox
           checked={done}
           onCheckedChange={() => onToggle(routine)}
+          disabled={readOnly}
           aria-label={`${done ? 'Rouvrir' : 'Cocher'} la routine ${routine.name} pour aujourd’hui`}
           // Case de 19px comme dans l'export, zone cliquable agrandie à 44px.
           className="relative mt-0.5 after:absolute after:-inset-3 after:content-['']"

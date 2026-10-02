@@ -20,6 +20,7 @@ const CoursesPage = lazy(() => import('@/modules/courses/courses-page'));
 const RoutinesPage = lazy(() => import('@/modules/routines/routines-page'));
 const RecettesPage = lazy(() => import('@/modules/recettes/recettes-page'));
 const ArdoisePage = lazy(() => import('@/modules/ardoise/ardoise-page'));
+const ArdoiseDetailPage = lazy(() => import('@/modules/ardoise/ardoise-detail-page'));
 const CadeauxPage = lazy(() => import('@/modules/cadeaux/cadeaux-page'));
 const AnniversairesPage = lazy(() => import('@/modules/anniversaires/anniversaires-page'));
 const AnimauxPage = lazy(() => import('@/modules/animaux/animaux-page'));
@@ -214,6 +215,14 @@ export function AppRoutes() {
           element={
             <Suspense fallback={<RouteFallback />}>
               <ArdoisePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/ardoise/:id"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <ArdoiseDetailPage />
             </Suspense>
           }
         />

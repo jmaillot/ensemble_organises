@@ -29,6 +29,9 @@ const auth = {
   signInWithPassword: vi.fn(),
   signInWithOAuth: vi.fn(),
   signOut: vi.fn(),
+  getUserIdentities: vi.fn(),
+  linkIdentity: vi.fn(),
+  unlinkIdentity: vi.fn(),
   onAuthStateChange: vi.fn((callback: (event: string, session: { user: User } | null) => void) => {
     listeners.push(callback);
     return { data: { subscription: { unsubscribe: vi.fn() } } };
@@ -216,5 +219,65 @@ describe("chemin d'authentification", () => {
 
     expect(useSessionStore.getState().status).toBe('guest');
     expect(useSessionStore.getState().user).toBeNull();
+  });
+});
+
+describe('comptes liés (fusion email + OAuth)', () => {
+  beforeEach(() => {
+    auth.getUserIdentities.mockReset();
+    auth.linkIdentity.mockReset();
+    auth.unlinkIdentity.mockReset();
+  });
+
+  it('lit les identités liées', async () => {
+    const { getLinkedIdentities } = await import('./use-auth');
+    auth.getUserIdentities.mockResolvedValue({
+      data: {
+        identities: [
+          { provider: 'email', identity_id: 'id-email', email: 'alice@example.fr' },
+          { provider: 'google', identity_id: 'id-google', email: 'alice@example.fr' },
+        ],
+      },
+      error: null,
+    });
+
+    const identities = await getLinkedIdentities();
+
+    expect(identities.map((identity) => identity.provider)).toEqual(['email', 'google']);
+  });
+
+  it('lie un fournisseur OAuth en session', async () => {
+    const { linkOAuthProvider } = await import('./use-auth');
+    auth.linkIdentity.mockResolvedValue({ data: { provider: 'google' }, error: null });
+
+    await linkOAuthProvider('google');
+
+    expect(auth.linkIdentity).toHaveBeenCalledOnce();
+    expect(auth.linkIdentity.mock.calls[0][0]).toMatchObject({ provider: 'google' });
+  });
+
+  it('refuse de délier le dernier mode de connexion', async () => {
+    const { unlinkOAuthProvider } = await import('./use-auth');
+    auth.getUserIdentities.mockResolvedValue({
+      data: { identities: [{ provider: 'email', identity_id: 'id-email' }] },
+      error: null,
+    });
+
+    await expect(unlinkOAuthProvider('email')).rejects.toThrow(/dernier mode/);
+    expect(auth.unlinkIdentity).not.toHaveBeenCalled();
+  });
+
+  it('délie un fournisseur quand il en reste un autre', async () => {
+    const { unlinkOAuthProvider } = await import('./use-auth');
+    const google = { provider: 'google', identity_id: 'id-google' };
+    auth.getUserIdentities.mockResolvedValue({
+      data: { identities: [{ provider: 'email', identity_id: 'id-email' }, google] },
+      error: null,
+    });
+    auth.unlinkIdentity.mockResolvedValue({ data: {}, error: null });
+
+    await unlinkOAuthProvider('google');
+
+    expect(auth.unlinkIdentity).toHaveBeenCalledWith(google);
   });
 });

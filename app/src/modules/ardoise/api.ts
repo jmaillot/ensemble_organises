@@ -1,14 +1,24 @@
 import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import type { ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, InvitationRow } from '@/types';
+import type {
+  ArdoiseGuestRow,
+  ArdoiseMemberRow,
+  ArdoiseRow,
+  ExpenseParticipantRow,
+  ExpenseRow,
+  HouseholdMemberRow,
+  InvitationRow,
+} from '@/types';
 import {
+  GUEST_KEY_PREFIX,
   MEMBER_KEY_PREFIX,
-  memberKey,
   normalizeShares,
+  participantKey,
   roundCents,
   type Balance,
   type InvitationInput,
   type NewExpenseInput,
+  type ParticipantKind,
   type Settlement,
 } from './types';
 
@@ -20,20 +30,212 @@ import {
 export interface ArdoiseSnapshot {
   expenses: ExpenseRow[];
   participants: ExpenseParticipantRow[];
+  guests: ArdoiseGuestRow[];
 }
 
-/** Les dépenses ne se partagent qu'entre membres (décision 0038, même message que le serveur). */
-function assertMembersOnly(participants: string[]): void {
-  if (participants.some((key) => !key.startsWith(MEMBER_KEY_PREFIX))) {
-    throw new Error('Les participants externes ne sont plus acceptés sur une dépense : partagez entre membres du foyer.');
+/** Ticket invité stocké localement, par ardoise (jamais en base en clair côté client). */
+const guestTicketKey = (ardoiseId: string) => `eo:ardoise:ticket:${ardoiseId}`;
+
+export function readGuestTicket(ardoiseId: string): string | null {
+  try {
+    return window.localStorage.getItem(guestTicketKey(ardoiseId));
+  } catch {
+    return null;
   }
+}
+
+export function writeGuestTicket(ardoiseId: string, ticket: string): void {
+  try {
+    window.localStorage.setItem(guestTicketKey(ardoiseId), ticket);
+  } catch {
+    // Stockage indisponible : le ticket est perdu à la fermeture, l'invité
+    // utilisera de nouveau son code.
+  }
+}
+
+export function clearGuestTicket(ardoiseId: string): void {
+  try {
+    window.localStorage.removeItem(guestTicketKey(ardoiseId));
+  } catch {
+    // Rien à nettoyer.
+  }
+}
+
+/** Les clés `membre:`/`invite:` portent le kind ; toute autre forme est rejetée (`null`). */
+function splitParticipantKey(key: string): { kind: ParticipantKind; id: string } | null {
+  if (key.startsWith(GUEST_KEY_PREFIX)) {
+    const id = key.slice(GUEST_KEY_PREFIX.length);
+    return id === '' ? null : { kind: 'guest', id };
+  }
+  if (key.startsWith(MEMBER_KEY_PREFIX)) {
+    const id = key.slice(MEMBER_KEY_PREFIX.length);
+    return id === '' ? null : { kind: 'membre', id };
+  }
+  return null;
+}
+
+/** Clés `membre:` (membre du foyer) ou `invite:` (invité de l'ardoise). */
+function assertParticipantKeys(participants: string[]): void {
+  if (participants.some((key) => splitParticipantKey(key) === null)) {
+    throw new Error('Participant invalide : partagez entre membres et invités de l’ardoise.');
+  }
+}
+
+/** Variante qui lève (les appels sont précédés de `assertParticipantKeys`). */
+function requireSplitParticipantKey(key: string): { kind: ParticipantKind; id: string } {
+  const split = splitParticipantKey(key);
+  if (!split) throw new Error('Participant invalide : partagez entre membres et invités de l’ardoise.');
+  return split;
 }
 export async function fetchArdoiseSnapshot(householdId: string): Promise<ArdoiseSnapshot> {
   const [expenses, participants] = await Promise.all([
     data.list<ExpenseRow>('expenses', { household_id: householdId }),
     data.list<ExpenseParticipantRow>('expense_participants', {}),
   ]);
-  return { expenses, participants };
+  return { expenses, participants, guests: [] };
+}
+
+/** Instantané d'UNE ardoise : dépenses, parts et invités. */
+export async function fetchArdoiseDetail(ardoiseId: string): Promise<ArdoiseSnapshot> {
+  const [expenses, guests] = await Promise.all([
+    data.list<ExpenseRow>('expenses', { ardoise_id: ardoiseId }),
+    data.list<ArdoiseGuestRow>('ardoise_guests', { ardoise_id: ardoiseId }).catch(() => []),
+  ]);
+  const participants = await data.list<ExpenseParticipantRow>('expense_participants', {});
+  return {
+    expenses,
+    participants: participants.filter((part) => expenses.some((expense) => expense.id === part.expense_id)),
+    guests,
+  };
+}
+
+export async function fetchArdoises(householdId: string): Promise<ArdoiseRow[]> {
+  const rows = await data.list<ArdoiseRow>('ardoises', { household_id: householdId });
+  return [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export interface NewArdoiseInput {
+  name: string;
+  description?: string;
+  coverUrl?: string | null;
+}
+
+/** Création : Edge + RPC serveur en configuré (seed des membres inclus), direct + seed en local. */
+export async function createArdoise(householdId: string, input: NewArdoiseInput): Promise<ArdoiseRow> {
+  const name = input.name.trim();
+  if (name.length === 0 || name.length > 120) throw new Error('Nommez votre ardoise (1 à 120 caractères).');
+  if (isSupabaseConfigured) {
+    return callArdoiseInvite<ArdoiseRow>('create-ardoise', {
+      name,
+      description: input.description?.trim() || undefined,
+      coverUrl: input.coverUrl ?? undefined,
+      householdId,
+    });
+  }
+  const created = await data.create<ArdoiseRow>('ardoises', {
+    household_id: householdId,
+    name,
+    description: input.description?.trim() || null,
+    cover_url: input.coverUrl ?? null,
+  });
+  // Seed local : les écrivains du foyer (même règle que le serveur).
+  const members = await data.list<HouseholdMemberRow>('household_members', { household_id: householdId }).catch(() => []);
+  await Promise.all(
+    members
+      .filter((member) => member.role === 'admin' || member.role === 'membre')
+      .map((member) =>
+        data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: created.id, member_id: member.id }).catch(() => undefined),
+      ),
+  );
+  return created;
+}
+
+export async function updateArdoise(
+  id: string,
+  input: { name?: string; description?: string | null; cover_url?: string | null },
+): Promise<ArdoiseRow> {
+  return data.update<ArdoiseRow>('ardoises', id, input);
+}
+
+export async function deleteArdoise(id: string): Promise<void> {
+  clearGuestTicket(id);
+  await data.remove('ardoises', id);
+}
+
+/* ------------------------------------------------------------------ */
+/* Partage par code (Edge Function `ardoise-invite`)                   */
+/* ------------------------------------------------------------------ */
+
+async function callArdoiseInvite<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
+  const { data: authData } = await supabase!.auth.getSession();
+  const session = authData.session;
+  const response = await fetch(`${supabaseFunctionsBase}/ardoise-invite`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
+    },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error((detail as { error?: string } | null)?.error ?? 'Partage impossible.');
+  }
+  return (await response.json()) as T;
+}
+
+export interface ArdoiseCode {
+  code: string;
+  expiresAt: string | null;
+  maxUses: number;
+  ardoiseId: string;
+}
+
+export interface ArdoiseCodeSummary {
+  ardoiseId: string;
+  isActive: boolean;
+  hasCode: boolean;
+  expiresAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+}
+
+export async function createInviteCode(ardoiseId: string, options?: { expiresAt?: string; maxUses?: number }): Promise<ArdoiseCode> {
+  return callArdoiseInvite<ArdoiseCode>('create', {
+    ardoiseId,
+    ...(options?.expiresAt ? { expiresAt: options.expiresAt } : {}),
+    ...(options?.maxUses ? { maxUses: options.maxUses } : {}),
+  });
+}
+
+export async function revokeInviteCode(ardoiseId: string): Promise<void> {
+  await callArdoiseInvite('revoke', { ardoiseId });
+}
+
+export async function fetchInviteSummary(ardoiseId: string): Promise<ArdoiseCodeSummary | null> {
+  if (!isSupabaseConfigured) return null;
+  return callArdoiseInvite<ArdoiseCodeSummary | null>('summary', { ardoiseId });
+}
+
+/** Membre du foyer qui rejoint via code (idempotent). */
+export async function joinArdoise(code: string): Promise<{ ardoise_id: string }> {
+  return callArdoiseInvite('join', { code: code.trim() });
+}
+
+/** Invité externe : échange le code contre un ticket stocké localement. */
+export async function redeemGuestTicket(code: string, displayName: string): Promise<{ ardoiseId: string }> {
+  const trimmed = code.trim();
+  if (trimmed.length < 22) throw new Error('Un code fait au moins 22 caractères.');
+  const name = displayName.trim();
+  if (name.length === 0) throw new Error('Indiquez un pseudonyme.');
+  const result = await callArdoiseInvite<{ ardoise_id: string; guest_ticket: string }>('redeem-guest', {
+    code: trimmed,
+    displayName: name,
+  });
+  writeGuestTicket(result.ardoise_id, result.guest_ticket);
+  return { ardoiseId: result.ardoise_id };
 }
 
 /**
@@ -46,21 +248,25 @@ export async function fetchArdoiseSnapshot(householdId: string): Promise<Ardoise
  * passe donc par le RPC transactionnel ci-dessous.
  */
 export async function createExpense(householdId: string, input: NewExpenseInput): Promise<ExpenseRow> {
+  if (!input.ardoiseId) throw new Error('Choisissez une ardoise pour la dépense.');
   if (input.participants.length === 0) {
     throw new Error('Choisissez au moins une personne qui partage la dépense.');
   }
-  assertMembersOnly(input.participants);
+  assertParticipantKeys(input.participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');
   }
   const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  const paidByKind = input.paidByKind ?? 'membre';
   if (isSupabaseConfigured) {
     return callExpenseRpc('create_expense', {
       p_household_id: householdId,
+      p_ardoise_id: input.ardoiseId,
       p_title: input.title.trim(),
       p_amount: amount,
-      p_paid_by: input.paidBy,
+      p_paid_by: paidByKind === 'membre' ? input.paidBy : null,
+      p_paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
       p_expense_date: input.date,
       p_split_type: input.splitType,
       p_parts: expensePartsPayload(input.participants, shares),
@@ -68,9 +274,11 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
   }
   const expense = await data.create<ExpenseRow>('expenses', {
     household_id: householdId,
+    ardoise_id: input.ardoiseId,
     title: input.title.trim(),
     amount,
-    paid_by: input.paidBy,
+    paid_by: paidByKind === 'membre' ? input.paidBy : null,
+    paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
     expense_date: input.date,
     split_type: input.splitType,
     created_at: new Date().toISOString(),
@@ -78,10 +286,12 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
 
   try {
     for (const [index, key] of input.participants.entries()) {
+      const { kind, id } = requireSplitParticipantKey(key);
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expense.id,
-        participant_type: 'membre',
-        member_id: key.slice(MEMBER_KEY_PREFIX.length),
+        participant_type: kind,
+        member_id: kind === 'membre' ? id : null,
+        guest_id: kind === 'guest' ? id : null,
         share_amount: roundCents(shares[index] ?? 0),
       });
     }
@@ -109,18 +319,20 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
   if (input.participants.length === 0) {
     throw new Error('Choisissez au moins une personne qui partage la dépense.');
   }
-  assertMembersOnly(input.participants);
+  assertParticipantKeys(input.participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');
   }
   const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  const paidByKind = input.paidByKind ?? 'membre';
   if (isSupabaseConfigured) {
     return callExpenseRpc('update_expense', {
       p_expense_id: expenseId,
       p_title: input.title.trim(),
       p_amount: amount,
-      p_paid_by: input.paidBy,
+      p_paid_by: paidByKind === 'membre' ? input.paidBy : null,
+      p_paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
       p_expense_date: input.date,
       p_split_type: input.splitType,
       p_parts: expensePartsPayload(input.participants, shares),
@@ -134,7 +346,8 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
   const updated = await data.update<ExpenseRow>('expenses', expenseId, {
     title: input.title.trim(),
     amount,
-    paid_by: input.paidBy,
+    paid_by: paidByKind === 'membre' ? input.paidBy : null,
+    paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
     expense_date: input.date,
     split_type: input.splitType,
   });
@@ -142,10 +355,12 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
   try {
     await Promise.all(oldParts.map((participant) => data.remove('expense_participants', participant.id)));
     for (const [index, key] of input.participants.entries()) {
+      const { kind, id } = requireSplitParticipantKey(key);
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expenseId,
-        participant_type: 'membre',
-        member_id: key.slice(MEMBER_KEY_PREFIX.length),
+        participant_type: kind,
+        member_id: kind === 'membre' ? id : null,
+        guest_id: kind === 'guest' ? id : null,
         share_amount: roundCents(shares[index] ?? 0),
       });
     }
@@ -174,6 +389,7 @@ async function restoreExpense(old: ExpenseRow, oldParts: ExpenseParticipantRow[]
         expense_id: part.expense_id,
         participant_type: part.participant_type,
         member_id: part.member_id,
+        guest_id: part.guest_id,
         share_amount: part.share_amount,
       })
       .catch(() => undefined);
@@ -181,17 +397,16 @@ async function restoreExpense(old: ExpenseRow, oldParts: ExpenseParticipantRow[]
 }
 
 /**
- * Parts au format du RPC : membres du foyer uniquement (externes purgés,
- * 0039), vérifiées par la fonction avant écriture.
+ * Parts au format du RPC : membres du foyer et invités de l'ardoise,
+ * vérifiés par la fonction avant écriture.
  */
 export function expensePartsPayload(keys: string[], shares: number[]) {
   return keys.map((key, index) => {
-    if (!key.startsWith(MEMBER_KEY_PREFIX)) {
-      throw new Error('Les participants externes ne sont plus acceptés sur une dépense : partagez entre membres du foyer.');
-    }
+    const { kind, id } = requireSplitParticipantKey(key);
     return {
-      participant_type: 'membre',
-      member_id: key.slice(MEMBER_KEY_PREFIX.length),
+      participant_type: kind,
+      member_id: kind === 'membre' ? id : null,
+      guest_id: kind === 'guest' ? id : null,
       share_amount: roundCents(shares[index] ?? 0),
     };
   });
@@ -264,12 +479,28 @@ export async function createInvitation(householdId: string, input: InvitationInp
 
 /**
  * Contrat de réponse de `expense-settlement` (montants au centime, solde
- * positif = le foyer doit au membre). Membres du foyer uniquement.
+ * positif = l'ardoise doit au participant). Membres et invités.
  */
 export interface ServerSettlement {
   household_id: string;
   balances: { member_id: string; display_name: string; amount: number }[];
   settlements: { from_member_id: string; from_name: string; to_member_id: string; to_name: string; amount: number }[];
+  generated_at: string;
+}
+
+export interface ArdoiseServerSettlement {
+  ardoise_id: string;
+  household_id: string | null;
+  balances: { kind: ParticipantKind; participant_id: string; display_name: string; amount: number }[];
+  settlements: {
+    from_kind: ParticipantKind;
+    from_id: string;
+    from_name: string;
+    to_kind: ParticipantKind;
+    to_id: string;
+    to_name: string;
+    amount: number;
+  }[];
   generated_at: string;
 }
 
@@ -284,18 +515,18 @@ export class SettlementRequestError extends Error {
 }
 
 /**
- * Soldes de référence, calculés en base. `null` en mode local (démo, hors
+ * Soldes d'UNE ardoise, calculés en base. `null` en mode local (démo, hors
  * ligne sans backend) : l'appelant bascule alors sur le calcul local de
- * `types.ts`. Une erreur réseau ne renvoie jamais `null` : elle lève, et
+ * `types.ts`. Les invités passent leur ticket (`x-ardoise-guest`), les membres
+ * leur session. Une erreur réseau ne renvoie jamais `null` : elle lève, et
  * c'est l'appelant qui décide du repli.
  */
-export async function fetchServerSettlement(householdId: string): Promise<ServerSettlement | null> {
+export async function fetchArdoiseSettlement(ardoiseId: string, guestTicket: string | null = null): Promise<ArdoiseServerSettlement | null> {
   if (!supabase) return null;
 
-  // `functions.invoke` résout même sur un échec HTTP : le statut vit dans
-  // `error`, pas dans la promesse (même piège que `push.ts`).
   const { data: body, error, response } = await supabase.functions.invoke('expense-settlement', {
-    body: { household_id: householdId },
+    body: { ardoise_id: ardoiseId },
+    headers: guestTicket ? { 'x-ardoise-guest': guestTicket } : undefined,
   });
   if (error) {
     throw new SettlementRequestError(
@@ -303,7 +534,7 @@ export async function fetchServerSettlement(householdId: string): Promise<Server
       await readSettlementError(response),
     );
   }
-  return body as ServerSettlement;
+  return body as ArdoiseServerSettlement;
 }
 
 async function readSettlementError(response: Response | undefined): Promise<string> {
@@ -321,29 +552,30 @@ async function readSettlementError(response: Response | undefined): Promise<stri
 /**
  * Soldes serveur -> lignes d'affichage. Miroir des graines locales
  * (`use-ardoise.ts`) : les enfants en sont exclus, la pastille couleur vient
- * du foyer. Un membre inconnu du store est conservé (nom du serveur) plutôt
- * que masqué : un solde qui disparaît est pire qu'une pastille grise.
+ * du foyer (grise pour les invités). Un participant inconnu du store est
+ * conservé (nom du serveur) plutôt que masqué : un solde qui disparaît est
+ * pire qu'une pastille grise.
  */
-export function toServerBalances(payload: ServerSettlement, members: HouseholdMemberRow[]): Balance[] {
+export function toServerBalances(payload: ArdoiseServerSettlement, members: HouseholdMemberRow[]): Balance[] {
   const index = new Map(members.map((member) => [member.id, member]));
   return payload.balances
-    .filter((row) => index.get(row.member_id)?.role !== 'enfant')
+    .filter((row) => (row.kind === 'membre' ? index.get(row.participant_id)?.role !== 'enfant' : true))
     .map((row) => ({
-      key: memberKey(row.member_id),
-      kind: 'membre' as const,
-      name: row.display_name || index.get(row.member_id)?.display_name || 'Membre',
-      colorTag: index.get(row.member_id)?.color_tag ?? null,
+      key: participantKey(row.kind, row.participant_id),
+      kind: row.kind,
+      name: row.display_name || (row.kind === 'membre' ? (index.get(row.participant_id)?.display_name || 'Membre') : 'Invité'),
+      colorTag: row.kind === 'membre' ? (index.get(row.participant_id)?.color_tag ?? null) : null,
       amount: roundCents(Number(row.amount) || 0),
     }));
 }
 
-/** Transferts serveur -> propositions d'affichage (membres uniquement). */
-export function toServerSettlements(payload: ServerSettlement): Settlement[] {
+/** Transferts serveur -> propositions d'affichage (membres et invités). */
+export function toServerSettlements(payload: ArdoiseServerSettlement): Settlement[] {
   return payload.settlements.map((row) => ({
-    id: `${memberKey(row.from_member_id)}>${memberKey(row.to_member_id)}`,
-    fromKey: memberKey(row.from_member_id),
+    id: `${participantKey(row.from_kind, row.from_id)}>${participantKey(row.to_kind, row.to_id)}`,
+    fromKey: participantKey(row.from_kind, row.from_id),
     fromName: row.from_name,
-    toKey: memberKey(row.to_member_id),
+    toKey: participantKey(row.to_kind, row.to_id),
     toName: row.to_name,
     amount: roundCents(Number(row.amount) || 0),
   }));

@@ -91,6 +91,16 @@ test.describe('Parcours des modules', () => {
     await expect(page.getByRole('checkbox', { name: /Rouvrir Acheter du pain/ })).toBeVisible();
   });
 
+  test('une tâche peut être rangée dans un dossier', async ({ page }) => {
+    await page.goto('/taches');
+    await page.getByRole('button', { name: 'Nouveau dossier' }).click();
+    await page.getByLabel('Nom du dossier').fill('Week-end');
+    await page.getByRole('button', { name: 'Créer le dossier' }).click();
+    await expect(page.getByRole('tab', { name: 'Week-end' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Week-end' }).click();
+    await expect(page.getByText('Aucune tâche à faire')).toBeVisible();
+  });
+
   test('la suppression d’une tâche demande confirmation', async ({ page }) => {
     await page.goto('/taches');
     await page.getByRole('button', { name: /^Supprimer Valider les rendez-vous/ }).click();
@@ -101,12 +111,24 @@ test.describe('Parcours des modules', () => {
 
   test('une dépense alimente l’ardoise', async ({ page }) => {
     await page.goto('/ardoise');
+    await page.getByRole('button', { name: 'Créer une ardoise' }).click();
+    await page.getByLabel('Nom de l’ardoise').fill('Week-end entre amis');
+    await page.getByRole('button', { name: 'Créer l’ardoise' }).click();
+    await expect(page.getByRole('tab', { name: 'Dépenses' })).toBeVisible();
     await page.getByRole('button', { name: 'Ajouter une dépense' }).first().click();
     await page.getByLabel(/Libellé/).fill('Balade à la boulangerie');
     await page.getByLabel(/Montant/).fill('12.50');
     await page.getByRole('button', { name: /Ajouter la dépense/ }).last().click();
     await expect(page.getByText('Balade à la boulangerie')).toBeVisible();
+    await expect(page.getByTestId('shares-pie')).toBeVisible();
+    await page.getByRole('tab', { name: 'Répartition' }).click();
     await expect(page.getByText('Qui doit quoi ?')).toBeVisible();
+  });
+
+  test('une ardoise se rejoint avec un code', async ({ page }) => {
+    await page.goto('/ardoise');
+    await page.getByRole('button', { name: 'Rejoindre' }).click();
+    await expect(page.getByText(/Code de partage/)).toBeVisible();
   });
 
   test('une carte de fidélité s’affiche en plein écran', async ({ page }) => {
@@ -121,6 +143,26 @@ test.describe('Parcours des modules', () => {
     await page.goto('/calendrier');
     await expect(page.getByRole('heading', { name: 'Calendrier' })).toBeVisible();
     await expect(page.getByText('Jours fériés').first()).toBeVisible();
+  });
+
+  test('le calendrier change de vue et crée une catégorie', async ({ page }) => {
+    await page.goto('/calendrier');
+    await expect(page.getByRole('heading', { name: 'Calendrier' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Liste' }).click();
+    await expect(page.getByText(/occupé|Rien à venir/)).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Semaine' }).click();
+    await expect(page.getByText(/Semaine du/)).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Jour' }).click();
+    await expect(page.getByRole('button', { name: 'Jour suivant' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Mois' }).click();
+    await page.getByRole('button', { name: '+ Catégorie' }).click();
+    await page.getByLabel('Nom de la catégorie').fill('Devoirs');
+    await page.getByRole('button', { name: 'Créer la catégorie' }).click();
+    await expect(page.getByLabel('Filtrer par catégorie').getByRole('option', { name: 'Devoirs' })).toBeAttached();
   });
 });
 

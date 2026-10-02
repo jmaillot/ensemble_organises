@@ -1,334 +1,324 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field } from '@/components/ui/field';
+import { Input, Textarea } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
-import { MemberAvatar } from '@/components/shared/member-avatar';
-import { formatEuro, pluralize, relativeDayLabel } from '@/lib/utils';
-import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
+import { pluralize } from '@/lib/utils';
+import { useArdoises } from './hooks/use-ardoise';
+import { joinArdoise, redeemGuestTicket } from './api';
 import { useSessionUser } from '@/hooks/use-auth';
-import { useMembers } from '@/stores/household-store';
-import { useAddExpense, useArdoise, useDeleteExpense, useSendInvitation, useUpdateExpense } from './hooks/use-ardoise';
-import type { Expense, NewExpenseInput } from './types';
-import { BalanceCard, MemberBalances } from './components/balance-panel';
-import { SettlementsPanel } from './components/settlements-panel';
-import { ExpenseFormDialog } from './components/expense-form-dialog';
-import { InviteMemberDialog } from './components/invite-member-dialog';
 
-const rowAction =
-  'grid size-11 shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';
-
+/** Liste des ardoises du foyer + création + rejoindre par code. */
 export default function ArdoisePage() {
-  const {
-    expenses,
-    balances,
-    settlements,
-    settlementSource,
-    sharingMembers,
-    currentMember,
-    total,
-    monthTotal,
-    monthLabel,
-    averageTicket,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useArdoise();
-  const addExpense = useAddExpense();
-  const updateExpenseMutation = useUpdateExpense();
-  const deleteExpense = useDeleteExpense();
-  const sendInvitation = useSendInvitation();
+  const { ardoises, isLoading, isError, error, refetch, isMutating, addArdoise, removeArdoise } = useArdoises();
   const toast = useToast();
+  const navigate = useNavigate();
   const sessionUser = useSessionUser();
-  const members = useMembers();
 
-  // Payeur par défaut : le membre lié à la session, pas le profil courant
-  // (un parent peut saisir au nom d'un enfant). Repli : profil courant.
-  const selfMemberId = sessionUser ? (members.find((member) => member.user_id === sessionUser.id)?.id ?? null) : null;
-
-  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [pendingDeletion, setPendingDeletion] = useState<Expense | null>(null);
-  // Une seule variante est montée : tableau sur bureau, cartes empilées sur
-  // mobile. Aucun scroll horizontal, même interne.
-  const isMobileLayout = useIsMobileLayout();
-
-  const handleAddExpense = async (values: NewExpenseInput) => {
-    // Même dialogue en création et en édition : la cible distingue les deux.
-    if (editingExpense) {
-      try {
-        await updateExpenseMutation.mutateAsync({ expenseId: editingExpense.id, input: values });
-        setExpenseDialogOpen(false);
-        setEditingExpense(null);
-        toast('Dépense mise à jour, les soldes sont à jour.');
-      } catch (updateError) {
-        toast(updateError instanceof Error ? updateError.message : 'Modification impossible.', 'error');
-      }
-      return;
-    }
-    try {
-      await addExpense.mutateAsync(values);
-      setExpenseDialogOpen(false);
-      toast('Dépense ajoutée, les soldes sont à jour.');
-    } catch (creationError) {
-      toast(creationError instanceof Error ? creationError.message : 'Dépense impossible.', 'error');
-    }
-  };
-
-  const openCreator = () => {
-    setEditingExpense(null);
-    setExpenseDialogOpen(true);
-  };
-
-  const openEditor = (expense: Expense) => {
-    setEditingExpense(expense);
-    setExpenseDialogOpen(true);
-  };
-
-  const handleDeleteExpense = async () => {
-    if (!pendingDeletion) return;
-    const title = pendingDeletion.title;
-    setPendingDeletion(null);
-    try {
-      await deleteExpense.mutateAsync(pendingDeletion.id);
-      toast(`« ${title} » a été supprimée.`);
-    } catch {
-      toast('Suppression impossible.', 'error');
-    }
-  };
-
-  const memberCount = balances.filter((balance) => balance.kind === 'membre').length;
+  const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   return (
     <ModuleShell
       module="ardoise"
       actions={
-        <Button icon="plus" onClick={openCreator}>
-          Ajouter une dépense
-        </Button>
+        <>
+          <Button icon="plus" onClick={() => setCreateOpen(true)}>
+            Créer une ardoise
+          </Button>
+          <Button variant="secondary" icon="arrow" onClick={() => setJoinOpen(true)}>
+            Rejoindre
+          </Button>
+        </>
       }
     >
-      <BalanceCard
-        total={total}
-        monthLabel={monthLabel}
-        onAddExpense={openCreator}
-        onInvite={() => setInviteDialogOpen(true)}
-      />
-
       <MetricRow
         items={[
-          { label: 'Total du mois', value: formatEuro(monthTotal), caption: 'dépenses du foyer' },
-          { label: 'Dépenses', value: expenses.length, caption: 'lignes enregistrées' },
-          { label: 'Membres', value: memberCount, caption: 'à l’ardoise' },
-          { label: 'Ticket moyen', value: formatEuro(averageTicket), caption: 'par dépense' },
+          { label: 'Ardoises', value: ardoises.length, caption: 'comptes partagés' },
+          { label: 'Actives', value: ardoises.filter((ardoise) => ardoise.is_active).length, caption: 'partages ouverts' },
         ]}
       />
 
-      <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] items-start gap-[18px] max-[920px]:grid-cols-1 [&>*]:min-w-0">
+      {isError ? (
+        <ErrorState
+          message={error?.message ?? 'Les ardoises du foyer n’ont pas pu être chargées.'}
+          onRetry={refetch}
+        />
+      ) : isLoading ? (
+        <LoadingRows rows={3} />
+      ) : ardoises.length === 0 ? (
+        <EmptyState
+          icon="receipt"
+          title="Aucune ardoise pour le moment"
+          description="Créez une ardoise par occasion — coloc, week-end entre amis, sortie en famille — ou rejoignez-en une avec un code partagé."
+          actionLabel="Créer une ardoise"
+          onAction={() => setCreateOpen(true)}
+          secondaryActionLabel="Rejoindre avec un code"
+          onSecondaryAction={() => setJoinOpen(true)}
+        />
+      ) : (
         <Panel
-          id="expense-list-panel"
-          title="Dernières dépenses"
-          description="Chaque ligne sait qui doit quoi à qui."
-          action={<CountBadge value={expenses.length} label="dépenses" />}
+          id="ardoises-panel"
+          title="Vos ardoises"
+          description="Un compte par occasion, des soldes indépendants."
+          action={<CountBadge value={ardoises.length} label="ardoises" />}
         >
-          {isLoading ? (
-            <LoadingRows rows={4} />
-          ) : isError ? (
-            <ErrorState message={error?.message ?? 'Les dépenses sont inaccessibles.'} onRetry={refetch} />
-          ) : expenses.length === 0 ? (
-            <EmptyState
-              icon="wallet"
-              title="Aucune dépense pour le moment"
-              description="Ajoutez la première facture : le partage et les soldes se calculent automatiquement."
-              actionLabel="Ajouter une dépense"
-              onAction={() => setExpenseDialogOpen(true)}
-            />
-          ) : isMobileLayout ? (
-            /* Mobile : cartes empilées, aucun scroll horizontal. */
-            <ul className="m-0 grid list-none gap-2.5 p-0" aria-label="Dépenses du foyer">
-              {expenses.map((expense) => (
-                <li key={expense.id} className="min-w-0 rounded-[13px] border border-border bg-bg p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <strong className="block truncate text-[13px]">{expense.title}</strong>
-                      <small className="block text-[10px] text-muted">
-                        {relativeDayLabel(expense.date)} · Payé par {expense.paidByName}
-                      </small>
-                    </div>
-                    <strong className="shrink-0 font-display text-[15px]">{formatEuro(expense.amount)}</strong>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center">
-                      {expense.participants.slice(0, 5).map((participant) => (
-                        <MemberAvatar
-                          key={participant.key}
-                          name={participant.name}
-                          colorTag={participant.colorTag}
-                          size="sm"
-                          className="-ml-[5px] border-2 border-surface first:ml-0"
-                        />
-                      ))}
-                      {expense.participants.length > 5 ? (
-                        <span
-                          aria-hidden="true"
-                          className="-ml-[5px] grid size-[23px] shrink-0 place-items-center rounded-[8px] border-2 border-surface bg-bg text-[9px] font-extrabold text-muted"
-                        >
-                          +{expense.participants.length - 5}
-                        </span>
-                      ) : null}
-                      <span className="sr-only">{pluralize(expense.participants.length, 'participant')}</span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        className={rowAction}
-                        aria-label={`Modifier la dépense ${expense.title}`}
-                        onClick={() => openEditor(expense)}
-                      >
-                        <span className="sr-only">Modifier</span>
-                        <Icon name="edit" size="sm" />
-                      </button>
-                      <button
-                        type="button"
-                        className={`${rowAction} hover:bg-coral-soft hover:text-coral max-[650px]:size-11`}
-                        aria-label={`Supprimer la dépense ${expense.title}`}
-                        onClick={() => setPendingDeletion(expense)}
-                      >
-                        <span className="sr-only">Supprimer</span>
-                        <Icon name="trash" size="sm" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            /* Bureau : tableau complet avec scroll interne si besoin. */
-            <div className="scrollbar-slim w-full max-w-full overflow-x-auto overscroll-x-contain">
-              <table className="w-full min-w-[680px] table-auto border-collapse [&>th]:px-1 [&>td]:px-1 sm:[&>th]:px-0 sm:[&>td]:px-0">
-                <caption className="sr-only">Dépenses du foyer, payeur, participants et montant</caption>
-                <thead>
-                  <tr className="[&>th]:border-t [&>th]:border-border [&>th]:py-3 [&>th]:text-left [&>th]:text-[10px] [&>th]:font-extrabold [&>th]:tracking-[0.08em] [&>th]:uppercase [&>th]:text-muted [&>th:last-child]:text-right">
-                    <th scope="col">Dépense</th>
-                    <th scope="col">Payé par</th>
-                    <th scope="col">Partage</th>
-                    <th scope="col">Montant</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((expense) => (
-                    <tr
-                      key={expense.id}
-                      className="[&>td]:border-t [&>td]:border-border [&>td]:py-3 [&>td]:text-left [&>td]:text-xs [&>td:last-child]:text-right"
-                    >
-                      <td>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <strong className="block truncate font-bold">{expense.title}</strong>
-                            <small className="block text-[10px] text-muted">{relativeDayLabel(expense.date)}</small>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              className={rowAction}
-                              aria-label={`Modifier la dépense ${expense.title}`}
-                              onClick={() => openEditor(expense)}
-                            >
-                              <span className="sr-only">Modifier</span>
-                              <Icon name="edit" size="sm" />
-                            </button>
-                            <button
-                              type="button"
-                              className={`${rowAction} hover:bg-coral-soft hover:text-coral`}
-                              aria-label={`Supprimer la dépense ${expense.title}`}
-                              onClick={() => setPendingDeletion(expense)}
-                            >
-                              <span className="sr-only">Supprimer</span>
-                              <Icon name="trash" size="sm" />
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{expense.paidByName}</td>
-                      <td>
-                        <div className="flex items-center">
-                          {expense.participants.slice(0, 5).map((participant) => (
-                            <MemberAvatar
-                              key={participant.key}
-                              name={participant.name}
-                              colorTag={participant.colorTag}
-                              size="sm"
-                              className="-ml-[5px] border-2 border-surface first:ml-0"
-                            />
-                          ))}
-                          {expense.participants.length > 5 ? (
-                            <span
-                              aria-hidden="true"
-                              className="-ml-[5px] grid size-[23px] shrink-0 place-items-center rounded-[8px] border-2 border-surface bg-bg text-[9px] font-extrabold text-muted"
-                            >
-                              +{expense.participants.length - 5}
-                            </span>
-                          ) : null}
-                          <span className="sr-only">
-                            {pluralize(expense.participants.length, 'participant')}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{formatEuro(expense.amount)}</strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div role="list" aria-label="Ardoises du foyer" className="grid gap-2.5">
+            {ardoises.map((ardoise) => (
+              <div
+                key={ardoise.id}
+                role="listitem"
+                className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border px-3.5 py-3"
+              >
+                <div className="min-w-[150px] flex-1">
+                  <p className="m-0 text-[14px] font-[760]">{ardoise.name}</p>
+                  <small className="text-[11px] text-muted">
+                    {ardoise.description ? `${ardoise.description} · ` : ''}
+                    {ardoise.is_active ? 'Partage actif' : 'Partage coupé'}
+                  </small>
+                </div>
+                <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
+                  Ouvrir
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setPendingDeleteId(ardoise.id)}
+                  aria-label={`Supprimer ${ardoise.name}`}
+                  className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+                >
+                  <Icon name="trash" size="sm" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-muted">
+            {pluralize(ardoises.length, 'ardoise')} {ardoises.length > 1 ? 's' : ''} dans le foyer.
+          </p>
         </Panel>
+      )}
 
-        <div>
-          <MemberBalances balances={balances} source={settlementSource} />
-          <SettlementsPanel settlements={settlements} className="mt-[18px]" />
-        </div>
-      </div>
-
-      <ExpenseFormDialog
-        open={expenseDialogOpen}
-        onOpenChange={(open) => {
-          setExpenseDialogOpen(open);
-          if (!open) setEditingExpense(null);
+      <CreateArdoiseDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        isSaving={isMutating}
+        onSubmit={async (values) => {
+          try {
+            const created = await addArdoise(values);
+            setCreateOpen(false);
+            toast(`Ardoise « ${created.name} » créée.`);
+            navigate(`/ardoise/${created.id}`);
+          } catch (creationError) {
+            toast(creationError instanceof Error ? creationError.message : 'Création impossible.', 'error');
+          }
         }}
-        members={sharingMembers}
-        defaultPayerId={
-          selfMemberId && sharingMembers.some((member) => member.id === selfMemberId)
-            ? selfMemberId
-            : (currentMember?.id ?? null)
-        }
-        onSubmit={handleAddExpense}
-        isPending={addExpense.isPending || updateExpenseMutation.isPending}
-        initialExpense={editingExpense}
       />
 
-      <InviteMemberDialog
-        open={inviteDialogOpen}
-        onOpenChange={setInviteDialogOpen}
-        onSubmit={(values) => sendInvitation.mutateAsync(values)}
-        isPending={sendInvitation.isPending}
-      />
+      <JoinArdoiseDialog open={joinOpen} onOpenChange={setJoinOpen} isMember={Boolean(sessionUser)} />
 
       <ConfirmDialog
-        open={Boolean(pendingDeletion)}
+        open={pendingDeleteId !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingDeletion(null);
+          if (!open) setPendingDeleteId(null);
         }}
-        title={pendingDeletion ? `Supprimer « ${pendingDeletion.title} »` : 'Supprimer la dépense'}
-        description="Les parts de cette dépense seront également supprimées et les soldes recalculés."
-        confirmLabel="Supprimer"
-        onConfirm={() => void handleDeleteExpense()}
+        title="Supprimer cette ardoise ?"
+        description="L’ardoise, ses dépenses et ses soldes seront définitivement retirés."
+        confirmLabel="Supprimer l’ardoise"
+        onConfirm={() => {
+          const target = pendingDeleteId;
+          setPendingDeleteId(null);
+          if (!target) return;
+          void removeArdoise(target)
+            .then(() => toast('Ardoise supprimée.'))
+            .catch((removalError: unknown) =>
+              toast(removalError instanceof Error ? removalError.message : 'Suppression impossible.', 'error'),
+            );
+        }}
       />
     </ModuleShell>
+  );
+}
+
+function CreateArdoiseDialog({
+  open,
+  onOpenChange,
+  isSaving,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isSaving: boolean;
+  onSubmit: (values: { name: string; description?: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setName('');
+          setDescription('');
+        }
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <p className="eyebrow mb-2">Ardoise</p>
+          <DialogTitle>Créer une ardoise</DialogTitle>
+          <DialogDescription>
+            Ex. coloc, week-end entre amis, sortie en famille. Un code de partage sera généré pour inviter.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          noValidate
+          className="grid gap-3.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSubmit({ name, description });
+          }}
+        >
+          <Field label="Nom de l’ardoise">
+            {(props) => (
+              <Input {...props} value={name} onChange={(change) => setName(change.target.value)} maxLength={120} autoComplete="off" />
+            )}
+          </Field>
+          <Field label="Description" optional>
+            {(props) => (
+              <Textarea {...props} value={description} onChange={(change) => setDescription(change.target.value)} rows={2} />
+            )}
+          </Field>
+          <DialogActions>
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="submit" icon="plus" disabled={isSaving || name.trim() === ''}>
+              Créer l’ardoise
+            </Button>
+          </DialogActions>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function JoinArdoiseDialog({
+  open,
+  onOpenChange,
+  isMember,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Faux pour un visiteur sans compte : seul le parcours invité est proposé. */
+  isMember: boolean;
+}) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [code, setCode] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+
+  const submitMember = () => {
+    setIsJoining(true);
+    void joinArdoise(code)
+      .then(({ ardoise_id }) => {
+        onOpenChange(false);
+        setCode('');
+        toast('Ardoise rejointe.');
+        navigate(`/ardoise/${ardoise_id}`);
+      })
+      .catch((joinError: unknown) =>
+        toast(joinError instanceof Error ? joinError.message : 'Code invalide.', 'error'),
+      )
+      .finally(() => setIsJoining(false));
+  };
+
+  const submitGuest = () => {
+    setIsJoining(true);
+    void redeemGuestTicket(code, displayName)
+      .then(({ ardoiseId }) => {
+        onOpenChange(false);
+        setCode('');
+        setDisplayName('');
+        toast('Bienvenue sur l’ardoise.');
+        navigate(`/ardoise/${ardoiseId}`);
+      })
+      .catch((joinError: unknown) =>
+        toast(joinError instanceof Error ? joinError.message : 'Code invalide.', 'error'),
+      )
+      .finally(() => setIsJoining(false));
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setCode('');
+          setDisplayName('');
+        }
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <p className="eyebrow mb-2">Ardoise</p>
+          <DialogTitle>Rejoindre une ardoise</DialogTitle>
+          <DialogDescription>
+            Collez le code partagé par l’organisateur. Sans compte, indiquez un pseudonyme.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          noValidate
+          className="grid gap-3.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (isMember) submitMember();
+            else submitGuest();
+          }}
+        >
+          <Field label="Code de partage">
+            {(props) => (
+              <Input {...props} value={code} onChange={(change) => setCode(change.target.value)} autoComplete="off" />
+            )}
+          </Field>
+          {!isMember ? (
+            <Field label="Pseudonyme">
+              {(props) => (
+                <Input
+                  {...props}
+                  value={displayName}
+                  onChange={(change) => setDisplayName(change.target.value)}
+                  maxLength={120}
+                  autoComplete="off"
+                />
+              )}
+            </Field>
+          ) : null}
+          <p className="m-0 text-[11px] text-muted">
+            {isMember
+              ? 'Membre du foyer : le code vous inscrit à l’ardoise.'
+              : 'Invité : votre ticket est conservé dans ce navigateur.'}{' '}
+            Un code fait au moins 22 caractères.
+          </p>
+          <DialogActions>
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="submit" icon="arrow" disabled={isJoining || code.trim().length < 22}>
+              Rejoindre
+            </Button>
+          </DialogActions>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

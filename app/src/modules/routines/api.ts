@@ -1,8 +1,9 @@
 import { data } from '@/lib/data';
-import type { RoutineCompletionRow, RoutineRow } from '@/types';
+import type { RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
 import type { RoutineAssigneeRecord, RoutineFormValues, RoutineReminderRecord } from './types';
 
 export const ROUTINES_TABLE = 'routines';
+export const ROUTINE_FOLDERS_TABLE = 'routine_folders';
 export const ROUTINE_ASSIGNEES_TABLE = 'routine_assignees';
 export const ROUTINE_REMINDERS_TABLE = 'routine_reminders';
 export const ROUTINE_COMPLETIONS_TABLE = 'routine_completions';
@@ -21,7 +22,31 @@ export function toRoutinePayload(values: RoutineFormValues, recurrenceRule: stri
     name: values.name.trim(),
     description: values.description.trim() === '' ? null : values.description.trim(),
     recurrence_rule: recurrenceRule,
+    folder_id: values.folderId === '' ? null : values.folderId,
   };
+}
+
+/** Dossiers de routines : création (propriétaire = soi), renommage. */
+export async function createRoutineFolder(
+  householdId: string,
+  ownerMemberId: string,
+  name: string,
+  visibility: RoutineFolderRow['visibility'],
+): Promise<RoutineFolderRow> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) throw new Error('Nom de dossier invalide (1 à 80 caractères).');
+  return data.create<RoutineFolderRow>(ROUTINE_FOLDERS_TABLE, {
+    household_id: householdId,
+    name: trimmed,
+    visibility,
+    owner_member_id: ownerMemberId,
+  });
+}
+
+export async function renameRoutineFolder(id: string, name: string): Promise<RoutineFolderRow> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) throw new Error('Nom de dossier invalide (1 à 80 caractères).');
+  return data.update<RoutineFolderRow>(ROUTINE_FOLDERS_TABLE, id, { name: trimmed });
 }
 
 /** Valeur d'un `datetime-local` convertie en ISO, chaîne vide = aucun rappel. */

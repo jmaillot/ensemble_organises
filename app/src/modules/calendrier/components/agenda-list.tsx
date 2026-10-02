@@ -10,6 +10,7 @@ const chipClass: Record<AgendaItem['kind'], string> = {
   tache: 'bg-[oklch(94%_0.05_300)] text-[oklch(48%_0.13_300)]',
   anniversaire: 'bg-accent-faint text-accent-strong',
   ferie: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
+  vacances: 'bg-[#dbe9f6] text-[#1f4e79]',
 };
 
 export interface AgendaListProps {
@@ -56,6 +57,7 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
                 )}
               >
                 {item.kind === 'ferie' ? <span aria-hidden="true" className={cn('size-[5px] rounded-full', memberTagClass('amber'))} /> : null}
+                {item.kind === 'vacances' ? <span aria-hidden="true" className="size-[5px] rounded-full bg-[#1f4e79]" /> : null}
                 {item.chipLabel}
               </span>
               {item.kind === 'event' && item.author ? (

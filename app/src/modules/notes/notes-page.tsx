@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
+import { FolderTabs } from '@/components/shared/folder-tabs';
 import { formatBytes, isImageMime } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useMembers } from '@/stores/household-store';
@@ -35,6 +36,13 @@ export default function NotesPage() {
     notes,
     visibleNotes,
     categories,
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    canWrite,
+    createFolder,
+    renameFolder,
+    deleteFolder,
     total,
     categoryCount,
     shared,
@@ -66,9 +74,11 @@ export default function NotesPage() {
     <ModuleShell
       module="notes"
       actions={
-        <Button icon="plus" onClick={openCreate}>
-          Créer une note
-        </Button>
+        canWrite ? (
+          <Button icon="plus" onClick={openCreate}>
+            Créer une note
+          </Button>
+        ) : null
       }
     >
       <MetricRow
@@ -83,6 +93,38 @@ export default function NotesPage() {
           },
         ]}
       />
+
+      <div className="mb-4">
+        <FolderTabs
+          folders={folders}
+          activeId={activeFolderId}
+          onSelect={setActiveFolderId}
+          onCreate={async (name, visibility) => {
+            await createFolder(name, visibility);
+            toast('Dossier créé.');
+          }}
+          onRename={async (id, name) => {
+            try {
+              await renameFolder(id, name);
+              toast('Dossier renommé.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être renommé.', 'error');
+              throw folderError;
+            }
+          }}
+          onDelete={async (folder) => {
+            try {
+              await deleteFolder(folder.id);
+              toast('Dossier supprimé, contenu rangé dans Général.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être supprimé.', 'error');
+              throw folderError;
+            }
+          }}
+          canManage={canWrite}
+          label="Dossiers de notes"
+        />
+      </div>
 
       <SectionHeading
         title="Vos pensées, au même endroit"
@@ -151,8 +193,8 @@ export default function NotesPage() {
           icon="edit"
           title="Aucune note pour le moment"
           description="Une idée, une information ou une mémoire à garder : la première note peut rester privée, ou devenir un repère pour le foyer."
-          actionLabel="Créer une note"
-          onAction={openCreate}
+          actionLabel={canWrite ? 'Créer une note' : undefined}
+          onAction={canWrite ? openCreate : undefined}
         />
       ) : visibleNotes.length === 0 ? (
         <EmptyState
@@ -223,25 +265,27 @@ export default function NotesPage() {
 
                   <div className="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted">
                     <span>{noteVisibilityLabels[note.visibility]}</span>
-                    <span className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-[9px] hover:bg-coral-soft hover:text-coral"
-                        aria-label={`Supprimer ${note.title}`}
-                        onClick={() => setPendingDelete(note)}
-                      >
-                        <Icon name="trash" size="sm" />
-                      </Button>
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[11px] font-extrabold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:text-accent-deep"
-                        onClick={() => openEdit(note)}
-                      >
-                        Modifier
-                        <Icon name="arrow" size="sm" />
-                      </button>
-                    </span>
+                    {canWrite ? (
+                      <span className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-[9px] hover:bg-coral-soft hover:text-coral"
+                          aria-label={`Supprimer ${note.title}`}
+                          onClick={() => setPendingDelete(note)}
+                        >
+                          <Icon name="trash" size="sm" />
+                        </Button>
+                        <button
+                          type="button"
+                          className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[11px] font-extrabold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:text-accent-deep"
+                          onClick={() => openEdit(note)}
+                        >
+                          Modifier
+                          <Icon name="arrow" size="sm" />
+                        </button>
+                      </span>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -254,6 +298,8 @@ export default function NotesPage() {
         open={dialog.open}
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         note={dialog.note}
+        initialFolderId={activeFolderId}
+        folders={folders}
         isSaving={isMutating}
         onSubmit={async (values, files, removedAttachmentIds) => {
           const editing = dialog.note;

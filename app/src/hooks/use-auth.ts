@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
+import type { User, UserIdentity } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { data } from '@/lib/data';
 import { useSessionStore } from '@/stores/session-store';
@@ -162,6 +162,61 @@ export async function signInWithProvider(provider: 'google' | 'facebook') {
     options: { redirectTo: `${window.location.origin}/accueil`, scopes: provider === 'facebook' ? 'email,public_profile' : undefined },
   });
   if (error) throw error;
+}
+
+/**
+ * Comptes liés (fusion email + OAuth).
+ *
+ * Supabase Auth ne fusionne jamais deux `auth.users` tout seul : sans liaison,
+ * « compte email » puis « Continuer avec Google » sur la même adresse crée un
+ * second utilisateur, donc un second profil et des foyers séparés. La voie
+ * officielle est la liaison manuelle, en session : `linkIdentity` ajoute une
+ * seconde identité au même `auth.users`, et les deux connexions mènent ensuite
+ * au même profil. Requiert « Enable Manual Linking » côté Auth.
+ */
+export type OAuthProvider = 'google' | 'facebook';
+
+export interface LinkedIdentity {
+  provider: string;
+  identityId: string;
+  email?: string;
+}
+
+export async function getLinkedIdentities(): Promise<LinkedIdentity[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.auth.getUserIdentities();
+  if (error) throw error;
+  return (data?.identities ?? []).map((identity: UserIdentity) => ({
+    provider: identity.provider,
+    identityId: String(identity.identity_id),
+    email: typeof identity.identity_data?.email === 'string' ? identity.identity_data.email : undefined,
+  }));
+}
+
+/** Lie Google/Facebook au compte connecté (redirection OAuth, comme à la connexion). */
+export async function linkOAuthProvider(provider: OAuthProvider) {
+  if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
+  const { error } = await supabase.auth.linkIdentity({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/parametres`,
+      scopes: provider === 'facebook' ? 'email,public_profile' : undefined,
+    },
+  });
+  if (error) throw error;
+}
+
+/** Délie un fournisseur déjà lié. Refuse de retirer le dernier mode de connexion. */
+export async function unlinkOAuthProvider(provider: string) {
+  if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
+  const { data, error } = await supabase.auth.getUserIdentities();
+  if (error) throw error;
+  const identities = data?.identities ?? [];
+  const target = identities.find((identity: UserIdentity) => identity.provider === provider);
+  if (!target) throw new Error('Ce compte n’est pas lié.');
+  if (identities.length <= 1) throw new Error('Impossible de retirer le dernier mode de connexion.');
+  const { error: unlinkError } = await supabase.auth.unlinkIdentity(target);
+  if (unlinkError) throw unlinkError;
 }
 
 export async function signInWithEmail(email: string, password: string) {

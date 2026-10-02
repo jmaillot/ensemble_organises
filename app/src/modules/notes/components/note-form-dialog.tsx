@@ -25,6 +25,7 @@ const noteSchema = z
     customCategory: z.string().trim().max(40, '40 caractères maximum.'),
     content: z.string().trim().min(2, 'Écrivez ce qu’il ne faut pas oublier.').max(2000, '2000 caractères maximum.'),
     visibility: z.enum(['privee', 'foyer']),
+    folderId: z.string(),
   })
   .superRefine((values, ctx) => {
     if (values.category === OTHER_CATEGORY && values.customCategory.trim().length < 2) {
@@ -35,9 +36,9 @@ const noteSchema = z
 const isKnownCategory = (category: string): category is (typeof NOTE_CATEGORIES)[number] =>
   (NOTE_CATEGORIES as readonly string[]).includes(category);
 
-function defaultValues(note: Note | null): NoteFormValues {
+function defaultValues(note: Note | null, initialFolderId: string | null = null): NoteFormValues {
   if (!note) {
-    return { title: '', category: 'Maison', customCategory: '', content: '', visibility: 'privee' };
+    return { title: '', category: 'Maison', customCategory: '', content: '', visibility: 'privee', folderId: initialFolderId ?? '' };
   }
   const category: NoteCategoryChoice = isKnownCategory(note.category) ? note.category : OTHER_CATEGORY;
   return {
@@ -46,6 +47,7 @@ function defaultValues(note: Note | null): NoteFormValues {
     customCategory: isKnownCategory(note.category) ? '' : note.category,
     content: note.content,
     visibility: note.visibility,
+    folderId: note.folderId ?? '',
   };
 }
 
@@ -53,12 +55,15 @@ export interface NoteFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   note: Note | null;
+  /** Dossier pré-rempli à la création (onglet courant). */
+  initialFolderId?: string | null;
+  folders?: { id: string; name: string }[];
   isSaving?: boolean;
   onSubmit: (values: NoteFormValues, files: File[], removedAttachmentIds: string[]) => Promise<void> | void;
 }
 
 /** Création et modification d'une note du foyer, pièces jointes comprises. */
-export function NoteFormDialog({ open, onOpenChange, note, isSaving = false, onSubmit }: NoteFormDialogProps) {
+export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = null, folders = [], isSaving = false, onSubmit }: NoteFormDialogProps) {
   const { register, handleSubmit, reset, watch, formState } = useForm<NoteFormValues>({
     resolver: zodResolver(noteSchema),
     mode: 'onSubmit',
@@ -70,13 +75,13 @@ export function NoteFormDialog({ open, onOpenChange, note, isSaving = false, onS
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(note));
+    reset(defaultValues(note, initialFolderId));
     setNewFiles([]);
     setRemovedIds([]);
     // `note` identifie une ouverture : le formulaire n'est pas réinitialisé à
     // chaque frappe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, note?.id]);
+  }, [open, note?.id, initialFolderId]);
 
   const existing: NoteAttachment[] = (note?.attachments ?? []).filter(
     (attachment) => !removedIds.includes(attachment.id),
@@ -143,6 +148,21 @@ export function NoteFormDialog({ open, onOpenChange, note, isSaving = false, onS
               )}
             </Field>
           </div>
+
+          {folders.length > 0 ? (
+            <Field label="Dossier" optional error={errors.folderId?.message}>
+              {(props) => (
+                <Select {...props} {...register('folderId')}>
+                  <option value="">Général</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          ) : null}
 
           {category === OTHER_CATEGORY ? (
             <Field label="Nom de la catégorie" error={errors.customCategory?.message}>

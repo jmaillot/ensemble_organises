@@ -468,6 +468,8 @@ export interface RoutineFormValues {
   yearlyNthWeekday: string;
   description: string;
   assigneeIds: string[];
+  /** Dossier (`routine_folders.id`), chaîne vide = Général. */
+  folderId: string;
   /** Valeurs de `datetime-local`, une entrée vide = pas de rappel à cet index. */
   reminders: string[];
   /** Coche « aussi 1 jour avant » : chaque rappel gagne un doublon à −24 h. */
@@ -514,6 +516,8 @@ export interface Routine {
   name: string;
   description: string | null;
   recurrenceRule: string;
+  /** Dossier (`routine_folders.id`), `null` = Général. */
+  folderId: string | null;
   /** « Chaque semaine », « Le 15 de chaque mois »… */
   frequencyLabel: string;
   preset: FrequencyPreset;
@@ -587,6 +591,7 @@ export function toRoutine(row: RoutineRow, context: RoutineContext = emptyContex
     name: row.name,
     description: row.description,
     recurrenceRule: row.recurrence_rule,
+    folderId: row.folder_id,
     frequencyLabel: describeRecurrence(row.recurrence_rule),
     preset: presetForRule(row.recurrence_rule),
     assignees: context.assignees,
@@ -703,6 +708,20 @@ export function filterRoutines(routines: Routine[], query: string, lateOnly = fa
     if (needle === '') return true;
     return routine.name.toLowerCase().includes(needle) || (routine.description ?? '').toLowerCase().includes(needle);
   });
+}
+
+/** Onglet dossier : `null` = Général (routines sans dossier). */
+export function filterRoutinesByFolder(routines: Routine[], folderId: string | null): Routine[] {
+  return routines.filter((routine) => (routine.folderId ?? null) === folderId);
+}
+
+/** Filtre assigné : `tous`, `non-assigne`, ou un `household_members.id`. */
+export type RoutineAssigneeFilter = 'tous' | 'non-assigne' | string;
+
+export function filterRoutinesByAssignee(routines: Routine[], assignee: RoutineAssigneeFilter): Routine[] {
+  if (assignee === 'tous') return routines;
+  if (assignee === 'non-assigne') return routines.filter((routine) => routine.assignees.length === 0);
+  return routines.filter((routine) => routine.assignees.some((entry) => entry.memberId === assignee));
 }
 
 /** Routines avec au moins une occurrence à rattraper, les plus en retard d'abord. */

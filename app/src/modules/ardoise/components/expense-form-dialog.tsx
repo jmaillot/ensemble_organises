@@ -9,7 +9,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, todayIso } from '@/lib/utils';
-import { MEMBER_KEY_PREFIX, memberKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type SplitType } from '../types';
+import { GUEST_KEY_PREFIX, MEMBER_KEY_PREFIX, guestKey, memberKey, participantKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type ParticipantKind, type SplitType } from '../types';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -57,6 +57,8 @@ export interface ExpenseFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: MemberOption[];
+  /** Invités de l'ardoise (sans pastille couleur). */
+  guests?: { id: string; name: string }[];
   defaultPayerId: string | null;
   onSubmit: (values: NewExpenseInput) => void;
   isPending?: boolean;
@@ -68,13 +70,14 @@ export interface ExpenseFormDialogProps {
  * Ajout et modification d'une dépense : libellé, montant, payeur et
  * participants restent visibles ; date, type de partage et montants
  * personnalisés sont repliés pour rester lisible sur mobile. Le partage se
- * fait entre membres du foyer uniquement (décision 0038). En édition, le
+ * fait entre membres du foyer et invités de l'ardoise. En édition, le
  * formulaire est pré-rempli de la dépense visée.
  */
 export function ExpenseFormDialog({
   open,
   onOpenChange,
   members,
+  guests = [],
   defaultPayerId,
   onSubmit,
   isPending = false,
@@ -88,20 +91,20 @@ export function ExpenseFormDialog({
       return {
         title: '',
         amount: '',
-        paidBy: defaultPayerId ?? members[0]?.id ?? '',
+        paidBy: defaultPayerId ? memberKey(defaultPayerId) : (members[0] ? memberKey(members[0].id) : ''),
         date: todayIso(),
         splitType: 'egal',
-        participants: members.map((member) => member.id),
+        participants: [...members.map((member) => memberKey(member.id)), ...guests.map((guest) => guestKey(guest.id))],
         customShares: {},
       };
     }
     return {
       title: expense.title,
       amount: String(expense.amount),
-      paidBy: expense.paidBy,
+      paidBy: expense.paidBy ? participantKey(expense.paidByKind, expense.paidBy) : '',
       date: expense.date,
       splitType: expense.splitType,
-      participants: expense.participants.filter((participant) => participant.kind === 'membre').map((participant) => participant.key.slice(MEMBER_KEY_PREFIX.length)),
+      participants: expense.participants.map((participant) => participant.key),
       customShares: Object.fromEntries(expense.participants.map((participant) => [participant.key, String(participant.shareAmount)])),
     };
   };
@@ -129,13 +132,20 @@ export function ExpenseFormDialog({
   const shareCount = participants.length;
 
   const submit = (values: FormValues) => {
+    const payerKind: ParticipantKind = values.paidBy.startsWith(GUEST_KEY_PREFIX) ? 'guest' : 'membre';
+    const payerId = values.paidBy.startsWith(GUEST_KEY_PREFIX)
+      ? values.paidBy.slice(GUEST_KEY_PREFIX.length)
+      : values.paidBy.startsWith(MEMBER_KEY_PREFIX)
+        ? values.paidBy.slice(MEMBER_KEY_PREFIX.length)
+        : values.paidBy;
     onSubmit({
       title: values.title,
       amount: roundCents(parseAmount(values.amount)),
-      paidBy: values.paidBy,
+      paidBy: payerId,
+      paidByKind: payerKind,
       date: values.date,
       splitType: values.splitType as SplitType,
-      participants: values.participants.map(memberKey),
+      participants: values.participants,
       customShares:
         values.splitType === 'personnalise'
           ? Object.fromEntries(
@@ -160,7 +170,7 @@ export function ExpenseFormDialog({
             {(props) => <Input {...props} {...register('title')} placeholder="Ex. Courses du samedi" />}
           </Field>
 
-          <div className="grid grid-cols-2 gap-3 max-[650px]:grid-cols-1">
+          <div className="grid grid-cols-2 items-end gap-3 max-[650px]:grid-cols-1">
             <Field label="Montant" error={errors.amount?.message} hint="En euros">
               {(props) => (
                 <Input {...props} type="number" step="0.01" min="0" inputMode="decimal" placeholder="24,90" {...register('amount')} />
@@ -170,8 +180,13 @@ export function ExpenseFormDialog({
               {(props) => (
                 <Select {...props} {...register('paidBy')}>
                   {members.map((member) => (
-                    <option key={member.id} value={member.id}>
+                    <option key={member.id} value={memberKey(member.id)}>
                       {member.name}
+                    </option>
+                  ))}
+                  {guests.map((guest) => (
+                    <option key={guest.id} value={guestKey(guest.id)}>
+                      {guest.name} (invité)
                     </option>
                   ))}
                 </Select>
@@ -184,9 +199,15 @@ export function ExpenseFormDialog({
             <div className="flex flex-wrap gap-2">
               {members.map((member) => (
                 <label key={member.id} className={checkOption}>
-                  <input type="checkbox" value={member.id} className="accent-accent" {...register('participants')} />
+                  <input type="checkbox" value={memberKey(member.id)} className="accent-accent" {...register('participants')} />
                   <MemberAvatar name={member.name} colorTag={member.colorTag} size="sm" />
                   {member.name.split(' ')[0]}
+                </label>
+              ))}
+              {guests.map((guest) => (
+                <label key={guest.id} className={checkOption}>
+                  <input type="checkbox" value={guestKey(guest.id)} className="accent-accent" {...register('participants')} />
+                  {guest.name.split(' ')[0]}
                 </label>
               ))}
             </div>
@@ -237,7 +258,7 @@ export function ExpenseFormDialog({
                     </p>
                   ) : null}
                   {members
-                    .filter((member) => participants.includes(member.id))
+                    .filter((member) => participants.includes(memberKey(member.id)))
                     .map((member) => (
                       <Field key={member.id} label={member.name} className="grid-cols-[1fr_130px] items-center gap-3 max-[650px]:grid-cols-1">
                         {(props) => (
@@ -249,6 +270,23 @@ export function ExpenseFormDialog({
                             inputMode="decimal"
                             placeholder="0,00"
                             {...register(`customShares.${memberKey(member.id)}`)}
+                          />
+                        )}
+                      </Field>
+                    ))}
+                  {guests
+                    .filter((guest) => participants.includes(guestKey(guest.id)))
+                    .map((guest) => (
+                      <Field key={guest.id} label={`${guest.name} (invité)`} className="grid-cols-[1fr_130px] items-center gap-3 max-[650px]:grid-cols-1">
+                        {(props) => (
+                          <Input
+                            {...props}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            {...register(`customShares.${guestKey(guest.id)}`)}
                           />
                         )}
                       </Field>

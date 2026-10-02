@@ -2,36 +2,36 @@
  * Edge Function `expense-settlement`.
  *
  * Point d'entrée : `POST /functions/v1/expense-settlement`
- * Corps : `{ household_id?: string }`
+ * Corps : `{ household_id?: string, ardoise_id?: string }`
+ * En-tête invité : `x-ardoise-guest: <ticket brut>` (sans compte, voir
+ * `ardoise-invite`). Le ticket brut n'est ni persisté ni journalisé : seule
+ * son empreinte SHA-256 transite vers la base.
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
- *   `auth: 'user'` — session obligatoire (`Authorization: Bearer <JWT>`).
- *   Le foyer est déduit de la session : aucun appel sans session n'aboutit,
- *   et aucun appel ne peut viser un foyer dont l'appelant n'est pas membre.
+ *   `auth: ['user', 'publishable']`
+ *   * `user`        → session obligatoire. Le foyer est déduit de la session ;
+ *                     une ardoise ne se calcule que si l'appelant la voit
+ *                     (membre inscrit ou admin, revérifié en base).
+ *   * `publishable` → accepté par la passerelle UNIQUEMENT avec un ticket
+ *                     invité valide (`x-ardoise-guest`) et `ardoise_id`.
+ *                     Sans ticket : 401, sans valider quoi que ce soit.
  *
  *   La compilation des soldes et la compensation des dettes sont faites
- *   EN BASE par `private.household_balances()` et
- *   `private.simplify_household_debts()` (migration 0006), via le pont
- *   `public.expense_settlement()` (migration 0013). C'est la référence que le
- *   client affiche quand il est connecté (`useServerSettlement`) ; le calcul
- *   local de `app/src/modules/ardoise/types.ts` ne sert que de repli (démo,
- *   hors ligne, fonction injoignable).
+ *   EN BASE (`private.ardoise_balances()` / `simplify_ardoise_debts()`,
+ *   `household_balances()` / `simplify_household_debts()` historiques), via
+ *   les ponts `public.ardoise_settlement()` / `public.expense_settlement()`.
+ *   Le calcul local de `app/src/modules/ardoise/types.ts` ne sert que de
+ *   repli (démo, hors ligne, fonction injoignable).
  *
- * CONTRAT DE RÉPONSE
+ * CONTRAT DE RÉPONSE (ardoise)
  *   {
- *     household_id: string,
- *     balances:    [{ member_id, display_name, amount }],
- *     settlements: [{ from_member_id, from_name, to_member_id, to_name, amount }],
+ *     ardoise_id, household_id: string,
+ *     balances:    [{ kind, participant_id, display_name, amount }],
+ *     settlements: [{ from_kind, from_id, from_name, to_kind, to_id, to_name, amount }],
  *     generated_at: string
  *   }
  *
- *   `amount` est un nombre arrondi au centime, positif dans les deux sens :
- *   solde positif = le foyer lui doit, transfert = `from_member_id` rembourse
- *   `to_member_id`.
- *
- * Note d'exécution : `withSupabase` renvoie un gestionnaire `fetch` ; on le
- * passe à `Deno.serve`, forme équivalente à `export default { fetch }` pour le
- * runtime Deno de la stack auto-hébergée.
+ *   `amount` est un nombre arrondi au centime, positif dans les deux sens.
  */
 
 // Spécificateur BARE, et non `npm:@supabase/server` : le runtime publie une
@@ -58,7 +58,7 @@ const JSON_HEADERS = {
 
 const CORS_HEADERS = {
   'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, apikey, content-type',
+  'access-control-allow-headers': 'authorization, apikey, content-type, x-ardoise-guest',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 
@@ -88,8 +88,10 @@ class SettlementError extends Error {
  * des uuid : la validation ne doit surtout pas imposer un format uuid.
  */
 const requestSchema = z.object({
-  /** Foyer visé ; absent, le premier foyer de l'appelant est utilisé. */
+  /** Foyer visé (chemin historique) ; absent, le premier foyer de l'appelant est utilisé. */
   household_id: z.string().trim().min(1).max(128).optional(),
+  /** Ardoise visée : fait foi dès qu'elle est présente (revérifiée en base). */
+  ardoise_id: z.string().trim().min(1).max(128).optional(),
 });
 
 async function parseBody(request: Request): Promise<z.infer<typeof requestSchema>> {
@@ -137,10 +139,27 @@ interface BalanceRow {
   amount: number;
 }
 
+interface ArdoiseBalanceRow {
+  kind: string;
+  participant_id: string;
+  display_name: string;
+  amount: number;
+}
+
 interface SettlementRow {
   from_member_id: string;
   from_name: string;
   to_member_id: string;
+  to_name: string;
+  amount: number;
+}
+
+interface ArdoiseSettlementRow {
+  from_kind: string;
+  from_id: string;
+  from_name: string;
+  to_kind: string;
+  to_id: string;
   to_name: string;
   amount: number;
 }
@@ -189,6 +208,52 @@ function readSettlements(value: unknown): SettlementRow[] {
       amount: toCents(item.amount),
     };
   });
+}
+
+function readArdoiseBalances(value: unknown): ArdoiseBalanceRow[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((row) => {
+    const item = (row ?? {}) as Record<string, unknown>;
+    return {
+      kind: String(item.kind ?? 'membre'),
+      participant_id: String(item.participant_id ?? ''),
+      display_name: String(item.display_name ?? ''),
+      amount: toCents(item.amount),
+    };
+  });
+}
+
+function readArdoiseSettlements(value: unknown): ArdoiseSettlementRow[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((row) => {
+    const item = (row ?? {}) as Record<string, unknown>;
+    return {
+      from_kind: String(item.from_kind ?? 'membre'),
+      from_id: String(item.from_id ?? ''),
+      from_name: String(item.from_name ?? ''),
+      to_kind: String(item.to_kind ?? 'membre'),
+      to_id: String(item.to_id ?? ''),
+      to_name: String(item.to_name ?? ''),
+      amount: toCents(item.amount),
+    };
+  });
+}
+
+/** SHA-256 hexadécimal (ticket invité → empreinte vérifiée en base).
+ *
+ * Le ticket est une capacité de 192 bits : son empreinte SHA-256 suffit à le
+ * vérifier sans le stocker en clair, et aucun secret n'est requis ici — le
+ * secret HMAC (`ARDOISE_HMAC_SECRET`) protège les codes d'invitation, pas les
+ * tickets (générés et hachés côté base dans `redeem_ardoise_invite`). */
+async function sha256Hex(ticket: string): Promise<string> {
+  const bytes = new TextEncoder().encode(ticket);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +313,12 @@ function translateRpcError(error: { code?: string; message?: string }): Settleme
   if (message.includes('n’appartenez pas') || message.includes("n'appartenez pas")) {
     return new SettlementError(403, 'Vous n’appartenez pas à ce foyer.');
   }
+  if (message.includes('ticket invalide')) {
+    return new SettlementError(404, 'Ticket invité invalide.');
+  }
+  if (message.includes('inscription à l’ardoise requise')) {
+    return new SettlementError(403, 'Vous ne participez pas à cette ardoise.');
+  }
   if (message.includes('session requise')) {
     return new SettlementError(401, 'Connectez-vous pour consulter l’Ardoise.');
   }
@@ -281,7 +352,7 @@ function translateRpcError(error: { code?: string; message?: string }): Settleme
 // ---------------------------------------------------------------------------
 
 Deno.serve(
-  withSupabase({ auth: 'user' }, async (request, ctx) => {
+  withSupabase({ auth: ['user', 'publishable'] }, async (request, ctx) => {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
@@ -291,15 +362,64 @@ Deno.serve(
         return json({ error: 'Méthode non autorisée.' }, 405);
       }
 
+      const body = await parseBody(request);
       const userId = ctx.authMode === 'user' ? ctx.userClaims?.id : undefined;
+      const guestTicket = request.headers.get('x-ardoise-guest')?.trim() || null;
+      const admin: AdminClient = ctx.supabaseAdmin;
+
+      // Chemin ardoise : membre inscrit (session) ou invité (ticket + publishable).
+      if (body.ardoise_id) {
+        if (guestTicket) {
+          const ticketHash = await sha256Hex(guestTicket);
+          const { data, error } = await admin.rpc('ardoise_settlement', {
+            p_actor_id: null,
+            p_ardoise_id: body.ardoise_id,
+            p_ticket_hash: ticketHash,
+          });
+          if (error) throw translateRpcError(error);
+          const result = (data ?? {}) as SettlementResult;
+          return json({
+            ardoise_id: body.ardoise_id,
+            household_id: result.household_id ?? null,
+            balances: readArdoiseBalances(result.balances),
+            settlements: readArdoiseSettlements(result.settlements),
+            generated_at: result.generated_at ?? new Date().toISOString(),
+          });
+        }
+        if (!userId) {
+          return json({ error: 'Connectez-vous pour consulter l’Ardoise.' }, 401);
+        }
+        // L'ardoise doit être visible de l'appelant (la base revérifie).
+        const { data: visible } = await ctx.supabase
+          .from('ardoises')
+          .select('id')
+          .eq('id', body.ardoise_id)
+          .maybeSingle();
+        if (!visible) {
+          return json({ error: 'Vous ne participez pas à cette ardoise.' }, 403);
+        }
+        const { data, error } = await admin.rpc('ardoise_settlement', {
+          p_actor_id: userId,
+          p_ardoise_id: body.ardoise_id,
+          p_ticket_hash: null,
+        });
+        if (error) throw translateRpcError(error);
+        const result = (data ?? {}) as SettlementResult;
+        return json({
+          ardoise_id: body.ardoise_id,
+          household_id: result.household_id ?? null,
+          balances: readArdoiseBalances(result.balances),
+          settlements: readArdoiseSettlements(result.settlements),
+          generated_at: result.generated_at ?? new Date().toISOString(),
+        });
+      }
+
+      // Chemin historique (foyer entier) : session obligatoire.
       if (!userId) {
         return json({ error: 'Connectez-vous pour consulter l’Ardoise.' }, 401);
       }
-
-      const body = await parseBody(request);
       const householdId = await resolveHousehold(ctx.supabase, userId, body.household_id);
 
-      const admin: AdminClient = ctx.supabaseAdmin;
       const { data, error } = await admin.rpc('expense_settlement', {
         p_actor_id: userId,
         p_household_id: householdId,

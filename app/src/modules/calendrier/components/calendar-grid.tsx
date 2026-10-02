@@ -160,6 +160,9 @@ export function CalendarGrid({
                   {marker.hasTask ? (
                     <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[oklch(55%_0.13_300)]')} />
                   ) : null}
+                  {marker.hasVacation ? (
+                    <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[#1f4e79]')} />
+                  ) : null}
                 </span>
               ) : null}
             </button>
@@ -179,6 +182,10 @@ export function CalendarGrid({
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="size-[6px] rounded-full bg-amber" />
           Jour férié
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="size-[6px] rounded-full bg-[#1f4e79]" />
+          Vacances
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="size-[6px] rounded-full bg-[oklch(55%_0.13_300)]" />

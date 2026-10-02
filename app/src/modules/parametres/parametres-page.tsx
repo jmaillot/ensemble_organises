@@ -3,6 +3,7 @@ import { ModuleHeader } from '@/components/shared/module-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { HouseholdForm } from './components/household-form';
 import { InvitationsPanel } from './components/invitations-panel';
+import { LinkedAccountsPanel } from './components/linked-accounts-panel';
 import { MembersPanel } from './components/members-panel';
 import { NotificationsPanel } from './components/notifications-panel';
 import { OfflinePanel } from './components/offline-panel';
@@ -38,7 +39,10 @@ export default function ParametresPage() {
           ))}
         </TabsList>
         <TabsContent value="profil">
-          <ProfileForm />
+          <div className="grid gap-[18px]">
+            <ProfileForm />
+            <LinkedAccountsPanel />
+          </div>
         </TabsContent>
         <TabsContent value="foyer">
           <div className="grid gap-[18px]">

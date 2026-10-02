@@ -3,12 +3,13 @@ import { ModuleShell, MetricRow, Panel, SectionHeading } from '@/components/shar
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
-import { SearchInput } from '@/components/ui/input';
+import { SearchInput, Select } from '@/components/ui/input';
 import { Badge } from '@/components/ui/primitives';
 import { Checkbox } from '@/components/ui/primitives';
 import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
+import { FolderTabs } from '@/components/shared/folder-tabs';
 import { useCalendarGrid } from '@/hooks/use-calendar';
 import { formatMonthLabel } from '@/lib/utils';
 import { RoutineCard } from './components/routine-card';
@@ -25,7 +26,17 @@ export default function RoutinesPage() {
     visibleRoutines,
     history,
     dayStatuses,
+    members,
     currentMemberId,
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    assigneeFilter,
+    setAssigneeFilter,
+    canWrite,
+    createFolder,
+    renameFolder,
+    deleteFolder,
     period,
     setPeriod,
     query,
@@ -71,9 +82,11 @@ export default function RoutinesPage() {
     <ModuleShell
       module="routines"
       actions={
-        <Button icon="plus" onClick={openCreate}>
-          Nouvelle routine
-        </Button>
+        canWrite ? (
+          <Button icon="plus" onClick={openCreate}>
+            Nouvelle routine
+          </Button>
+        ) : null
       }
     >
       <MetricRow
@@ -88,6 +101,38 @@ export default function RoutinesPage() {
           },
         ]}
       />
+
+      <div className="mb-4">
+        <FolderTabs
+          folders={folders}
+          activeId={activeFolderId}
+          onSelect={setActiveFolderId}
+          onCreate={async (name, visibility) => {
+            await createFolder(name, visibility);
+            toast('Dossier créé.');
+          }}
+          onRename={async (id, name) => {
+            try {
+              await renameFolder(id, name);
+              toast('Dossier renommé.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être renommé.', 'error');
+              throw folderError;
+            }
+          }}
+          onDelete={async (folder) => {
+            try {
+              await deleteFolder(folder.id);
+              toast('Dossier supprimé, contenu rangé dans Général.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être supprimé.', 'error');
+              throw folderError;
+            }
+          }}
+          canManage={canWrite}
+          label="Dossiers de routines"
+        />
+      </div>
 
       {isError ? (
         <ErrorState
@@ -115,16 +160,16 @@ export default function RoutinesPage() {
                   icon="wand"
                   title="Aucune routine dans le foyer"
                   description="Les séries se construisent avec les petits gestes répétés. Créez un premier rituel récurrent pour lancer la dynamique."
-                  actionLabel="Créer une routine"
-                  onAction={openCreate}
+                  actionLabel={canWrite ? 'Créer une routine' : undefined}
+                  onAction={canWrite ? openCreate : undefined}
                 />
               ) : dueToday.length === 0 ? (
                 <EmptyState
                   icon="checkCircle"
                   title="Rien à cocher aujourd’hui"
                   description="Aucune routine n’est prévue pour aujourd’hui. Les prochaines occurrences apparaîtront ici au moment venu."
-                  actionLabel="Créer une routine"
-                  onAction={openCreate}
+                  actionLabel={canWrite ? 'Créer une routine' : undefined}
+                  onAction={canWrite ? openCreate : undefined}
                   secondaryActionLabel="Voir toutes les routines"
                   onSecondaryAction={() => routinesPanelRef.current?.scrollIntoView({ block: 'start' })}
                 />
@@ -139,6 +184,7 @@ export default function RoutinesPage() {
                       key={routine.id}
                       routine={routine}
                       showStreakBadge
+                      readOnly={!canWrite}
                       onToggle={(target) => {
                         void toggleOccurrence(target).catch((toggleError: unknown) =>
                           report(toggleError, 'L’occurrence n’a pas pu être enregistrée.'),
@@ -156,13 +202,29 @@ export default function RoutinesPage() {
                 title="Toutes les routines"
                 description="Fréquence, prochaine occurrence et série de chaque rituel."
                 action={
-                  <SearchInput
-                    aria-label="Rechercher une routine"
-                    placeholder="Rechercher une routine"
-                    className="w-auto min-w-[200px] max-[650px]:w-full max-[650px]:min-w-0"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    <SearchInput
+                      aria-label="Rechercher une routine"
+                      placeholder="Rechercher une routine"
+                      className="w-auto min-w-[200px] max-[650px]:w-full max-[650px]:min-w-0"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                    <Select
+                      aria-label="Filtrer par assigné"
+                      className="w-auto min-w-[170px] max-[650px]:w-full max-[650px]:min-w-0"
+                      value={assigneeFilter}
+                      onChange={(event) => setAssigneeFilter(event.target.value)}
+                    >
+                      <option value="tous">Tous les assignés</option>
+                      <option value="non-assigne">Non assignées</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.display_name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                 }
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -221,22 +283,26 @@ export default function RoutinesPage() {
                         {routine.isLate ? <Badge tone="coral">{routine.lateLabel ?? 'En retard'}</Badge> : null}
 
                         <div className="ml-auto flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(routine)}
-                            aria-label={`Modifier la routine ${routine.name}`}
-                            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
-                          >
-                            <Icon name="edit" size="sm" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(routine)}
-                            aria-label={`Supprimer la routine ${routine.name}`}
-                            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
-                          >
-                            <Icon name="trash" size="sm" />
-                          </button>
+                          {canWrite ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(routine)}
+                                aria-label={`Modifier la routine ${routine.name}`}
+                                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+                              >
+                                <Icon name="edit" size="sm" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingDelete(routine)}
+                                aria-label={`Supprimer la routine ${routine.name}`}
+                                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                              >
+                                <Icon name="trash" size="sm" />
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -272,6 +338,8 @@ export default function RoutinesPage() {
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         routine={dialog.routine}
         currentMemberId={currentMemberId}
+        initialFolderId={activeFolderId}
+        folders={folders}
         isSaving={isMutating}
         onSubmit={async (values) => {
           const editing = dialog.routine;

@@ -1,20 +1,24 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { data } from '@/lib/data';
 import { queryKeys, useResource } from '@/lib/data/useResource';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
 import { addDays, todayIso } from '@/lib/utils';
-import type { HouseholdMemberRow, RoutineCompletionRow, RoutineRow } from '@/types';
+import type { HouseholdMemberRow, RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
 import {
   ROUTINE_ASSIGNEES_TABLE,
   ROUTINE_COMPLETIONS_TABLE,
+  ROUTINE_FOLDERS_TABLE,
   ROUTINE_REMINDERS_TABLE,
   ROUTINES_TABLE,
+  createRoutineFolder,
   deleteOccurrence as deleteOccurrenceRow,
   deleteRoutineChildren,
   listRoutineAssignees,
   listRoutineReminders,
   markOccurrenceDone,
   markOccurrenceMissed,
+  renameRoutineFolder,
   setRoutineAssignees,
   setRoutineReminders,
   toReminderIsos,
@@ -24,6 +28,8 @@ import {
   CALENDAR_MARGIN_DAYS,
   buildRoutines,
   filterRoutines,
+  filterRoutinesByAssignee,
+  filterRoutinesByFolder,
   routineDayStatuses,
   routineHistory,
   routineMetrics,
@@ -33,6 +39,7 @@ import {
   type HistoryEntry,
   type HistoryPeriod,
   type Routine,
+  type RoutineAssigneeFilter,
   type RoutineAssigneeRecord,
   type RoutineFormValues,
   type RoutineMetrics,
@@ -44,7 +51,7 @@ export interface UseRoutinesResult extends RoutineMetrics {
   routines: Routine[];
   /** Occurrences dues aujourd'hui, à cocher comme une checklist. */
   dueToday: Routine[];
-  /** Routines du foyer filtrées par la recherche de la liste complète. */
+  /** Routines de l'onglet courant, filtrées par la recherche et l'assigné. */
   visibleRoutines: Routine[];
   /** Historique de la période courante, passé puis à venir. */
   history: HistoryEntry[];
@@ -52,6 +59,17 @@ export interface UseRoutinesResult extends RoutineMetrics {
   dayStatuses: DayStatusMap;
   members: HouseholdMemberRow[];
   currentMemberId: string;
+  folders: RoutineFolderRow[];
+  /** Onglet dossier : `null` = Général. */
+  activeFolderId: string | null;
+  setActiveFolderId: (id: string | null) => void;
+  assigneeFilter: RoutineAssigneeFilter;
+  setAssigneeFilter: (filter: RoutineAssigneeFilter) => void;
+  /** Faux pour le rôle `enfant` (lecture seule). */
+  canWrite: boolean;
+  createFolder: (name: string, visibility: RoutineFolderRow['visibility']) => Promise<RoutineFolderRow>;
+  renameFolder: (id: string, name: string) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
   period: HistoryPeriod;
   setPeriod: (period: HistoryPeriod) => void;
   query: string;
@@ -83,6 +101,38 @@ export function useRoutines(): UseRoutinesResult {
   const today = todayIso();
   const [period, setPeriod] = useState<HistoryPeriod>(7);
   const [query, setQuery] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState<RoutineAssigneeFilter>('tous');
+
+  const foldersResource = useResource<RoutineFolderRow>(ROUTINE_FOLDERS_TABLE);
+  const folders = useMemo(
+    () => [...foldersResource.rows].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    [foldersResource.rows],
+  );
+
+  const folderStorageKey = `eo:routines:folder:${householdId ?? 'none'}`;
+  const [storedFolderId, setStoredFolderId] = useState<string | null>(() => {
+    try {
+      return window.localStorage.getItem(folderStorageKey);
+    } catch {
+      return null;
+    }
+  });
+  const activeFolderId =
+    storedFolderId !== null && folders.some((folder) => folder.id === storedFolderId) ? storedFolderId : null;
+  const setActiveFolderId = useCallback(
+    (id: string | null) => {
+      setStoredFolderId(id);
+      try {
+        if (id === null) window.localStorage.removeItem(folderStorageKey);
+        else window.localStorage.setItem(folderStorageKey, id);
+      } catch {
+        // Stockage indisponible : l'onglet reste en mémoire pour la session.
+      }
+    },
+    [folderStorageKey],
+  );
+
+  const canWrite = currentMember?.role !== 'enfant';
 
   const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<RoutineRow>(ROUTINES_TABLE);
@@ -109,8 +159,11 @@ export function useRoutines(): UseRoutinesResult {
     () => buildRoutines(rows, assignees, reminders, completions, members, today),
     [assignees, completions, members, reminders, rows, today],
   );
-  const dueToday = useMemo(() => todayOccurrencesOf(routines), [routines]);
-  const visibleRoutines = useMemo(() => filterRoutines(routines, query), [query, routines]);
+  const dueToday = useMemo(() => todayOccurrencesOf(filterRoutinesByFolder(routines, activeFolderId)), [activeFolderId, routines]);
+  const visibleRoutines = useMemo(
+    () => filterRoutinesByAssignee(filterRoutines(filterRoutinesByFolder(routines, activeFolderId), query), assigneeFilter),
+    [activeFolderId, assigneeFilter, query, routines],
+  );
   const history = useMemo(
     () => routineHistory(routines, completions, members, period, today),
     [completions, members, period, routines, today],
@@ -131,6 +184,7 @@ export function useRoutines(): UseRoutinesResult {
   const refresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: [ROUTINES_TABLE] }),
+      queryClient.invalidateQueries({ queryKey: [ROUTINE_FOLDERS_TABLE] }),
       queryClient.invalidateQueries({ queryKey: [ROUTINE_COMPLETIONS_TABLE] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(ROUTINE_ASSIGNEES_TABLE) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(ROUTINE_REMINDERS_TABLE) }),
@@ -140,6 +194,7 @@ export function useRoutines(): UseRoutinesResult {
   const toggleOccurrence = useCallback(
     async (routine: Routine) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       if (routine.isDoneToday) {
         await markOccurrenceMissed({ routineId: routine.id, householdId, occurrenceDate: today });
       } else {
@@ -152,12 +207,13 @@ export function useRoutines(): UseRoutinesResult {
       }
       await refresh();
     },
-    [currentMember?.id, householdId, refresh, today],
+    [canWrite, currentMember?.id, householdId, refresh, today],
   );
 
   const saveRoutine = useCallback(
     async (routine: Routine | null, values: RoutineFormValues) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       const selection = {
         weeklyDays: values.weeklyDays,
         monthlyMode: values.monthlyMode,
@@ -180,16 +236,47 @@ export function useRoutines(): UseRoutinesResult {
       ]);
       await refresh();
     },
-    [create, currentMember?.id, householdId, refresh, update],
+    [canWrite, create, currentMember?.id, householdId, refresh, update],
   );
 
   const removeRoutine = useCallback(
     async (routine: Routine) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       // La ligne `routines` part par la ressource, ses tables enfants par l'API.
       await Promise.all([remove(routine.id), deleteRoutineChildren(routine.id)]);
       await refresh();
     },
-    [refresh, remove],
+    [canWrite, refresh, remove],
+  );
+
+  const createFolder = useCallback(
+    async (name: string, visibility: RoutineFolderRow['visibility']) => {
+      if (!householdId || !currentMember) throw new Error('Aucun foyer sélectionné.');
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      const folder = await createRoutineFolder(householdId, currentMember.id, name, visibility);
+      await refresh();
+      return folder;
+    },
+    [canWrite, currentMember, householdId, refresh],
+  );
+
+  const renameFolder = useCallback(
+    async (id: string, name: string) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      await renameRoutineFolder(id, name);
+      await refresh();
+    },
+    [canWrite, refresh],
+  );
+
+  const deleteFolder = useCallback(
+    async (id: string) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      await data.remove(ROUTINE_FOLDERS_TABLE, id);
+      if (activeFolderId === id) setActiveFolderId(null);
+      await refresh();
+    },
+    [activeFolderId, canWrite, refresh, setActiveFolderId],
   );
 
   const removeOccurrence = useCallback(
@@ -208,6 +295,15 @@ export function useRoutines(): UseRoutinesResult {
     dayStatuses,
     members,
     currentMemberId: currentMember?.id ?? '',
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    assigneeFilter,
+    setAssigneeFilter,
+    canWrite,
+    createFolder,
+    renameFolder,
+    deleteFolder,
     period,
     setPeriod,
     query,

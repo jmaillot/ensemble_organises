@@ -6,7 +6,7 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Les 45 tables du contrat existent, avec exactement les colonnes attendues
+-- 1. Les tables du contrat existent, avec exactement les colonnes attendues
 --
 -- L'inventaire est la seule chose qui rattrape un oubli de colonne : la RLS et
 -- les contraintes ne les voient pas. `push_subscriptions` y figure depuis la
@@ -23,26 +23,36 @@ begin
   for r in
     select * from (values
           ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at']::text[]),
-          ('households', ARRAY['id', 'name', 'avatar_color', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('households', ARRAY['id', 'name', 'avatar_color', 'school_zone', 'created_by', 'created_at', 'updated_at']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('invitations', ARRAY['id', 'household_id', 'email', 'phone', 'role', 'status', 'created_at']::text[]),
           ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at']::text[]),
           ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'created_at']::text[]),
-          ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'created_by', 'created_at']::text[]),
+          ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'category_id', 'calendar_id', 'created_by', 'created_at']::text[]),
+          ('event_categories', ARRAY['id', 'household_id', 'name', 'color', 'icon', 'is_default', 'created_by', 'created_at']::text[]),
+          ('event_calendars', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'color', 'created_at', 'updated_at']::text[]),
+          ('public_holidays', ARRAY['holiday_date', 'name', 'year']::text[]),
+          ('school_holidays', ARRAY['id', 'zone', 'school_year', 'name', 'start_date', 'end_date']::text[]),
           ('event_reminders', ARRAY['id', 'event_id', 'remind_at']::text[]),
-          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at']::text[]),
           ('note_attachments', ARRAY['id', 'note_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
-          ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'created_by', 'created_at']::text[]),
+          ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'folder_id', 'created_by', 'created_at']::text[]),
           ('task_assignees', ARRAY['task_id', 'member_id']::text[]),
           ('task_reminders', ARRAY['id', 'task_id', 'remind_at']::text[]),
-          ('routines', ARRAY['id', 'household_id', 'name', 'description', 'recurrence_rule', 'created_by', 'created_at']::text[]),
+          ('routines', ARRAY['id', 'household_id', 'name', 'description', 'recurrence_rule', 'folder_id', 'created_by', 'created_at']::text[]),
           ('routine_assignees', ARRAY['routine_id', 'member_id']::text[]),
           ('routine_reminders', ARRAY['id', 'routine_id', 'remind_at']::text[]),
           ('routine_completions', ARRAY['id', 'routine_id', 'household_id', 'occurrence_date', 'completed_by', 'completed_at', 'status']::text[]),
           ('recipes', ARRAY['id', 'household_id', 'title', 'created_at']::text[]),
-          ('expenses', ARRAY['id', 'household_id', 'title', 'amount', 'paid_by', 'expense_date', 'split_type', 'created_at']::text[]),
-          ('expense_participants', ARRAY['id', 'expense_id', 'participant_type', 'member_id', 'share_amount']::text[]),
+          ('ardoises', ARRAY['id', 'household_id', 'name', 'description', 'cover_url', 'invite_hash', 'is_active', 'max_uses', 'use_count', 'expires_at', 'created_by', 'created_at']::text[]),
+          ('ardoise_members', ARRAY['ardoise_id', 'member_id']::text[]),
+          ('ardoise_guests', ARRAY['id', 'ardoise_id', 'display_name', 'ticket_hash', 'created_at']::text[]),
+          ('task_lists', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
+          ('note_folders', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
+          ('routine_folders', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
+          ('expenses', ARRAY['id', 'household_id', 'ardoise_id', 'title', 'amount', 'paid_by', 'paid_by_guest', 'expense_date', 'split_type', 'created_at']::text[]),
+          ('expense_participants', ARRAY['id', 'expense_id', 'participant_type', 'member_id', 'guest_id', 'share_amount']::text[]),
           ('gift_lists', ARRAY['id', 'household_id', 'owner_member_id', 'name', 'visibility', 'created_at']::text[]),
           ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'purchased', 'created_at']::text[]),
           ('gift_list_shares', ARRAY['id', 'list_id', 'shared_with_member_id', 'shared_with_email', 'permission']::text[]),

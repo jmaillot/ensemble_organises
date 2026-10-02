@@ -12,6 +12,8 @@ const event = (overrides: Partial<EventRow>): EventRow => ({
   all_day: false,
   location: null,
   color: null,
+  category_id: null,
+  calendar_id: 'cal',
   created_by: null,
   created_at: '2026-09-30T10:00:00.000Z',
   ...overrides,

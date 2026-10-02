@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { FolderTabs } from '@/components/shared/folder-tabs';
 import { memberFirstName, taskFilters, type Task } from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
@@ -36,8 +37,18 @@ export default function TachesPage() {
   const {
     visibleTasks,
     reminders,
+    members,
     filter,
     setFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    canWrite,
+    createFolder,
+    renameFolder,
+    deleteFolder,
     open: openCount,
     total,
     highPriority,
@@ -128,9 +139,11 @@ export default function TachesPage() {
     <ModuleShell
       module="taches"
       actions={
-        <Button icon="plus" onClick={openCreate}>
-          Ajouter une tâche
-        </Button>
+        canWrite ? (
+          <Button icon="plus" onClick={openCreate}>
+            Ajouter une tâche
+          </Button>
+        ) : null
       }
     >
       <MetricRow
@@ -141,6 +154,39 @@ export default function TachesPage() {
           { label: 'Membres', value: assigneeCount, caption: 'participants actifs' },
         ]}
       />
+
+      <div className="mb-4">
+        <FolderTabs
+          folders={folders}
+          activeId={activeFolderId}
+          onSelect={setActiveFolderId}
+          onCreate={async (name, visibility) => {
+            // Le dialogue affiche lui-même l'erreur en ligne et reste ouvert.
+            await createFolder(name, visibility);
+            toast('Dossier créé.');
+          }}
+          onRename={async (id, name) => {
+            try {
+              await renameFolder(id, name);
+              toast('Dossier renommé.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être renommé.', 'error');
+              throw folderError;
+            }
+          }}
+          onDelete={async (folder) => {
+            try {
+              await deleteFolder(folder.id);
+              toast('Dossier supprimé, contenu rangé dans Général.');
+            } catch (folderError) {
+              toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être supprimé.', 'error');
+              throw folderError;
+            }
+          }}
+          canManage={canWrite}
+          label="Dossiers de tâches"
+        />
+      </div>
 
       {isError ? (
         <ErrorState
@@ -154,18 +200,34 @@ export default function TachesPage() {
             title="Vos prochaines tâches"
             description="Glissez les lignes pour réordonner, ou changez la priorité."
             action={
-              <Select
-                aria-label="Filtrer les tâches"
-                className="w-auto min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value as typeof filter)}
-              >
-                {taskFilters.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  aria-label="Filtrer les tâches"
+                  className="w-auto min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value as typeof filter)}
+                >
+                  {taskFilters.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="Filtrer par assigné"
+                  className="w-auto min-w-[170px] max-[650px]:w-full max-[650px]:min-w-0"
+                  value={assigneeFilter}
+                  onChange={(event) => setAssigneeFilter(event.target.value)}
+                >
+                  <option value="tous">Tous les assignés</option>
+                  <option value="non-assigne">Non assignées</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.display_name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             }
           >
             {isLoading ? (
@@ -179,9 +241,31 @@ export default function TachesPage() {
                     ? 'Les tâches cochées apparaîtront ici, avec leur date d’échéance.'
                     : 'Rien ne presse pour le moment. Ajoutez une tâche avec une échéance claire pour que le foyer s’organise.'
                 }
-                actionLabel="Ajouter une tâche"
-                onAction={openCreate}
+                actionLabel={canWrite ? 'Ajouter une tâche' : undefined}
+                onAction={canWrite ? openCreate : undefined}
               />
+            ) : !canWrite ? (
+              <div role="list" aria-label="Tâches du foyer" className="grid gap-2.5">
+                {visibleTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    readOnly
+                    onToggle={(target) => {
+                      void toggleStatus(target).catch((toggleError: unknown) =>
+                        toast(
+                          toggleError instanceof Error
+                            ? toggleError.message
+                            : 'Le statut n’a pas pu être mis à jour.',
+                          'error',
+                        ),
+                      );
+                    }}
+                    onEdit={openEdit}
+                    onDelete={setPendingDelete}
+                  />
+                ))}
+              </div>
             ) : (
               <DndContext
                 sensors={sensors}
@@ -197,6 +281,7 @@ export default function TachesPage() {
                       <TaskRow
                         key={task.id}
                         task={task}
+                        readOnly={!canWrite}
                         onToggle={(target) => {
                           void toggleStatus(target).catch((toggleError: unknown) =>
                             toast(
@@ -269,6 +354,8 @@ export default function TachesPage() {
         task={dialog.task}
         currentMemberId={currentMemberId}
         initialDueDate={dialog.dueDate}
+        initialFolderId={activeFolderId}
+        folders={folders}
         isSaving={isMutating}
         onSubmit={async (values) => {
           const editing = dialog.task;

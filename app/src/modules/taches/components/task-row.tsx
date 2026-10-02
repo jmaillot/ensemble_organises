@@ -12,6 +12,8 @@ export interface TaskRowProps {
   onToggle: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
+  /** Rôle `enfant` : lecture seule, sans poignée ni actions d'écriture. */
+  readOnly?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ export interface TaskRowProps {
  * assignataires, rappel, priorité et actions. Le glisser-déposer s'appuie sur
  * dnd-kit, la poignée restant un vrai bouton utilisable au clavier.
  */
-export function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
+export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false }: TaskRowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -36,20 +38,25 @@ export function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
         isDragging && 'opacity-50',
       )}
     >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label={`Réordonner : ${task.name}`}
-        className="relative grid size-[20px] cursor-grab place-items-center text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
-      >
-        <Icon name="drag" size="sm" />
-      </button>
+      {!readOnly ? (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label={`Réordonner : ${task.name}`}
+          className="relative grid size-[20px] cursor-grab place-items-center text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
+        >
+          <Icon name="drag" size="sm" />
+        </button>
+      ) : (
+        <span aria-hidden="true" className="max-[650px]:hidden" />
+      )}
 
       <Checkbox
         checked={done}
         onCheckedChange={() => onToggle(task)}
+        disabled={readOnly}
         aria-label={`${done ? 'Rouvrir' : 'Terminer'} ${task.name}`}
         // La case mesure 19px comme dans l'export : la zone cliquable est
         // agrandie à 43px sans modifier la mise en page.
@@ -83,22 +90,26 @@ export function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
 
       <div className="flex items-center gap-[5px]">
         <PriorityTag priority={task.priority} />
-        <button
-          type="button"
-          onClick={() => onEdit(task)}
-          aria-label={`Modifier ${task.name}`}
-          className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg max-[650px]:hidden"
-        >
-          <Icon name="edit" size="sm" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(task)}
-          aria-label={`Supprimer ${task.name}`}
-          className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
-        >
-          <Icon name="trash" size="sm" />
-        </button>
+        {!readOnly ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(task)}
+              aria-label={`Modifier ${task.name}`}
+              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg max-[650px]:hidden"
+            >
+              <Icon name="edit" size="sm" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(task)}
+              aria-label={`Supprimer ${task.name}`}
+              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+            >
+              <Icon name="trash" size="sm" />
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

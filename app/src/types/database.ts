@@ -67,6 +67,7 @@ export interface HouseholdRow {
   id: Uuid;
   name: string;
   avatar_color: string;
+  school_zone: 'A' | 'B' | 'C' | null;
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
@@ -138,8 +139,49 @@ export interface EventRow {
   all_day: boolean;
   location: string | null;
   color: string | null;
+  category_id: Uuid | null;
+  calendar_id: Uuid;
   created_by: Uuid | null;
   created_at: IsoDateTime;
+}
+
+export type EventCalendarVisibility = 'commun' | 'perso';
+
+export interface EventCategoryRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  color: string;
+  icon: string | null;
+  is_default: boolean;
+  created_by: Uuid | null;
+  created_at: IsoDateTime;
+}
+
+export interface EventCalendarRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  visibility: EventCalendarVisibility;
+  owner_member_id: Uuid | null;
+  color: string | null;
+  created_at: IsoDateTime;
+  updated_at: IsoDateTime;
+}
+
+export interface PublicHolidayRow {
+  holiday_date: IsoDate;
+  name: string;
+  year: number;
+}
+
+export interface SchoolHolidayRow {
+  id: Uuid;
+  zone: 'A' | 'B' | 'C';
+  school_year: string;
+  name: string;
+  start_date: IsoDate;
+  end_date: IsoDate;
 }
 
 export interface EventReminderRow {
@@ -155,6 +197,7 @@ export interface NoteRow {
   content: string;
   category: string;
   color: string | null;
+  folder_id: Uuid | null;
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
@@ -182,6 +225,38 @@ export interface NoteAttachmentRow {
   created_at: IsoDateTime;
 }
 
+export type FolderVisibility = 'perso' | 'foyer';
+
+export interface TaskListRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  visibility: FolderVisibility;
+  owner_member_id: Uuid;
+  is_default: boolean;
+  created_at: IsoDateTime;
+}
+
+export interface NoteFolderRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  visibility: FolderVisibility;
+  owner_member_id: Uuid;
+  is_default: boolean;
+  created_at: IsoDateTime;
+}
+
+export interface RoutineFolderRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  visibility: FolderVisibility;
+  owner_member_id: Uuid;
+  is_default: boolean;
+  created_at: IsoDateTime;
+}
+
 export type TaskStatus = 'a_faire' | 'en_cours' | 'fait';
 export type TaskPriority = 'haute' | 'normale' | 'basse';
 
@@ -193,6 +268,7 @@ export interface TaskRow {
   due_date: IsoDate | null;
   priority_order: number;
   status: TaskStatus;
+  folder_id: Uuid | null;
   created_by: Uuid | null;
   created_at: IsoDateTime;
 }
@@ -214,6 +290,7 @@ export interface RoutineRow {
   name: string;
   description: string | null;
   recurrence_rule: string; // RRULE
+  folder_id: Uuid | null;
   created_by: Uuid | null;
   created_at: IsoDateTime;
 }
@@ -249,9 +326,11 @@ export interface RecipeRow {
 export interface ExpenseRow {
   id: Uuid;
   household_id: Uuid;
+  ardoise_id: Uuid;
   title: string;
   amount: number;
-  paid_by: Uuid; // household_members.id
+  paid_by: Uuid | null; // household_members.id (null si payeur invité)
+  paid_by_guest: Uuid | null; // ardoise_guests.id (exclusif avec paid_by)
   expense_date: IsoDate;
   split_type: 'egal' | 'personnalise';
   created_at: IsoDateTime;
@@ -260,9 +339,38 @@ export interface ExpenseRow {
 export interface ExpenseParticipantRow {
   id: Uuid;
   expense_id: Uuid;
-  participant_type: 'membre';
-  member_id: Uuid;
+  participant_type: 'membre' | 'guest';
+  member_id: Uuid | null;
+  guest_id: Uuid | null;
   share_amount: number;
+}
+
+export interface ArdoiseRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  description: string | null;
+  cover_url: string | null;
+  invite_hash: string | null;
+  is_active: boolean;
+  max_uses: number | null;
+  use_count: number;
+  expires_at: IsoDateTime | null;
+  created_by: Uuid | null;
+  created_at: IsoDateTime;
+}
+
+export interface ArdoiseMemberRow {
+  ardoise_id: Uuid;
+  member_id: Uuid;
+}
+
+export interface ArdoiseGuestRow {
+  id: Uuid;
+  ardoise_id: Uuid;
+  display_name: string;
+  ticket_hash: string;
+  created_at: IsoDateTime;
 }
 
 export interface GiftListRow {

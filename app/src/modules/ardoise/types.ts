@@ -3,20 +3,27 @@ import type { ExpenseParticipantRow, ExpenseRow, MemberColorTag } from '@/types'
 /** Type de partage porté par `expenses.split_type`. */
 export type SplitType = 'egal' | 'personnalise';
 
-/** Nature d'un participant : toujours un membre du foyer (externes purgés, 0039). */
-export type ParticipantKind = 'membre';
+/** Nature d'un participant : membre du foyer ou invité externe d'une ardoise. */
+export type ParticipantKind = 'membre' | 'guest';
 
 export const MEMBER_KEY_PREFIX = 'membre:';
+export const GUEST_KEY_PREFIX = 'invite:';
 
 export const memberKey = (id: string) => `${MEMBER_KEY_PREFIX}${id}`;
+export const guestKey = (id: string) => `${GUEST_KEY_PREFIX}${id}`;
+
+/** Clé stable d'un participant, membre ou invité. */
+export const participantKey = (kind: ParticipantKind, id: string) =>
+  kind === 'guest' ? guestKey(id) : memberKey(id);
 
 /** Résolution d'un `member_id` en libellé. */
 export type ParticipantResolver = (kind: ParticipantKind, id: string) => { name: string; colorTag: MemberColorTag | null } | null;
 
 export interface Participant {
-  /** `membre:<id>` : clé stable d'un participant. */
+  /** `membre:<id>` ou `invite:<id>` : clé stable d'un participant. */
   key: string;
   kind: ParticipantKind;
+  /** `member_id` ou `guest_id` selon le kind. */
   memberId: string;
   name: string;
   colorTag: MemberColorTag | null;
@@ -25,9 +32,11 @@ export interface Participant {
 
 export interface Expense {
   id: string;
+  ardoiseId: string;
   title: string;
   amount: number;
-  paidBy: string;
+  paidBy: string | null;
+  paidByKind: ParticipantKind;
   paidByName: string;
   paidByColorTag: MemberColorTag | null;
   date: string;
@@ -62,9 +71,13 @@ export interface Settlement {
 }
 
 export interface NewExpenseInput {
+  /** Ardoise visée (obligatoire depuis les ardoises multiples). */
+  ardoiseId?: string;
   title: string;
   amount: number;
   paidBy: string;
+  /** Membre ou invité ; `membre` par défaut (compatibilité). */
+  paidByKind?: ParticipantKind;
   date: string;
   splitType: SplitType;
   /** Clés de participants dans l'ordre d'affichage ; le dernier absorbe l'écart. */
@@ -114,25 +127,30 @@ export function toExpense(
   participants: ExpenseParticipantRow[],
   resolve: ParticipantResolver,
 ): Expense {
-  const payer = resolve('membre', row.paid_by);
+  const paidKind: ParticipantKind = row.paid_by_guest ? 'guest' : 'membre';
+  const payerId = row.paid_by_guest ?? row.paid_by ?? '';
+  const payer = payerId === '' ? null : resolve(paidKind, payerId);
   return {
     id: row.id,
+    ardoiseId: row.ardoise_id,
     title: row.title,
     amount: Number(row.amount) || 0,
-    paidBy: row.paid_by,
-    paidByName: payer?.name ?? 'Membre',
+    paidBy: row.paid_by_guest ?? row.paid_by,
+    paidByKind: paidKind,
+    paidByName: payer?.name ?? 'Payeur',
     paidByColorTag: payer?.colorTag ?? null,
     date: row.expense_date,
     splitType: row.split_type === 'personnalise' ? 'personnalise' : 'egal',
     participants: participants
-      .filter((participant) => participant.expense_id === row.id && participant.participant_type === 'membre')
+      .filter((participant) => participant.expense_id === row.id)
       .map((participant) => {
-        const id = participant.member_id;
-        const resolved = id ? resolve('membre', id) : null;
+        const kind: ParticipantKind = participant.participant_type === 'guest' ? 'guest' : 'membre';
+        const id = (kind === 'guest' ? participant.guest_id : participant.member_id) ?? '';
+        const resolved = id === '' ? null : resolve(kind, id);
         return {
-          key: memberKey(id ?? ''),
-          kind: 'membre',
-          memberId: participant.member_id,
+          key: participantKey(kind, id),
+          kind,
+          memberId: id,
           name: resolved?.name ?? 'Participant',
           colorTag: resolved?.colorTag ?? null,
           shareAmount: Number(participant.share_amount) || 0,
@@ -143,13 +161,16 @@ export function toExpense(
 
 /**
  * Solde de chaque participant : ce qu'il a avancé moins sa part.
- * La somme des soldes est nulle : seuls des membres partagent (0039).
+ * La somme des soldes est nulle par ardoise (membres + invités).
  */
 export function computeBalances(expenses: Expense[], seeds: Participant[]): Balance[] {
   const totals = new Map<string, number>();
   seeds.forEach((seed) => totals.set(seed.key, 0));
   expenses.forEach((expense) => {
-    totals.set(memberKey(expense.paidBy), (totals.get(memberKey(expense.paidBy)) ?? 0) + expense.amount);
+    if (expense.paidBy !== null) {
+      const payerKey = participantKey(expense.paidByKind, expense.paidBy);
+      totals.set(payerKey, (totals.get(payerKey) ?? 0) + expense.amount);
+    }
     expense.participants.forEach((participant) => {
       totals.set(participant.key, (totals.get(participant.key) ?? 0) - participant.shareAmount);
     });
@@ -161,6 +182,41 @@ export function computeBalances(expenses: Expense[], seeds: Participant[]): Bala
     colorTag: seed.colorTag,
     amount: roundCents(totals.get(seed.key) ?? 0),
   }));
+}
+
+/**
+ * Part d'achat de chaque participant : somme de ses `shareAmount` sur
+ * l'ardoise. Les parts nulles sont exclues (camembert lisible).
+ */
+export interface Share {
+  key: string;
+  kind: ParticipantKind;
+  name: string;
+  colorTag: MemberColorTag | null;
+  amount: number;
+}
+
+export function computeShares(expenses: Expense[]): Share[] {
+  const totals = new Map<string, Share>();
+  for (const expense of expenses) {
+    for (const participant of expense.participants) {
+      const current = totals.get(participant.key);
+      if (current) {
+        current.amount = roundCents(current.amount + participant.shareAmount);
+      } else {
+        totals.set(participant.key, {
+          key: participant.key,
+          kind: participant.kind,
+          name: participant.name,
+          colorTag: participant.colorTag,
+          amount: roundCents(participant.shareAmount),
+        });
+      }
+    }
+  }
+  return [...totals.values()]
+    .filter((share) => share.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 }
 
 /**

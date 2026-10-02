@@ -20,6 +20,7 @@ const taskSchema = z.object({
   description: z.string().trim().max(400, '400 caractères maximum.'),
   priority: z.enum(['haute', 'normale', 'basse']),
   assigneeIds: z.array(z.string()),
+  folderId: z.string(),
   reminderAt: z
     .string()
     .trim()
@@ -28,7 +29,12 @@ const taskSchema = z.object({
 
 const toReminderValue = (remindAt: string | null) => (remindAt ? remindAt.slice(0, 16) : '');
 
-function defaultValues(task: Task | null, currentMemberId: string, initialDueDate: string | null = null): TaskFormValues {
+function defaultValues(
+  task: Task | null,
+  currentMemberId: string,
+  initialDueDate: string | null = null,
+  initialFolderId: string | null = null,
+): TaskFormValues {
   if (!task) {
     return {
       name: '',
@@ -36,6 +42,7 @@ function defaultValues(task: Task | null, currentMemberId: string, initialDueDat
       description: '',
       priority: 'normale',
       assigneeIds: currentMemberId ? [currentMemberId] : [],
+      folderId: initialFolderId ?? '',
       reminderAt: '',
     };
   }
@@ -45,6 +52,7 @@ function defaultValues(task: Task | null, currentMemberId: string, initialDueDat
     description: task.description ?? '',
     priority: task.priority,
     assigneeIds: task.assignees.map((assignee) => assignee.memberId),
+    folderId: task.folderId ?? '',
     reminderAt: toReminderValue(task.reminderAt),
   };
 }
@@ -57,6 +65,9 @@ export interface TaskFormDialogProps {
   currentMemberId: string;
   /** Échéance pré-remplie à la création (raccourci depuis le calendrier). */
   initialDueDate?: string | null;
+  /** Dossier pré-rempli à la création (onglet courant). */
+  initialFolderId?: string | null;
+  folders?: { id: string; name: string }[];
   isSaving?: boolean;
   onSubmit: (values: TaskFormValues) => Promise<void> | void;
 }
@@ -68,6 +79,8 @@ export function TaskFormDialog({
   task,
   currentMemberId,
   initialDueDate = null,
+  initialFolderId = null,
+  folders = [],
   isSaving = false,
   onSubmit,
 }: TaskFormDialogProps) {
@@ -80,11 +93,11 @@ export function TaskFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(task, currentMemberId, initialDueDate));
+    reset(defaultValues(task, currentMemberId, initialDueDate, initialFolderId));
     // `task` identifie une ouverture : le formulaire n'est pas réinitialisé à
     // chaque frappe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task?.id, currentMemberId, initialDueDate]);
+  }, [open, task?.id, currentMemberId, initialDueDate, initialFolderId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,6 +145,21 @@ export function TaskFormDialog({
               )}
             </Field>
           </div>
+
+          {folders.length > 0 ? (
+            <Field label="Dossier" optional error={errors.folderId?.message}>
+              {(props) => (
+                <Select {...props} {...register('folderId')}>
+                  <option value="">Général</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          ) : null}
 
           <Controller
             name="assigneeIds"
