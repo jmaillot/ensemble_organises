@@ -538,6 +538,9 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
       .finally(() => setIsSaving(false));
   };
 
+  const inviteLink = (code: string) =>
+    `${window.location.origin}/invitation/ardoise?code=${encodeURIComponent(code)}`;
+
   const copyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -548,10 +551,10 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   };
 
   const shareCode = async (code: string) => {
-    const inviteUrl = `${window.location.origin}/invitation/ardoise?code=${encodeURIComponent(code)}`;
+    const link = inviteLink(code);
     const shareData = {
       title: ardoise?.name ?? 'Ardoise',
-      text: `Rejoins mon ardoise « ${ardoise?.name ?? ''} » sans compte, en lecture : ${inviteUrl}`,
+      text: `Rejoins mon ardoise « ${ardoise?.name ?? ''} » sans compte, en lecture : ${link}`,
     };
     try {
       if (navigator.share) {
@@ -559,9 +562,14 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
         return;
       }
     } catch {
-      // Partage annulé : repli copie ci-dessous.
+      // Partage annulé : repli copie du lien ci-dessous.
     }
-    await copyCode(code);
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Lien copié.');
+    } catch {
+      toast(link, undefined);
+    }
   };
 
   return (

@@ -208,6 +208,43 @@ describe('ArdoiseDetailPage', () => {
     expect(screen.getByText(/Thomas Martin → Camille Martin/)).toBeInTheDocument();
   });
 
+  it('partager sans partage natif copie le lien d’invitation (pas le code brut)', async () => {
+    const code = 'CODE-LIEN-12345678901234';
+    localStorage.setItem('eo:ardoise-code:ardoise-foyer', code);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ardoiseId: 'ardoise-foyer',
+          isActive: true,
+          hasCode: true,
+          expiresAt: null,
+          maxUses: null,
+          useCount: 0,
+        }),
+      }),
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    try {
+      // Après userEvent.setup() : celui-ci installe son propre presse-papiers
+      // quand il manque, et écraserait un stub posé avant.
+      const user = userEvent.setup();
+      Object.defineProperty(window.navigator, 'clipboard', { value: { writeText }, configurable: true });
+      renderDetail();
+      await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
+      expect(await screen.findByText(code)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Partager' }));
+      expect(writeText).toHaveBeenCalledOnce();
+      const copied = writeText.mock.calls[0][0] as string;
+      expect(copied).toContain(`/invitation/ardoise?code=${code}`);
+      expect(await screen.findByText('Lien copié.')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+      localStorage.clear();
+    }
+  });
+
   it('réaffiche le code mémorisé après navigation (remontage)', async () => {
     const code = 'CODE-MEMOIRE-1234567890';
     localStorage.setItem('eo:ardoise-code:ardoise-foyer', code);
