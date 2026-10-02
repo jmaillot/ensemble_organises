@@ -33,7 +33,7 @@ import { BalanceCard, MemberBalances } from './components/balance-panel';
 import { SettlementsPanel } from './components/settlements-panel';
 import { ArdoiseMembersDialog } from './components/ardoise-members-dialog';
 import { ExpenseFormDialog } from './components/expense-form-dialog';
-import { computeSpent, type Expense, type NewExpenseInput, type Share } from './types';
+import { applyFreePayerShare, computeSpent, type Expense, type NewExpenseInput, type Share } from './types';
 
 /** Remplissage SVG d'une part : palette membre, gris décliné pour les invités. */
 const TAG_FILL: Record<string, string> = {
@@ -199,10 +199,20 @@ export default function ArdoiseDetailPage() {
 
   const handleSubmitExpense = async (values: NewExpenseInput) => {
     const resolveValues = async (): Promise<NewExpenseInput> => {
-      // Payeur externe en texte libre : invité matérialisé avant écriture.
+      // Payeur externe en texte libre : invité matérialisé avant écriture,
+      // éventuellement inclus au partage égal (choix du formulaire).
       if (values.payerName && values.payerName.trim() !== '') {
         const guest = await ensureExpenseGuest(ardoiseId ?? '', values.payerName);
-        return { ...values, paidBy: guest.id, paidByKind: 'guest', payerName: undefined };
+        const { payerName: _dropped, includePayer: _droppedFlag, ...rest } = values;
+        return {
+          ...rest,
+          paidBy: guest.id,
+          paidByKind: 'guest',
+          participants: applyFreePayerShare(values.participants, guest.id, {
+            include: values.includePayer ?? true,
+            splitType: values.splitType,
+          }),
+        };
       }
       return values;
     };

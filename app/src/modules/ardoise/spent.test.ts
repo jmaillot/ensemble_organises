@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSpent, type Expense } from './types';
+import { applyFreePayerShare, computeSpent, type Expense } from './types';
 
 const expense = (id: string, overrides: Partial<Expense>): Expense => ({
   id,
@@ -43,5 +43,28 @@ describe('computeSpent', () => {
 
   it('rend une liste vide sans dépense', () => {
     expect(computeSpent([])).toEqual([]);
+  });
+});
+
+describe('applyFreePayerShare', () => {
+  it('ajoute l’invité au partage égal quand inclus', () => {
+    expect(applyFreePayerShare(['membre:a'], 'g1', { include: true, splitType: 'egal' })).toEqual([
+      'membre:a',
+      'invite:g1',
+    ]);
+  });
+
+  it('ne duplique pas un invité déjà coché', () => {
+    expect(applyFreePayerShare(['membre:a', 'invite:g1'], 'g1', { include: true, splitType: 'egal' })).toEqual([
+      'membre:a',
+      'invite:g1',
+    ]);
+  });
+
+  it('laisse le partage inchangé si exclu ou en personnalisé', () => {
+    expect(applyFreePayerShare(['membre:a'], 'g1', { include: false, splitType: 'egal' })).toEqual(['membre:a']);
+    expect(applyFreePayerShare(['membre:a'], 'g1', { include: true, splitType: 'personnalise' })).toEqual([
+      'membre:a',
+    ]);
   });
 });

@@ -50,9 +50,27 @@ describe('ExpenseFormDialog — payeur libre', () => {
     await user.type(within(dialog).getByLabelText(/Montant/), '15');
     await user.selectOptions(within(dialog).getByLabelText(/Payé par/), 'autre');
     await user.type(await within(dialog).findByLabelText(/Nom de la personne/), 'Mamie');
+    expect(within(dialog).getByRole('checkbox', { name: /partage aussi/ })).toBeChecked();
     await user.click(within(dialog).getByRole('button', { name: 'Ajouter la dépense' }));
 
     expect(onSubmit).toHaveBeenCalledOnce();
-    expect(onSubmit.mock.calls[0][0]).toMatchObject({ paidByKind: 'guest', payerName: 'Mamie' });
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ paidByKind: 'guest', payerName: 'Mamie', includePayer: true });
+  });
+
+  it('exclut le payeur du partage quand la case est décochée', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderDialog(onSubmit);
+    const dialog = screen.getByRole('dialog');
+
+    await user.type(within(dialog).getByLabelText(/Libellé/), 'Fleurs');
+    await user.type(within(dialog).getByLabelText(/Montant/), '15');
+    await user.selectOptions(within(dialog).getByLabelText(/Payé par/), 'autre');
+    await user.type(await within(dialog).findByLabelText(/Nom de la personne/), 'Mamie');
+    await user.click(within(dialog).getByRole('checkbox', { name: /partage aussi/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter la dépense' }));
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ payerName: 'Mamie', includePayer: false });
   });
 });

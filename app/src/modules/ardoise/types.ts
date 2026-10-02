@@ -83,6 +83,8 @@ export interface NewExpenseInput {
   paidByKind?: ParticipantKind;
   /** Payeur externe en texte libre : matérialisé en invité avant écriture. */
   payerName?: string;
+  /** Payeur libre inclus au partage égal (créé après le choix des parts). */
+  includePayer?: boolean;
   date: string;
   splitType: SplitType;
   /** Clés de participants dans l'ordre d'affichage ; le dernier absorbe l'écart. */
@@ -199,6 +201,22 @@ export interface Share {
   name: string;
   colorTag: MemberColorTag | null;
   amount: number;
+}
+
+/**
+ * Partage égal avec payeur libre : l'invité est créé APRÈS le choix des parts,
+ * il ne peut donc pas être coché. Avec `include`, il rejoint le partage égal
+ * (ex. « Norman a payé pour nous deux ») ; sans, il avance seul (ex. Mamie
+ * offre les courses). En personnalisé, les montants saisis priment : inchangé.
+ */
+export function applyFreePayerShare(
+  participants: string[],
+  guestId: string,
+  options: { include: boolean; splitType: SplitType },
+): string[] {
+  if (!options.include || options.splitType !== 'egal') return participants;
+  const key = guestKey(guestId);
+  return participants.includes(key) ? participants : [...participants, key];
 }
 
 /**

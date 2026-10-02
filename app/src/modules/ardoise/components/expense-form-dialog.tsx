@@ -89,6 +89,7 @@ export function ExpenseFormDialog({
   initialExpense = null,
 }: ExpenseFormDialogProps) {
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [includePayer, setIncludePayer] = useState(true);
   const editing = initialExpense !== null;
 
   const defaultValues = (expense: Expense | null): FormValues => {
@@ -129,6 +130,7 @@ export function ExpenseFormDialog({
     if (!open) return;
     reset(defaultValues(initialExpense));
     setOptionsOpen(false);
+    setIncludePayer(true);
     // Se rouvre avec une autre dépense : le pré-remplissage suit la cible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialId, reset]);
@@ -147,6 +149,7 @@ export function ExpenseFormDialog({
         paidBy: '',
         paidByKind: 'guest',
         payerName: (values.payerName ?? '').trim(),
+        includePayer,
         date: values.date,
         splitType: values.splitType as SplitType,
         participants: values.participants,
@@ -229,6 +232,19 @@ export function ExpenseFormDialog({
                 <Input {...props} {...register('payerName')} placeholder="Ex. Mamie" maxLength={120} autoComplete="off" />
               )}
             </Field>
+          ) : null}
+          {paidByValue === FREE_PAYER_VALUE && splitType === 'egal' ? (
+            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-[12px] font-semibold text-muted">
+              <input
+                type="checkbox"
+                checked={includePayer}
+                onChange={(change) => setIncludePayer(change.target.checked)}
+                className="accent-accent"
+              />
+              {(watch('payerName') ?? '').trim() !== ''
+                ? `« ${(watch('payerName') ?? '').trim()} » partage aussi (parts égales)`
+                : 'Le payeur partage aussi (parts égales)'}
+            </label>
           ) : null}
 
           <fieldset className="grid gap-1.5">
