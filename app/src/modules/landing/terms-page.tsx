@@ -59,7 +59,9 @@ export default function TermsPage() {
             <li>
               <strong>Âge minimum : 15 ans révolus</strong> pour créer un compte. En dessous de 15 ans, aucune
               inscription directe : un parent (ou représentant légal) crée et gère un profil « enfant » depuis son
-              propre compte et en assume la responsabilité.
+              propre compte et en assume la responsabilité. À la première connexion, il vous est demandé de
+              certifier avoir 15 ans ou plus : cette attestation est enregistrée une seule fois sur votre compte et
+              l’accès au service reste bloqué tant qu’elle n’est pas confirmée.
             </li>
             <li>
               <strong>Connexion :</strong> via Google, Facebook ou e-mail et mot de passe. Vous êtes responsable de

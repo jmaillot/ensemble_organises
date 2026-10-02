@@ -152,10 +152,12 @@ export default function PrivacyPage() {
             7. Enfants mineurs
           </h2>
           <p className="m-0">
-            La création d’un compte est réservée aux personnes de <strong>15 ans et plus</strong>. Les profils
-            « enfant » sont <strong>créés et gérés par un parent</strong> (ou représentant légal) depuis son propre
-            compte, qui en est responsable : c’est lui qui saisit leurs informations, décide de ce qui est partagé
-            et peut les supprimer à tout moment.
+            La création d’un compte est réservée aux personnes de <strong>15 ans et plus</strong>. À la première
+            connexion, il vous est demandé de certifier votre âge : cette attestation est enregistrée une seule
+            fois, et l’accès reste bloqué tant qu’elle n’est pas confirmée. Les profils « enfant » sont{' '}
+            <strong>créés et gérés par un parent</strong> (ou représentant légal) depuis son propre compte, qui en
+            est responsable : c’est lui qui saisit leurs informations, décide de ce qui est partagé et peut les
+            supprimer à tout moment.
           </p>
         </section>
 
