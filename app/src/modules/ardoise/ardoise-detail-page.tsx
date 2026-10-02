@@ -29,6 +29,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ardoiseKeys } from './hooks/use-settlement';
 import { BalanceCard, MemberBalances } from './components/balance-panel';
 import { SettlementsPanel } from './components/settlements-panel';
+import { ArdoiseMembersDialog } from './components/ardoise-members-dialog';
 import { ExpenseFormDialog } from './components/expense-form-dialog';
 import { computeSpent, type Expense, type NewExpenseInput, type Share } from './types';
 
@@ -148,6 +149,7 @@ export default function ArdoiseDetailPage() {
     settlementSource,
     sharingMembers,
     guestOptions,
+    currentMember,
     total,
     monthTotal,
     monthLabel,
@@ -168,6 +170,7 @@ export default function ArdoiseDetailPage() {
 
   const [tab, setTab] = useState<DetailTab>('depenses');
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<Expense | null>(null);
 
@@ -242,7 +245,7 @@ export default function ArdoiseDetailPage() {
         total={total}
         monthLabel={ardoise?.name ?? monthLabel}
         onAddExpense={openCreator}
-        onInvite={() => setTab('parametres')}
+        onInvite={() => setMembersOpen(true)}
       />
 
       <div className="mb-4 flex flex-wrap gap-1.5" role="tablist" aria-label="Onglets de l’ardoise">
@@ -376,6 +379,14 @@ export default function ArdoiseDetailPage() {
       ) : (
         <ArdoiseSettings ardoiseId={ardoiseId} />
       )}
+
+      <ArdoiseMembersDialog
+        ardoiseId={ardoiseId}
+        ardoiseName={ardoise?.name ?? 'ardoise'}
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+        canManage={currentMember?.role === 'admin'}
+      />
 
       <ExpenseFormDialog
         open={expenseDialogOpen}

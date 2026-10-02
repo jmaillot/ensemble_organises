@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import ArdoisePage from './ardoise-page';
+import ArdoiseDetailPage from './ardoise-detail-page';
 
 describe('ArdoisePage — liste', () => {
   it('affiche les ardoises du foyer de démonstration', async () => {
@@ -23,6 +25,30 @@ describe('ArdoisePage — liste', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’ardoise' }));
 
     expect(await screen.findByText('Week-end ski')).toBeInTheDocument();
+  });
+
+  it('crée une ardoise avec une sélection de membres', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/ardoise" element={<ArdoisePage />} />
+        <Route path="/ardoise/:id" element={<ArdoiseDetailPage />} />
+      </Routes>,
+      { route: '/ardoise' },
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Créer une ardoise' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Nom de l’ardoise/), 'Week-end restreint');
+    // Thomas exclu : tout le monde est coché par défaut.
+    await user.click(within(dialog).getByRole('checkbox', { name: /Thomas/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Créer l’ardoise' }));
+
+    expect(await screen.findByText('Week-end restreint')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Inviter un membre' }));
+    const membersDialog = await screen.findByRole('dialog', { name: /Membres de/ });
+    expect(within(membersDialog).getByText('Dans l’ardoise (3)')).toBeInTheDocument();
+    expect(within(membersDialog).getByText('Ajouter (1)')).toBeInTheDocument();
   });
 
   it('ouvre le dialogue rejoindre avec un code', async () => {

@@ -97,6 +97,9 @@ const requestSchema = z.discriminatedUnion('action', [
     description: z.string().trim().max(500).optional(),
     coverUrl: z.string().trim().max(500).optional(),
     householdId: ardoiseField.optional(),
+    /** Sélection initiale : identifiants de membres du foyer (admin/membre).
+     * Absent = tous (régime historique) ; les inconnus et enfants sont ignorés. */
+    memberIds: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
   }),
   z.object({
     action: z.literal('create'),
@@ -284,6 +287,7 @@ async function handleCreateArdoise(admin: AdminClient, userId: string, body: Req
     p_description: body.description ?? null,
     p_cover_url: body.coverUrl ?? null,
     p_invite_hash: null,
+    p_member_ids: body.memberIds ?? null,
   });
 
   if (error) throw translateRpcError(error);

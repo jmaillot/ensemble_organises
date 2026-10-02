@@ -4,12 +4,15 @@ import { formatMonthLabel, todayIso } from '@/lib/utils';
 import type { ArdoiseRow, HouseholdMemberRow, MemberColorTag } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
 import {
+  addArdoiseMembers,
   createArdoise,
   createExpense,
   deleteArdoise,
   deleteExpense,
   fetchArdoiseDetail,
+  fetchArdoiseMemberIds,
   fetchArdoises,
+  removeArdoiseMember,
   toServerBalances,
   toServerSettlements,
   updateArdoise,
@@ -83,8 +86,36 @@ export function useArdoises(): ArdoisesData {
   };
 }
 
-export interface ArdoiseDetailData {
-  ardoise: ArdoiseRow | null;
+/** Membres inscrits à UNE ardoise + ajout / retrait (admin du foyer). */
+export function useArdoiseMembers(ardoiseId: string | null) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: [...ardoiseKeys.all, 'members', ardoiseId ?? ''],
+    enabled: Boolean(ardoiseId),
+    queryFn: () => fetchArdoiseMemberIds(ardoiseId as string),
+  });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [...ardoiseKeys.all, 'members', ardoiseId ?? ''] });
+    queryClient.invalidateQueries({ queryKey: ardoiseKeys.detail(ardoiseId) });
+  };
+  const addMutation = useMutation({
+    mutationFn: (memberIds: string[]) => addArdoiseMembers(ardoiseId as string, memberIds),
+    onSuccess: invalidate,
+  });
+  const removeMutation = useMutation({
+    mutationFn: (memberId: string) => removeArdoiseMember(ardoiseId as string, memberId),
+    onSuccess: invalidate,
+  });
+  return {
+    memberIds: query.data ?? [],
+    isLoading: query.isLoading,
+    isMutating: addMutation.isPending || removeMutation.isPending,
+    addMembers: (memberIds: string[]) => addMutation.mutateAsync(memberIds),
+    removeMember: (memberId: string) => removeMutation.mutateAsync(memberId),
+  };
+}
+
+export interface ArdoiseDetailData {  ardoise: ArdoiseRow | null;
   expenses: Expense[];
   balances: Balance[];
   settlements: Settlement[];

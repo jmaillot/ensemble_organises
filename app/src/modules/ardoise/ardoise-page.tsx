@@ -8,8 +8,10 @@ import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
+import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
 import { pluralize } from '@/lib/utils';
+import { useMembers } from '@/stores/household-store';
 import { useArdoises } from './hooks/use-ardoise';
 import { joinArdoise, redeemGuestTicket } from './api';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -154,19 +156,34 @@ function CreateArdoiseDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSaving: boolean;
-  onSubmit: (values: { name: string; description?: string }) => Promise<void>;
+  onSubmit: (values: { name: string; description?: string; memberIds: string[] }) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  // `null` = tous cochés (régime historique) ; décochez pour exclure.
+  const [selected, setSelected] = useState<string[] | null>(null);
+  const householdMembers = useMembers();
+  const eligible = householdMembers.filter((member) => member.role === 'admin' || member.role === 'membre');
+  const effective = selected ?? eligible.map((member) => member.id);
+
+  const reset = () => {
+    setName('');
+    setDescription('');
+    setSelected(null);
+  };
+
+  const toggle = (memberId: string) => {
+    const current = new Set(effective);
+    if (current.has(memberId)) current.delete(memberId);
+    else current.add(memberId);
+    setSelected([...current]);
+  };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
-          setName('');
-          setDescription('');
-        }
+        if (!next) reset();
         onOpenChange(next);
       }}
     >
@@ -183,7 +200,7 @@ function CreateArdoiseDialog({
           className="grid gap-3.5"
           onSubmit={(event) => {
             event.preventDefault();
-            void onSubmit({ name, description });
+            void onSubmit({ name, description, memberIds: effective });
           }}
         >
           <Field label="Nom de l’ardoise">
@@ -196,6 +213,31 @@ function CreateArdoiseDialog({
               <Textarea {...props} value={description} onChange={(change) => setDescription(change.target.value)} rows={2} />
             )}
           </Field>
+          {eligible.length > 0 ? (
+            <fieldset className="grid gap-1.5">
+              <legend className="text-[11px] font-extrabold text-muted">Membres inclus</legend>
+              <div className="flex flex-wrap gap-2">
+                {eligible.map((member) => (
+                  <label
+                    key={member.id}
+                    className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[11px] font-semibold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong max-[650px]:min-h-11"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={effective.includes(member.id)}
+                      onChange={() => toggle(member.id)}
+                      className="accent-accent"
+                    />
+                    <MemberAvatar member={member} size="sm" />
+                    {member.display_name.split(' ')[0]}
+                  </label>
+                ))}
+              </div>
+              <p className="m-0 text-[10px] text-muted">
+                Décochez pour exclure. D’autres membres pourront être ajoutés ensuite.
+              </p>
+            </fieldset>
+          ) : null}
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Annuler

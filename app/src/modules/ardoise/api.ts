@@ -118,6 +118,8 @@ export interface NewArdoiseInput {
   name: string;
   description?: string;
   coverUrl?: string | null;
+  /** Sélection initiale (ids de membres) : absent = tous les admin/membre. */
+  memberIds?: string[];
 }
 
 /** Création : Edge + RPC serveur en configuré (seed des membres inclus), direct + seed en local. */
@@ -130,6 +132,7 @@ export async function createArdoise(householdId: string, input: NewArdoiseInput)
       description: input.description?.trim() || undefined,
       coverUrl: input.coverUrl ?? undefined,
       householdId,
+      ...(input.memberIds ? { memberIds: input.memberIds } : {}),
     });
   }
   const created = await data.create<ArdoiseRow>('ardoises', {
@@ -140,9 +143,11 @@ export async function createArdoise(householdId: string, input: NewArdoiseInput)
   });
   // Seed local : les écrivains du foyer (même règle que le serveur).
   const members = await data.list<HouseholdMemberRow>('household_members', { household_id: householdId }).catch(() => []);
+  const wanted = input.memberIds === undefined ? null : new Set(input.memberIds);
   await Promise.all(
     members
       .filter((member) => member.role === 'admin' || member.role === 'membre')
+      .filter((member) => (wanted === null ? true : wanted.has(member.id)))
       .map((member) =>
         data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: created.id, member_id: member.id }).catch(() => undefined),
       ),
@@ -160,6 +165,29 @@ export async function updateArdoise(
 export async function deleteArdoise(id: string): Promise<void> {
   clearGuestTicket(id);
   await data.remove('ardoises', id);
+}
+
+/** Membres inscrits à l'ardoise (ids de `household_members`). */
+export async function fetchArdoiseMemberIds(ardoiseId: string): Promise<string[]> {
+  const rows = await data.list<ArdoiseMemberRow>('ardoise_members', { ardoise_id: ardoiseId }).catch(() => []);
+  return rows.map((row) => row.member_id);
+}
+
+/**
+ * Ajout ultérieur de membres (admin du foyer : politique
+ * `ardoise_members_admin`, doublons ignorés).
+ */
+export async function addArdoiseMembers(ardoiseId: string, memberIds: string[]): Promise<void> {
+  await Promise.all(
+    memberIds.map((memberId) =>
+      data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }).catch(() => undefined),
+    ),
+  );
+}
+
+/** Retrait d'un membre (l'historique — dépenses, parts — est conservé). */
+export async function removeArdoiseMember(ardoiseId: string, memberId: string): Promise<void> {
+  await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId });
 }
 
 /* ------------------------------------------------------------------ */
