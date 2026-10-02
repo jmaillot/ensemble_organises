@@ -200,7 +200,12 @@ export default function LandingPage() {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-5 py-6 text-[11px] text-muted max-[650px]:px-[15px]">
           <span>Ensemble &amp; Organisés — l’espace familial pour tout garder en mouvement.</span>
-          <span>Application web installable, utilisable hors ligne.</span>
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Application web installable, utilisable hors ligne.</span>
+            <Link to="/confidentialite" className="font-bold text-accent-strong">
+              Confidentialité
+            </Link>
+          </span>
         </div>
       </footer>
     </div>

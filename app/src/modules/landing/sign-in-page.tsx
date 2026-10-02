@@ -139,6 +139,13 @@ export default function SignInPage() {
               {mode === 'connexion' ? 'Créer un compte' : 'Se connecter'}
             </button>
           </p>
+          <p className="mt-3 mb-0 text-[11px] text-muted">
+            En continuant, vous acceptez la{' '}
+            <Link to="/confidentialite" className="font-bold text-accent-strong">
+              politique de confidentialité
+            </Link>
+            .
+          </p>
 
           {!isSupabaseConfigured ? (
             <div className="mt-6 rounded-[16px] border border-dashed border-accent/40 bg-accent-faint p-4">
