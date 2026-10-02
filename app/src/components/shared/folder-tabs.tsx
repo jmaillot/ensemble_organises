@@ -37,7 +37,11 @@ export interface FolderTabsProps {
 export function FolderTabs({ folders, activeId, onSelect, onCreate, onRename, onDelete, canManage, label }: FolderTabsProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
-  const sorted = [...folders].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  // Le bouton « Général » ci-dessous couvre les items sans dossier (`null`) :
+  // la ligne seedée `is_default` de même nom ne doit ni doubler l'onglet, ni
+  // apparaître dans « Gérer » (le trigger `guard_folder_default` refuse toute
+  // modification, les boutons n'y produiraient que des erreurs).
+  const sorted = [...folders].filter((folder) => !folder.is_default).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
