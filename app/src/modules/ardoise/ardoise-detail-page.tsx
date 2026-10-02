@@ -113,7 +113,6 @@ function SpendingPie({ shares, total }: { shares: Share[]; total: number }) {
         </ul>
       </div>
       <table className="sr-only">
-        <caption>Dépenses par payeur</caption>
         <tbody>
           {shares.map((share) => (
             <tr key={share.key}>
