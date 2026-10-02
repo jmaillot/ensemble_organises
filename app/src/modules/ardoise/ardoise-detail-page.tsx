@@ -515,7 +515,11 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   };
 
   const shareCode = async (code: string) => {
-    const shareData = { title: ardoise?.name ?? 'Ardoise', text: `Rejoins mon ardoise avec ce code : ${code}` };
+    const inviteUrl = `${window.location.origin}/invitation/ardoise?code=${encodeURIComponent(code)}`;
+    const shareData = {
+      title: ardoise?.name ?? 'Ardoise',
+      text: `Rejoins mon ardoise « ${ardoise?.name ?? ''} » sans compte, en lecture : ${inviteUrl}`,
+    };
     try {
       if (navigator.share) {
         await navigator.share(shareData);

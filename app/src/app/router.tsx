@@ -9,6 +9,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 
 const LandingPage = lazy(() => import('@/modules/landing/landing-page'));
 const SignInPage = lazy(() => import('@/modules/landing/sign-in-page'));
+const GuestArdoisePage = lazy(() => import('@/modules/ardoise/guest-ardoise-page'));
 const WelcomePage = lazy(() => import('@/modules/landing/welcome-page'));
 const CreateHouseholdPage = lazy(() => import('@/modules/landing/create-household-page'));
 const JoinHouseholdPage = lazy(() => import('@/modules/landing/join-household-page'));
@@ -142,6 +143,14 @@ export function AppRoutes() {
         element={
           <Suspense fallback={<RouteFallback />}>
             <JoinHouseholdPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/invitation/ardoise"
+        element={
+          <Suspense fallback={<RouteFallback />}>
+            <GuestArdoisePage />
           </Suspense>
         }
       />

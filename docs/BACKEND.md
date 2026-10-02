@@ -465,6 +465,7 @@ répond 404 et la fonction renvoie `503` si la migration, elle, manque.
 | Fonction | Endpoint | Modes déclarés | Objet |
 |---|---|---|---|
 | `household-invite` | `POST /functions/v1/household-invite` | `['publishable', 'user']` | cycle de vie des tokens d'invitation |
+| `ardoise-invite` | `POST /functions/v1/ardoise-invite` | `['user', 'publishable']` | ardoises, codes de partage et lecture invité (`guest-view`, sans session) |
 | `expense-settlement` | `POST /functions/v1/expense-settlement` | `'user'` | soldes et compensation des dettes de l'Ardoise |
 | `generate-routine-occurrences` | `POST /functions/v1/generate-routine-occurrences` | `['secret', 'user']` | maintenance quotidienne des routines |
 | `push-subscribe` | `POST /functions/v1/push-subscribe` | `'user'` | abonnement, révocation et liste des appareils ; clé VAPID publique |

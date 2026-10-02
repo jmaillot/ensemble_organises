@@ -135,6 +135,11 @@ const requestSchema = z.discriminatedUnion('action', [
       .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.'),
     displayName: z.string().trim().min(1, 'Indiquez un pseudonyme.').max(120),
   }),
+  z.object({
+    action: z.literal('guest-view'),
+    /** Ticket brut remis à l'échange (jamais persisté côté serveur). */
+    ticket: z.string().trim().min(20).max(256),
+  }),
 ]);
 
 type RequestBody = z.infer<typeof requestSchema>;
@@ -170,6 +175,16 @@ function generateCode(): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** SHA-256 simple du ticket brut (les tickets sont hachés sans secret côté base). */
+async function sha256Hex(ticket: string): Promise<string> {
+  const bytes = new TextEncoder().encode(ticket);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /** HMAC-SHA-256 du code, en hexadécimal minuscule (64 caractères). */
 async function hmacSha256Hex(code: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -192,7 +207,7 @@ async function hmacSha256Hex(code: string, secret: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30 };
+const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -404,6 +419,106 @@ async function handleRedeemGuest(admin: AdminClient, body: RequestBody & { actio
   return json({ ardoise_id: redeemed.ardoise_id ?? null, guest_ticket: redeemed.guest_ticket ?? null });
 }
 
+/**
+ * Lecture invité (sans compte) : ardoise, dépenses nommées et soldes, pour un
+ * ticket valide. Réutilise `verify_ardoise_ticket` + `ardoise_settlement`
+ * (chemin ticket) : aucun JWT requis, aucune écriture.
+ */
+async function handleGuestView(admin: AdminClient, body: RequestBody & { action: 'guest-view' }) {
+  const ticketHash = await sha256Hex(body.ticket);
+
+  const { data: verified, error: verifyError } = await admin.rpc('verify_ardoise_ticket', {
+    p_ticket_hash: ticketHash,
+  });
+  if (verifyError) throw translateRpcError(verifyError);
+  const guest = (verified ?? {}) as { guest_id?: string; ardoise_id?: string; display_name?: string };
+  if (!guest.ardoise_id) throw new ArdoiseInviteError(404, 'Ticket invalide.');
+
+  const { data: ardoise, error: ardoiseError } = await admin
+    .from('ardoises')
+    .select('id,name,description,cover_url,is_active')
+    .eq('id', guest.ardoise_id)
+    .single();
+  if (ardoiseError || !ardoise) throw new ArdoiseInviteError(404, 'Ardoise introuvable.');
+
+  const [{ data: expenses }, { data: parts }, { data: members }, { data: guests }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select('id,title,amount,expense_date,paid_by,paid_by_guest')
+      .eq('ardoise_id', guest.ardoise_id)
+      .order('expense_date', { ascending: false })
+      .order('created_at', { ascending: false }),
+    admin.from('expense_participants').select('expense_id,participant_type,member_id,guest_id,share_amount'),
+    admin.from('household_members').select('id,display_name'),
+    admin.from('ardoise_guests').select('id,display_name').eq('ardoise_id', guest.ardoise_id),
+  ]);
+
+  const memberNames = new Map(((members ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]));
+  const guestNames = new Map(((guests ?? []) as { id: string; display_name: string }[]).map((g) => [g.id, g.display_name]));
+  const displayName = (kind: string, memberId: string | null, guestId: string | null): string => {
+    if (kind === 'guest') return (guestId && guestNames.get(guestId)) || 'Invité';
+    return (memberId && memberNames.get(memberId)) || 'Membre';
+  };
+  const expenseIds = new Set(((expenses ?? []) as { id: string }[]).map((e) => e.id));
+  const partsByExpense = new Map<string, { name: string; share: number }[]>();
+  for (const part of (parts ?? []) as {
+    expense_id: string;
+    participant_type: string;
+    member_id: string | null;
+    guest_id: string | null;
+    share_amount: number | string;
+  }[]) {
+    if (!expenseIds.has(part.expense_id)) continue;
+    const list = partsByExpense.get(part.expense_id) ?? [];
+    list.push({
+      name: displayName(part.participant_type, part.member_id, part.guest_id),
+      share: Number(part.share_amount) || 0,
+    });
+    partsByExpense.set(part.expense_id, list);
+  }
+
+  const viewExpenses = ((expenses ?? []) as {
+    id: string;
+    title: string;
+    amount: number | string;
+    expense_date: string;
+    paid_by: string | null;
+    paid_by_guest: string | null;
+  }[]).map((expense) => {
+    const paidByGuest = expense.paid_by_guest ?? null;
+    return {
+      id: expense.id,
+      title: expense.title,
+      amount: Number(expense.amount) || 0,
+      date: expense.expense_date,
+      paidByName: paidByGuest
+        ? displayName('guest', null, paidByGuest)
+        : displayName('membre', expense.paid_by, null),
+      participants: partsByExpense.get(expense.id) ?? [],
+    };
+  });
+
+  const { data: settlement, error: settlementError } = await admin.rpc('ardoise_settlement', {
+    p_actor_id: null,
+    p_ardoise_id: guest.ardoise_id,
+    p_ticket_hash: ticketHash,
+  });
+  if (settlementError) throw translateRpcError(settlementError);
+
+  return json({
+    ardoise: {
+      id: (ardoise as { id: string }).id,
+      name: (ardoise as { name: string }).name,
+      description: (ardoise as { description: string | null }).description,
+      cover_url: (ardoise as { cover_url: string | null }).cover_url,
+      is_active: (ardoise as { is_active: boolean }).is_active,
+    },
+    guest: { display_name: guest.display_name ?? 'Invité' },
+    expenses: viewExpenses,
+    settlement: settlement ?? null,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Point d'entrée
 // ---------------------------------------------------------------------------
@@ -426,10 +541,14 @@ Deno.serve(
       const isUser = ctx.authMode === 'user' && Boolean(userId);
       const admin = ctx.supabaseAdmin;
 
-      // `redeem-guest` est le seul chemin sans session : les invités n'ont
-      // pas de compte. Tout le reste exige une session, sans valider le code.
+      // `redeem-guest` et `guest-view` sont les seuls chemins sans session :
+      // les invités n'ont pas de compte. Tout le reste exige une session,
+      // sans valider le code.
       if (body.action === 'redeem-guest') {
         return await handleRedeemGuest(admin, body);
+      }
+      if (body.action === 'guest-view') {
+        return await handleGuestView(admin, body);
       }
       if (!isUser || !userId) {
         return json({ error: 'Connectez-vous pour rejoindre une ardoise.' }, 401);
