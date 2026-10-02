@@ -140,7 +140,11 @@ export default function SignInPage() {
             </button>
           </p>
           <p className="mt-3 mb-0 text-[11px] text-muted">
-            En continuant, vous acceptez la{' '}
+            En continuant, vous acceptez les{' '}
+            <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
+              CGU
+            </Link>{' '}
+            et la{' '}
             <Link to="/confidentialite" className="font-bold text-accent-strong">
               politique de confidentialité
             </Link>

@@ -202,6 +202,9 @@ export default function LandingPage() {
           <span>Ensemble &amp; Organisés — l’espace familial pour tout garder en mouvement.</span>
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>Application web installable, utilisable hors ligne.</span>
+            <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
+              Conditions d’utilisation
+            </Link>
             <Link to="/confidentialite" className="font-bold text-accent-strong">
               Confidentialité
             </Link>

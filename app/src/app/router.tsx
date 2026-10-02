@@ -10,6 +10,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 const LandingPage = lazy(() => import('@/modules/landing/landing-page'));
 const SignInPage = lazy(() => import('@/modules/landing/sign-in-page'));
 const PrivacyPage = lazy(() => import('@/modules/landing/privacy-page'));
+const TermsPage = lazy(() => import('@/modules/landing/terms-page'));
 const GuestArdoisePage = lazy(() => import('@/modules/ardoise/guest-ardoise-page'));
 const WelcomePage = lazy(() => import('@/modules/landing/welcome-page'));
 const CreateHouseholdPage = lazy(() => import('@/modules/landing/create-household-page'));
@@ -160,6 +161,14 @@ export function AppRoutes() {
         element={
           <Suspense fallback={<RouteFallback />}>
             <PrivacyPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/conditions-utilisation"
+        element={
+          <Suspense fallback={<RouteFallback />}>
+            <TermsPage />
           </Suspense>
         }
       />
