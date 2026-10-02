@@ -22,7 +22,7 @@ declare
 begin
   for r in
     select * from (values
-          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at']::text[]),
+          ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at', 'age_attested_at']::text[]),
           ('households', ARRAY['id', 'name', 'avatar_color', 'school_zone', 'created_by', 'created_at', 'updated_at']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),

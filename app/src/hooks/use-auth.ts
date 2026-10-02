@@ -243,8 +243,13 @@ export async function signUpWithEmail(email: string, password: string) {
 }
 
 export async function signOut() {
-  if (supabase) await supabase.auth.signOut();
-  await useSessionStore.getState().signOut();
+  try {
+    if (supabase) await supabase.auth.signOut();
+  } finally {
+    // La session locale tombe dans tous les cas : un échec réseau ne doit
+    // jamais laisser l'utilisateur connecté en apparence seulement.
+    await useSessionStore.getState().signOut();
+  }
 }
 
 export const demoUser: SessionUser = {

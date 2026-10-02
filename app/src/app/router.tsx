@@ -1,11 +1,16 @@
-import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ToastProvider } from '@/components/ui/toast';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ToastProvider, useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AppShell } from './app-shell';
-import { useIsAuthenticated } from '@/hooks/use-auth';
+import { signOut, useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
 import { useHouseholdStore } from '@/stores/household-store';
+import { data } from '@/lib/data';
+import { isSupabaseConfigured } from '@/lib/supabase/client';
+import type { ProfileRow } from '@/types';
 
 const LandingPage = lazy(() => import('@/modules/landing/landing-page'));
 const SignInPage = lazy(() => import('@/modules/landing/sign-in-page'));
@@ -67,7 +72,101 @@ function RequireAuth({ children }: { children: ReactNode }) {
   if (!isAuthenticated) {
     return <Navigate to="/connexion" replace state={{ from: location.pathname }} />;
   }
-  return <>{children}</>;
+  return <RequireAttestation>{children}</RequireAttestation>;
+}
+
+/**
+ * Barrage « 15 ans et plus » (CGU art. 3), UNIQUE et post-connexion : il couvre
+ * tous les providers et les deux modes (une case pré-inscription serait
+ * contournée en SSO resté en mode « connexion »). Horodaté dans
+ * `profiles.age_attested_at`, une seule fois par compte. Refus = déconnexion.
+ * En démo (backend absent), rien à attester : passage direct.
+ */
+export function RequireAttestation({ children }: { children: ReactNode }) {
+  const user = useSessionUser();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [checked, setChecked] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const profileQuery = useQuery({
+    queryKey: ['profile', 'attestation', user?.id ?? ''],
+    enabled: Boolean(user?.id) && isSupabaseConfigured,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const rows = await data.list<ProfileRow>('profiles', { id: user!.id });
+      return rows[0] ?? null;
+    },
+  });
+
+  if (!isSupabaseConfigured || !user) return <>{children}</>;
+  if (profileQuery.isLoading) return <RouteFallback />;
+  if (profileQuery.data?.age_attested_at) return <>{children}</>;
+
+  const confirm = () => {
+    if (!checked || isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    void data
+      .update('profiles', user.id, { age_attested_at: new Date().toISOString() })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['profile', 'attestation', user.id] }))
+      .catch((updateError: unknown) =>
+        setSaveError(updateError instanceof Error ? updateError.message : 'Enregistrement impossible.'),
+      )
+      .finally(() => setIsSaving(false));
+  };
+
+  const refuse = () => {
+    void signOut().then(() => {
+      toast('Compte déconnecté.');
+      navigate('/connexion', { replace: true });
+    });
+  };
+
+  return (
+    <>
+      {children}
+      <Dialog open onOpenChange={() => {}}>
+        <DialogContent
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <p className="eyebrow mb-2">Première connexion</p>
+            <DialogTitle>Une dernière étape avant de commencer</DialogTitle>
+            <DialogDescription>
+              L’utilisation du service est réservée aux personnes de 15 ans et plus (CGU, article 3). En dessous de
+              15 ans, un parent doit créer un profil « enfant » depuis son propre compte.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="flex cursor-pointer items-start gap-2.5 text-[13px]">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(change) => setChecked(change.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            Je certifie avoir 15 ans ou plus.
+          </label>
+          {saveError ?? profileQuery.isError ? (
+            <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+              {saveError ?? 'Profil introuvable, reconnectez-vous.'}
+            </p>
+          ) : null}
+          <DialogActions>
+            <Button variant="secondary" onClick={refuse}>
+              Refuser et se déconnecter
+            </Button>
+            <Button onClick={confirm} disabled={!checked || isSaving}>
+              {isSaving ? 'Enregistrement…' : 'Confirmer'}
+            </Button>
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 /** Un utilisateur connecté sans foyer est redirigé vers le choix créer/rejoindre. */

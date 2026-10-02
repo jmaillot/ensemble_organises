@@ -80,6 +80,7 @@ export const demoProfile: ProfileRow = {
   message_notifications_enabled: true,
   created_at: now(),
   updated_at: now(),
+  age_attested_at: null,
 };
 
 export const demoHousehold: HouseholdRow = {

@@ -29,6 +29,8 @@ export interface ProfileRow {
   message_notifications_enabled: boolean;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
+  /** Attestation 15 ans et plus (CGU art. 3). NULL : non attesté. */
+  age_attested_at: IsoDateTime | null;
 }
 
 /**
