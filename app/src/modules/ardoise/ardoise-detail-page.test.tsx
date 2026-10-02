@@ -234,6 +234,7 @@ describe('ArdoiseDetailPage', () => {
       renderDetail();
       await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
       expect(await screen.findByText(code)).toBeInTheDocument();
+      expect(screen.getByText(/Lien à partager :/)).toHaveTextContent(`/invitation/ardoise?code=${code}`);
       await user.click(screen.getByRole('button', { name: 'Partager' }));
       expect(writeText).toHaveBeenCalledOnce();
       const copied = writeText.mock.calls[0][0] as string;

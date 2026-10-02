@@ -623,9 +623,14 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
                 : 'Aucun code actif. Générez-en un pour inviter.'}
             </p>
             {lastCode ? (
-              <p className="m-0 rounded-[11px] bg-bg px-3 py-2.5 font-mono text-[13px] break-all" role="status">
-                {lastCode}
-              </p>
+              <>
+                <p className="m-0 rounded-[11px] bg-bg px-3 py-2.5 font-mono text-[13px] break-all" role="status">
+                  {lastCode}
+                </p>
+                <p className="m-0 text-[12px] break-all text-muted">
+                  Lien à partager : {inviteLink(lastCode)}
+                </p>
+              </>
             ) : summary?.hasCode ? (
               <p className="m-0 text-[12px] text-muted">
                 Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.
