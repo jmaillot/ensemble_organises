@@ -140,6 +140,12 @@ const requestSchema = z.discriminatedUnion('action', [
     /** Ticket brut remis à l'échange (jamais persisté côté serveur). */
     ticket: z.string().trim().min(20).max(256),
   }),
+  z.object({
+    action: z.literal('add-guest'),
+    ardoiseId: ardoiseField,
+    /** Payeur externe saisi en texte libre : devient un invité SANS ticket. */
+    displayName: z.string().trim().min(1, 'Indiquez un nom.').max(120),
+  }),
 ]);
 
 type RequestBody = z.infer<typeof requestSchema>;
@@ -207,7 +213,7 @@ async function hmacSha256Hex(code: string, secret: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30 };
+const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30, 'add-guest': 20 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -420,6 +426,71 @@ async function handleRedeemGuest(admin: AdminClient, body: RequestBody & { actio
 }
 
 /**
+ * Payeur externe saisi en texte libre : devient un invité SANS ticket d'accès
+ * (dédupliqué par nom insensible à la casse). Réservé aux écrivains du foyer
+ * inscrits à l'ardoise (ou admins), comme `create_expense`.
+ */
+async function handleAddGuest(admin: AdminClient, userId: string, body: RequestBody & { action: 'add-guest' }) {
+  const name = body.displayName.trim();
+
+  const { data: ardoise, error: ardoiseError } = await admin
+    .from('ardoises')
+    .select('id,household_id')
+    .eq('id', body.ardoiseId)
+    .single();
+  if (ardoiseError || !ardoise) throw new ArdoiseInviteError(404, 'Ardoise introuvable.');
+  const householdId = (ardoise as { household_id: string }).household_id;
+
+  const { data: membership } = await admin
+    .from('household_members')
+    .select('id,role')
+    .eq('household_id', householdId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  const role = (membership as { id: string; role: string } | null)?.role ?? null;
+  if (role !== 'admin' && role !== 'membre') {
+    throw new ArdoiseInviteError(403, 'Écriture réservée aux membres du foyer.');
+  }
+  if (role !== 'admin') {
+    const { data: inscrit } = await admin
+      .from('ardoise_members')
+      .select('member_id')
+      .eq('ardoise_id', body.ardoiseId)
+      .eq('member_id', (membership as { id: string }).id)
+      .limit(1)
+      .maybeSingle();
+    if (!inscrit) throw new ArdoiseInviteError(403, 'Inscription à l’ardoise requise.');
+  }
+
+  const { data: existing } = await admin
+    .from('ardoise_guests')
+    .select('id,display_name')
+    .eq('ardoise_id', body.ardoiseId)
+    .ilike('display_name', name)
+    .limit(1)
+    .maybeSingle();
+  if (existing) {
+    return json({
+      guest_id: (existing as { id: string }).id,
+      display_name: (existing as { display_name: string }).display_name,
+      created: false,
+    });
+  }
+
+  const { data: created, error: createError } = await admin
+    .from('ardoise_guests')
+    .insert({ ardoise_id: body.ardoiseId, display_name: name, ticket_hash: null })
+    .select('id,display_name')
+    .single();
+  if (createError || !created) throw new ArdoiseInviteError(500, 'Invité impossible.');
+  return json({
+    guest_id: (created as { id: string }).id,
+    display_name: (created as { display_name: string }).display_name,
+    created: true,
+  });
+}
+/**
  * Lecture invité (sans compte) : ardoise, dépenses nommées et soldes, pour un
  * ticket valide. Réutilise `verify_ardoise_ticket` + `ardoise_settlement`
  * (chemin ticket) : aucun JWT requis, aucune écriture.
@@ -558,6 +629,7 @@ Deno.serve(
       if (body.action === 'create') return await handleCreate(admin, userId, body);
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);
       if (body.action === 'summary') return await handleSummary(admin, userId, body);
+      if (body.action === 'add-guest') return await handleAddGuest(admin, userId, body);
       return await handleJoin(admin, ctx.supabase, userId, body);
     } catch (error) {
       if (error instanceof ArdoiseInviteError) return json({ error: error.message }, error.status);

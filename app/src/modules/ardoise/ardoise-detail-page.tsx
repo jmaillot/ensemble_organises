@@ -20,6 +20,7 @@ import {
 } from './hooks/use-ardoise';
 import {
   createInviteCode,
+  ensureExpenseGuest,
   fetchInviteSummary,
   revokeInviteCode,
   updateArdoise,
@@ -185,9 +186,18 @@ export default function ArdoiseDetailPage() {
   const paidByMember = useMemo(() => computeSpent(expenses), [expenses]);
 
   const handleSubmitExpense = async (values: NewExpenseInput) => {
+    const resolveValues = async (): Promise<NewExpenseInput> => {
+      // Payeur externe en texte libre : invité matérialisé avant écriture.
+      if (values.payerName && values.payerName.trim() !== '') {
+        const guest = await ensureExpenseGuest(ardoiseId ?? '', values.payerName);
+        return { ...values, paidBy: guest.id, paidByKind: 'guest', payerName: undefined };
+      }
+      return values;
+    };
     if (editingExpense) {
       try {
-        await updateExpenseMutation.mutateAsync({ expenseId: editingExpense.id, input: values });
+        const resolved = await resolveValues();
+        await updateExpenseMutation.mutateAsync({ expenseId: editingExpense.id, input: resolved });
         setExpenseDialogOpen(false);
         setEditingExpense(null);
         toast('Dépense mise à jour, les soldes sont à jour.');
@@ -197,7 +207,8 @@ export default function ArdoiseDetailPage() {
       return;
     }
     try {
-      await addExpense.mutateAsync(values);
+      const resolved = await resolveValues();
+      await addExpense.mutateAsync(resolved);
       setExpenseDialogOpen(false);
       toast('Dépense ajoutée, les soldes sont à jour.');
     } catch (creationError) {

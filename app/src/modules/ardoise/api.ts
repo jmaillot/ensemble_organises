@@ -190,6 +190,31 @@ export async function removeArdoiseMember(ardoiseId: string, memberId: string): 
   await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId });
 }
 
+/**
+ * Payeur externe saisi en texte libre : invité existant (même nom) ou créé
+ * (sans ticket d'accès). En configuré via l'Edge, en local en direct.
+ */
+export async function ensureExpenseGuest(ardoiseId: string, displayName: string): Promise<{ id: string; name: string }> {
+  const name = displayName.trim();
+  if (name.length === 0) throw new Error('Indiquez le nom de la personne.');
+  if (isSupabaseConfigured) {
+    const created = await callArdoiseInvite<{ guest_id: string; display_name: string }>('add-guest', {
+      ardoiseId,
+      displayName: name,
+    });
+    return { id: created.guest_id, name: created.display_name };
+  }
+  const guests = await data.list<ArdoiseGuestRow>('ardoise_guests', { ardoise_id: ardoiseId }).catch(() => []);
+  const existing = guests.find((guest) => guest.display_name.toLowerCase() === name.toLowerCase());
+  if (existing) return { id: existing.id, name: existing.display_name };
+  const created = await data.create<ArdoiseGuestRow>('ardoise_guests', {
+    ardoise_id: ardoiseId,
+    display_name: name,
+    ticket_hash: null,
+  });
+  return { id: created.id, name: created.display_name };
+}
+
 /* ------------------------------------------------------------------ */
 /* Partage par code (Edge Function `ardoise-invite`)                   */
 /* ------------------------------------------------------------------ */

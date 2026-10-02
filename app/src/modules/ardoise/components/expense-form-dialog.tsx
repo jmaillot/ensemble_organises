@@ -9,7 +9,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, todayIso } from '@/lib/utils';
-import { GUEST_KEY_PREFIX, MEMBER_KEY_PREFIX, guestKey, memberKey, participantKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type ParticipantKind, type SplitType } from '../types';
+import { GUEST_KEY_PREFIX, MEMBER_KEY_PREFIX, FREE_PAYER_VALUE, guestKey, memberKey, participantKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type ParticipantKind, type SplitType } from '../types';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,6 +30,7 @@ const schema = z
       .min(1, 'Indiquez un montant.')
       .refine((value) => parseAmount(value) > 0, 'Le montant doit être supérieur à zéro.'),
     paidBy: z.string().min(1, 'Choisissez qui a payé.'),
+    payerName: z.string().trim().max(120, '120 caractères maximum.').optional(),
     date: z.string().refine(isRealDate, 'Indiquez une date valide (AAAA-MM-JJ).'),
     splitType: z.enum(['egal', 'personnalise']),
     participants: z.array(z.string()).min(1, 'Choisissez au moins une personne qui partage.'),
@@ -40,7 +41,11 @@ const schema = z
       values.splitType !== 'personnalise' ||
       Object.values(values.customShares).every((value) => value.trim() === '' || parseAmount(value) >= 0),
     { message: 'Les montants personnalisés doivent être positifs.', path: ['customShares'] },
-  );
+  )
+  .refine((values) => values.paidBy !== FREE_PAYER_VALUE || (values.payerName ?? '').trim() !== '', {
+    message: 'Indiquez le nom de la personne.',
+    path: ['payerName'],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -92,6 +97,7 @@ export function ExpenseFormDialog({
         title: '',
         amount: '',
         paidBy: defaultPayerId ? memberKey(defaultPayerId) : (members[0] ? memberKey(members[0].id) : ''),
+        payerName: '',
         date: todayIso(),
         splitType: 'egal',
         participants: [...members.map((member) => memberKey(member.id)), ...guests.map((guest) => guestKey(guest.id))],
@@ -102,6 +108,7 @@ export function ExpenseFormDialog({
       title: expense.title,
       amount: String(expense.amount),
       paidBy: expense.paidBy ? participantKey(expense.paidByKind, expense.paidBy) : '',
+      payerName: '',
       date: expense.date,
       splitType: expense.splitType,
       participants: expense.participants.map((participant) => participant.key),
@@ -128,10 +135,32 @@ export function ExpenseFormDialog({
 
   const splitType = watch('splitType');
   const participants = watch('participants') ?? [];
+  const paidByValue = watch('paidBy');
   const amount = parseAmount(watch('amount'));
   const shareCount = participants.length;
 
   const submit = (values: FormValues) => {
+    if (values.paidBy === FREE_PAYER_VALUE) {
+      onSubmit({
+        title: values.title,
+        amount: roundCents(parseAmount(values.amount)),
+        paidBy: '',
+        paidByKind: 'guest',
+        payerName: (values.payerName ?? '').trim(),
+        date: values.date,
+        splitType: values.splitType as SplitType,
+        participants: values.participants,
+        customShares:
+          values.splitType === 'personnalise'
+            ? Object.fromEntries(
+                Object.entries(values.customShares)
+                  .filter(([, value]) => value.trim() !== '')
+                  .map(([key, value]) => [key, roundCents(parseAmount(value))]),
+              )
+            : undefined,
+      });
+      return;
+    }
     const payerKind: ParticipantKind = values.paidBy.startsWith(GUEST_KEY_PREFIX) ? 'guest' : 'membre';
     const payerId = values.paidBy.startsWith(GUEST_KEY_PREFIX)
       ? values.paidBy.slice(GUEST_KEY_PREFIX.length)
@@ -189,10 +218,18 @@ export function ExpenseFormDialog({
                       {guest.name} (invité)
                     </option>
                   ))}
+                  <option value={FREE_PAYER_VALUE}>Autre personne…</option>
                 </Select>
               )}
             </Field>
           </div>
+          {paidByValue === FREE_PAYER_VALUE ? (
+            <Field label="Nom de la personne" error={errors.payerName?.message}>
+              {(props) => (
+                <Input {...props} {...register('payerName')} placeholder="Ex. Mamie" maxLength={120} autoComplete="off" />
+              )}
+            </Field>
+          ) : null}
 
           <fieldset className="grid gap-1.5">
             <legend className="text-[11px] font-extrabold text-muted">Qui partage</legend>

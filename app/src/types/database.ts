@@ -369,7 +369,8 @@ export interface ArdoiseGuestRow {
   id: Uuid;
   ardoise_id: Uuid;
   display_name: string;
-  ticket_hash: string;
+  /** NULL = payeur nommé sans accès (jamais échangé). */
+  ticket_hash: string | null;
   created_at: IsoDateTime;
 }
 

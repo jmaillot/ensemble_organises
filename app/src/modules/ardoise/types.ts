@@ -12,6 +12,9 @@ export const GUEST_KEY_PREFIX = 'invite:';
 export const memberKey = (id: string) => `${MEMBER_KEY_PREFIX}${id}`;
 export const guestKey = (id: string) => `${GUEST_KEY_PREFIX}${id}`;
 
+/** Valeur du Select payeur pour une personne externe saisie en texte libre. */
+export const FREE_PAYER_VALUE = 'autre';
+
 /** Clé stable d'un participant, membre ou invité. */
 export const participantKey = (kind: ParticipantKind, id: string) =>
   kind === 'guest' ? guestKey(id) : memberKey(id);
@@ -78,6 +81,8 @@ export interface NewExpenseInput {
   paidBy: string;
   /** Membre ou invité ; `membre` par défaut (compatibilité). */
   paidByKind?: ParticipantKind;
+  /** Payeur externe en texte libre : matérialisé en invité avant écriture. */
+  payerName?: string;
   date: string;
   splitType: SplitType;
   /** Clés de participants dans l'ordre d'affichage ; le dernier absorbe l'écart. */
