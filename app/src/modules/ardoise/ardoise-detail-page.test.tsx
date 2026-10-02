@@ -135,12 +135,14 @@ describe('ArdoiseDetailPage', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Ajouter une dépense' })[0]);
     const dialog = await screen.findByRole('dialog');
+    // Maya (foyer, hors ardoise) n’est proposée ni en payeur ni en partage.
+    expect(within(dialog).queryByRole('checkbox', { name: /Maya/ })).not.toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText(/Libellé/), 'Pizza du soir');
     await user.type(within(dialog).getByLabelText(/Montant/), '20');
-    // Partage limité à Camille et Thomas pour rendre le résultat déterministe.
+    // Partage limité à Camille et Thomas (seuls inscrits cochés : Lina décochée,
+    // Maya n’est pas dans l’ardoise donc absente du formulaire).
     await user.click(within(dialog).getByRole('checkbox', { name: /Lina/ }));
-    await user.click(within(dialog).getByRole('checkbox', { name: /Maya/ }));
 
     expect(plain(within(dialog).getByText(/par personne/).textContent ?? '')).toContain('10,00');
 

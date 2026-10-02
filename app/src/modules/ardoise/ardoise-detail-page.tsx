@@ -15,6 +15,7 @@ import { useSessionUser } from '@/hooks/use-auth';
 import {
   useAddExpense,
   useArdoiseDetail,
+  useArdoiseMembers,
   useDeleteExpense,
   useUpdateExpense,
 } from './hooks/use-ardoise';
@@ -181,7 +182,18 @@ export default function ArdoiseDetailPage() {
   };
 
   const sessionMemberId = useSessionMemberId();
-  const defaultPayerId = sessionMemberId ?? sharingMembers[0]?.id ?? null;
+  // Le formulaire ne propose que les inscrits de l'ardoise (pas tout le
+  // foyer) + « Autre personne… ». En chargement, repli sur tout le foyer
+  // pour ne jamais présenter un formulaire vide.
+  const { memberIds: ardoiseMemberIds, isLoading: membersLoading } = useArdoiseMembers(ardoiseId);
+  const expenseMembers = useMemo(
+    () =>
+      !ardoiseId || membersLoading
+        ? sharingMembers
+        : sharingMembers.filter((member) => ardoiseMemberIds.includes(member.id)),
+    [ardoiseId, membersLoading, sharingMembers, ardoiseMemberIds],
+  );
+  const defaultPayerId = sessionMemberId ?? expenseMembers[0]?.id ?? sharingMembers[0]?.id ?? null;
 
   const paidByMember = useMemo(() => computeSpent(expenses), [expenses]);
 
@@ -405,7 +417,7 @@ export default function ArdoiseDetailPage() {
           if (!open) setEditingExpense(null);
           setExpenseDialogOpen(open);
         }}
-        members={sharingMembers}
+        members={expenseMembers}
         guests={guestOptions}
         defaultPayerId={defaultPayerId}
         initialExpense={editingExpense}
