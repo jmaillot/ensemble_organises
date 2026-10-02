@@ -17,7 +17,7 @@ const CODE = 'code-partage-12345678901234';
 
 const viewPayload = {
   ardoise: { id: 'ardoise-1', name: 'Week-end', description: null, cover_url: null, is_active: true },
-  guest: { display_name: 'Hugo' },
+  guest: null,
   expenses: [
     {
       id: 'e1',
@@ -37,15 +37,13 @@ const viewPayload = {
   },
 };
 
-function mockFetch(calls: string[]) {
+function mockViewFetch(calls: string[], ok = true) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation(async (_url: unknown, init?: RequestInit) => {
-      const action = (JSON.parse((init?.body as string) ?? '{}') as { action?: string }).action ?? '?';
-      calls.push(action);
-      if (action === 'redeem-guest') {
-        return { ok: true, json: async () => ({ ardoise_id: 'ardoise-1', guest_ticket: 'TICKET-BRUT-1234567890' }) };
-      }
+      const body = (JSON.parse((init?.body as string) ?? '{}') as { action?: string; code?: string }) ?? {};
+      calls.push(`${body.action ?? '?'}`);
+      if (!ok) return { ok: false, json: async () => ({ error: 'Lien invalide.' }) };
       return { ok: true, json: async () => viewPayload };
     }),
   );
@@ -66,34 +64,45 @@ describe('GuestArdoisePage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('échange le code une fois puis affiche l’ardoise en lecture seule', async () => {
+  it('affiche l’ardoise directement depuis le lien, sans nom ni ticket', async () => {
     const calls: string[] = [];
-    mockFetch(calls);
-    const user = userEvent.setup();
+    mockViewFetch(calls);
     try {
       renderGuest(CODE);
-      expect(screen.getByLabelText(/Code d’invitation/)).toHaveValue(CODE);
-
-      await user.type(screen.getByLabelText(/pseudonyme/), 'Hugo');
-      await user.click(screen.getByRole('button', { name: 'Voir l’ardoise' }));
-
       expect(await screen.findByText('Courses')).toBeInTheDocument();
       expect(screen.getByText('Participer ?')).toBeInTheDocument();
-      expect(calls.filter((action) => action === 'redeem-guest')).toHaveLength(1);
+      expect(screen.queryByLabelText(/pseudonyme/i)).not.toBeInTheDocument();
+      expect(calls).toEqual(['link-view']);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('réutilise le ticket au retour, sans rééchanger ni reconsommer', async () => {
+  it('propose le formulaire sans code, puis ouvre le lien saisi', async () => {
     const calls: string[] = [];
-    mockFetch(calls);
-    localStorage.setItem(`eo:ardoise:guest-link:${CODE}`, 'ardoise-1');
-    localStorage.setItem('eo:ardoise:ticket:ardoise-1', 'TICKET-BRUT-1234567890');
+    mockViewFetch(calls);
+    const user = userEvent.setup();
+    try {
+      renderGuest(null);
+      await user.type(screen.getByLabelText(/Code d’invitation/), CODE);
+      await user.click(screen.getByRole('button', { name: 'Voir l’ardoise' }));
+      expect(await screen.findByText('Courses')).toBeInTheDocument();
+      expect(calls).toEqual(['link-view']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('lien révoqué : message et retour au formulaire', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls, false);
+    const user = userEvent.setup();
     try {
       renderGuest(CODE);
-      expect(await screen.findByText('Courses')).toBeInTheDocument();
-      expect(calls).toEqual(['guest-view']);
+      expect(await screen.findByText(/ne passe plus/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Réessayer/ }));
+      expect(screen.getByLabelText(/Code d’invitation/)).toBeInTheDocument();
+      expect(calls).toEqual(['link-view']);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -33,6 +33,9 @@
  *   summary     -> { ardoise_id, is_active, has_code, expires_at, max_uses, use_count } | null
  *   join        -> { ardoise_id, already_member: true }
  *   redeem-guest -> { ardoise_id, guest_ticket }
+ *   guest-view  -> vue invité (ticket) : { ardoise, guest, expenses, settlement }
+ *   link-view   -> vue anonyme (code vérifié) : { ardoise, guest: null, expenses, settlement }
+ *   add-guest   -> { guest_id, display_name, created }
  */
 
 // Spécificateur BARE, comme `household-invite` : le runtime épingle
@@ -141,6 +144,16 @@ const requestSchema = z.discriminatedUnion('action', [
     ticket: z.string().trim().min(20).max(256),
   }),
   z.object({
+    action: z.literal('link-view'),
+    /** Code brut du lien (vérifié actif, non expiré ; sans ticket ni nom). */
+    code: z
+      .string()
+      .trim()
+      .min(22, 'Un code fait au moins 22 caractères.')
+      .max(512)
+      .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.'),
+  }),
+  z.object({
     action: z.literal('add-guest'),
     ardoiseId: ardoiseField,
     /** Payeur externe saisi en texte libre : devient un invité SANS ticket. */
@@ -213,7 +226,7 @@ async function hmacSha256Hex(code: string, secret: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30, 'add-guest': 20 };
+const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30, 'link-view': 30, 'add-guest': 20 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -505,10 +518,23 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
   const guest = (verified ?? {}) as { guest_id?: string; ardoise_id?: string; display_name?: string };
   if (!guest.ardoise_id) throw new ArdoiseInviteError(404, 'Ticket invalide.');
 
+  return buildGuestView(admin, guest.ardoise_id, guest.display_name ?? null, { ticketHash });
+}
+
+/**
+ * Vue invité partagée (`guest-view` ticket, `link-view` code vérifié) :
+ * ardoise, dépenses nommées, soldes. Lecture seule, aucune écriture.
+ */
+async function buildGuestView(
+  admin: AdminClient,
+  ardoiseId: string,
+  guestDisplayName: string | null,
+  auth: { ticketHash: string } | { open: true },
+) {
   const { data: ardoise, error: ardoiseError } = await admin
     .from('ardoises')
     .select('id,name,description,cover_url,is_active')
-    .eq('id', guest.ardoise_id)
+    .eq('id', ardoiseId)
     .single();
   if (ardoiseError || !ardoise) throw new ArdoiseInviteError(404, 'Ardoise introuvable.');
 
@@ -516,12 +542,12 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
     admin
       .from('expenses')
       .select('id,title,amount,expense_date,paid_by,paid_by_guest')
-      .eq('ardoise_id', guest.ardoise_id)
+      .eq('ardoise_id', ardoiseId)
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false }),
     admin.from('expense_participants').select('expense_id,participant_type,member_id,guest_id,share_amount'),
     admin.from('household_members').select('id,display_name'),
-    admin.from('ardoise_guests').select('id,display_name').eq('ardoise_id', guest.ardoise_id),
+    admin.from('ardoise_guests').select('id,display_name').eq('ardoise_id', ardoiseId),
   ]);
 
   const memberNames = new Map(((members ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]));
@@ -569,11 +595,11 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
     };
   });
 
-  const { data: settlement, error: settlementError } = await admin.rpc('ardoise_settlement', {
-    p_actor_id: null,
-    p_ardoise_id: guest.ardoise_id,
-    p_ticket_hash: ticketHash,
-  });
+  const settlementArgs =
+    'ticketHash' in auth
+      ? { p_actor_id: null, p_ardoise_id: ardoiseId, p_ticket_hash: auth.ticketHash }
+      : { p_actor_id: null, p_ardoise_id: ardoiseId, p_ticket_hash: null, p_open_access: true };
+  const { data: settlement, error: settlementError } = await admin.rpc('ardoise_settlement', settlementArgs);
   if (settlementError) throw translateRpcError(settlementError);
 
   return json({
@@ -584,11 +610,35 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
       cover_url: (ardoise as { cover_url: string | null }).cover_url,
       is_active: (ardoise as { is_active: boolean }).is_active,
     },
-    guest: { display_name: guest.display_name ?? 'Invité' },
+    guest: guestDisplayName ? { display_name: guestDisplayName } : null,
     expenses: viewExpenses,
     settlement: settlement ?? null,
   });
 }
+
+/**
+ * Lecture anonyme par lien : le code EST le contrôle d'accès (actif, non
+ * expiré). Aucun nom demandé, aucune ligne invitée créée, compteur
+ * d'utilisations intact (`max_uses` borne les inscriptions, pas les lectures).
+ */
+async function handleLinkView(admin: AdminClient, body: RequestBody & { action: 'link-view' }) {
+  const secret = checkSecret();
+  const codeHash = await hmacSha256Hex(body.code, secret);
+
+  const { data: ardoise, error: ardoiseError } = await admin
+    .from('ardoises')
+    .select('id,is_active,expires_at')
+    .eq('invite_hash', codeHash)
+    .single();
+  const row = ardoise as { id: string; is_active: boolean; expires_at: string | null } | null;
+  if (ardoiseError || !row) throw new ArdoiseInviteError(404, 'Lien invalide.');
+  if (!row.is_active) throw new ArdoiseInviteError(404, 'Lien invalide.');
+  if (row.expires_at && row.expires_at <= new Date().toISOString()) {
+    throw new ArdoiseInviteError(404, 'Lien invalide.');
+  }
+  return buildGuestView(admin, row.id, null, { open: true });
+}
+
 
 // ---------------------------------------------------------------------------
 // Point d'entrée
@@ -612,14 +662,17 @@ Deno.serve(
       const isUser = ctx.authMode === 'user' && Boolean(userId);
       const admin = ctx.supabaseAdmin;
 
-      // `redeem-guest` et `guest-view` sont les seuls chemins sans session :
-      // les invités n'ont pas de compte. Tout le reste exige une session,
-      // sans valider le code.
+      // `redeem-guest`, `guest-view` et `link-view` sont les seuls chemins
+      // sans session : les invités n'ont pas de compte. Tout le reste exige
+      // une session, sans valider le code.
       if (body.action === 'redeem-guest') {
         return await handleRedeemGuest(admin, body);
       }
       if (body.action === 'guest-view') {
         return await handleGuestView(admin, body);
+      }
+      if (body.action === 'link-view') {
+        return await handleLinkView(admin, body);
       }
       if (!isUser || !userId) {
         return json({ error: 'Connectez-vous pour rejoindre une ardoise.' }, 401);

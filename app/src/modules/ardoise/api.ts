@@ -288,7 +288,8 @@ export interface GuestExpenseView {
 
 export interface GuestArdoiseView {
   ardoise: { id: string; name: string; description: string | null; cover_url: string | null; is_active: boolean };
-  guest: { display_name: string };
+  /** NULL en accès anonyme par lien (aucun nom demandé). */
+  guest: { display_name: string } | null;
   expenses: GuestExpenseView[];
   settlement: ArdoiseServerSettlement | null;
 }
@@ -298,23 +299,11 @@ export async function fetchGuestArdoiseView(ticket: string): Promise<GuestArdois
   return callArdoiseInvite<GuestArdoiseView>('guest-view', { ticket });
 }
 
-/** Lien invité mémorisé (code → ardoise), pour réutiliser le ticket sans rééchanger. */
-const guestLinkKey = (code: string) => `eo:ardoise:guest-link:${code.trim()}`;
-
-export function readGuestLinkArdoise(code: string): string | null {
-  try {
-    return window.localStorage.getItem(guestLinkKey(code));
-  } catch {
-    return null;
-  }
-}
-
-export function writeGuestLinkArdoise(code: string, ardoiseId: string): void {
-  try {
-    window.localStorage.setItem(guestLinkKey(code), ardoiseId);
-  } catch {
-    // Stockage indisponible : nouvel échange à la prochaine visite.
-  }
+/** Lecture anonyme par lien : le code suffit, sans nom ni ticket. */
+export async function fetchGuestLinkView(code: string): Promise<GuestArdoiseView> {
+  const trimmed = code.trim();
+  if (trimmed.length < 22) throw new Error('Lien invalide.');
+  return callArdoiseInvite<GuestArdoiseView>('link-view', { code: trimmed });
 }
 
 /** Invité externe : échange le code contre un ticket stocké localement. */

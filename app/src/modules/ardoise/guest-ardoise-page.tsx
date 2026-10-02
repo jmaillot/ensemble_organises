@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -9,75 +9,52 @@ import { MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell'
 import { formatEuro } from '@/lib/utils';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import {
-  fetchGuestArdoiseView,
-  readGuestLinkArdoise,
-  readGuestTicket,
-  redeemGuestTicket,
+  fetchGuestLinkView,
   toServerBalances,
   toServerSettlements,
-  writeGuestLinkArdoise,
 } from './api';
 import { MemberBalances } from './components/balance-panel';
 import { SettlementsPanel } from './components/settlements-panel';
 
-interface GuestSession {
-  ticket: string;
-  ardoiseId: string;
-}
-
-function readStoredSession(code: string): GuestSession | null {
-  const trimmed = code.trim();
-  if (trimmed === '') return null;
-  const ardoiseId = readGuestLinkArdoise(trimmed);
-  if (!ardoiseId) return null;
-  const ticket = readGuestTicket(ardoiseId);
-  if (!ticket) return null;
-  return { ticket, ardoiseId };
-}
-
 /**
  * Page PUBLIQUE d'invitation (hors authentification) : un lien
- * `/invitation/ardoise?code=…` suffit, aucun compte requis.
+ * `/invitation/ardoise?code=…` suffit — aucun compte, aucun nom demandé.
  *
- * Parcours : code (pré-rempli) + pseudonyme → échange contre un ticket stocké
- * sur l'appareil → lecture seule de l'ardoise. L'échange n'a lieu qu'une fois
- * par appareil (ni doublon d'invité, ni consommation du compteur au retour).
- * Pour AVANCER des dépenses, il faut un compte puis rejoindre l'ardoise.
+ * Accès anonyme en lecture seule : le code EST le contrôle d'accès (actif,
+ * non expiré). Aucune ligne invitée créée, compteur d'utilisations intact,
+ * l'invité n'apparaît pas dans la répartition. Pour AVANCER des dépenses,
+ * il faut un compte puis rejoindre l'ardoise (l'adhésion inscrit aux
+ * dépenses à part zéro sur le passé).
  */
 export default function GuestArdoisePage() {
   const [params] = useSearchParams();
-  const queryClient = useQueryClient();
   const [code, setCode] = useState(() => params.get('code') ?? '');
-  const [displayName, setDisplayName] = useState('');
-  const [session, setSession] = useState<GuestSession | null>(() => readStoredSession(params.get('code') ?? ''));
+  const [activeCode, setActiveCode] = useState(() => {
+    const initial = (params.get('code') ?? '').trim();
+    return initial.length >= 22 ? initial : null;
+  });
   const [formError, setFormError] = useState<string | null>(null);
-  const [isJoining, setIsJoining] = useState(false);
 
   const viewQuery = useQuery({
-    queryKey: ['ardoise', 'guest-view', session?.ardoiseId ?? ''],
-    enabled: Boolean(session),
+    queryKey: ['ardoise', 'link-view', activeCode ?? ''],
+    enabled: activeCode !== null,
     retry: false,
-    queryFn: () => fetchGuestArdoiseView((session as GuestSession).ticket),
+    queryFn: () => fetchGuestLinkView(activeCode as string),
   });
 
-  const join = (event: React.FormEvent) => {
+  const openLink = (event: React.FormEvent) => {
     event.preventDefault();
     setFormError(null);
     if (!isSupabaseConfigured) {
       setFormError('Connexion au serveur indisponible pour le moment.');
       return;
     }
-    setIsJoining(true);
-    void redeemGuestTicket(code, displayName)
-      .then(({ ardoiseId }) => {
-        writeGuestLinkArdoise(code, ardoiseId);
-        const ticket = readGuestTicket(ardoiseId);
-        setSession(ticket ? { ticket, ardoiseId } : null);
-      })
-      .catch((joinError: unknown) =>
-        setFormError(joinError instanceof Error ? joinError.message : 'Code invalide.'),
-      )
-      .finally(() => setIsJoining(false));
+    const trimmed = code.trim();
+    if (trimmed.length < 22) {
+      setFormError('Ce lien semble incomplet.');
+      return;
+    }
+    setActiveCode(trimmed);
   };
 
   const view = viewQuery.data ?? null;
@@ -90,14 +67,10 @@ export default function GuestArdoisePage() {
       <Panel
         id="guest-ardoise-panel"
         title={view ? view.ardoise.name : 'Invitation à une ardoise'}
-        description={
-          view
-            ? `Invité : ${view.guest.display_name} · lecture seule`
-            : 'Un code suffit, aucun compte n’est requis pour regarder.'
-        }
+        description={view ? 'Accès invité · lecture seule' : 'Un lien suffit, aucun compte n’est requis pour regarder.'}
       >
-        {!session ? (
-          <form noValidate className="grid gap-3.5" onSubmit={join}>
+        {!activeCode ? (
+          <form noValidate className="grid gap-3.5" onSubmit={openLink}>
             <Field label="Code d’invitation" error={formError ?? undefined}>
               {(props) => (
                 <Input
@@ -105,25 +78,13 @@ export default function GuestArdoisePage() {
                   value={code}
                   onChange={(change) => setCode(change.target.value)}
                   autoComplete="off"
-                  placeholder="Code partagé par l’organisateur"
-                />
-              )}
-            </Field>
-            <Field label="Votre pseudonyme">
-              {(props) => (
-                <Input
-                  {...props}
-                  value={displayName}
-                  onChange={(change) => setDisplayName(change.target.value)}
-                  maxLength={120}
-                  autoComplete="nickname"
-                  placeholder="Ex. Hugo"
+                  placeholder="Code figurant dans le lien partagé"
                 />
               )}
             </Field>
             <div>
-              <Button type="submit" icon="arrow" disabled={isJoining || code.trim().length < 22}>
-                {isJoining ? 'Vérification…' : 'Voir l’ardoise'}
+              <Button type="submit" icon="arrow" disabled={code.trim().length < 22}>
+                Voir l’ardoise
               </Button>
             </div>
           </form>
@@ -131,11 +92,8 @@ export default function GuestArdoisePage() {
           <LoadingRows rows={3} />
         ) : viewQuery.isError || !view ? (
           <ErrorState
-            message="Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau code à l’organisateur."
-            onRetry={() => {
-              setSession(null);
-              void queryClient.invalidateQueries({ queryKey: ['ardoise', 'guest-view'] });
-            }}
+            message="Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur."
+            onRetry={() => setActiveCode(null)}
           />
         ) : (
           <div className="grid gap-[18px]">
@@ -186,9 +144,9 @@ export default function GuestArdoisePage() {
               description="La lecture est libre, mais avancer une dépense demande un compte."
             >
               <p className="m-0 mb-3 text-[12px] text-muted">
-                Créez un compte, puis rejoignez l’ardoise avec ce code : gardez-le précieusement.
+                Créez un compte, puis rejoignez l’ardoise : vous serez ajouté aux dépenses (part zéro sur le
+                passé, partage normal ensuite).
               </p>
-              <p className="m-0 mb-3 rounded-[11px] bg-bg px-3 py-2.5 font-mono text-[13px] break-all">{code.trim()}</p>
               <Link
                 to="/connexion"
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
