@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Contrôles statiques sur le SQL du dépôt.
 
-Trois défauts que la relecture, `migrate.sh` et le test de contrat n'ont pas
+Quatre défauts que la relecture, `migrate.sh` et le test de contrat n'ont pas
 vus, et que seule l'exécution a révélés. Ils sont tous de la même famille : le
 code est accepté à la création, et refusé à l'appel. Un contrôle automatique
 est donc le seul moyen fiable de les voir avant la recette.
@@ -46,6 +46,12 @@ Les vérifications
    depuis un bloc `do` avec une portée globale lit donc les données de la base
    entière, et l'assertion échoue — ou pire, passe pour la mauvaise raison —
    dès qu'un foyer réel a une notification due.
+8. DML PUIS ALTER MÊME TABLE MÊME TRANSACTION — un `insert`/`update`/`delete`
+   sur une table portant un `CONSTRAINT TRIGGER … DEFERRABLE INITIALLY
+   DEFERRED`, suivi dans la même transaction d'un `alter table` sur elle.
+   PostgreSQL répond « cannot ALTER TABLE … because it has pending trigger
+   events » dès que le DML touche au moins une ligne — et passe sur table
+   vide, ce qui est exactement pourquoi la recette locale ne le voit jamais.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -793,6 +799,168 @@ def _appels_globaux_dans_un_bloc(texte: str, nom_fichier: str) -> list[str]:
     return findings
 
 
+# Motif DML→ALTER déjà survenu et inerte : `0039` purge des lignes `externe`
+# dans un bloc `do`, puis ALTER la même table dans la même transaction — la
+# forme exacte que le contrôle 8 interdit. Le fichier est journalé sur toutes
+# les bases (et n'a vu que zéro ligne, 0038 interdisant déjà ces lignes) : il
+# ne rejouera jamais, on ne le réécrit donc pas, on le signale sans échouer.
+EXEMPTES_DML_ALTER = {
+    "0039_ardoise_drop_external_parts.sql",
+}
+
+RE_TAG_DOLLAR = re.compile(r"\$([A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)?\$")
+RE_DML = re.compile(
+    r"^(?:insert\s+into|update|delete\s+from)\s+(?:only\s+)?(?:public\.)?(\w+)",
+    re.I,
+)
+RE_ALTER = re.compile(
+    r"^alter\s+table\s+(?:only\s+)?(?:if\s+exists\s+)?(?:public\.)?(\w+)",
+    re.I,
+)
+RE_TRIGGER_DIFFERE = re.compile(
+    r"create\s+constraint\s+trigger\s+\S+\s+after\b.*?\bon\s+(?:public\.)?(\w+)"
+    r".*?deferrable\s+initially\s+deferred",
+    re.I | re.S,
+)
+
+
+def _regions_dollar(texte: str) -> list[tuple[int, int, str]]:
+    """Bornes [début, fin) de chaque région dollar-quotée, tag reconnu.
+
+    `$$` (tag vide) et `$corps$` sont deux tags différents, et seul le tag
+    fermant IDENTIQUE referme : un `$$` à l'intérieur d'un `$corps$` n'est
+    qu'un contenu. Le premier jet appariait au premier `$…$` venu (et ignorait
+    `$$`, dont le tag est vide) : un corps de fonction n'était jamais masqué,
+    et le contrôle voyait du DML là où il n'y a qu'une définition.
+    """
+    regions: list[tuple[int, int, str]] = []
+    pile: list[tuple[str, int]] = []
+    for m in RE_TAG_DOLLAR.finditer(texte):
+        tag = m.group(1) or ""
+        if pile and pile[-1][0] == tag:
+            _, debut = pile.pop()
+            if not pile:
+                regions.append((debut, m.end(), tag))
+        elif not pile:
+            pile.append((tag, m.start()))
+        # Tag différent à l'intérieur d'une région : contenu, on l'ignore.
+    return regions
+
+
+def _texte_executable_migration(texte: str) -> str:
+    """Texte des seuls ordres EXÉCUTÉS par `migrate.sh`, dans l'ordre.
+
+    - Les commentaires deviennent des espaces (longueurs conservées).
+    - Le contenu des corps de fonction `create … as $tag$ … $tag$` devient des
+      espaces : une définition n'exécute rien à la migration. Seul le corps
+      d'un bloc `do $tag$ … $tag$` est conservé tel quel : lui S'exécute.
+    - Toute autre région dollar-quotée (littéral `$$…$$` dans un `insert`,
+      par exemple) devient des espaces : son contenu n'est pas du SQL de
+      migration.
+
+    Les offsets et les sauts de ligne sont conservés : les numéros de ligne
+    rapportés restent ceux du fichier.
+    """
+    sans_commentaires = _sans_commentes(texte)
+    regions = _regions_dollar(sans_commentaires)
+    execute: list[str] = []
+    curseur = 0
+    for debut, fin, _tag in regions:
+        execute.append(sans_commentaires[curseur:debut])
+        avant = sans_commentaires[:debut]
+        corps = sans_commentaires[debut:fin]
+        if re.search(r"\bdo\s*$", avant[-400:], re.I):
+            # Bloc `do` : il s'exécute à la migration, on garde le contenu
+            # mais sans ses marqueurs.
+            m_ouvrant = RE_TAG_DOLLAR.match(corps)
+            m_fermant = list(RE_TAG_DOLLAR.finditer(corps))[-1]
+            execute.append(" " * m_ouvrant.end())
+            execute.append(corps[m_ouvrant.end() : m_fermant.start()])
+            execute.append(" " * (len(corps) - m_fermant.start()))
+        else:
+            execute.append(re.sub(r"[^\n]", " ", corps))
+        curseur = fin
+    execute.append(sans_commentaires[curseur:])
+    return "".join(execute)
+
+
+def _tables_triggers_differes(fichiers: list[pathlib.Path]) -> set[str]:
+    """Tables portant un `CONSTRAINT TRIGGER … DEFERRABLE INITIALLY DEFERRED`.
+
+    Tout DML sur elles laisse des événements en attente jusqu'au COMMIT : c'est
+    la condition qui rend le motif DML→ALTER fatal. La liste est DÉRIVÉE des
+    migrations (texte exécutable : les corps de fonction, qui définissent sans
+    exécuter, sont déjà exclus), pas écrite en dur — un futur trigger différé
+    y entre seul. Les FK `deferrable` ne sont pas couvertes : le dépôt n'en
+    contient aucune, et le contrôle dit ce qu'il voit.
+    """
+    tables: set[str] = set()
+    for f in fichiers:
+        executable = _texte_executable_migration(f.read_text())
+        for m in RE_TRIGGER_DIFFERE.finditer(executable):
+            nom = re.search(r"\bon\s+(?:public\.)?(\w+)", m.group(0), re.I)
+            if nom:
+                tables.add(nom.group(1).lower())
+    return tables
+
+
+def _dml_puis_alter(texte: str, nom_fichier: str, differees: set[str]) -> list[str]:
+    """DML puis ALTER même table dans la même transaction (contrôle 8).
+
+    Prouvé le 2026-10-03 sur `0055_ardoises.sql` : `update expenses` (backfill)
+    puis `alter table expenses … set not null` dans une seule transaction.
+    Vert sur la base de développement (table vide : le DML ne touche aucune
+    ligne, donc aucun événement différé), rouge `cannot ALTER TABLE …
+    because it has pending trigger events` sur le distant (lignes réelles).
+
+    Le contrôle respecte l'ORDRE des ordres : un ALTER avant tout DML est sain
+    (c'est le cas de `0056`), et chaque `commit`/`begin` de niveau migration
+    repart d'une transaction vide. Les corps de fonction sont exclus : ils
+    définissent, ils n'exécutent pas.
+
+    CE QUE CE CONTRÔLE NE COUVRE PAS : la condition de déclenchement dépend
+    des lignes (zéro ligne touchée = zéro événement = ALTER accepté). Le
+    contrôle conclut donc sur le MOTIF, prouvé fatal dès qu'une ligne est
+    touchée, pas sur un échec certain à chaque exécution.
+    """
+    trouvailles: list[str] = []
+    executable = _texte_executable_migration(texte)
+    masque = _masque_litteraux(executable)
+    segment: dict[str, str] = {}
+    # Positions plutôt que `find` : un même ordre peut apparaître deux fois
+    # dans un fichier, et `find` désignerait toujours la première occurrence.
+    for morceau in re.finditer(r"[^;]+;?", masque):
+        debut = morceau.start()
+        ordre = morceau.group(0).strip().rstrip(";").strip()
+        ligne = masque[:debut].count("\n") + 1 + morceau.group(0)[
+            : len(morceau.group(0)) - len(morceau.group(0).lstrip())
+        ].count("\n")
+        if re.fullmatch(r"begin", ordre, re.I):
+            segment = {}
+            continue
+        if re.fullmatch(r"commit", ordre, re.I):
+            segment = {}
+            continue
+        m_dml = RE_DML.match(ordre)
+        if m_dml:
+            table = m_dml.group(1).lower()
+            if table in differees and table not in segment:
+                segment[table] = f"{nom_fichier}:{ligne}  {ordre[:72].strip()}"
+            continue
+        m_alter = RE_ALTER.match(ordre)
+        if m_alter:
+            table = m_alter.group(1).lower()
+            if table in segment:
+                trouvailles.append(
+                    f"{segment[table]}\n"
+                    f"      puis {nom_fichier}:{ligne}  {ordre[:72].strip()}\n"
+                    f"      → `{table}` porte un trigger différé : dès que le DML touche\n"
+                    f"        une ligne, l'ALTER échoue (« pending trigger events »), et il\n"
+                    f"        passe sur table vide. Séparez par `commit; begin;`."
+                )
+    return trouvailles
+
+
 def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, str, str, bool]]:
     """(fichier, signature, corps, langage, est_effective) pour chaque fonction.
 
@@ -834,7 +1002,20 @@ def main() -> int:
 
     defauts: list[str] = []
     obsolete: list[str] = []
+    connus: list[str] = []
     n_effective = 0
+
+    differees = _tables_triggers_differes(migrations)
+    vus: set[str] = set()
+    for f in migrations:
+        for trouvaille in _dml_puis_alter(f.read_text(), f.name, differees):
+            if f.name in EXEMPTES_DML_ALTER:
+                resume = trouvaille.splitlines()[0]
+                if resume not in vus:
+                    vus.add(resume)
+                    connus.append(resume + " (risque connu, inerte)")
+            else:
+                defauts.append(f"{trouvaille}")
 
     for f, signature, corps, langage, effective in _definitions(migrations):
         if not effective:
@@ -917,6 +1098,10 @@ def main() -> int:
     if obsolete:
         print("Définitions dépassées, sans effet sur la base (corrigées plus loin) :")
         print("\n".join(obsolete) + "\n")
+
+    if connus:
+        print("Motif DML→ALTER déjà survenu, sans effet prévisible (exempté, voir EXEMPTES_DML_ALTER) :")
+        print("\n".join(f"    {c}" for c in connus) + "\n")
 
     if not defauts:
         print(

@@ -77,6 +77,16 @@ update public.expenses e
    and a.household_id = e.household_id
    and a.name = 'Ardoise du foyer';
 
+-- `expenses` porte un CONSTRAINT TRIGGER DEFERRABLE (`expenses_share_total`,
+-- 0008) : le backfill ci-dessus laisse des événements en attente jusqu'au
+-- COMMIT, et tout ALTER TABLE ultérieur dans la même transaction échoue
+-- (« pending trigger events ») dès que la table contient des lignes — vide
+-- en recette, pleine en réel, d'où le vert local et le rouge distant
+-- (constaté le 2026-10-03 sur `migrate.sh`, fichier jamais appliqué hors
+-- développement : correctif à statements inchangés, résultat final identique).
+commit;
+begin;
+
 alter table public.expenses alter column ardoise_id set not null;
 
 -- Membres initiaux : admin + membre du foyer (enfants exclus, lecture seule).

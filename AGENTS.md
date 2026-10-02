@@ -159,12 +159,14 @@ révèle qu'à son premier appel, en production, quatre fois par heure.
 
 #### B. Le contrôle statique SQL
 
-`python3 scripts/check-sql-statique.py` — vert avant tout commit. Sept
+`python3 scripts/check-sql-statique.py` — vert avant tout commit. Huit
 vérifications : nom de table non qualifié sous un `search_path` vide, CTE qui se
 rejoint lui-même, littéral laissé ouvert en fin de ligne, référence non qualifiée
 à une colonne de `returns table`, types des deux arguments de `testkit.eq`,
-variable plpgsql dans une chaîne SQL exécutée par `testkit.count()`, et CTE
-récursif sous un `with` qui n'est pas `recursive`.
+variable plpgsql dans une chaîne SQL exécutée par `testkit.count()`, CTE
+récursif sous un `with` qui n'est pas `recursive`, et DML puis ALTER même table
+dans la même transaction sur une table à triggers différés (prouvé le
+2026-10-03 sur `0055` : vert sur table vide, `pending trigger events` en réel).
 
 Un mode de défaillance plus insidieux que les sept autres : **un contrôle qui
 ne regarde rien**. Il est vert, il ne fait aucun bruit, et il ne peut rien

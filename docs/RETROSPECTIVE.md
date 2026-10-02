@@ -576,3 +576,43 @@ ici c'est l'inverse, une présence affirmée qui n'existe plus).
 
 Reste à prouver, inchangé : le frontend contre un vrai Supabase (les e2e
 tournent en démo IndexedDB), OAuth/SMTP réels.
+
+## 11. La migration qui passait à vide et cassait en réel (2026-10-03)
+
+`0055_ardoises.sql` faisait, dans une seule transaction : backfill
+`update expenses set ardoise_id = …`, puis `alter table expenses …
+set not null`. Verte en recette, rouge sur le distant :
+`cannot ALTER TABLE "expenses" because it has pending trigger events`.
+
+La cause dormait depuis `0008` : `expenses_share_total`, `CONSTRAINT TRIGGER
+… DEFERRABLE INITIALLY DEFERRED`. Tout DML sur `expenses` laisse des
+événements en attente jusqu'au COMMIT, et tout ALTER ultérieur dans la même
+transaction est refusé — mais seulement si le DML touche au moins une ligne.
+Table vide en développement : zéro événement, ALTER accepté. Table pleine en
+réel : échec. Quatrième membre de la famille « accepté à la création, refusé
+à l'appel », et le plus vicieux : la preuve locale (base vide) est
+structurellement incapable de le voir.
+
+**Classe, pas instance** : `0039` porte le même motif (DELETE legacy dans un
+bloc `do`, puis ALTER même table même transaction) — inerte, journalé
+partout, zéro ligne concernée (0038 interdisait déjà ces lignes), il ne
+rejouera jamais : documenté, exempté, non réécrit. `0056` ne le porte pas
+(ALTER avant tout DML ; son INSERT vit dans un corps de fonction, qui
+définit sans exécuter).
+
+**Correctif** : `0055` découpée en deux transactions (`commit; begin;`
+entre backfill et SET NOT NULL), statements inchangés, résultat final
+identique. Écart assumé à « ne jamais réécrire une migration appliquée » :
+le fichier n'avait abouti sur aucune base durable (journalé en développement
+seulement, rollback jamais journalé sur le distant), et aucune correction
+« vers l'avant » n'est possible — c'est le fichier lui-même qui bloque la
+chaîne, rien après lui ne peut s'exécuter. Le commentaire dans le fichier
+dit tout cela.
+
+**Preuves** (base de développement, lignes jetables `zz_repro_*`, zéro résidu
+vérifié) : forme exacte 0055 reproduite à l'octet (`UPDATE 1` puis l'ERROR
+du distant) ; forme découpée verte sans trace ; contrôle statique n°8
+(DML→ALTER même table même transaction sur table à triggers différés,
+liste dérivée des migrations) rouge sur 0055 avant, vert après, `0039`
+signalé sans échouer. Chaîne : statique 112 fonctions OK, `test-db.sh`
+19/19.
