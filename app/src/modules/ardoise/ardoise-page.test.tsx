@@ -51,6 +51,19 @@ describe('ArdoisePage — liste', () => {
     expect(within(membersDialog).getByText('Ajouter (1)')).toBeInTheDocument();
   });
 
+  it('affiche la photo de couverture en fond dans la liste', async () => {
+    const { updateArdoise } = await import('./api');
+    await updateArdoise('ardoise-foyer', { cover_url: 'https://exemple.fr/cover.jpg' });
+    try {
+      const { container } = renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+      await screen.findByText('Ardoise du foyer');
+      const photo = container.querySelector('img[src="https://exemple.fr/cover.jpg"]');
+      expect(photo).not.toBeNull();
+    } finally {
+      await updateArdoise('ardoise-foyer', { cover_url: null });
+    }
+  });
+
   it('ouvre le dialogue rejoindre avec un code', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ArdoisePage />, { route: '/ardoise' });

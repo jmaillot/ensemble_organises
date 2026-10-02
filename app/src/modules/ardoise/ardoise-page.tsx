@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/toast';
 import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
-import { pluralize } from '@/lib/utils';
 import { useMembers } from '@/stores/household-store';
 import { useArdoises } from './hooks/use-ardoise';
 import { joinArdoise, redeemGuestTicket } from './api';
@@ -77,32 +76,48 @@ export default function ArdoisePage() {
               <div
                 key={ardoise.id}
                 role="listitem"
-                className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border px-3.5 py-3"
+                className={`relative flex flex-wrap items-center gap-3 overflow-hidden rounded-[12px] border px-3.5 py-3 ${
+                  ardoise.cover_url ? 'border-transparent' : 'border-border'
+                }`}
               >
-                <div className="min-w-[150px] flex-1">
-                  <p className="m-0 text-[14px] font-[760]">{ardoise.name}</p>
-                  <small className="text-[11px] text-muted">
+                {ardoise.cover_url ? (
+                  <>
+                    <img
+                      src={ardoise.cover_url}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <div aria-hidden="true" className="absolute inset-0 bg-fg/60" />
+                  </>
+                ) : null}
+                <div className="relative min-w-[150px] flex-1">
+                  <p className={`m-0 text-[14px] font-[760] ${ardoise.cover_url ? 'text-white' : ''}`}>
+                    {ardoise.name}
+                  </p>
+                  <small className={`text-[11px] ${ardoise.cover_url ? 'text-white/75' : 'text-muted'}`}>
                     {ardoise.description ? `${ardoise.description} · ` : ''}
                     {ardoise.is_active ? 'Partage actif' : 'Partage coupé'}
                   </small>
                 </div>
-                <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
-                  Ouvrir
-                </Button>
+                <div className="relative">
+                  <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
+                    Ouvrir
+                  </Button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setPendingDeleteId(ardoise.id)}
                   aria-label={`Supprimer ${ardoise.name}`}
-                  className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+                  className={`relative grid size-11 place-items-center rounded-[9px] transition-colors hover:bg-coral-soft hover:text-coral ${
+                    ardoise.cover_url ? 'text-white/85' : 'text-muted'
+                  }`}
                 >
                   <Icon name="trash" size="sm" />
                 </button>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted">
-            {pluralize(ardoises.length, 'ardoise')} {ardoises.length > 1 ? 's' : ''} dans le foyer.
-          </p>
         </Panel>
       )}
 
