@@ -17,7 +17,37 @@
     <title>Ensemble &amp; Organisés</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Repli statique pour les robots sans JavaScript (vérification OAuth,
+        indexation) : remplacé par l'application au démarrage (createRoot).
+        À synchroniser avec app/src/modules/landing/landing-page.tsx :
+        nom, promesse, et surtout les liens légaux ci-dessous.
+      -->
+      <header style="max-width:780px;margin:0 auto;padding:40px 20px 8px;font-family:system-ui,sans-serif">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#555">
+          Ensemble &amp; Organisés
+        </p>
+        <h1 style="margin:0 0 8px;font-size:30px;line-height:1.08">Tout le foyer, au même endroit.</h1>
+        <p style="margin:0;font-size:14px;color:#333">
+          Tâches, courses, calendrier, budget partagé et souvenirs : l’espace familial pour tout garder en
+          mouvement, installable et utilisable hors ligne.
+        </p>
+        <nav aria-label="Navigation principale" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:16px;font-size:14px">
+          <a href="/connexion">Se connecter</a>
+          <a href="/invitation/ardoise">Rejoindre une ardoise</a>
+          <a href="/confidentialite">Politique de confidentialité</a>
+          <a href="/conditions-utilisation">Conditions d’utilisation</a>
+        </nav>
+      </header>
+      <noscript>
+        <p style="max-width:780px;margin:0 auto;padding:16px 20px;font-family:system-ui,sans-serif;font-size:14px">
+          Cette application nécessite JavaScript pour fonctionner. Consultez la
+          <a href="/confidentialite">politique de confidentialité</a> et les
+          <a href="/conditions-utilisation">conditions d’utilisation</a>.
+        </p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
