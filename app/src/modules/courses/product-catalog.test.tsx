@@ -5,7 +5,17 @@ import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import type { ProductRow } from '@/types';
-import CoursesPage from './courses-page';
+import { Route, Routes } from 'react-router';
+import ProductCatalogPage from './product-catalog-page';
+
+function renderCatalogue() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/courses/catalogue" element={<ProductCatalogPage />} />
+    </Routes>,
+    { route: '/courses/catalogue' },
+  );
+}
 
 async function seedProduct() {
   return data.create<ProductRow>('products', {
@@ -26,7 +36,7 @@ describe('ProductCatalog', () => {
   it('liste les produits scannés du foyer', async () => {
     await seedProduct();
     try {
-      renderWithProviders(<CoursesPage />);
+      renderCatalogue();
       const heading = await screen.findByRole('heading', { name: 'Catalogue des produits scannés' });
       const panel = heading.closest('section') as HTMLElement;
       expect(await within(panel).findByText('Nutella')).toBeInTheDocument();
@@ -41,7 +51,7 @@ describe('ProductCatalog', () => {
     const user = userEvent.setup();
     const created = await seedProduct();
     try {
-      renderWithProviders(<CoursesPage />);
+      renderCatalogue();
       await user.click(await screen.findByRole('button', { name: 'Modifier Nutella' }));
       const dialog = await screen.findByRole('dialog', { name: 'Modifier le produit' });
 
@@ -65,7 +75,7 @@ describe('ProductCatalog', () => {
     const user = userEvent.setup();
     const created = await seedProduct();
     try {
-      renderWithProviders(<CoursesPage />);
+      renderCatalogue();
       await user.click(await screen.findByRole('button', { name: 'Modifier Nutella' }));
       const dialog = await screen.findByRole('dialog', { name: 'Modifier le produit' });
 

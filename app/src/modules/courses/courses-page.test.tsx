@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import CoursesPage from './courses-page';
+import ProductCatalogPage from './product-catalog-page';
 
 /** Chaque liste est une `section` étiquetée par son nom. */
 const listRegion = (name: string) => screen.getByRole('region', { name });
@@ -148,5 +150,19 @@ describe('Module Courses', () => {
     });
     const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
     expect(within(row).getByText(/Ménage/)).toBeInTheDocument();
+  });
+
+  it('le bouton Catalogue ouvre la page catalogue', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/courses" element={<CoursesPage />} />
+        <Route path="/courses/catalogue" element={<ProductCatalogPage />} />
+      </Routes>,
+      { route: '/courses' },
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Catalogue' }));
+    expect(await screen.findByRole('heading', { name: 'Catalogue des produits scannés' })).toBeInTheDocument();
   });
 });

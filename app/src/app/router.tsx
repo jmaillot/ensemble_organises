@@ -25,6 +25,7 @@ const TachesPage = lazy(() => import('@/modules/taches/taches-page'));
 const CalendrierPage = lazy(() => import('@/modules/calendrier/calendrier-page'));
 const NotesPage = lazy(() => import('@/modules/notes/notes-page'));
 const CoursesPage = lazy(() => import('@/modules/courses/courses-page'));
+const ProductCatalogPage = lazy(() => import('@/modules/courses/product-catalog-page'));
 const RoutinesPage = lazy(() => import('@/modules/routines/routines-page'));
 const RecettesPage = lazy(() => import('@/modules/recettes/recettes-page'));
 const ArdoisePage = lazy(() => import('@/modules/ardoise/ardoise-page'));
@@ -317,6 +318,14 @@ export function AppRoutes() {
           element={
             <Suspense fallback={<RouteFallback />}>
               <CoursesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/courses/catalogue"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <ProductCatalogPage />
             </Suspense>
           }
         />
