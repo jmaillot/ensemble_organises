@@ -173,6 +173,166 @@ select testkit.eq(testkit.count('select 1 from public.contact_lists'), 2::bigint
 reset role;
 
 -- ===========================================================================
+-- Miroir contacts→birthdays (plan 05-02) : fixtures comme postgres
+-- ===========================================================================
+-- Les insertions ci-dessous déclenchent `mirror_contact_birthday` (0078) :
+-- un contact daté crée son miroir, sauf garde homonyme (D-10). Les
+-- anniversaires manuels ne créent aucun contact (D-03).
+do $$
+declare
+  home_a text := (select household_id from testkit.fx where key = 'alice');
+  alice_m text := (select row_id from testkit.fx where key = 'alice');
+  famille_a text := (select row_id from testkit.fx where key = 'famille_a');
+  idee_miroir text := private.new_id('gift-idea');
+  liste_miroir text := private.new_id('gift-list');
+begin
+  -- Tante Agathe : contact daté, sans homonyme → exactement 1 miroir.
+  insert into public.contacts (id, list_id, household_id, name, birth_date, photo_url)
+  values ('contact_agathe', famille_a, home_a, 'Tante Agathe', date '1960-05-06', 'https://exemple.fr/agathe.jpg');
+
+  -- Flux D-10 (anniversaire d'abord) : l'anniversaire manuel existe avant le
+  -- contact homonyme (casse volontairement différente : la garde normalise).
+  insert into public.birthdays (id, household_id, name, birth_date)
+  values ('birthday_manu', home_a, 'Oncle Gaston', date '1955-02-14');
+  insert into public.contacts (id, list_id, household_id, name, birth_date)
+  values ('contact_gaston', famille_a, home_a, 'oncle gaston', date '1955-02-14');
+
+  -- D-03 : un anniversaire manuel isolé, sans aucun contact homonyme.
+  insert into public.birthdays (id, household_id, name, birth_date)
+  values ('birthday_zoe', home_a, 'Zoe Lointaine', date '2001-09-09');
+
+  -- Contact daté modifiable (synchronisation) + contact non daté.
+  insert into public.contacts (id, list_id, household_id, name, birth_date)
+  values ('contact_sync', famille_a, home_a, 'Cousin Sync', date '1999-12-31');
+  insert into public.contacts (id, list_id, household_id, name)
+  values ('contact_sans_date', famille_a, home_a, 'Voisin Flou');
+
+  -- Idée + articles (propagation « offert », D-06).
+  insert into public.gift_ideas (id, household_id, name, status, created_by)
+  values (idee_miroir, home_a, 'Montre pour Gaston', 'a_offrir', alice_m);
+  insert into public.gift_lists (id, household_id, owner_member_id, name, visibility)
+  values (liste_miroir, home_a, alice_m, 'Noel Miroir', 'privee');
+  insert into public.gift_items (id, list_id, household_id, name, idea_id, purchased)
+  values ('gitem_lie', liste_miroir, home_a, 'Montre', idee_miroir, false);
+  insert into public.gift_items (id, list_id, household_id, name, purchased)
+  values ('gitem_libre', liste_miroir, home_a, 'Chaussettes', false);
+
+  insert into testkit.fx (key, user_id, household_id, row_id) values
+    ('idee_miroir', null, home_a, idee_miroir);
+end;
+$$;
+
+-- ===========================================================================
+-- Alice : un contact daté vaut exactement un miroir fidèle
+-- ===========================================================================
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_agathe'''), 1::bigint,
+  'un contact date cree exactement 1 miroir');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.birthdays where contact_id = %L and household_id = %L and name = %L and birth_date = %L and photo_url = %L',
+  'contact_agathe', (select household_id from testkit.fx where key = 'alice'),
+  'Tante Agathe', '1960-05-06', 'https://exemple.fr/agathe.jpg')), 1::bigint,
+  'le miroir reprend foyer, nom, date et photo du contact');
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_sans_date'''), 0::bigint,
+  'un contact sans date n''a aucun miroir');
+
+reset role;
+
+-- ===========================================================================
+-- D-10 : le flux anniversaire-d'abord ne crée aucun doublon
+-- ===========================================================================
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_gaston'''), 0::bigint,
+  'le contact homonyme d''un anniversaire existant ne cree pas de miroir');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.birthdays where household_id = %L and birth_date = %L',
+  (select household_id from testkit.fx where key = 'alice'), '1955-02-14')), 1::bigint,
+  'une seule ligne subsiste pour la personne (pas de doublon D-10)');
+
+reset role;
+
+-- ===========================================================================
+-- D-03 : les anniversaires existants n'ont généré aucun contact
+-- ===========================================================================
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.count(
+  'select 1 from public.contacts where name = ''Zoe Lointaine'''), 0::bigint,
+  'un anniversaire manuel ne genere aucun contact (D-03)');
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where id = ''birthday_zoe'' and contact_id is null'), 1::bigint,
+  'l''anniversaire manuel reste orphelin de contact, contact_id NULL');
+
+reset role;
+
+-- ===========================================================================
+-- Synchronisation : le miroir suit son contact, puis disparaît avec sa date
+-- ===========================================================================
+-- Écritures RLS en tant qu'Alice (admin : suppression autorisée sur contacts).
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(
+  'update public.contacts set birth_date = date ''2000-01-02'', name = ''Cousin Resync'' where id = ''contact_sync'''), 1::bigint,
+  'Alice modifie le contact synchronise');
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_sync'' and birth_date = date ''2000-01-02'' and name = ''Cousin Resync'''), 1::bigint,
+  'le miroir suit la date et le nom du contact');
+select testkit.eq(testkit.affected(
+  'update public.contacts set birth_date = null where id = ''contact_sync'''), 1::bigint,
+  'Alice retire la date du contact');
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_sync'''), 0::bigint,
+  'sans date, le miroir disparait');
+
+reset role;
+
+-- ===========================================================================
+-- D-06 : marquer l'idée « offert » marque l'article lié acheté
+-- ===========================================================================
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'update public.gift_ideas set status = %L where id = %L', 'offert',
+  (select row_id from testkit.fx where key = 'idee_miroir'))), 1::bigint,
+  'Alice marque l''idee offerte');
+
+reset role;
+
+select testkit.eq(
+  (select purchased from public.gift_items where id = 'gitem_lie'), true,
+  'l''article lie a l''idee est marque achete (D-06)');
+select testkit.eq(
+  (select purchased from public.gift_items where id = 'gitem_libre'), false,
+  'l''article sans lien reste non achete');
+
+-- ===========================================================================
+-- D-14 : supprimer le contact supprime son miroir (en FIN de fichier miroir)
+-- ===========================================================================
+-- Ce bloc détruit la fixture Agathe : il est donc dernier avant les
+-- suppressions de listes.
+select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(
+  'delete from public.contacts where id = ''contact_agathe'''), 1::bigint,
+  'Alice supprime le contact date');
+select testkit.eq(testkit.count(
+  'select 1 from public.birthdays where contact_id = ''contact_agathe'''), 0::bigint,
+  'le miroir est supprime en cascade avec son contact (D-14)');
+
+reset role;
+
+-- ===========================================================================
 -- Suppressions (en FIN de fichier) : non-défaut OK, dernière-défaut refusée
 -- ===========================================================================
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';

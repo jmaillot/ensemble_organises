@@ -56,7 +56,8 @@ begin
           ('gift_lists', ARRAY['id', 'household_id', 'owner_member_id', 'name', 'visibility', 'created_at']::text[]),
           ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'purchased', 'idea_id', 'created_at']::text[]),
           ('gift_list_shares', ARRAY['id', 'list_id', 'shared_with_member_id', 'shared_with_email', 'permission']::text[]),
-          ('birthdays', ARRAY['id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[]),
+          ('gift_list_invites', ARRAY['id', 'list_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
+          ('birthdays', ARRAY['id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id', 'contact_id']::text[]),
           ('pets', ARRAY['id', 'household_id', 'name', 'species', 'breed', 'weight_kg', 'birth_date', 'identification_number', 'photo_url', 'created_at']::text[]),
           ('pet_records', ARRAY['id', 'pet_id', 'household_id', 'type', 'name', 'record_date', 'next_due_date', 'notes', 'attachment_url']::text[]),
           ('pet_attachments', ARRAY['id', 'pet_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
@@ -144,9 +145,11 @@ $$;
 -- écrit les politiques des tables filles de `expense_participants` en
 -- oubliant la mère.
 --
--- Trois exceptions, documentées l'une et l'autre :
+-- Cinq exceptions, documentées l'une et l'autre :
 --   * `household_invite_tokens` ne doit avoir AUCUNE politique ni aucun GRANT,
 --     pour rester inatteignable ;
+--   * `gift_list_invites` de même (0079) : codes de partage des listes de
+--     cadeaux, RPC `service_role` seuls ;
 --   * `push_subscriptions` de même, pour une raison plus forte encore : un
 --     `endpoint` de Push est une CAPACITÉ. Le laisser lire, même par son
 --     propriétaire, revient à exposer à toute fuite de jeton la possibilité de
@@ -169,7 +172,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'push_subscriptions', 'schema_migrations', 'message_notifications')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -182,6 +185,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''household_invite_tokens'''),
     0::bigint,
     'household_invite_tokens reste sans politique, donc inatteignable'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''gift_list_invites'''),
+    0::bigint,
+    'gift_list_invites reste sans politique, donc inatteignable'
   );
   perform testkit.eq(
     testkit.count('select 1 from pg_policies where tablename = ''push_subscriptions'''),
@@ -293,7 +301,7 @@ declare
   v_privilege text;
   v_table text;
 begin
-  foreach v_table in array array['household_invite_tokens', 'push_subscriptions'] loop
+  foreach v_table in array array['household_invite_tokens', 'gift_list_invites', 'push_subscriptions'] loop
     perform testkit.eq(
       testkit.count(format('select 1 from pg_policies where schemaname = ''public'' and tablename = %L', v_table)),
       0::bigint,
@@ -330,6 +338,10 @@ declare
     'public.revoke_household_invite_tokens(uuid,text)',
     'public.household_invite_token_summary(uuid,text)',
     'public.redeem_household_invite_token(text,uuid,text,text,text)',
+    'public.create_gift_list_invite(uuid,text,text,timestamptz,integer)',
+    'public.revoke_gift_list_invite(uuid,text)',
+    'public.gift_list_invite_summary(uuid,text)',
+    'public.redeem_gift_list_invite(text,uuid,text)',
     'public.register_push_subscription(uuid,text,text,text,timestamptz,text,text)',
     'public.rename_push_subscription(uuid,text,text)',
     'public.remove_push_subscription(uuid,text)',
