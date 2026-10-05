@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/shared/module-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
+import { HouseholdDeletePanel } from './components/household-delete-panel';
 import { HouseholdForm } from './components/household-form';
 import { InvitationsPanel } from './components/invitations-panel';
 import { LinkedAccountsPanel } from './components/linked-accounts-panel';
@@ -48,6 +49,7 @@ export default function ParametresPage() {
           <div className="grid gap-[18px]">
             <HouseholdForm />
             <MembersPanel />
+            <HouseholdDeletePanel />
           </div>
         </TabsContent>
         <TabsContent value="invitations">

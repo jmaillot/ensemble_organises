@@ -27,11 +27,15 @@ __pycache__/
 !.env.app.example
 
 # ── Runtime Supabase auto-hébergé (fournisseur) ──────────────────────────────
-# Seul ce que nous maintenons est versionné : le tag épinglé et l'override
-# Traefik. Tout le reste provient du clone du snapshot officiel.
+# Seul ce que nous maintenons est versionné : le tag épinglé, l'override
+# Traefik, l'override de rotation des logs et la conf logrotate. Tout le
+# reste provient du clone du snapshot officiel. `.backup-passphrase` et
+# `backups/` restent ignorés (données personnelles chiffrées, hors dépôt).
 supabase-project/*
 !supabase-project/.supabase-version
 !supabase-project/docker-compose.traefik.yml
+!supabase-project/docker-compose.logging.yml
+!supabase-project/logrotate-docker
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 coverage/

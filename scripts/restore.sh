@@ -11,9 +11,11 @@
 #   sh scripts/restore.sh 20260925T060000Z --dry-run
 #
 # Variables d'environnement reconnues :
-#   DB_CONTAINER     service Compose de la base (défaut : db)
-#   STORAGE_SERVICE  service de stockage      (défaut : storage)
-#   BACKUP_DIR       origine des sauvegardes  (défaut : supabase-project/backups)
+#   DB_CONTAINER           service Compose de la base (défaut : db)
+#   STORAGE_SERVICE        service de stockage      (défaut : storage)
+#   BACKUP_DIR             origine des sauvegardes  (défaut : supabase-project/backups)
+#   BACKUP_PASSPHRASE_FILE fichier de la phrase secrète (même fichier qu'au
+#                          backup ; voir docs/BACKEND.md §11).
 
 set -eu
 
@@ -21,6 +23,7 @@ DB_CONTAINER="${DB_CONTAINER:-db}"
 STORAGE_SERVICE="${STORAGE_SERVICE:-storage}"
 PROJECT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/../supabase-project" && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_DIR/backups}"
+BACKUP_PASSPHRASE_FILE="${BACKUP_PASSPHRASE_FILE:-$PROJECT_DIR/.backup-passphrase}"
 
 stamp="${1:-}"
 confirm="${2:-}"
@@ -40,6 +43,27 @@ fi
 
 echo "Sauvegarde ciblée : $target"
 ( cd "$target" && sha256sum -c SHA256SUMS )
+
+if [ ! -f "$BACKUP_PASSPHRASE_FILE" ]; then
+  echo "restore.sh: phrase secrète introuvable : $BACKUP_PASSPHRASE_FILE" >&2
+  exit 1
+fi
+
+# Déchiffrement vers un répertoire éphémère, jamais dans la sauvegarde.
+work="$(mktemp -d)"
+cleanup() { rm -rf "$work"; }
+trap cleanup EXIT INT TERM
+for artefact in database.dump storage.tar.gz db-config.tar.gz; do
+  if [ ! -f "$target/$artefact.gpg" ]; then
+    echo "restore.sh: $target/$artefact.gpg absent (sauvegarde d'avant le chiffrement ?" >&2
+    echo "           Restaurez-la avec la version du script antérieure au chiffrement.)" >&2
+    exit 1
+  fi
+  gpg --batch --yes --pinentry-mode loopback \
+    --passphrase-file "$BACKUP_PASSPHRASE_FILE" \
+    -o "$work/$artefact" -d "$target/$artefact.gpg"
+done
+target="$work"
 
 if [ "$confirm" = "--dry-run" ]; then
   echo

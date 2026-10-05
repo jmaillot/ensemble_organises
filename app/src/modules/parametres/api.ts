@@ -147,3 +147,44 @@ export async function renameMember(memberId: string, displayName: string): Promi
   if (name.length > 120) throw new Error('120 caractères maximum.');
   await data.update('household_members', memberId, { display_name: name });
 }
+
+export interface HouseholdDeleteResult {
+  household_id: string;
+  expenses: number;
+  storage_objects: number;
+  storage_cleanup: 'ok' | 'partial';
+}
+
+/**
+ * Supprime le foyer et tout son contenu, via l'Edge Function
+ * `household-delete` (RPC serveur + nettoyage Storage). Action réservée à
+ * l'administrateur, revérifiée en base. Irréversible : l'appelant affiche
+ * une confirmation explicite avant tout appel.
+ */
+export async function deleteHousehold(householdId: string): Promise<HouseholdDeleteResult> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour supprimer le foyer.');
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Hors ligne : reconnectez-vous pour supprimer le foyer.');
+  }
+  const { data: body, error, response } = await supabase.functions.invoke('household-delete', {
+    body: { householdId },
+  });
+  if (error) {
+    throw new Error(await readFunctionError(response, 'Suppression du foyer impossible pour le moment.'));
+  }
+  return body as HouseholdDeleteResult;
+}
+
+async function readFunctionError(response: Response | undefined, fallback: string): Promise<string> {
+  if (response) {
+    try {
+      const parsed = (await response.clone().json()) as { error?: unknown };
+      if (typeof parsed?.error === 'string' && parsed.error) return parsed.error;
+    } catch {
+      // Corps vide ou non JSON : repli générique ci-dessous.
+    }
+  }
+  return fallback;
+}

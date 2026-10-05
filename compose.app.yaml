@@ -19,6 +19,14 @@ services:
     container_name: ensemble-organises-app
     security_opt:
       - no-new-privileges:true
+    # Journaux techniques (politique §6 : 1 mois maximum) : garde-fou par
+    # taille ici, borne temporelle par logrotate (voir
+    # supabase-project/logrotate-docker).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 30s

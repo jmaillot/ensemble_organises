@@ -1,0 +1,17 @@
+# Rotation mensuelle des journaux de conteneurs (politique §6 : 1 mois
+# maximum). Complète les garde-fous par taille de
+# `docker-compose.logging.yml`, qui seuls ne bornent pas dans le temps.
+#
+# Installation (hôte) :
+#   sudo cp supabase-project/logrotate-docker /etc/logrotate.d/ensemble-organises
+#
+# Les journaux du reverse proxy Traefik, externe au dépôt, relèvent de
+# l'exploitant : même politique (1 mois maximum) à y appliquer.
+/var/lib/docker/containers/*/*.log {
+    monthly
+    rotate 1
+    copytruncate
+    compress
+    missingok
+    notifempty
+}

@@ -1,0 +1,34 @@
+# Rotation des journaux techniques (politique de confidentialité §6 :
+# 1 mois maximum). Garde-fou par taille pour chaque service ; la borne
+# temporelle vient de logrotate (voir `logrotate-docker`).
+#
+# Enregistrer avant le premier démarrage concerné :
+#   cd supabase-project && sh run.sh config add logging
+
+services:
+  studio:
+    logging: &journaux
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+  api-gw:
+    logging: *journaux
+  auth:
+    logging: *journaux
+  rest:
+    logging: *journaux
+  realtime:
+    logging: *journaux
+  storage:
+    logging: *journaux
+  imgproxy:
+    logging: *journaux
+  meta:
+    logging: *journaux
+  functions:
+    logging: *journaux
+  db:
+    logging: *journaux
+  supavisor:
+    logging: *journaux

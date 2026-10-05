@@ -1217,19 +1217,41 @@ sh scripts/restore.sh 20260925T060000Z --confirm       # restauration réelle
 
 `backup.sh` produit, dans un répertoire horodaté :
 
-* `database.dump` — `pg_dump --format=custom`, instantané cohérent même à chaud ;
-* `storage.tar.gz` — les objets stockés ;
-* `db-config.tar.gz` — **clé pgsodium et configuration PostgreSQL**, à
+* `database.dump.gpg` — `pg_dump --format=custom`, instantané cohérent même à chaud, **chiffré AES-256** ;
+* `storage.tar.gz.gpg` — les objets stockés, chiffrés ;
+* `db-config.tar.gz.gpg` — **clé pgsodium et configuration PostgreSQL**, à
   sauvegarder avec la base : sans elle, la clé de chiffrement des secrets Vault
   est perdue ;
-* `SHA256SUMS` — empreintes de contrôle.
+* `SHA256SUMS` — empreintes de contrôle des fichiers chiffrés.
+
+Chiffrement (décision 05/10/2026) : `gpg --symmetric --cipher-algo AES-256`,
+phrase secrète lue **par fichier uniquement** (`BACKUP_PASSPHRASE_FILE`,
+défaut `supabase-project/.backup-passphrase`, `chmod 600`, jamais versionnée,
+jamais en ligne de commande). La créer hors dépôt :
+`openssl rand -base64 48 > supabase-project/.backup-passphrase && chmod 600`
+le même fichier. Les sauvegardes d'avant le chiffrement se restaurent avec la
+version du script antérieure (git).
 
 `restore.sh` refuse de s'exécuter sans `--confirm` et `--dry-run` permet de
-valider le manifest sans rien modifier.
+valider le manifeste et le déchiffrement sans rien modifier.
 
-Ré rehearser au moins une restauration complète par trimestre, sur un hôte
-distinct. Une copie à chaud n'est pas une sauvegarde cohérente ; les RTO/RPO et
-la rétention restent à trancher (`AGENTS.md` §9.6).
+Rétention et objectifs (décision 05/10/2026, cf. politique §6) :
+**30 jours** (`RETENTION_DAYS`, purge automatique par `backup.sh`),
+**RPO ≤ 24 h** (sauvegarde quotidienne par cron exploitant, ex. :
+`0 3 * * * cd /opt/ensemble_organises && sh scripts/backup.sh`),
+**RTO ≤ 4 h** (procédure `restore.sh` ci-dessus).
+Répéter au moins une restauration complète par trimestre, sur un hôte
+distinct. Une copie à chaud n'est pas une sauvegarde cohérente.
+
+## 11b. Journaux techniques (politique §6 : 1 mois maximum)
+
+Garde-fou par taille dans les fichiers Compose (`logging: max-size 10m,
+max-file 5` sur le frontend et via l'override `docker-compose.logging.yml`
+de la stack, enregistré par `sh run.sh config add logging`) et borne
+temporelle par logrotate (`supabase-project/logrotate-docker`, mensuel,
+`rotate 1`, à copier dans `/etc/logrotate.d/` de l'hôte).
+Les journaux du reverse proxy Traefik, externe au dépôt, relèvent de
+l'exploitant : même politique (1 mois maximum) à y appliquer.
 
 ---
 
