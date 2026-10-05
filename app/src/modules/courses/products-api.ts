@@ -27,6 +27,27 @@ export interface FindProductInput {
   createdBy?: string | null;
 }
 
+export interface ProductUpdate {
+  name: string;
+  brand?: string | null;
+  category?: string | null;
+  ean?: string;
+  photoUrl?: string | null;
+}
+
+/** Mise à jour d'un produit du foyer (RLS : créateur ou ligne sans auteur). */
+export async function updateProduct(id: string, input: ProductUpdate): Promise<ProductRow> {
+  const name = input.name.trim();
+  if (name.length < 1 || name.length > 200) throw new Error('Nommez le produit (1 à 200 caractères).');
+  return data.update<ProductRow>(PRODUCTS_TABLE, id, {
+    name,
+    brand: input.brand?.trim().slice(0, 200) || null,
+    category: normalizeRayon(input.category),
+    ...(input.ean !== undefined ? { ean: input.ean.trim() } : {}),
+    ...(input.photoUrl !== undefined ? { photo_url: input.photoUrl } : {}),
+  });
+}
+
 export interface ResolveScanInput extends FindProductInput {
   listId: string;
   addedBy?: string | null;

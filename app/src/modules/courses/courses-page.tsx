@@ -17,6 +17,7 @@ import { useCourses } from './hooks/use-courses';
 import { ItemFormDialog } from './components/item-form-dialog';
 import { ScanDialog } from './components/scan-dialog';
 import { ProductSheet } from './components/product-sheet';
+import { ProductCatalog } from './components/product-catalog';
 import { ShoppingGroupCard } from './components/shopping-group-card';
 import { fetchOffResult, isQueryableEan, type OffProduct } from './off-client';
 import { findProductByEan, offProductFromRow } from './products-api';
@@ -56,6 +57,8 @@ export default function CoursesPage() {
     removeItem,
     removeList,
     editItem,
+    products,
+    editProduct,
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
@@ -288,6 +291,7 @@ export default function CoursesPage() {
         </Panel>
 
         <aside className="grid min-w-0 grid-cols-1 gap-[14px]">
+          <ProductCatalog products={products} onEdit={editProduct} />
           <div className="relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
             <span aria-hidden="true" className="coupon-ring" />
             <p className="mb-4 text-[11px] text-on-dark">Liste partagée · {householdName}</p>

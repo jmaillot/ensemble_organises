@@ -20,6 +20,7 @@ import {
   PRODUCTS_TABLE,
   resolveScannedProduct,
   scanAddedToast,
+  updateProduct,
   type ScanResolution,
 } from '../products-api';
 import { cleanOffImageUrl } from '../off-client';
@@ -60,6 +61,9 @@ export interface UseCoursesResult {
   removeItem: (id: string) => Promise<void>;
   removeList: (id: string) => Promise<void>;
   editItem: (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => Promise<void>;
+  /** Catalogue brut trié (lignes `products` du foyer) pour l'espace catalogue. */
+  products: ProductRow[];
+  editProduct: (id: string, values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null }) => Promise<void>;
 }
 
 /**
@@ -331,6 +335,22 @@ export function useCourses(): UseCoursesResult {
     [householdId, invalidate],
   );
 
+  const editProduct = useCallback(
+    async (id: string, values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null }) => {
+      await updateProduct(id, {
+        name: values.name.trim(),
+        brand: values.brand.trim() || null,
+        category: values.category,
+        ean: values.ean.trim(),
+        ...(values.photoUrl !== undefined ? { photoUrl: values.photoUrl } : {}),
+      });
+      await invalidate();
+    },
+    [invalidate],
+  );
+
+  const products = useMemo(() => [...productResource.rows].sort((a, b) => a.name.localeCompare(b.name, 'fr')), [productResource.rows]);
+
   return {
     lists,
     itemCount,
@@ -354,5 +374,7 @@ export function useCourses(): UseCoursesResult {
     removeItem,
     removeList,
     editItem,
+    products,
+    editProduct,
   };
 }
