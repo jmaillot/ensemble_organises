@@ -30,6 +30,12 @@ const HOUSEHOLD_SCOPED = new Set([
   'gift_lists',
   'gift_items',
   'gift_list_shares',
+  'gift_ideas',
+  'contact_lists',
+  'contacts',
+  // `gift_list_invites` est volontairement EXCLUE : RLS sans politique
+  // (0079), lisible uniquement via les RPC `service_role` appelés par l'Edge
+  // `gift-list-invite` — même régime que `household_invite_tokens`.
   'birthdays',
   'pets',
   'pet_records',
