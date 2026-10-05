@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useHouseholdStore } from '@/stores/household-store';
+import { useToast } from '@/components/ui/toast';
 import { useResource } from '@/lib/data/useResource';
 import { daysBetween, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
-import type { EventRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
+import type { EventRow, ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 import {
   createShoppingItem,
   createShoppingList,
@@ -13,6 +14,13 @@ import {
   SHOPPING_ITEMS_TABLE,
   SHOPPING_LISTS_TABLE,
 } from '../api';
+import {
+  findProductByEan,
+  PRODUCTS_TABLE,
+  resolveScannedProduct,
+  scanAddedToast,
+  type ScanResolution,
+} from '../products-api';
 import {
   NEW_LIST_OPTION,
   normalizeRayon,
@@ -43,6 +51,8 @@ export interface UseCoursesResult {
   toggleItem: (item: ShoppingItem) => Promise<void>;
   addItem: (values: ItemFormValues) => Promise<void>;
   addItemToList: (listId: string, name: string) => Promise<void>;
+  /** Re-scan d'un EAN connu : produit Dexie → item (+1 si déjà présent, D-04). */
+  addScannedToList: (listId: string, ean: string, addedBy?: string | null) => Promise<ScanResolution>;
   addList: (name: string) => Promise<void>;
   renameList: (id: string, name: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
@@ -55,12 +65,14 @@ export interface UseCoursesResult {
  */
 export function useCourses(): UseCoursesResult {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const householdId = useHouseholdStore((state) => state.householdId);
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
 
   const listResource = useResource<ShoppingListRow>(SHOPPING_LISTS_TABLE);
   const itemResource = useResource<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE);
   const eventResource = useResource<EventRow>('events');
+  const productResource = useResource<ProductRow>(PRODUCTS_TABLE);
 
   /**
    * Invalidation par préfixe de table : la clé de `useResource` commence par le
@@ -70,6 +82,7 @@ export function useCourses(): UseCoursesResult {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: [SHOPPING_LISTS_TABLE] }),
       queryClient.invalidateQueries({ queryKey: [SHOPPING_ITEMS_TABLE] }),
+      queryClient.invalidateQueries({ queryKey: [PRODUCTS_TABLE] }),
     ]);
   }, [queryClient]);
 
@@ -118,17 +131,55 @@ export function useCourses(): UseCoursesResult {
     );
   }, [itemResource.rows]);
 
+  /**
+   * Produits du catalogue du foyer (D-03) : triés par nom pour un ordre
+   * stable, photo locale prioritaire puis repli `off_data.image_url` (D-05).
+   */
+  const productEntries = useMemo(
+    () =>
+      [...productResource.rows]
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+        .map((row) => {
+          const offData = row.off_data ?? {};
+          const fallback = typeof offData.image_url === 'string' ? offData.image_url : null;
+          return {
+            name: row.name.trim(),
+            rayon: normalizeRayon(row.category),
+            photoUrl: row.photo_url ?? fallback,
+          };
+        })
+        .filter((entry) => entry.name.length > 0),
+    [productResource.rows],
+  );
+
   const suggestionsFor = useCallback(
     (listId: string) => {
       const present = new Set(
         itemResource.rows.filter((row) => row.list_id === listId).map((row) => row.name.trim().toLowerCase()),
       );
-      return history
-        .filter((entry) => !present.has(entry.name.toLowerCase()))
-        .slice(0, SUGGESTION_LIMIT)
-        .map((entry) => ({ name: entry.name, rayon: normalizeRayon(entry.rayon) }));
+      // Produits du foyer d'abord (D-03), puis historique, dédupliqués par
+      // nom insensible à la casse, limite totale de 5.
+      const seen = new Set(present);
+      const merged: ItemSuggestion[] = [];
+      for (const entry of productEntries) {
+        if (merged.length >= SUGGESTION_LIMIT) break;
+        const key = entry.name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(entry);
+      }
+      if (merged.length < SUGGESTION_LIMIT) {
+        for (const entry of history) {
+          if (merged.length >= SUGGESTION_LIMIT) break;
+          const key = entry.name.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          merged.push({ name: entry.name, rayon: normalizeRayon(entry.rayon) });
+        }
+      }
+      return merged;
     },
-    [history, itemResource.rows],
+    [history, itemResource.rows, productEntries],
   );
 
   /** Prochain rendez-vous « Courses » du calendrier, aujourd'hui compris. */
@@ -184,7 +235,9 @@ export function useCourses(): UseCoursesResult {
       if (!householdId) return;
       const trimmed = name.trim();
       if (!trimmed) return;
-      const known = history.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase());
+      const known =
+        history.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase()) ??
+        productEntries.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase());
       await createShoppingItem({
         householdId,
         listId,
@@ -196,7 +249,34 @@ export function useCourses(): UseCoursesResult {
       });
       await invalidate();
     },
-    [currentMemberId, householdId, history, invalidate],
+    [currentMemberId, householdId, history, invalidate, productEntries],
+  );
+
+  /**
+   * Re-scan d'un EAN déjà connu du foyer (D-04, D-06) : lecture Dexie pure,
+   * aucun appel réseau. Produit inconnu → erreur vers la fiche manuelle.
+   */
+  const addScannedToList = useCallback(
+    async (listId: string, ean: string, addedBy?: string | null): Promise<ScanResolution> => {
+      if (!householdId) throw new Error('Aucun foyer actif : reconnectez-vous.');
+      const known = await findProductByEan(householdId, ean.trim());
+      if (!known) throw new Error('Produit inconnu : créez-le depuis la fiche.');
+      const resolution = await resolveScannedProduct({
+        householdId,
+        listId,
+        ean: known.ean,
+        name: known.name,
+        brand: known.brand,
+        category: known.category,
+        offData: known.off_data,
+        createdBy: currentMemberId,
+        addedBy: addedBy ?? currentMemberId,
+      });
+      await invalidate();
+      toast(scanAddedToast(resolution.product.name, resolution.incremented), 'success');
+      return resolution;
+    },
+    [currentMemberId, householdId, invalidate, toast],
   );
 
   const addList = useCallback(
@@ -239,7 +319,7 @@ export function useCourses(): UseCoursesResult {
     checkedCount,
     suggestionsFor,
     nextCourse,
-    isLoading: listResource.isLoading || itemResource.isLoading,
+    isLoading: listResource.isLoading || itemResource.isLoading || productResource.isLoading,
     isError: listResource.isError || itemResource.isError,
     error: listResource.error ?? itemResource.error,
     refetch: () => {
@@ -250,6 +330,7 @@ export function useCourses(): UseCoursesResult {
     toggleItem,
     addItem,
     addItemToList,
+    addScannedToList,
     addList,
     renameList,
     removeItem,

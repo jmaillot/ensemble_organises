@@ -117,9 +117,19 @@ export function ShoppingGroupCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => onQuickAdd(list.id, suggestion.name)}
+                title={suggestion.rayon}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-bg px-2.5 text-[11px] text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-strong disabled:opacity-55"
               >
-                <Icon name="plus" size="sm" />
+                {suggestion.photoUrl ? (
+                  <img
+                    src={suggestion.photoUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="size-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <Icon name="plus" size="sm" />
+                )}
                 {suggestion.name}
               </button>
             ))}

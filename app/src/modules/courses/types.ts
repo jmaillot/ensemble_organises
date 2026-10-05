@@ -73,6 +73,8 @@ export interface ItemSection {
 export interface ItemSuggestion {
   name: string;
   rayon: Rayon;
+  /** Photo du produit du foyer (D-03) : `photo_url`, sinon repli `off_data.image_url`. */
+  photoUrl?: string | null;
 }
 
 export interface ShoppingListInput {
