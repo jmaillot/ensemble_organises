@@ -26,6 +26,7 @@ export interface ShoppingGroupCardProps {
   onToggle: (item: ShoppingItem) => void;
   onQuickAdd: (listId: string, name: string) => void;
   onDelete: (item: ShoppingItem) => void;
+  onEdit: (item: ShoppingItem) => void;
   onDeleteList: (list: ShoppingListView) => void;
 }
 
@@ -42,6 +43,7 @@ export function ShoppingGroupCard({
   onToggle,
   onQuickAdd,
   onDelete,
+  onEdit,
   onDeleteList,
 }: ShoppingGroupCardProps) {
   const [draft, setDraft] = useState('');
@@ -174,6 +176,14 @@ export function ShoppingGroupCard({
                     {itemStateLabel(item.checked)}
                   </span>
                   <span className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      icon="edit"
+                      className="size-8 min-h-8 hover:bg-accent-faint hover:text-fg"
+                      aria-label={`Modifier ${item.name}`}
+                      onClick={() => onEdit(item)}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"

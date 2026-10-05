@@ -54,3 +54,20 @@ export async function createShoppingItem(input: ShoppingItemInput): Promise<Shop
 export async function deleteShoppingItem(id: string): Promise<void> {
   await data.remove(SHOPPING_ITEMS_TABLE, id);
 }
+
+export interface ShoppingItemUpdate {
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  rayon: string;
+}
+
+/** Renomme / re-quantifie / change le rayon d'un article (crop RLS existant). */
+export async function updateShoppingItem(id: string, input: ShoppingItemUpdate): Promise<ShoppingListItemRow> {
+  return data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, id, {
+    name: input.name.trim(),
+    quantity: input.quantity,
+    unit: input.unit?.trim() || null,
+    category: normalizeRayon(input.rayon),
+  });
+}

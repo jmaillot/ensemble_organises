@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setupServer } from 'msw/node';
@@ -35,6 +35,68 @@ function renderDialog() {
     />,
   );
 }
+
+describe('ItemFormDialog — rayon suggéré', () => {
+  it('devine le rayon depuis le nom tant que non touché', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const dialog = await screen.findByRole('dialog');
+    const rayon = within(dialog).getByLabelText(/Rayon/) as HTMLSelectElement;
+
+    expect(rayon.value).toBe('Divers');
+    await user.type(within(dialog).getByLabelText(/Article/), 'Lait demi-écrémé');
+    expect(rayon.value).toBe('Frais');
+  });
+
+  it('le choix manuel n’est plus écrasé par la frappe', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const dialog = await screen.findByRole('dialog');
+
+    await user.type(within(dialog).getByLabelText(/Article/), 'Lait');
+    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Boissons');
+    await user.type(within(dialog).getByLabelText(/Article/), ' en poudre');
+    expect((within(dialog).getByLabelText(/Rayon/) as HTMLSelectElement).value).toBe('Boissons');
+  });
+});
+
+describe('ItemFormDialog — édition', () => {
+  it('pré-remplit, masque la liste et enregistre', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <ItemFormDialog
+        open
+        onOpenChange={() => undefined}
+        lists={[list]}
+        currentMemberName="Camille"
+        onSubmit={onSubmit}
+        initialItem={{
+          id: 'item-1',
+          listId: 'list-fresque',
+          householdId: 'household-demo',
+          name: 'Savon',
+          quantity: null,
+          unit: null,
+          rayon: 'Divers',
+          checked: false,
+          addedBy: null,
+          createdAt: new Date().toISOString(),
+        }}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+
+    expect(screen.getByRole('heading', { name: 'Modifier l’article' })).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/Liste/)).not.toBeInTheDocument();
+    expect((within(dialog).getByLabelText(/Article/) as HTMLInputElement).value).toBe('Savon');
+
+    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Hygiène');
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Savon', rayon: 'Hygiène' });
+  });
+});
 
 describe('ItemFormDialog — recherche Open Food Facts', () => {
   it('remplit le rayon et montre la photo depuis un résultat', async () => {

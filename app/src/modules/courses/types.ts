@@ -31,6 +31,145 @@ export function normalizeRayon(value: string | null | undefined): Rayon {
   return match ?? DEFAULT_RAYON;
 }
 
+/** Mots-clés (sans accents) vers rayon, testés dans l'ordre : le spécifique d'abord. */
+const RAYON_KEYWORDS: [string, Rayon][] = [
+  ['boulanger', 'Boulangerie'],
+  ['baguette', 'Boulangerie'],
+  ['croissant', 'Boulangerie'],
+  ['brioche', 'Boulangerie'],
+  ['viennoiserie', 'Boulangerie'],
+  ['pain au', 'Boulangerie'],
+  ['pain', 'Boulangerie'],
+  ['gateau', 'Boulangerie'],
+  ['tarte', 'Boulangerie'],
+  ['cake', 'Boulangerie'],
+  ['muffin', 'Boulangerie'],
+  ['cookie', 'Boulangerie'],
+  ['patisserie', 'Boulangerie'],
+  ['viande', 'Boucherie'],
+  ['volaille', 'Boucherie'],
+  ['boeuf', 'Boucherie'],
+  ['porc', 'Boucherie'],
+  ['poulet', 'Boucherie'],
+  ['dinde', 'Boucherie'],
+  ['canard', 'Boucherie'],
+  ['lapin', 'Boucherie'],
+  ['agneau', 'Boucherie'],
+  ['veau', 'Boucherie'],
+  ['saucisse', 'Boucherie'],
+  ['merguez', 'Boucherie'],
+  ['jambon', 'Boucherie'],
+  ['steak', 'Boucherie'],
+  ['bacon', 'Boucherie'],
+  ['charcuterie', 'Boucherie'],
+  ['vin', 'Boissons'],
+  ['biere', 'Boissons'],
+  ['champagne', 'Boissons'],
+  ['aperitif', 'Boissons'],
+  ['jus', 'Boissons'],
+  ['soda', 'Boissons'],
+  ['cola', 'Boissons'],
+  ['limonade', 'Boissons'],
+  ['sirop', 'Boissons'],
+  ['boisson', 'Boissons'],
+  ['cafe', 'Boissons'],
+  [' the ', 'Boissons'],
+  ['eau', 'Boissons'],
+  ['fruit', 'Fruits & légumes'],
+  ['legume', 'Fruits & légumes'],
+  ['pomme', 'Fruits & légumes'],
+  ['banane', 'Fruits & légumes'],
+  ['orange', 'Fruits & légumes'],
+  ['citron', 'Fruits & légumes'],
+  ['tomate', 'Fruits & légumes'],
+  ['salade', 'Fruits & légumes'],
+  ['carotte', 'Fruits & légumes'],
+  ['poireau', 'Fruits & légumes'],
+  ['courgette', 'Fruits & légumes'],
+  ['poivron', 'Fruits & légumes'],
+  ['fraise', 'Fruits & légumes'],
+  ['framboise', 'Fruits & légumes'],
+  ['raisin', 'Fruits & légumes'],
+  ['oignon', 'Fruits & légumes'],
+  ['ail', 'Fruits & légumes'],
+  ['chou', 'Fruits & légumes'],
+  ['poire', 'Fruits & légumes'],
+  ['peche', 'Fruits & légumes'],
+  ['abricot', 'Fruits & légumes'],
+  ['cerise', 'Fruits & légumes'],
+  ['melon', 'Fruits & légumes'],
+  ['avocat', 'Fruits & légumes'],
+  ['champignon', 'Fruits & légumes'],
+  ['haricot', 'Fruits & légumes'],
+  ['concombre', 'Fruits & légumes'],
+  ['aubergine', 'Fruits & légumes'],
+  ['brocoli', 'Fruits & légumes'],
+  ['epinard', 'Fruits & légumes'],
+  ['lait', 'Frais'],
+  ['yaourt', 'Frais'],
+  ['yogourt', 'Frais'],
+  ['fromage', 'Frais'],
+  ['beurre', 'Frais'],
+  ['creme', 'Frais'],
+  ['oeuf', 'Frais'],
+  ['comte', 'Frais'],
+  ['chevre', 'Frais'],
+  ['mozzarella', 'Frais'],
+  ['poisson', 'Frais'],
+  ['thon', 'Frais'],
+  ['saumon', 'Frais'],
+  ['cabillaud', 'Frais'],
+  ['crevette', 'Frais'],
+  ['surimi', 'Frais'],
+  ['sandwich', 'Frais'],
+  ['traiteur', 'Frais'],
+  ['surgele', 'Surgelés'],
+  ['congele', 'Surgelés'],
+  ['glace', 'Surgelés'],
+  ['picard', 'Surgelés'],
+  ['savon', 'Hygiène'],
+  ['shampoing', 'Hygiène'],
+  ['dentifrice', 'Hygiène'],
+  ['papier toilette', 'Hygiène'],
+  ['couche', 'Hygiène'],
+  ['gel douche', 'Hygiène'],
+  ['deodorant', 'Hygiène'],
+  ['rasoir', 'Hygiène'],
+  ['brosse a dent', 'Hygiène'],
+  ['hygiene', 'Hygiène'],
+  ['papier', 'Hygiène'],
+  ['lessive', 'Ménage'],
+  ['eponge', 'Ménage'],
+  ['javel', 'Ménage'],
+  ['nettoyant', 'Ménage'],
+  ['sac poubelle', 'Ménage'],
+  ['liquide vaisselle', 'Ménage'],
+  ['balai', 'Ménage'],
+  ['serpilliere', 'Ménage'],
+  ['detache', 'Ménage'],
+  ['adoucissant', 'Ménage'],
+  ['essuie-tout', 'Ménage'],
+  ['menage', 'Ménage'],
+];
+
+/**
+ * Devine le rayon depuis le nom saisi (minuscules, accents ignorés).
+ * Repli `Divers` quand rien ne correspond : la suggestion ne bloque jamais.
+ */
+export function guessRayon(name: string | null | undefined): Rayon {
+  const clean = (name ?? '')
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const padded = ` ${clean} `;
+  for (const [keyword, rayon] of RAYON_KEYWORDS) {
+    if (padded.includes(keyword)) return rayon;
+  }
+  return DEFAULT_RAYON;
+}
+
 export interface ShoppingList {
   id: string;
   householdId: string;

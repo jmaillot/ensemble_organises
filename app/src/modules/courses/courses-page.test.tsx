@@ -132,4 +132,21 @@ describe('Module Courses', () => {
     expect(await screen.findByRole('region', { name: 'Maison' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fresque' })).not.toBeInTheDocument();
   });
+
+  it('modifie le rayon d’un article depuis la liste', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+
+    await user.click(await screen.findByRole('button', { name: 'Modifier Savon liquide' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier l’article' });
+    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Ménage');
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
+    expect(within(row).getByText(/Ménage/)).toBeInTheDocument();
+  });
 });

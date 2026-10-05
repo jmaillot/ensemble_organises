@@ -11,6 +11,7 @@ import {
   deleteShoppingItem,
   deleteShoppingList,
   renameShoppingList,
+  updateShoppingItem,
   SHOPPING_ITEMS_TABLE,
   SHOPPING_LISTS_TABLE,
 } from '../api';
@@ -58,6 +59,7 @@ export interface UseCoursesResult {
   renameList: (id: string, name: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   removeList: (id: string) => Promise<void>;
+  editItem: (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => Promise<void>;
 }
 
 /**
@@ -306,6 +308,20 @@ export function useCourses(): UseCoursesResult {
     [invalidate],
   );
 
+  const editItem = useCallback(
+    async (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => {
+      const rawQuantity = values.quantity.trim() === '' ? null : Number(values.quantity);
+      await updateShoppingItem(id, {
+        name: values.name.trim(),
+        quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) ? rawQuantity : null,
+        unit: values.unit.trim() || null,
+        rayon: values.rayon,
+      });
+      await invalidate();
+    },
+    [invalidate],
+  );
+
   const removeList = useCallback(
     async (id: string) => {
       if (!householdId) return;
@@ -337,5 +353,6 @@ export function useCourses(): UseCoursesResult {
     renameList,
     removeItem,
     removeList,
+    editItem,
   };
 }

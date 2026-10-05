@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
-import { RAYONS, NEW_LIST_OPTION, type ItemFormValues, type ShoppingListView } from '../types';
+import { RAYONS, NEW_LIST_OPTION, guessRayon, type ItemFormValues, type ShoppingItem, type ShoppingListView } from '../types';
 import { offCategoriesToRayon } from '../off-rayon';
 import { searchOffProducts, type OffSearchHit } from '../off-client';
 
@@ -58,6 +58,8 @@ export interface ItemFormDialogProps {
   currentMemberName: string;
   isMutating?: boolean;
   onSubmit: (values: ItemFormValues) => Promise<void> | void;
+  /** Édition : pré-remplit et masque le choix de liste. */
+  initialItem?: ShoppingItem | null;
 }
 
 export function ItemFormDialog({
@@ -67,7 +69,9 @@ export function ItemFormDialog({
   currentMemberName,
   isMutating = false,
   onSubmit,
+  initialItem = null,
 }: ItemFormDialogProps) {
+  const editing = initialItem !== null;
   const {
     register,
     handleSubmit,
@@ -77,12 +81,46 @@ export function ItemFormDialog({
     formState: { errors, isSubmitting },
   } = useForm<ItemFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyValues(lists),
+    defaultValues: initialItem
+      ? {
+          name: initialItem.name,
+          quantity: initialItem.quantity === null ? '' : String(initialItem.quantity),
+          unit: initialItem.unit ?? '',
+          rayon: initialItem.rayon,
+          listId: initialItem.listId,
+          newListName: '',
+        }
+      : emptyValues(lists),
   });
 
   const listId = watch('listId');
   const articleName = watch('name') ?? '';
   const wasOpen = useRef(false);
+  const rayonTouched = useRef(false);
+
+  // Le formulaire n'est réinitialisé qu'à l'ouverture : une arrivée tardive des
+  // listes ne doit jamais effacer une saisie en cours.
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      wasOpen.current = true;
+      reset(
+        initialItem
+          ? {
+              name: initialItem.name,
+              quantity: initialItem.quantity === null ? '' : String(initialItem.quantity),
+              unit: initialItem.unit ?? '',
+              rayon: initialItem.rayon,
+              listId: initialItem.listId,
+              newListName: '',
+            }
+          : emptyValues(lists),
+      );
+      rayonTouched.current = editing;
+      setSearchState({ status: 'idle' });
+      setSearchPhoto(null);
+    }
+    if (!open) wasOpen.current = false;
+  }, [lists, open, reset, initialItem, editing]);
 
   // Recherche Open Food Facts : un tap explicite (10 req/min côté recherche),
   // jamais d'autocomplete. Remplit le rayon + montre la photo (affichage seul :
@@ -110,7 +148,19 @@ export function ItemFormDialog({
       );
   };
 
+  // Rayon suggéré depuis le nom tant que l'utilisateur ne l'a pas touché
+  // (ni choisi via la recherche) : aide à catégoriser sans imposer.
+  useEffect(() => {
+    if (!open || rayonTouched.current) return;
+    setValue('rayon', guessRayon(articleName), { shouldValidate: false });
+  }, [open, articleName, setValue]);
+
+  const markRayonTouched = () => {
+    rayonTouched.current = true;
+  };
+
   const pickHit = (hit: OffSearchHit) => {
+    markRayonTouched();
     setValue('rayon', offCategoriesToRayon(hit.categoriesTags), { shouldValidate: true });
     setSearchPhoto(hit.imageUrl ? { url: hit.imageUrl, label: hit.name } : null);
     setSearchState({ status: 'idle' });
@@ -133,7 +183,7 @@ export function ItemFormDialog({
       <DialogContent>
         <DialogHeader>
           <p className="eyebrow mb-2">{ITEM_DIALOG_COPY.eyebrow}</p>
-          <DialogTitle>{ITEM_DIALOG_COPY.title}</DialogTitle>
+          <DialogTitle>{editing ? 'Modifier l’article' : ITEM_DIALOG_COPY.title}</DialogTitle>
           <DialogDescription>{ITEM_DIALOG_COPY.intro}</DialogDescription>
         </DialogHeader>
         <form
@@ -210,7 +260,7 @@ export function ItemFormDialog({
 
           <Field label="Rayon" error={errors.rayon?.message}>
             {(props) => (
-              <Select {...props} {...register('rayon')}>
+              <Select {...props} {...register('rayon', { onChange: markRayonTouched })}>
                 {RAYONS.map((rayon) => (
                   <option key={rayon} value={rayon}>
                     {rayon}
@@ -220,43 +270,47 @@ export function ItemFormDialog({
             )}
           </Field>
 
-          <Field
-            label="Liste"
-            error={errors.listId?.message}
-            hint={listId === NEW_LIST_OPTION ? 'La liste sera créée en même temps que l’article.' : undefined}
-          >
-            {(props) => (
-              <Select {...props} {...register('listId')}>
-                {lists.map((list) => (
-                  <option key={list.id} value={list.id}>
-                    {list.name}
-                  </option>
-                ))}
-                <option value={NEW_LIST_OPTION}>Nouvelle liste</option>
-              </Select>
-            )}
-          </Field>
+          {editing ? null : (
+            <>
+              <Field
+                label="Liste"
+                error={errors.listId?.message}
+                hint={listId === NEW_LIST_OPTION ? 'La liste sera créée en même temps que l’article.' : undefined}
+              >
+                {(props) => (
+                  <Select {...props} {...register('listId')}>
+                    {lists.map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name}
+                      </option>
+                    ))}
+                    <option value={NEW_LIST_OPTION}>Nouvelle liste</option>
+                  </Select>
+                )}
+              </Field>
 
-          {listId === NEW_LIST_OPTION ? (
-            <Field label="Nom de la nouvelle liste" error={errors.newListName?.message}>
-              {(props) => <Input placeholder="Ex. Épicerie du mois" {...props} {...register('newListName')} />}
-            </Field>
-          ) : null}
+              {listId === NEW_LIST_OPTION ? (
+                <Field label="Nom de la nouvelle liste" error={errors.newListName?.message}>
+                  {(props) => <Input placeholder="Ex. Épicerie du mois" {...props} {...register('newListName')} />}
+                </Field>
+              ) : null}
 
-          {/* Membre courant : information en lecture, pas un champ éditable. */}
-          <div className="grid gap-1.5">
-            <label htmlFor="item-added-by" className="text-[11px] font-extrabold text-muted">
-              Ajouté par
-            </label>
-            <Input id="item-added-by" readOnly value={currentMemberName} className="bg-bg" />
-          </div>
+              {/* Membre courant : information en lecture, pas un champ éditable. */}
+              <div className="grid gap-1.5">
+                <label htmlFor="item-added-by" className="text-[11px] font-extrabold text-muted">
+                  Ajouté par
+                </label>
+                <Input id="item-added-by" readOnly value={currentMemberName} className="bg-bg" />
+              </div>
+            </>
+          )}
 
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
             <Button type="submit" icon="arrow" disabled={isSubmitting || isMutating}>
-              {isSubmitting || isMutating ? 'Ajout…' : ITEM_DIALOG_COPY.submit}
+              {isSubmitting || isMutating ? (editing ? 'Enregistrement…' : 'Ajout…') : editing ? 'Enregistrer' : ITEM_DIALOG_COPY.submit}
             </Button>
           </DialogActions>
         </form>

@@ -15,7 +15,7 @@ import { createShoppingItem, SHOPPING_ITEMS_TABLE, SHOPPING_LISTS_TABLE } from '
 import { isQueryableEan, type OffProduct } from '../off-client';
 import { offCategoriesToRayon } from '../off-rayon';
 import * as productsApi from '../products-api';
-import { normalizeRayon, RAYONS } from '../types';
+import { normalizeRayon, RAYONS, guessRayon } from '../types';
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Indiquez le nom du produit.').max(200, '200 caractères maximum.'),
@@ -61,11 +61,24 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: offProduct?.name ?? '', rayon: suggestedRayon },
   });
+
+  const typedName = watch('name') ?? '';
+  const rayonTouched = useRef(false);
+
+  // Création manuelle (EAN inconnu) : le rayon se devine depuis le nom tant
+  // que l'utilisateur ne l'a pas touché. Avec enrichissement OFF, le rayon
+  // suggéré prime et la saisie manuelle ne l'écrase pas.
+  useEffect(() => {
+    if (!open || offProduct || rayonTouched.current) return;
+    setValue('rayon', guessRayon(typedName), { shouldValidate: false });
+  }, [open, offProduct, typedName, setValue]);
 
   // La fiche est pré-remplie à chaque ouverture : un scan tardif ne doit
   // jamais écraser une saisie en cours, ni un EAN précédent survivre.
@@ -78,6 +91,7 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
   useEffect(() => {
     if (open) {
       reset({ name: offProduct?.name ?? '', rayon: suggestedRayon });
+      rayonTouched.current = false;
       setPhotoFile(null);
       setPhotoError(null);
       setTargetListId((current) =>
@@ -302,7 +316,7 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
 
           <Field label="Rayon" error={errors.rayon?.message}>
             {(props) => (
-              <Select {...props} {...register('rayon')}>
+              <Select {...props} {...register('rayon', { onChange: () => { rayonTouched.current = true; } })}>
                 {RAYONS.map((rayon) => (
                   <option key={rayon} value={rayon}>
                     {rayon}

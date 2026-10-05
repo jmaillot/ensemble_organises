@@ -55,6 +55,7 @@ export default function CoursesPage() {
     addList,
     removeItem,
     removeList,
+    editItem,
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
@@ -67,6 +68,7 @@ export default function CoursesPage() {
   const [scanError, setScanError] = useState(false);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
+  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
 
   const {
@@ -92,6 +94,13 @@ export default function CoursesPage() {
     await addItem(values);
     setItemDialog({ open: false });
     toast(`« ${values.name.trim()} » ajouté à votre liste.`, 'success');
+  };
+
+  const submitItemEdit = async (values: ItemFormValues) => {
+    if (!editingItem) return;
+    await editItem(editingItem.id, values);
+    setEditingItem(null);
+    toast(`« ${values.name.trim()} » mis à jour.`, 'success');
   };
 
   /** L'apparition de la ligne suffit comme retour : seul l'erreur est signalée. */
@@ -268,6 +277,7 @@ export default function CoursesPage() {
                       onToggle={handleToggle}
                       onQuickAdd={handleQuickAdd}
                       onDelete={setPendingItem}
+                      onEdit={setEditingItem}
                       onDeleteList={setPendingList}
                     />
                   </div>
@@ -328,12 +338,16 @@ export default function CoursesPage() {
       </div>
 
       <ItemFormDialog
-        open={itemDialog.open}
-        onOpenChange={(open) => setItemDialog({ open })}
+        open={itemDialog.open || editingItem !== null}
+        onOpenChange={(open) => {
+          setItemDialog({ open });
+          if (!open) setEditingItem(null);
+        }}
         lists={lists}
         currentMemberName={currentMemberName}
         isMutating={isMutating}
-        onSubmit={submitItem}
+        initialItem={editingItem}
+        onSubmit={editingItem ? submitItemEdit : submitItem}
       />
 
       <ScanDialog
