@@ -118,6 +118,14 @@ export async function findProductByEan(householdId: string, ean: string): Promis
   return rows[0] ?? null;
 }
 
+/** Photo affichable d'un produit : téléversée, sinon repli OFF contrôlé. */
+export function productPhotoUrl(row: ProductRow): string | null {
+  if (row.photo_url) return row.photo_url;
+  const offData = row.off_data ?? {};
+  if (typeof offData !== 'object' || offData === null) return null;
+  return cleanOffImageUrl((offData as Record<string, unknown>).image_url);
+}
+
 /** Reconstruit un enrichissement OFF depuis une ligne produit connue. */
 export function offProductFromRow(row: ProductRow): OffProduct {
   const offData = row.off_data ?? {};

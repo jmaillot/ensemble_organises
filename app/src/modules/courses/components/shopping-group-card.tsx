@@ -9,6 +9,7 @@ import {
   guessRayon,
   itemStateLabel,
   matchCatalogue,
+  normalizeSearchText,
   quantityLabel,
   sectionsForList,
   RAYONS,
@@ -17,6 +18,7 @@ import {
   type ShoppingItem,
   type ShoppingListView,
 } from '../types';
+import { productPhotoUrl } from '../products-api';
 import type { ProductRow } from '@/types';
 
 /** Sur-titre de rayon : même traitement que `.section-kicker` de l'export. */
@@ -32,6 +34,7 @@ export interface ShoppingGroupCardProps {
   onToggle: (item: ShoppingItem) => void;
   onQuickAdd: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => void;
   onQuickAddProduct: (listId: string, productId: string) => void;
+  onUpdateQuantity: (item: ShoppingItem, quantity: string) => void;
   onDelete: (item: ShoppingItem) => void;
   onEdit: (item: ShoppingItem) => void;
   onDeleteList: (list: ShoppingListView) => void;
@@ -51,6 +54,7 @@ export function ShoppingGroupCard({
   onToggle,
   onQuickAdd,
   onQuickAddProduct,
+  onUpdateQuantity,
   onDelete,
   onEdit,
   onDeleteList,
@@ -58,6 +62,7 @@ export function ShoppingGroupCard({
   const [draft, setDraft] = useState('');
   const [match, setMatch] = useState<
     | null
+    | { kind: 'duplicate'; name: string; item: ShoppingItem; quantity: string }
     | { kind: 'details'; name: string; quantity: string; rayon: (typeof RAYONS)[number] }
   >(null);
   // Autocomplétion live sur le catalogue local (pas de quota réseau) :
@@ -76,12 +81,34 @@ export function ShoppingGroupCard({
   const submitDraft = () => {
     const name = draft.trim();
     if (!name) return;
-    if (dropOpen && matchCatalogue(catalogue, name).length > 0) {
-      pickProduct(matchCatalogue(catalogue, name)[0].id);
+    // Doublon : l'article est déjà dans la liste → proposer la quantité.
+    const dupe = list.items.find((item) => normalizeSearchText(item.name) === normalizeSearchText(name));
+    if (dupe) {
+      setDropOpen(false);
+      setMatch({
+        kind: 'duplicate',
+        name,
+        item: dupe,
+        quantity: dupe.quantity === null ? '' : String(dupe.quantity),
+      });
       return;
     }
+    // Correspondance exacte : ajout lié direct. Sinon, mini-formulaire de
+    // création (le « Créer » du dropdown y mène aussi) : taper « Marss »
+    // quand « Mars » existe crée bien « Marss », jamais Mars à la place.
+    const exact = catalogue.find((product) => normalizeSearchText(product.name) === normalizeSearchText(name));
     setDropOpen(false);
+    if (exact) {
+      pickProduct(exact.id);
+      return;
+    }
     setMatch({ kind: 'details', name, quantity: '', rayon: guessRayon(name) });
+  };
+
+  const submitDuplicate = () => {
+    if (match?.kind !== 'duplicate') return;
+    onUpdateQuantity(match.item, match.quantity);
+    resetMatch();
   };
 
   const submitDetails = () => {
@@ -175,14 +202,62 @@ export function ShoppingGroupCard({
                   onMouseDown={(event) => event.preventDefault()}
                   className="flex w-full min-h-9 items-center gap-2 rounded-[9px] px-2 py-1.5 text-left transition-colors hover:bg-accent-faint disabled:opacity-55"
                 >
-                  {product.photo_url ? (
-                    <img src={product.photo_url} alt="" aria-hidden="true" className="size-7 shrink-0 rounded-[7px] object-cover" />
+                  {productPhotoUrl(product) ? (
+                    <img src={productPhotoUrl(product) as string} alt="" aria-hidden="true" className="size-7 shrink-0 rounded-[7px] object-cover" />
                   ) : null}
                   <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{product.name}</span>
                 </button>
               </li>
             ))}
+            <li role="option" aria-selected="false">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  setDropOpen(false);
+                  setMatch({ kind: 'details', name: draft.trim(), quantity: '', rayon: guessRayon(draft) });
+                }}
+                onMouseDown={(event) => event.preventDefault()}
+                className="flex w-full min-h-9 items-center gap-2 rounded-[9px] px-2 py-1.5 text-left text-[13px] font-semibold text-muted transition-colors hover:bg-accent-faint hover:text-fg disabled:opacity-55"
+              >
+                Créer « {draft.trim()} »
+              </button>
+            </li>
           </ul>
+        ) : null}
+
+        {match?.kind === 'duplicate' ? (
+          <div className="mt-2.5 grid gap-2 rounded-[11px] border border-border bg-bg p-2.5">
+            <p className="m-0 text-[11px] font-bold">
+              « {match.name} » est déjà dans la liste
+              {match.item.quantity !== null ? ` (quantité ${match.item.quantity})` : ''} — modifier ?
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="grid gap-1 text-[11px] font-extrabold text-muted">
+                Quantité
+                <input
+                  value={match.quantity}
+                  disabled={disabled}
+                  inputMode="decimal"
+                  placeholder="Ex. 3"
+                  onChange={(change) => setMatch({ ...match, quantity: change.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      submitDuplicate();
+                    }
+                  }}
+                  className="min-h-9 w-28 rounded-[9px] border border-border bg-surface px-2 text-[12px] font-semibold text-fg"
+                />
+              </label>
+              <Button icon="check" disabled={disabled} onClick={submitDuplicate}>
+                Mettre à jour
+              </Button>
+              <Button variant="secondary" onClick={resetMatch}>
+                Annuler
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         {match?.kind === 'details' ? (

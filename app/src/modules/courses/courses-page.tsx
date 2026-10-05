@@ -122,6 +122,13 @@ export default function CoursesPage() {
     runQuietly(() => addCatalogProductToList(listId, productId), 'Ajout impossible.');
   };
 
+  const handleUpdateQuantity = (item: ShoppingItem, quantity: string) => {
+    runQuietly(
+      () => editItem(item.id, { name: item.name, quantity, unit: item.unit ?? '', rayon: item.rayon }),
+      'Mise à jour impossible.',
+    );
+  };
+
   const handleToggle = (item: ShoppingItem) => {
     runQuietly(() => toggleItem(item), 'Mise à jour impossible.');
   };
@@ -289,6 +296,7 @@ export default function CoursesPage() {
                       onToggle={handleToggle}
                       onQuickAdd={handleQuickAdd}
                       onQuickAddProduct={handleQuickAddProduct}
+                      onUpdateQuantity={handleUpdateQuantity}
                       onDelete={setPendingItem}
                       onEdit={setEditingItem}
                       onDeleteList={setPendingList}

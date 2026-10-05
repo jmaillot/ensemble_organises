@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Panel } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { cleanOffImageUrl } from '../off-client';
+import { productPhotoUrl } from '../products-api';
 import { useHouseholdStore } from '@/stores/household-store';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile } from '@/lib/storage';
@@ -100,12 +100,7 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
           ) : null}
           <ul className="grid gap-2">
             {visible.map((product) => {
-              const offData = product.off_data ?? {};
-              const fallback =
-                !product.photo_url && typeof offData === 'object' && offData !== null
-                  ? cleanOffImageUrl((offData as Record<string, unknown>).image_url)
-                  : null;
-              const photo = product.photo_url ?? fallback;
+              const photo = productPhotoUrl(product);
               return (
                 <li
                   key={product.id}

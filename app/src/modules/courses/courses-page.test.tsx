@@ -215,4 +215,66 @@ describe('Module Courses', () => {
     await user.click(await screen.findByRole('button', { name: 'Catalogue' }));
     expect(await screen.findByRole('heading', { name: 'Catalogue des produits scannés' })).toBeInTheDocument();
   });
+
+  it('un nom approchant sans match exact ouvre la création (Marss, pas Mars)', async () => {
+    const user = userEvent.setup();
+    await data.create('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: '3019620432003',
+      name: 'Mars',
+      brand: null,
+      category: 'Divers',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      renderWithProviders(<CoursesPage />);
+
+      const champ = await screen.findByLabelText('Ajouter un article à la liste Fresque');
+      await user.type(champ, 'Marss');
+      // Le dropdown propose Mars, mais Entrée crée bien « Marss ».
+      expect(await screen.findByRole('listbox', { name: 'Produits du catalogue correspondants' })).toBeInTheDocument();
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findByText(/n’est pas au catalogue/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Confirmer l’ajout de Marss' }));
+      await waitFor(() => {
+        expect(within(listRegion('Fresque')).getByText('Marss')).toBeInTheDocument();
+      });
+    } finally {
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
+      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        name: string;
+      }[];
+      await Promise.all(
+        items.filter((item) => item.name === 'Marss').map((item) => data.remove('shopping_list_items', item.id)),
+      );
+    }
+  });
+
+  it('un article déjà présent propose de modifier sa quantité', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+
+    const champ = await screen.findByLabelText('Ajouter un article à la liste Maison');
+    await user.type(champ, 'Savon liquide');
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText(/est déjà dans la liste/)).toBeInTheDocument();
+    const qty = screen.getByLabelText(/Quantité/) as HTMLInputElement;
+    await user.clear(qty);
+    await user.type(qty, '5');
+    await user.click(screen.getByRole('button', { name: 'Mettre à jour' }));
+
+    await waitFor(() => {
+      const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
+      expect(within(row).getByText(/5/)).toBeInTheDocument();
+    });
+  });
 });
