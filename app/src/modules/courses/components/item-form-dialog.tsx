@@ -8,7 +8,8 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { RAYONS, NEW_LIST_OPTION, guessRayon, type ItemFormValues, type ShoppingItem, type ShoppingListView } from '../types';
 import { offCategoriesToRayon } from '../off-rayon';
-import { searchOffProducts, type OffSearchHit } from '../off-client';
+import { searchOffCatalog } from '../api';
+import type { OffSearchHit } from '../off-client';
 
 /** Libellés du dialogue repris de l'export de design. */
 const ITEM_DIALOG_COPY = {
@@ -138,7 +139,7 @@ export function ItemFormDialog({
     if (terms.length < 2 || searchState.status === 'loading') return;
     setSearchState({ status: 'loading' });
     setSearchPhoto(null);
-    void searchOffProducts(terms)
+    void searchOffCatalog(terms)
       .then((hits) => setSearchState({ status: 'done', hits }))
       .catch((searchError: unknown) =>
         setSearchState({

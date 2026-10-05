@@ -1,6 +1,8 @@
 import { data } from '@/lib/data';
+import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import type { ShoppingListItemRow, ShoppingListRow } from '@/types';
 import { normalizeRayon, type ShoppingItemInput, type ShoppingListInput } from './types';
+import type { OffSearchHit } from './off-client';
 
 export const SHOPPING_LISTS_TABLE = 'shopping_lists';
 export const SHOPPING_ITEMS_TABLE = 'shopping_list_items';
@@ -24,6 +26,68 @@ export async function createShoppingList(input: ShoppingListInput): Promise<Shop
 
 export async function renameShoppingList(id: string, name: string): Promise<ShoppingListRow> {
   return data.update<ShoppingListRow>(SHOPPING_LISTS_TABLE, id, { name: name.trim() });
+}
+
+/** Erreur proxy avec repli direct autorisé (infra Edge, pas quota ni validation). */
+export class OffProxyFallback extends Error {
+  constructor() {
+    super('proxy');
+  }
+}
+
+/**
+ * Recherche via le proxy Edge (cache 1 h, bascule miroirs côté serveur),
+ * avec repli direct navigateur quand le proxy est injoignable — jamais sur
+ * quota/validation (le direct aggraverait ou échouerait pareil).
+ */
+export async function searchOffCatalog(query: string, limit = 5): Promise<OffSearchHit[]> {
+  const terms = query.trim();
+  if (terms.length < 2) return [];
+  if (isSupabaseConfigured && supabaseFunctionsBase && supabase) {
+    try {
+      return await searchOffProxy(terms, limit);
+    } catch (proxyError) {
+      if (!(proxyError instanceof OffProxyFallback)) throw proxyError;
+    }
+  }
+  const { searchOffProducts } = await import('./off-client');
+  return searchOffProducts(terms, { limit });
+}
+
+async function searchOffProxy(query: string, limit: number): Promise<OffSearchHit[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const { data: authData } = await supabase!.auth.getSession();
+    const response = await fetch(`${supabaseFunctionsBase}/off-search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        ...(authData.session?.access_token ? { authorization: `Bearer ${authData.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ q: query, limit }),
+      signal: controller.signal,
+    });
+    if (response.status === 400 || response.status === 401 || response.status === 429) {
+      const detail = await response.json().catch(() => null);
+      throw new Error((detail as { error?: string } | null)?.error ?? 'Recherche impossible.');
+    }
+    if (!response.ok) throw new OffProxyFallback();
+    const payload = (await response.json().catch(() => null)) as { hits?: unknown } | null;
+    if (!payload || !Array.isArray(payload.hits)) throw new OffProxyFallback();
+    return (payload.hits as OffSearchHit[]).filter(
+      (hit) => hit && typeof hit.name === 'string' && hit.name.length > 0,
+    );
+  } catch (error) {
+    if (error instanceof OffProxyFallback) throw error;
+    if (error instanceof Error && (error.name === 'AbortError' || error instanceof TypeError)) {
+      throw new OffProxyFallback();
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Supprime une liste puis ses articles : les deux écritures sont liées. */
