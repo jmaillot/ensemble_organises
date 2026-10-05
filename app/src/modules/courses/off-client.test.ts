@@ -65,17 +65,20 @@ describe('fetchOffProduct', () => {
     await expect(fetchOffProduct(KNOWN_EAN, { timeoutMs: 50 })).resolves.toBeNull();
   }, 10000);
 
-  it('retourne null sur erreur reseau persistante (un unique retry)', async () => {
+  it('retourne null sur erreur reseau persistante (bascule puis echec franc)', async () => {
     let calls = 0;
+    const boom = () => {
+      calls += 1;
+      return HttpResponse.error();
+    };
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', () => {
-        calls += 1;
-        return HttpResponse.error();
-      }),
+      http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', boom),
+      http.get('https://api.openfoodfacts.org/api/v2/product/:ean.json', boom),
+      http.get('https://fr.openfoodfacts.org/api/v2/product/:ean.json', boom),
     );
     await expect(fetchOffProduct(KNOWN_EAN, { timeoutMs: 1000 })).resolves.toBeNull();
-    // Appel initial + un unique retry (T-04-04 : pas de retry storm).
-    expect(calls).toBe(2);
+    // world tenté une fois, puis bascule api puis fr : pas de retry storm.
+    expect(calls).toBe(3);
   });
 
   it('envoie fields= et X-User-Agent sur chaque requete', async () => {
@@ -122,8 +125,28 @@ describe('fetchOffResult (WR-04)', () => {
     expect(await fetchOffResult(UNKNOWN_EAN)).toEqual({ status: 'unknown' });
     server.use(
       http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', () => HttpResponse.error()),
+      http.get('https://api.openfoodfacts.org/api/v2/product/:ean.json', () => HttpResponse.error()),
+      http.get('https://fr.openfoodfacts.org/api/v2/product/:ean.json', () => HttpResponse.error()),
     );
     expect(await fetchOffResult(KNOWN_EAN, { timeoutMs: 1000 })).toEqual({ status: 'error' });
+  });
+
+  it('bascule sur le miroir quand world répond 503', async () => {
+    server.use(
+      http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', () => new HttpResponse(null, { status: 503 })),
+      http.get('https://api.openfoodfacts.org/api/v2/product/:ean.json', () =>
+        HttpResponse.json(
+          {
+            code: KNOWN_EAN,
+            status: 1,
+            product: { code: KNOWN_EAN, product_name: 'Nutella', brands: 'Ferrero', lang: 'fr' },
+          },
+          { status: 200 },
+        ),
+      ),
+    );
+    const result = await fetchOffResult(KNOWN_EAN);
+    expect(result).toMatchObject({ status: 'found' });
   });
 });
 
@@ -145,14 +168,17 @@ describe('searchOffProducts', () => {
 
   it('503 (quota/incident) : message dédié, sans retry', async () => {
     let calls = 0;
+    const down = () => {
+      calls += 1;
+      return new HttpResponse(null, { status: 503 });
+    };
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/search', () => {
-        calls += 1;
-        return new HttpResponse(null, { status: 503 });
-      }),
+      http.get('https://world.openfoodfacts.org/api/v2/search', down),
+      http.get('https://api.openfoodfacts.org/api/v2/search', down),
+      http.get('https://fr.openfoodfacts.org/api/v2/search', down),
     );
     await expect(searchOffProducts('comté')).rejects.toThrow(/patientez une minute/);
-    expect(calls).toBe(1);
+    expect(calls).toBe(3);
   });
 
   it('n’interroge pas sous 2 caractères', async () => {

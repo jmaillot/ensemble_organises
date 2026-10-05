@@ -105,13 +105,13 @@ const offSearchSchema = z.object({
     .optional(),
 });
 
-function searchUrl(query: string, limit: number): string {
+function searchPath(query: string, limit: number): string {
   const params = new URLSearchParams({
     search_terms: query.trim(),
     page_size: String(Math.min(Math.max(limit, 1), 10)),
     fields: OFF_FIELDS,
   });
-  return `${OFF_BASE_URL}/api/v2/search?${params.toString()}`;
+  return `/api/v2/search?${params.toString()}`;
 }
 
 interface OffSearchPayload {
@@ -148,45 +148,70 @@ export async function searchOffProducts(query: string, options: FetchOffOptions 
   if (terms.length < 2) return [];
   const timeoutMs = options.timeoutMs ?? OFF_TIMEOUT_MS;
   const userAgent = options.userAgent ?? OFF_USER_AGENT;
+  const response = await getOff(searchPath(terms, options.limit ?? 5), timeoutMs, userAgent);
+  if (!response.ok) throw new Error(`Recherche impossible (${response.status}).`);
+  const parsed = offSearchSchema.safeParse(await response.json().catch(() => null));
+  if (!parsed.success) throw new Error('Réponse de recherche inattendue.');
+  return (parsed.data.products ?? [])
+    .map(toSearchHit)
+    .filter((hit): hit is OffSearchHit => hit !== null)
+    .slice(0, 5);
+}
+
+function offProductPath(ean: string): string {
+  return `/api/v2/product/${encodeURIComponent(ean)}.json?fields=${OFF_FIELDS}`;
+}
+
+const OFF_HOSTS = [
+  'https://world.openfoodfacts.org',
+  'https://api.openfoodfacts.org',
+  'https://fr.openfoodfacts.org',
+];
+
+/** Erreur quota/surcharge : pas de bascule ni de retry, ça aggraverait. */
+class OffOverloadedError extends Error {
+  constructor() {
+    super('Trop de recherches rapprochées ou Open Food Facts surchargé : patientez une minute.');
+  }
+}
+
+async function getOnce(url: string, timeoutMs: number, userAgent: string): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(searchUrl(terms, options.limit ?? 5), {
+    return await fetch(url, {
       headers: { 'X-User-Agent': userAgent },
       signal: controller.signal,
     });
-    // 429/503 = quota de recherche dépassée (10/min/IP) ou incident OFF :
-    // message dédié, pas d'auto-retry (il aggraverait le quota).
-    if (response.status === 429 || response.status === 503) {
-      throw new Error('Trop de recherches rapprochées ou Open Food Facts surchargé : patientez une minute.');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GET sur les miroirs OFF dans l'ordre, au premier succès technique : la
+ * recherche flappe en 503 selon l'hôte/backend (constaté : world 503 pendant
+ * que api répond 200, et inversement). 429 → quota immédiat, sans bascule.
+ */
+async function getOff(path: string, timeoutMs: number, userAgent: string): Promise<Response> {
+  let lastError: unknown = null;
+  for (const host of OFF_HOSTS) {
+    let response: Response;
+    try {
+      response = await getOnce(`${host}${path}`, timeoutMs, userAgent);
+    } catch (error) {
+      lastError = error;
+      continue;
     }
-    if (!response.ok) throw new Error(`Recherche impossible (${response.status}).`);
-    const parsed = offSearchSchema.safeParse(await response.json().catch(() => null));
-    if (!parsed.success) throw new Error('Réponse de recherche inattendue.');
-    return (parsed.data.products ?? [])
-      .map(toSearchHit)
-      .filter((hit): hit is OffSearchHit => hit !== null)
-      .slice(0, 5);
-  } finally {
-    clearTimeout(timer);
+    if (response.status === 429) throw new OffOverloadedError();
+    if (response.status >= 500) {
+      lastError = new OffOverloadedError();
+      continue;
+    }
+    return response;
   }
-}
-
-function offUrl(ean: string): string {
-  return `${OFF_BASE_URL}/api/v2/product/${encodeURIComponent(ean)}.json?fields=${OFF_FIELDS}`;
-}
-
-async function getOnce(ean: string, timeoutMs: number, userAgent: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(offUrl(ean), {
-      headers: { 'X-User-Agent': userAgent },
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+  if (lastError instanceof OffOverloadedError) throw lastError;
+  throw new Error('Recherche impossible (réseau).');
 }
 
 function toOffProduct(ean: string, payload: z.infer<typeof offResponseSchema>): OffProduct | null {
@@ -223,14 +248,9 @@ export async function fetchOffResult(ean: string, options: FetchOffOptions = {})
 
   let response: Response;
   try {
-    response = await getOnce(code, timeoutMs, userAgent);
+    response = await getOff(offProductPath(code), timeoutMs, userAgent);
   } catch {
-    // Unique retry sur erreur reseau/timeout, puis erreur franche.
-    try {
-      response = await getOnce(code, timeoutMs, userAgent);
-    } catch {
-      return { status: 'error' };
-    }
+    return { status: 'error' };
   }
   if (response.status === 404) return { status: 'unknown' };
   if (!response.ok) return { status: 'error' };
