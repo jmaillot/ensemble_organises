@@ -143,6 +143,18 @@ describe('searchOffProducts', () => {
     await expect(searchOffProducts('comté', { timeoutMs: 1000 })).rejects.toThrow();
   });
 
+  it('503 (quota/incident) : message dédié, sans retry', async () => {
+    let calls = 0;
+    server.use(
+      http.get('https://world.openfoodfacts.org/api/v2/search', () => {
+        calls += 1;
+        return new HttpResponse(null, { status: 503 });
+      }),
+    );
+    await expect(searchOffProducts('comté')).rejects.toThrow(/patientez une minute/);
+    expect(calls).toBe(1);
+  });
+
   it('n’interroge pas sous 2 caractères', async () => {
     await expect(searchOffProducts('x')).resolves.toEqual([]);
   });

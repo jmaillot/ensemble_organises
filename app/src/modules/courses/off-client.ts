@@ -155,6 +155,11 @@ export async function searchOffProducts(query: string, options: FetchOffOptions 
       headers: { 'X-User-Agent': userAgent },
       signal: controller.signal,
     });
+    // 429/503 = quota de recherche dépassée (10/min/IP) ou incident OFF :
+    // message dédié, pas d'auto-retry (il aggraverait le quota).
+    if (response.status === 429 || response.status === 503) {
+      throw new Error('Trop de recherches rapprochées ou Open Food Facts surchargé : patientez une minute.');
+    }
     if (!response.ok) throw new Error(`Recherche impossible (${response.status}).`);
     const parsed = offSearchSchema.safeParse(await response.json().catch(() => null));
     if (!parsed.success) throw new Error('Réponse de recherche inattendue.');
