@@ -149,6 +149,23 @@ begin
     testkit.affected(format('delete from public.task_lists where id = %L', general_a)),
     0::bigint, 'Général insupprimable même par admin');
   reset role;
+
+  -- 7. Suppression du foyer : la cascade emporte tout, Général compris (0073).
+  -- En superuser ici (le parcours admin via RLS est couvert par la politique
+  -- `households_delete`, inchangée) ; le foyer B reste intact.
+  delete from public.households where id = home_a;
+  perform testkit.eq(
+    (select count(*) from public.households where id = home_a), 0::bigint,
+    'suppression foyer : foyer parti');
+  perform testkit.eq(
+    (select count(*) from public.task_lists where household_id = home_a), 0::bigint,
+    'suppression foyer : dossiers emportes, General compris');
+  perform testkit.eq(
+    (select count(*) from public.note_folders where household_id = home_a), 0::bigint,
+    'suppression foyer : dossiers notes emportes');
+  perform testkit.eq(
+    (select count(*) from public.households where id = home_b), 1::bigint,
+    'suppression foyer : foyer voisin intact');
 end;
 $$;
 
