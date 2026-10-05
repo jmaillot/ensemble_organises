@@ -325,4 +325,52 @@ begin
 end;
 $$;
 
+-- ===========================================================================
+-- 7. Vue masquée (0080, T-05-03) : le propriétaire ne voit pas `reserved_by`
+-- ===========================================================================
+-- La liste `gl_partagee` est lisible par tout le foyer : Bob (propriétaire)
+-- lit via la vue avec `reserved_by` NULL, Erin et Dave (non-propriétaires)
+-- le voient, Carol (autre foyer) ne voit rien.
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items_for_list where id = ''gitem_v'' and reserved_by is null'),
+  1::bigint,
+  'le proprietaire lisant via la vue ne voit pas reserved_by (T-05-03)');
+
+reset role;
+
+select testkit.as_user(user_id, 'erin@example.fr') from testkit.fx where key = 'erin';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_items_for_list where id = %L and reserved_by = %L',
+  'gitem_v', (select row_id from testkit.fx where key = 'erin'))),
+  1::bigint,
+  'un non-proprietaire voit reserved_by via la vue');
+
+reset role;
+
+select testkit.as_user(user_id, 'dave@example.fr') from testkit.fx where key = 'dave';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_items_for_list where id = %L and reserved_by = %L',
+  'gitem_v', (select row_id from testkit.fx where key = 'erin'))),
+  1::bigint,
+  'un membre non-proprietaire voit aussi reserved_by via la vue');
+
+reset role;
+
+select testkit.as_user(user_id, 'carol@example.fr') from testkit.fx where key = 'carol';
+set local role authenticated;
+
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items_for_list where id = ''gitem_v'''),
+  0::bigint,
+  'un autre foyer ne voit rien via la vue');
+
+reset role;
+
 rollback;
