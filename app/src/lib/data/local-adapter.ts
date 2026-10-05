@@ -52,11 +52,18 @@ export class LocalAdapter implements DataAdapter {
   async list<T = Row>(table: string, filter: RowFilter = {}): Promise<T[]> {
     await this.ensureSeeded();
     const db = getDatabase();
+    // `gift_items_for_list` (0080, T-05-03) n'existe qu'en base : en mode
+    // local on sert la vue depuis le magasin `gift_items` (mêmes lignes,
+    // mêmes colonnes). Le masquage `reserved_by → NULL` au propriétaire est
+    // une barrière serveur (vue `SECURITY INVOKER` + `current_member_id`) :
+    // hors ligne, sans identité serveur, les lignes sont rendues telles
+    // quelles — le repli d'affichage reste la conditionnelle JSX existante.
+    const sourceTable = table === 'gift_items_for_list' ? 'gift_items' : table;
     const householdId = filter.household_id;
     const collection =
       typeof householdId === 'string'
-        ? db.rows.where('[table+householdId]').equals([table, householdId])
-        : db.rows.where('table').equals(table);
+        ? db.rows.where('[table+householdId]').equals([sourceTable, householdId])
+        : db.rows.where('table').equals(sourceTable);
     const stored = await collection.toArray();
     const rows = stored.map((entry) => entry.data);
     return rows.filter((row) => matchesFilter(row, filter)) as T[];

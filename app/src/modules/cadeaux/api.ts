@@ -19,10 +19,22 @@ export interface CadeauxSnapshot {
   contacts: ContactRow[];
 }
 
+/**
+ * Source de lecture des articles (0080, T-05-03) : la vue
+ * `gift_items_for_list` masque `reserved_by` (NULL) au propriétaire de la
+ * liste, via `SECURITY INVOKER` (la RLS des tables filtre toujours les
+ * lignes). L'UI ne lit JAMAIS la table brute pour afficher ; les écritures
+ * (create/update/remove) passent toujours par `gift_items` (on n'écrit pas
+ * via une vue). En mode local, l'adaptateur sert la vue depuis le magasin
+ * `gift_items` (aucune frontière serveur hors ligne — le masquage réel est
+ * prod, porté par la vue).
+ */
+const GIFT_ITEMS_VIEW = 'gift_items_for_list';
+
 export async function fetchCadeauxSnapshot(householdId: string): Promise<CadeauxSnapshot> {
   const [lists, items, shares, birthdays, ideas, contactLists, contacts] = await Promise.all([
     data.list<GiftListRow>('gift_lists', { household_id: householdId }),
-    data.list<GiftItemRow>('gift_items', { household_id: householdId }),
+    data.list<GiftItemRow>(GIFT_ITEMS_VIEW, { household_id: householdId }),
     data.list<GiftListShareRow>('gift_list_shares', {}),
     data.list<BirthdayRow>('birthdays', { household_id: householdId }),
     data.list<GiftIdeaRow>('gift_ideas', { household_id: householdId }),
@@ -164,8 +176,10 @@ export async function createGiftList(householdId: string, ownerMemberId: string,
 
 /** Supprime les idées, les partages puis la liste : aucune ligne orpheline. */
 export async function deleteGiftList(listId: string): Promise<void> {
+  // Énumération via la vue masquée (mêmes lignes, mêmes ids — seul
+  // `reserved_by` peut être NULL) ; la suppression vise la table brute.
   const [items, shares] = await Promise.all([
-    data.list<GiftItemRow>('gift_items', { list_id: listId }),
+    data.list<GiftItemRow>(GIFT_ITEMS_VIEW, { list_id: listId }),
     data.list<GiftListShareRow>('gift_list_shares', { list_id: listId }),
   ]);
   await Promise.all([
