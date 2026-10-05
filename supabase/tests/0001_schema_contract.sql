@@ -54,7 +54,7 @@ begin
           ('expenses', ARRAY['id', 'household_id', 'ardoise_id', 'title', 'amount', 'paid_by', 'paid_by_guest', 'expense_date', 'split_type', 'created_at']::text[]),
           ('expense_participants', ARRAY['id', 'expense_id', 'participant_type', 'member_id', 'guest_id', 'share_amount']::text[]),
           ('gift_lists', ARRAY['id', 'household_id', 'owner_member_id', 'name', 'visibility', 'created_at']::text[]),
-          ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'purchased', 'created_at']::text[]),
+          ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'purchased', 'idea_id', 'created_at']::text[]),
           ('gift_list_shares', ARRAY['id', 'list_id', 'shared_with_member_id', 'shared_with_email', 'permission']::text[]),
           ('birthdays', ARRAY['id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[]),
           ('pets', ARRAY['id', 'household_id', 'name', 'species', 'breed', 'weight_kg', 'birth_date', 'identification_number', 'photo_url', 'created_at']::text[]),
@@ -76,7 +76,10 @@ begin
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
           ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[]),
           ('notification_reads', ARRAY['id', 'user_id', 'scope', 'scope_id', 'read_at']::text[]),
-          ('products', ARRAY['id', 'household_id', 'ean', 'name', 'brand', 'category', 'photo_url', 'off_data', 'created_by', 'created_at', 'updated_at']::text[])
+          ('products', ARRAY['id', 'household_id', 'ean', 'name', 'brand', 'category', 'photo_url', 'off_data', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('gift_ideas', ARRAY['id', 'household_id', 'name', 'price', 'url', 'comment', 'photo_url', 'status', 'giftee_text', 'giftee_contact_id', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('contact_lists', ARRAY['id', 'household_id', 'name', 'owner_member_id', 'is_default', 'created_at']::text[]),
+          ('contacts', ARRAY['id', 'list_id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(
@@ -247,7 +250,8 @@ declare
     'shopping_list_items', 'routine_completions', 'gift_items',
     'pet_records', 'pet_attachments', 'note_attachments',
     'provider_attachments',
-    'post_media', 'post_comments', 'post_reactions', 'messages'
+    'post_media', 'post_comments', 'post_reactions', 'messages',
+    'contacts'
   ];
   r text;
 begin
