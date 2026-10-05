@@ -14,6 +14,7 @@ export type ModuleKey =
   | 'ardoise'
   | 'cadeaux'
   | 'anniversaires'
+  | 'contacts'
   | 'animaux'
   | 'prestataires'
   | 'fidelite'
@@ -56,6 +57,7 @@ export const modules: ModuleEntry[] = [
   { key: 'recettes', label: 'Recettes', detail: 'Bientôt disponible', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
   { key: 'cadeaux', label: 'Cadeaux', detail: 'Idées à offrir', kicker: 'Pour dire merci', image: 'cadeaux.jpg', icon: 'gift', short: 'Cadeaux', tile: true, nav: false },
   { key: 'anniversaires', label: 'Anniversaires', detail: 'Ne rien oublier', kicker: 'Les petits moments', image: 'calendrier.jpg', icon: 'heart', short: 'Anniversaires', tile: true, nav: false },
+  { key: 'contacts', label: 'Contacts', detail: 'Famille & proches', kicker: 'Les visages du foyer', image: 'cercle.jpg', icon: 'people', short: 'Contacts', tile: true, nav: false },
   { key: 'animaux', label: 'Animaux', detail: 'Santé & historique', kicker: 'Toute la famille', image: 'animaux.jpg', icon: 'heart', short: 'Animaux', tile: true, nav: false },
   { key: 'prestataires', label: 'Prestataires', detail: 'Appels & contacts', kicker: 'Le bon relais', image: 'cercle.jpg', icon: 'settings', short: 'Prestataires', tile: true, nav: false },
   { key: 'fidelite', label: 'Fidélité', detail: 'Cartes & codes', kicker: 'Toujours sous la main', image: 'adresses.jpg', icon: 'wallet', short: 'Fidélité', tile: true, nav: false },
