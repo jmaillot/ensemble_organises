@@ -58,23 +58,30 @@ export function ShoppingGroupCard({
   const [draft, setDraft] = useState('');
   const [match, setMatch] = useState<
     | null
-    | { kind: 'products'; name: string; products: ProductRow[] }
     | { kind: 'details'; name: string; quantity: string; rayon: (typeof RAYONS)[number] }
   >(null);
+  // Autocomplétion live sur le catalogue local (pas de quota réseau) :
+  // visible pendant la frappe dès 2 caractères, fermée par Échap.
+  const [dropOpen, setDropOpen] = useState(false);
+  const liveHits = draft.trim().length >= 2 && dropOpen ? matchCatalogue(catalogue, draft) : [];
   const sections = sectionsForList(list.items, grouping);
   const inputId = `quick-add-${list.id}`;
 
   const resetMatch = () => {
     setMatch(null);
+    setDropOpen(false);
     setDraft('');
   };
 
   const submitDraft = () => {
     const name = draft.trim();
     if (!name) return;
-    const hits = matchCatalogue(catalogue, name);
-    if (hits.length > 0) setMatch({ kind: 'products', name, products: hits });
-    else setMatch({ kind: 'details', name, quantity: '', rayon: guessRayon(name) });
+    if (dropOpen && matchCatalogue(catalogue, name).length > 0) {
+      pickProduct(matchCatalogue(catalogue, name)[0].id);
+      return;
+    }
+    setDropOpen(false);
+    setMatch({ kind: 'details', name, quantity: '', rayon: guessRayon(name) });
   };
 
   const submitDetails = () => {
@@ -123,11 +130,22 @@ export function ShoppingGroupCard({
             value={draft}
             disabled={disabled}
             placeholder="Ajouter un article puis Entrée"
-            onChange={(event) => setDraft(event.target.value)}
+            role="combobox"
+            aria-expanded={liveHits.length > 0}
+            aria-controls={`catalogue-matches-${list.id}`}
+            aria-autocomplete="list"
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setMatch(null);
+              setDropOpen(true);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
                 submitDraft();
+              }
+              if (event.key === 'Escape') {
+                setDropOpen(false);
               }
             }}
           />
@@ -141,45 +159,30 @@ export function ShoppingGroupCard({
           </Button>
         </div>
 
-        {match?.kind === 'products' ? (
-          <div className="mt-2.5 grid gap-1.5 rounded-[11px] border border-border bg-bg p-2.5">
-            <p className="m-0 text-[11px] font-bold">
-              Produits du catalogue pour « {match.name} » — choisissez ou créez :
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {match.products.map((product) => (
+        {liveHits.length > 0 ? (
+          <ul
+            id={`catalogue-matches-${list.id}`}
+            role="listbox"
+            aria-label="Produits du catalogue correspondants"
+            className="mt-1.5 grid gap-1 rounded-[11px] border border-border bg-surface p-1.5"
+          >
+            {liveHits.map((product) => (
+              <li key={product.id} role="option" aria-selected="false">
                 <button
-                  key={product.id}
                   type="button"
                   disabled={disabled}
                   onClick={() => pickProduct(product.id)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-[11px] font-semibold transition-colors hover:border-accent hover:bg-accent-faint hover:text-accent-strong disabled:opacity-55"
+                  onMouseDown={(event) => event.preventDefault()}
+                  className="flex w-full min-h-9 items-center gap-2 rounded-[9px] px-2 py-1.5 text-left transition-colors hover:bg-accent-faint disabled:opacity-55"
                 >
                   {product.photo_url ? (
-                    <img src={product.photo_url} alt="" aria-hidden="true" className="size-5 rounded-full object-cover" />
+                    <img src={product.photo_url} alt="" aria-hidden="true" className="size-7 shrink-0 rounded-[7px] object-cover" />
                   ) : null}
-                  {product.name}
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{product.name}</span>
                 </button>
-              ))}
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() =>
-                  setMatch({ kind: 'details', name: match.name, quantity: '', rayon: guessRayon(match.name) })
-                }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 text-[11px] font-semibold text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-55"
-              >
-                Créer « {match.name} »
-              </button>
-              <button
-                type="button"
-                onClick={resetMatch}
-                className="inline-flex min-h-9 items-center px-2 text-[11px] font-bold text-muted hover:text-fg"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         ) : null}
 
         {match?.kind === 'details' ? (

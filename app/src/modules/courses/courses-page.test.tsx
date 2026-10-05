@@ -141,7 +141,7 @@ describe('Module Courses', () => {
     expect(screen.queryByRole('region', { name: 'Fresque' })).not.toBeInTheDocument();
   });
 
-  it('propose les correspondances catalogue avant de créer', async () => {
+  it('propose les correspondances catalogue pendant la frappe', async () => {
     const user = userEvent.setup();
     await data.create('products', {
       household_id: DEMO_HOUSEHOLD_ID,
@@ -160,11 +160,9 @@ describe('Module Courses', () => {
 
       const champ = await screen.findByLabelText('Ajouter un article à la liste Fresque');
       await user.type(champ, 'comté');
-      await user.keyboard('{Enter}');
 
-      const intro = await screen.findByText(/Produits du catalogue pour/);
-      const buttonsRow = intro.nextElementSibling as HTMLElement;
-      await user.click(within(buttonsRow).getByRole('button', { name: 'Comté affiné' }));
+      const menu = await screen.findByRole('listbox', { name: 'Produits du catalogue correspondants' });
+      await user.click(within(menu).getByRole('button', { name: 'Comté affiné' }));
       await waitFor(() => {
         expect(within(listRegion('Fresque')).getByText('Comté affiné')).toBeInTheDocument();
       });

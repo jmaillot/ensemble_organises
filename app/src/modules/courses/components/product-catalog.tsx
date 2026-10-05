@@ -8,7 +8,9 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Panel } from '@/components/shared/module-shell';
+import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
+import { cleanOffImageUrl } from '../off-client';
 import { useHouseholdStore } from '@/stores/household-store';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile } from '@/lib/storage';
@@ -97,14 +99,25 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
             </div>
           ) : null}
           <ul className="grid gap-2">
-            {visible.map((product) => (
-            <li
-              key={product.id}
-              className="flex min-h-11 items-center gap-2.5 rounded-[12px] border border-border px-3 py-2.5"
-            >
-              {product.photo_url ? (
-                <img src={product.photo_url} alt="" aria-hidden="true" className="size-9 shrink-0 rounded-[7px] object-cover" />
-              ) : null}
+            {visible.map((product) => {
+              const offData = product.off_data ?? {};
+              const fallback =
+                !product.photo_url && typeof offData === 'object' && offData !== null
+                  ? cleanOffImageUrl((offData as Record<string, unknown>).image_url)
+                  : null;
+              const photo = product.photo_url ?? fallback;
+              return (
+                <li
+                  key={product.id}
+                  className="flex min-h-11 items-center gap-2.5 rounded-[12px] border border-border px-3 py-2.5"
+                >
+                  {photo ? (
+                    <img src={photo} alt="" aria-hidden="true" className="size-9 shrink-0 rounded-[7px] object-cover" />
+                  ) : (
+                    <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-[7px] bg-bg text-muted">
+                      <Icon name="image" size="sm" />
+                    </span>
+                  )}
               <div className="min-w-0 flex-1">
                 <p className="m-0 truncate text-[13px] font-[760]">{product.name}</p>
                 <small className="text-[11px] text-muted">
@@ -120,7 +133,8 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
                 onClick={() => setEditing(product)}
               />
             </li>
-          ))}
+              );
+            })}
           </ul>
         </>
       )}
