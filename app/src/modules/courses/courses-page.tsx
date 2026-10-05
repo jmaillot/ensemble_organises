@@ -53,10 +53,12 @@ export default function CoursesPage() {
     toggleItem,
     addItem,
     addItemToList,
+    addCatalogProductToList,
     addList,
     removeItem,
     removeList,
     editItem,
+    products,
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
@@ -112,8 +114,12 @@ export default function CoursesPage() {
     });
   };
 
-  const handleQuickAdd = (listId: string, name: string) => {
-    runQuietly(() => addItemToList(listId, name), 'Ajout impossible.');
+  const handleQuickAdd = (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => {
+    runQuietly(() => addItemToList(listId, name, options), 'Ajout impossible.');
+  };
+
+  const handleQuickAddProduct = (listId: string, productId: string) => {
+    runQuietly(() => addCatalogProductToList(listId, productId), 'Ajout impossible.');
   };
 
   const handleToggle = (item: ShoppingItem) => {
@@ -278,9 +284,11 @@ export default function CoursesPage() {
                       list={visible}
                       grouping={grouping}
                       suggestions={suggestionsFor(visible.id)}
+                      catalogue={products}
                       disabled={isMutating}
                       onToggle={handleToggle}
                       onQuickAdd={handleQuickAdd}
+                      onQuickAddProduct={handleQuickAddProduct}
                       onDelete={setPendingItem}
                       onEdit={setEditingItem}
                       onDeleteList={setPendingList}

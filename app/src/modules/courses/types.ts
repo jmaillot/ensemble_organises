@@ -31,6 +31,16 @@ export function normalizeRayon(value: string | null | undefined): Rayon {
   return match ?? DEFAULT_RAYON;
 }
 
+/** Normalisation insensible casse/accents pour la recherche et la devinette. */
+export function normalizeSearchText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
 /** Mots-clés (sans accents) vers rayon, testés dans l'ordre : le spécifique d'abord. */
 const RAYON_KEYWORDS: [string, Rayon][] = [
   ['boulanger', 'Boulangerie'],
@@ -153,16 +163,27 @@ const RAYON_KEYWORDS: [string, Rayon][] = [
 ];
 
 /**
+ * Correspondance floue d'un nom tapé avec le catalogue (minuscules, accents
+ * ignorés, sous-chaîne dans les deux sens), triée par proximité de longueur.
+ */
+export function matchCatalogue<T extends { name: string }>(products: T[], name: string, limit = 5): T[] {
+  const needle = normalizeSearchText(name);
+  if (needle.length < 2) return [];
+  return products
+    .filter((product) => {
+      const haystack = normalizeSearchText(product.name);
+      return haystack.includes(needle) || needle.includes(haystack);
+    })
+    .sort((a, b) => Math.abs(a.name.length - needle.length) - Math.abs(b.name.length - needle.length))
+    .slice(0, Math.max(limit, 1));
+}
+
+/**
  * Devine le rayon depuis le nom saisi (minuscules, accents ignorés).
  * Repli `Divers` quand rien ne correspond : la suggestion ne bloque jamais.
  */
 export function guessRayon(name: string | null | undefined): Rayon {
-  const clean = (name ?? '')
-    .toLowerCase()
-    .replace(/œ/g, 'oe')
-    .replace(/æ/g, 'ae')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  const clean = normalizeSearchText(name);
   const padded = ` ${clean} `;
   for (const [keyword, rayon] of RAYON_KEYWORDS) {
     if (padded.includes(keyword)) return rayon;

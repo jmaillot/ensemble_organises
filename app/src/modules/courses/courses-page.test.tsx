@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
+import { data } from '@/lib/data';
+import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import CoursesPage from './courses-page';
 import ProductCatalogPage from './product-catalog-page';
 
@@ -45,10 +47,14 @@ describe('Module Courses', () => {
     await user.type(champ, 'Éponges');
     await user.keyboard('{Enter}');
 
+    // Inconnu du catalogue : mini-formulaire rayon (deviné) + quantité.
+    expect(await screen.findByText(/n’est pas au catalogue/)).toBeInTheDocument();
+    expect((screen.getByLabelText(/Rayon/) as HTMLSelectElement).value).toBe('Ménage');
+    await user.click(screen.getByRole('button', { name: 'Confirmer l’ajout de Éponges' }));
+
     await waitFor(() => {
       expect(within(listRegion('Maison')).getByText('Éponges')).toBeInTheDocument();
     });
-    expect(within(listRegion('Maison')).getByText('1/3')).toBeInTheDocument();
     expect(champ).toHaveValue('');
   });
 
@@ -133,6 +139,52 @@ describe('Module Courses', () => {
     await selectList(user, 'Maison');
     expect(await screen.findByRole('region', { name: 'Maison' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fresque' })).not.toBeInTheDocument();
+  });
+
+  it('propose les correspondances catalogue avant de créer', async () => {
+    const user = userEvent.setup();
+    await data.create('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: '3017620422003',
+      name: 'Comté affiné',
+      brand: null,
+      category: 'Frais',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      renderWithProviders(<CoursesPage />);
+
+      const champ = await screen.findByLabelText('Ajouter un article à la liste Fresque');
+      await user.type(champ, 'comté');
+      await user.keyboard('{Enter}');
+
+      const intro = await screen.findByText(/Produits du catalogue pour/);
+      const buttonsRow = intro.nextElementSibling as HTMLElement;
+      await user.click(within(buttonsRow).getByRole('button', { name: 'Comté affiné' }));
+      await waitFor(() => {
+        expect(within(listRegion('Fresque')).getByText('Comté affiné')).toBeInTheDocument();
+      });
+      const rows = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        name: string;
+        product_id: string | null;
+      }[];
+      const created = rows.find((row) => row.name === 'Comté affiné');
+      expect(created?.product_id).not.toBeNull();
+    } finally {
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
+      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        name: string;
+      }[];
+      await Promise.all(
+        items.filter((item) => item.name === 'Comté affiné').map((item) => data.remove('shopping_list_items', item.id)),
+      );
+    }
   });
 
   it('modifie le rayon d’un article depuis la liste', async () => {

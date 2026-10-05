@@ -6,14 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
 import {
+  guessRayon,
   itemStateLabel,
+  matchCatalogue,
   quantityLabel,
   sectionsForList,
+  RAYONS,
   type Grouping,
   type ItemSuggestion,
   type ShoppingItem,
   type ShoppingListView,
 } from '../types';
+import type { ProductRow } from '@/types';
 
 /** Sur-titre de rayon : même traitement que `.section-kicker` de l'export. */
 const kickerClass = 'mb-1 mt-3 text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase';
@@ -22,9 +26,12 @@ export interface ShoppingGroupCardProps {
   list: ShoppingListView;
   grouping: Grouping;
   suggestions: ItemSuggestion[];
+  /** Catalogue du foyer pour la correspondance à la frappe. */
+  catalogue: ProductRow[];
   disabled?: boolean;
   onToggle: (item: ShoppingItem) => void;
-  onQuickAdd: (listId: string, name: string) => void;
+  onQuickAdd: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => void;
+  onQuickAddProduct: (listId: string, productId: string) => void;
   onDelete: (item: ShoppingItem) => void;
   onEdit: (item: ShoppingItem) => void;
   onDeleteList: (list: ShoppingListView) => void;
@@ -39,22 +46,46 @@ export function ShoppingGroupCard({
   list,
   grouping,
   suggestions,
+  catalogue,
   disabled = false,
   onToggle,
   onQuickAdd,
+  onQuickAddProduct,
   onDelete,
   onEdit,
   onDeleteList,
 }: ShoppingGroupCardProps) {
   const [draft, setDraft] = useState('');
+  const [match, setMatch] = useState<
+    | null
+    | { kind: 'products'; name: string; products: ProductRow[] }
+    | { kind: 'details'; name: string; quantity: string; rayon: (typeof RAYONS)[number] }
+  >(null);
   const sections = sectionsForList(list.items, grouping);
   const inputId = `quick-add-${list.id}`;
+
+  const resetMatch = () => {
+    setMatch(null);
+    setDraft('');
+  };
 
   const submitDraft = () => {
     const name = draft.trim();
     if (!name) return;
-    onQuickAdd(list.id, name);
-    setDraft('');
+    const hits = matchCatalogue(catalogue, name);
+    if (hits.length > 0) setMatch({ kind: 'products', name, products: hits });
+    else setMatch({ kind: 'details', name, quantity: '', rayon: guessRayon(name) });
+  };
+
+  const submitDetails = () => {
+    if (match?.kind !== 'details') return;
+    onQuickAdd(list.id, match.name, { quantity: match.quantity, rayon: match.rayon });
+    resetMatch();
+  };
+
+  const pickProduct = (productId: string) => {
+    onQuickAddProduct(list.id, productId);
+    resetMatch();
   };
 
   return (
@@ -109,6 +140,102 @@ export function ShoppingGroupCard({
             Ajouter
           </Button>
         </div>
+
+        {match?.kind === 'products' ? (
+          <div className="mt-2.5 grid gap-1.5 rounded-[11px] border border-border bg-bg p-2.5">
+            <p className="m-0 text-[11px] font-bold">
+              Produits du catalogue pour « {match.name} » — choisissez ou créez :
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {match.products.map((product) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => pickProduct(product.id)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-[11px] font-semibold transition-colors hover:border-accent hover:bg-accent-faint hover:text-accent-strong disabled:opacity-55"
+                >
+                  {product.photo_url ? (
+                    <img src={product.photo_url} alt="" aria-hidden="true" className="size-5 rounded-full object-cover" />
+                  ) : null}
+                  {product.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  setMatch({ kind: 'details', name: match.name, quantity: '', rayon: guessRayon(match.name) })
+                }
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 text-[11px] font-semibold text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-55"
+              >
+                Créer « {match.name} »
+              </button>
+              <button
+                type="button"
+                onClick={resetMatch}
+                className="inline-flex min-h-9 items-center px-2 text-[11px] font-bold text-muted hover:text-fg"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {match?.kind === 'details' ? (
+          <div className="mt-2.5 grid gap-2 rounded-[11px] border border-border bg-bg p-2.5">
+            <p className="m-0 text-[11px] font-bold">« {match.name} » n’est pas au catalogue — précisez :</p>
+            <div className="grid grid-cols-2 gap-2 max-[650px]:grid-cols-1">
+              <label className="grid gap-1 text-[11px] font-extrabold text-muted">
+                Rayon
+                <select
+                  value={match.rayon}
+                  disabled={disabled}
+                  onChange={(change) =>
+                    setMatch({ ...match, rayon: change.target.value as (typeof RAYONS)[number] })
+                  }
+                  className="min-h-9 rounded-[9px] border border-border bg-surface px-2 text-[12px] font-semibold text-fg"
+                >
+                  {RAYONS.map((rayon) => (
+                    <option key={rayon} value={rayon}>
+                      {rayon}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[11px] font-extrabold text-muted">
+                Quantité
+                <input
+                  value={match.quantity}
+                  disabled={disabled}
+                  inputMode="decimal"
+                  placeholder="Ex. 3"
+                  onChange={(change) => setMatch({ ...match, quantity: change.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      submitDetails();
+                    }
+                  }}
+                  className="min-h-9 rounded-[9px] border border-border bg-surface px-2 text-[12px] font-semibold text-fg"
+                />
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                icon="plus"
+                disabled={disabled}
+                onClick={submitDetails}
+                aria-label={`Confirmer l’ajout de ${match.name}`}
+              >
+                Ajouter
+              </Button>
+              <Button variant="secondary" onClick={resetMatch}>
+                Annuler
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {suggestions.length > 0 ? (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">

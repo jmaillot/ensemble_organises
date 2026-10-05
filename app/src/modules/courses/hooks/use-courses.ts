@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useToast } from '@/components/ui/toast';
 import { useResource } from '@/lib/data/useResource';
+import { data } from '@/lib/data';
 import { daysBetween, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import type { EventRow, ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 import {
@@ -26,6 +27,7 @@ import {
 import { cleanOffImageUrl } from '../off-client';
 import {
   NEW_LIST_OPTION,
+  guessRayon,
   normalizeRayon,
   toShoppingItem,
   toShoppingList,
@@ -53,7 +55,8 @@ export interface UseCoursesResult {
   isMutating: boolean;
   toggleItem: (item: ShoppingItem) => Promise<void>;
   addItem: (values: ItemFormValues) => Promise<void>;
-  addItemToList: (listId: string, name: string) => Promise<void>;
+  addItemToList: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => Promise<void>;
+  addCatalogProductToList: (listId: string, productId: string) => Promise<void>;
   /** Re-scan d'un EAN connu : produit Dexie → item (+1 si déjà présent, D-04). */
   addScannedToList: (listId: string, ean: string, addedBy?: string | null) => Promise<ScanResolution>;
   addList: (name: string) => Promise<ShoppingListRow | undefined>;
@@ -238,25 +241,60 @@ export function useCourses(): UseCoursesResult {
 
   /** Ajout au clavier : nom seul, rayon repris de l'historique quand il existe. */
   const addItemToList = useCallback(
-    async (listId: string, name: string) => {
+    async (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => {
       if (!householdId) return;
       const trimmed = name.trim();
       if (!trimmed) return;
       const known =
         history.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase()) ??
         productEntries.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase());
+      const rawQuantity =
+        options?.quantity != null && options.quantity.trim() !== '' ? Number(options.quantity) : null;
       await createShoppingItem({
         householdId,
         listId,
         name: trimmed,
-        quantity: null,
+        quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null,
         unit: null,
-        rayon: normalizeRayon(known?.rayon),
+        rayon: options?.rayon ? normalizeRayon(options.rayon) : (known ? normalizeRayon(known.rayon) : guessRayon(trimmed)),
         addedBy: currentMemberId || null,
       });
       await invalidate();
     },
     [currentMemberId, householdId, history, invalidate, productEntries],
+  );
+
+  /**
+   * Ajout d'un produit du catalogue : +1 (et décoché) s'il est déjà dans la
+   * liste (D-04), sinon création liée (`product_id`) avec son rayon.
+   */
+  const addCatalogProductToList = useCallback(
+    async (listId: string, productId: string) => {
+      if (!householdId) return;
+      const product = productResource.rows.find((row) => row.id === productId);
+      if (!product || product.household_id !== householdId) return;
+      const siblings = await data.list<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, { household_id: householdId, list_id: listId });
+      const current = siblings.find((item) => item.product_id === productId);
+      if (current) {
+        await data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, current.id, {
+          quantity: (current.quantity ?? 1) + 1,
+          checked: false,
+        });
+      } else {
+        await createShoppingItem({
+          householdId,
+          listId,
+          name: product.name,
+          quantity: null,
+          unit: null,
+          rayon: normalizeRayon(product.category),
+          addedBy: currentMemberId || null,
+          productId: product.id,
+        });
+      }
+      await invalidate();
+    },
+    [currentMemberId, householdId, invalidate, productResource.rows],
   );
 
   /**
@@ -369,6 +407,7 @@ export function useCourses(): UseCoursesResult {
     addItem,
     addItemToList,
     addScannedToList,
+    addCatalogProductToList,
     addList,
     renameList,
     removeItem,
