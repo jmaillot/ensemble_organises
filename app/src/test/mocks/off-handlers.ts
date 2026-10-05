@@ -50,4 +50,29 @@ export const offHandlers = [
       { status: 404 },
     );
   }),
+  http.get('https://world.openfoodfacts.org/api/v2/search', ({ request }) => {
+    const terms = new URL(request.url).searchParams.get('search_terms') ?? '';
+    if (/comt/i.test(terms)) {
+      return HttpResponse.json(
+        {
+          count: 1,
+          page: 1,
+          page_size: 5,
+          products: [
+            {
+              code: '3017620422003',
+              product_name_fr: 'Comté affiné',
+              brands: 'Fruitière',
+              image_front_url:
+                'https://images.openfoodfacts.org/images/products/301/762/042/2003/front_fr.jpg',
+              categories_tags: ['en:cheeses', 'fr:comtes'],
+              lang: 'fr',
+            },
+          ],
+        },
+        { status: 200 },
+      );
+    }
+    return HttpResponse.json({ count: 0, page: 1, page_size: 5, products: [] }, { status: 200 });
+  }),
 ];

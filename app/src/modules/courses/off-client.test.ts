@@ -6,6 +6,7 @@ import {
   fetchOffProduct,
   fetchOffResult,
   isQueryableEan,
+  searchOffProducts,
   OFF_TIMEOUT_MS,
   OFF_USER_AGENT,
 } from './off-client';
@@ -123,6 +124,27 @@ describe('fetchOffResult (WR-04)', () => {
       http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', () => HttpResponse.error()),
     );
     expect(await fetchOffResult(KNOWN_EAN, { timeoutMs: 1000 })).toEqual({ status: 'error' });
+  });
+});
+
+describe('searchOffProducts', () => {
+  it('mappe les résultats (nom FR, marque, photo, rayon)', async () => {
+    const hits = await searchOffProducts('comté affiné');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ name: 'Comté affiné', brand: 'Fruitière' });
+    expect(hits[0].imageUrl).toContain('images.openfoodfacts.org');
+  });
+
+  it('tableau vide sans résultat, erreur levée sur panne réseau', async () => {
+    await expect(searchOffProducts('xyzintrouvable')).resolves.toEqual([]);
+    server.use(
+      http.get('https://world.openfoodfacts.org/api/v2/search', () => HttpResponse.error()),
+    );
+    await expect(searchOffProducts('comté', { timeoutMs: 1000 })).rejects.toThrow();
+  });
+
+  it('n’interroge pas sous 2 caractères', async () => {
+    await expect(searchOffProducts('x')).resolves.toEqual([]);
   });
 });
 

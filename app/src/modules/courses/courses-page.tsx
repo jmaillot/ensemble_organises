@@ -65,6 +65,7 @@ export default function CoursesPage() {
   const [scanEan, setScanEan] = useState('');
   const [scanOff, setScanOff] = useState<OffProduct | null>(null);
   const [scanError, setScanError] = useState(false);
+  const [activeListId, setActiveListId] = useState<string | null>(null);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
 
@@ -81,7 +82,8 @@ export default function CoursesPage() {
   };
 
   const submitList = handleSubmit(async (values) => {
-    await addList(values.name);
+    const created = await addList(values.name);
+    if (created) setActiveListId(created.id);
     setListDialogOpen(false);
     toast(`Liste « ${values.name.trim()} » créée.`, 'success');
   });
@@ -229,21 +231,49 @@ export default function CoursesPage() {
           ) : null}
 
           {!isLoading && !isError && lists.length > 0 ? (
-            <div className="grid grid-cols-1 gap-[17px]">
-              {lists.map((list) => (
-                <ShoppingGroupCard
-                  key={list.id}
-                  list={list}
-                  grouping={grouping}
-                  suggestions={suggestionsFor(list.id)}
-                  disabled={isMutating}
-                  onToggle={handleToggle}
-                  onQuickAdd={handleQuickAdd}
-                  onDelete={setPendingItem}
-                  onDeleteList={setPendingList}
-                />
-              ))}
-            </div>
+            <>
+              {lists.length > 1 ? (
+                <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Listes de courses">
+                  {lists.map((list) => {
+                    const active = (activeListId ?? lists[0].id) === list.id;
+                    return (
+                      <button
+                        key={list.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setActiveListId(list.id)}
+                        className={
+                          active
+                            ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
+                            : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+                        }
+                      >
+                        {list.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {(() => {
+                const visible = lists.find((list) => list.id === activeListId) ?? lists[0];
+                return (
+                  <div className="grid grid-cols-1 gap-[17px]">
+                    <ShoppingGroupCard
+                      key={visible.id}
+                      list={visible}
+                      grouping={grouping}
+                      suggestions={suggestionsFor(visible.id)}
+                      disabled={isMutating}
+                      onToggle={handleToggle}
+                      onQuickAdd={handleQuickAdd}
+                      onDelete={setPendingItem}
+                      onDeleteList={setPendingList}
+                    />
+                  </div>
+                );
+              })()}
+            </>
           ) : null}
         </Panel>
 

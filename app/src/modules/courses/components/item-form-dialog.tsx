@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { RAYONS, NEW_LIST_OPTION, type ItemFormValues, type ShoppingListView } from '../types';
+import { offCategoriesToRayon } from '../off-rayon';
+import { searchOffProducts, type OffSearchHit } from '../off-client';
 
 /** Libellés du dialogue repris de l'export de design. */
 const ITEM_DIALOG_COPY = {
@@ -71,6 +73,7 @@ export function ItemFormDialog({
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ItemFormValues>({
     resolver: zodResolver(schema),
@@ -78,7 +81,40 @@ export function ItemFormDialog({
   });
 
   const listId = watch('listId');
+  const articleName = watch('name') ?? '';
   const wasOpen = useRef(false);
+
+  // Recherche Open Food Facts : un tap explicite (10 req/min côté recherche),
+  // jamais d'autocomplete. Remplit le rayon + montre la photo (affichage seul :
+  // les articles n'ont pas de photo persistée).
+  const [searchState, setSearchState] = useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'done'; hits: OffSearchHit[] }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+  const [searchPhoto, setSearchPhoto] = useState<{ url: string; label: string } | null>(null);
+
+  const runSearch = () => {
+    const terms = articleName.trim();
+    if (terms.length < 2 || searchState.status === 'loading') return;
+    setSearchState({ status: 'loading' });
+    setSearchPhoto(null);
+    void searchOffProducts(terms)
+      .then((hits) => setSearchState({ status: 'done', hits }))
+      .catch((searchError: unknown) =>
+        setSearchState({
+          status: 'error',
+          message: searchError instanceof Error ? searchError.message : 'Recherche impossible.',
+        }),
+      );
+  };
+
+  const pickHit = (hit: OffSearchHit) => {
+    setValue('rayon', offCategoriesToRayon(hit.categoriesTags), { shouldValidate: true });
+    setSearchPhoto(hit.imageUrl ? { url: hit.imageUrl, label: hit.name } : null);
+    setSearchState({ status: 'idle' });
+  };
 
   // Le formulaire n'est réinitialisé qu'à l'ouverture : une arrivée tardive des
   // listes ne doit jamais effacer une saisie en cours.
@@ -86,6 +122,8 @@ export function ItemFormDialog({
     if (open && !wasOpen.current) {
       wasOpen.current = true;
       reset(emptyValues(lists));
+      setSearchState({ status: 'idle' });
+      setSearchPhoto(null);
     }
     if (!open) wasOpen.current = false;
   }, [lists, open, reset]);
@@ -108,6 +146,56 @@ export function ItemFormDialog({
           <Field label="Article" error={errors.name?.message}>
             {(props) => <Input placeholder="Ex. Lait d’agne" {...props} {...register('name')} />}
           </Field>
+          <div>
+            <Button
+              variant="secondary"
+              onClick={runSearch}
+              disabled={searchState.status === 'loading' || articleName.trim().length < 2}
+            >
+              {searchState.status === 'loading' ? 'Recherche…' : 'Rechercher photo et rayon'}
+            </Button>
+            <p className="m-0 mt-1.5 text-[10px] text-muted">
+              Open Food Facts : remplit le rayon et montre la photo.
+            </p>
+          </div>
+          {searchState.status === 'error' ? (
+            <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+              {searchState.message} Réessayez ou remplissez manuellement.
+            </p>
+          ) : null}
+          {searchState.status === 'done' ? (
+            searchState.hits.length === 0 ? (
+              <p className="m-0 text-[11px] text-muted">Aucun résultat : nommez et rangez l’article manuellement.</p>
+            ) : (
+              <ul className="grid gap-2">
+                {searchState.hits.map((hit) => (
+                  <li key={`${hit.ean}-${hit.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => pickHit(hit)}
+                      className="flex w-full items-center gap-2.5 rounded-[11px] border border-border px-3 py-2.5 text-left transition-colors hover:border-accent"
+                    >
+                      {hit.imageUrl ? (
+                        <img src={hit.imageUrl} alt="" aria-hidden="true" className="size-9 shrink-0 rounded-[7px] object-cover" />
+                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <strong className="block truncate text-[13px]">{hit.name}</strong>
+                        {hit.brand ? <small className="text-[11px] text-muted">{hit.brand}</small> : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+          {searchPhoto ? (
+            <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
+              <img src={searchPhoto.url} alt={`Photo ${searchPhoto.label} (Open Food Facts)`} className="max-h-44 w-full object-cover" />
+              <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
+                Illustration Open Food Facts — affichée seulement, non enregistrée.
+              </figcaption>
+            </figure>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3 max-[650px]:grid-cols-1">
             <Field label="Quantité" optional error={errors.quantity?.message}>

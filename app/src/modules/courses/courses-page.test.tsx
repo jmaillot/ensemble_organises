@@ -7,6 +7,11 @@ import CoursesPage from './courses-page';
 /** Chaque liste est une `section` étiquetée par son nom. */
 const listRegion = (name: string) => screen.getByRole('region', { name });
 
+/** Les listes sont derrière des onglets : n'affiche que celle demandée. */
+async function selectList(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(await screen.findByRole('tab', { name }));
+}
+
 describe('Module Courses', () => {
   it('coche un article, le passe dans le panier et met à jour le compteur de la liste', async () => {
     const user = userEvent.setup();
@@ -32,6 +37,7 @@ describe('Module Courses', () => {
   it('ajoute un article au clavier depuis le champ d’ajout rapide', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
 
     const champ = await screen.findByLabelText('Ajouter un article à la liste Maison');
     await user.type(champ, 'Éponges');
@@ -72,6 +78,7 @@ describe('Module Courses', () => {
   it('regroupe les articles par rayon puis par ordre d’ajout', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
 
     const maison = await screen.findByRole('region', { name: 'Maison' });
     // Vue par défaut : les articles sont rangés sous un en-tête de rayon.
@@ -87,6 +94,7 @@ describe('Module Courses', () => {
   it('supprime un article après confirmation', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
 
     await user.click(await screen.findByRole('button', { name: 'Supprimer Savon liquide' }));
     const confirmation = await screen.findByRole('alertdialog');
@@ -110,5 +118,18 @@ describe('Module Courses', () => {
 
     expect(await screen.findByRole('region', { name: 'Weekend' })).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Weekend' })).getByText('Cette liste est vide : ajoutez le premier article.')).toBeInTheDocument();
+  });
+
+  it('n’affiche que la liste sélectionnée derrière les onglets', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+
+    // Par défaut : la première liste seule.
+    expect(await screen.findByRole('region', { name: 'Fresque' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Maison' })).not.toBeInTheDocument();
+
+    await selectList(user, 'Maison');
+    expect(await screen.findByRole('region', { name: 'Maison' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Fresque' })).not.toBeInTheDocument();
   });
 });

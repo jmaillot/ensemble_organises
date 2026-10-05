@@ -54,7 +54,7 @@ export interface UseCoursesResult {
   addItemToList: (listId: string, name: string) => Promise<void>;
   /** Re-scan d'un EAN connu : produit Dexie → item (+1 si déjà présent, D-04). */
   addScannedToList: (listId: string, ean: string, addedBy?: string | null) => Promise<ScanResolution>;
-  addList: (name: string) => Promise<void>;
+  addList: (name: string) => Promise<ShoppingListRow | undefined>;
   renameList: (id: string, name: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   removeList: (id: string) => Promise<void>;
@@ -282,9 +282,10 @@ export function useCourses(): UseCoursesResult {
 
   const addList = useCallback(
     async (name: string) => {
-      if (!householdId) return;
-      await createShoppingList({ householdId, name: name.trim(), createdBy: currentMemberId || null });
+      if (!householdId) return undefined;
+      const created = await createShoppingList({ householdId, name: name.trim(), createdBy: currentMemberId || null });
       await invalidate();
+      return created;
     },
     [currentMemberId, householdId, invalidate],
   );

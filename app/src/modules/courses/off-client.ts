@@ -78,6 +78,95 @@ export interface FetchOffOptions {
   userAgent?: string;
 }
 
+/** Résultat de recherche par nom : photo + rayon récupérables (WR-04 manuel). */
+export interface OffSearchHit {
+  ean: string;
+  name: string;
+  brand: string | null;
+  imageUrl: string | null;
+  categoriesTags: string[];
+  lang: string | null;
+}
+
+const offSearchSchema = z.object({
+  products: z
+    .array(
+      z.object({
+        code: z.string().optional(),
+        product_name: z.string().optional(),
+        product_name_fr: z.string().optional(),
+        brands: z.string().optional(),
+        image_front_url: z.string().optional(),
+        image_url: z.string().optional(),
+        categories_tags: z.array(z.string()).optional(),
+        lang: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+function searchUrl(query: string, limit: number): string {
+  const params = new URLSearchParams({
+    search_terms: query.trim(),
+    page_size: String(Math.min(Math.max(limit, 1), 10)),
+    fields: OFF_FIELDS,
+  });
+  return `${OFF_BASE_URL}/api/v2/search?${params.toString()}`;
+}
+
+interface OffSearchPayload {
+  code?: string;
+  product_name?: string;
+  product_name_fr?: string;
+  brands?: string;
+  image_front_url?: string;
+  image_url?: string;
+  categories_tags?: string[];
+  lang?: string;
+}
+
+function toSearchHit(payload: OffSearchPayload): OffSearchHit | null {
+  const name = (payload.product_name_fr ?? payload.product_name ?? '').trim();
+  if (name.length < 1 || name.length > 200) return null;
+  return {
+    ean: (payload.code ?? '').trim(),
+    name,
+    brand: (payload.brands ?? '').trim().slice(0, 200) || null,
+    imageUrl: cleanOffImageUrl(payload.image_front_url) ?? cleanOffImageUrl(payload.image_url),
+    categoriesTags: payload.categories_tags ?? [],
+    lang: payload.lang ?? null,
+  };
+}
+
+/**
+ * Recherche par nom (saisie manuelle) : un tap explicite, pas d'autocomplete
+ * (10 req/min côté recherche). Lève sur erreur réseau/timeout (le dialogue
+ * affiche « réessayer ») ; tableau vide = aucun résultat → création manuelle.
+ */
+export async function searchOffProducts(query: string, options: FetchOffOptions & { limit?: number } = {}): Promise<OffSearchHit[]> {
+  const terms = query.trim();
+  if (terms.length < 2) return [];
+  const timeoutMs = options.timeoutMs ?? OFF_TIMEOUT_MS;
+  const userAgent = options.userAgent ?? OFF_USER_AGENT;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(searchUrl(terms, options.limit ?? 5), {
+      headers: { 'X-User-Agent': userAgent },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Recherche impossible (${response.status}).`);
+    const parsed = offSearchSchema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) throw new Error('Réponse de recherche inattendue.');
+    return (parsed.data.products ?? [])
+      .map(toSearchHit)
+      .filter((hit): hit is OffSearchHit => hit !== null)
+      .slice(0, 5);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function offUrl(ean: string): string {
   return `${OFF_BASE_URL}/api/v2/product/${encodeURIComponent(ean)}.json?fields=${OFF_FIELDS}`;
 }
