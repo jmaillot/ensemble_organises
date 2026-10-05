@@ -207,9 +207,9 @@ describe('rankSearchHits', () => {
     ]);
   });
 
-  it('garde tout quand aucun résultat ne score (découverte préservée)', () => {
-    const hits = [hit('Nutella'), hit('Confiture de fraises')];
-    expect(rankSearchHits(hits, 'pâte à tartiner')).toHaveLength(2);
+  it('renvoie vide quand rien ne correspond (bruit écarté, création manuelle)', () => {
+    const hits = [hit('Eau minérale naturelle', 'sidi ali'), hit('Fromage Blanc Nature')];
+    expect(rankSearchHits(hits, 'snickers')).toEqual([]);
   });
 
   it('classe l’exact avant le partiel, insensible aux accents', () => {

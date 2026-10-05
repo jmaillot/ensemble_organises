@@ -232,10 +232,13 @@ function toOffProduct(ean: string, payload: z.infer<typeof offResponseSchema>): 
 
 /**
  * Pertinence d'un résultat face à la requête (OFF renvoie parfois du bruit :
- * « snickers » peut ramener de l'eau minérale). Score : nom contenant toute
- * la requête (3), tous les jetons utiles dans nom/marque (2), un jeton (1),
- * sinon 0. Les zéros sont écartés UNIQUEMENT si au moins un résultat score —
- * sinon on garde tout (ex. « pâte à tartiner » → Nutella, découverte préservée).
+ * « snickers » peut ramener de l'eau minérale, voire un catalogue non filtré
+ * — constaté en sondes live : `count` ~4,79 M, aucun nom/marque pertinent).
+ * Score : nom contenant toute la requête (3), tous les jetons utiles dans
+ * nom/marque (2), un jeton (1), sinon 0. Les zéros sont écartés ; si AUCUN
+ * résultat ne score, on renvoie vide (création manuelle via l'état vide du
+ * dialogue) plutôt que du bruit — afficher 5 produits sans rapport est pire
+ * qu'aucun.
  */
 export function rankSearchHits(hits: OffSearchHit[], query: string): OffSearchHit[] {
   const normalize = (value: string) =>
@@ -258,8 +261,9 @@ export function rankSearchHits(hits: OffSearchHit[], query: string): OffSearchHi
     return { hit, score };
   });
   const best = Math.max(0, ...scored.map((entry) => entry.score));
+  if (best === 0) return [];
   return scored
-    .filter((entry) => (best > 0 ? entry.score > 0 : true))
+    .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.hit);
 }
