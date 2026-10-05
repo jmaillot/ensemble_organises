@@ -8,11 +8,12 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useHouseholdStore } from '@/stores/household-store';
+import { useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import type { ProductRow } from '@/types';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile } from '@/lib/storage';
-import { createShoppingItem } from '../api';
+import { createShoppingItem, SHOPPING_ITEMS_TABLE, SHOPPING_LISTS_TABLE } from '../api';
 import { isQueryableEan, type OffProduct } from '../off-client';
 import { offCategoriesToRayon } from '../off-rayon';
 import * as productsApi from '../products-api';
@@ -45,6 +46,7 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
   const toast = useToast();
   const householdId = useHouseholdStore((state) => state.householdId);
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
+  const queryClient = useQueryClient();
 
   const suggestedRayon = offProduct ? offCategoriesToRayon(offProduct.categoriesTags) : 'Divers';
 
@@ -171,6 +173,13 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
         });
         toast(`« ${name} » ajouté à la liste`, 'success');
       }
+      // La résolution écrit via `data.*` hors hook : invalider ici, comme
+      // `useCourses`, sinon l'article n'apparaît qu'au rechargement.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [SHOPPING_LISTS_TABLE] }),
+        queryClient.invalidateQueries({ queryKey: [SHOPPING_ITEMS_TABLE] }),
+        queryClient.invalidateQueries({ queryKey: [productsApi.PRODUCTS_TABLE] }),
+      ]);
       onOpenChange(false);
     } catch (error) {
       // Refus serveur (RLS enfant, T-04-07) : l'erreur est relayée en toast.

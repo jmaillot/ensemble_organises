@@ -180,4 +180,23 @@ describe('fiche produit 1-tap', () => {
       expect(products[0].name).toBe('Miel artisanal');
     });
   });
+
+  it('1-tap via la vraie page : l’article apparaît en liste sans rechargement', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+
+    await screen.findByRole('region', { name: 'Fresque' });
+    await user.click(screen.getByRole('button', { name: /scanner/i }));
+    await user.type(screen.getByLabelText(/code-barres/i), KNOWN_EAN);
+    await user.click(screen.getByRole('button', { name: 'Utiliser ce code' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Nutella' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
+
+    await screen.findByText(/ajouté à la liste/);
+    // Régression 04-03 : la fiche écrivait via `data.*` hors hook sans
+    // invalider TanStack — l'article existait en Dexie mais restait invisible.
+    await screen.findByRole('checkbox', { name: 'Terminer Nutella' });
+  });
 });
