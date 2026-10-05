@@ -153,6 +153,10 @@ describe('CalendrierPage', () => {
     const alert = await screen.findByRole('alertdialog');
     await user.click(within(alert).getByRole('button', { name: 'Supprimer l’événement' }));
 
+    // Le 7 octobre (J+2 vu du 5 octobre) porte aussi l'anniversaire de Maya :
+    // on masque les anniversaires pour vérifier que la suppression a bien
+    // vidé la journée de ses événements.
+    await user.click(screen.getByRole('button', { name: 'Anniversaires' }));
     expect(await screen.findByText('Journée libre')).toBeInTheDocument();
     expect(screen.queryByText('Courses du samedi')).not.toBeInTheDocument();
   });

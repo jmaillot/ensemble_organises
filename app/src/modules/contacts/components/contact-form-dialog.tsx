@@ -66,6 +66,7 @@ export function ContactFormDialog({
   const name = watch('name') ?? '';
   const birthDateInput = watch('birthDate') ?? '';
   const photoUrl = watch('photoUrl') ?? '';
+  const listId = watch('listId') ?? '';
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +75,15 @@ export function ContactFormDialog({
     // L'identifiant de la fiche éditée identifie une ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, contact?.id]);
+
+  // La liste par défaut dépend des listes chargées en asynchrone : si le
+  // dialogue s'ouvre avant leur arrivée, la sélection est posée dès
+  // qu'elles sont là, sans jamais écraser un choix explicite.
+  useEffect(() => {
+    if (open && !contact && listId === '' && lists.length > 0) {
+      setValue('listId', lists[0].id);
+    }
+  }, [open, contact, listId, lists, setValue]);
 
   // Avertissement doublon probable (D-04) : non bloquant, la soumission
   // reste autorisée — les homonymes réels sont possibles.
