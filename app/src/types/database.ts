@@ -455,25 +455,6 @@ export interface GiftIdeaRow {
   updated_at: IsoDateTime;
 }
 
-export interface ContactListRow {
-  id: Uuid;
-  household_id: Uuid;
-  name: string;
-  owner_member_id: Uuid | null;
-  is_default: boolean;
-  created_at: IsoDateTime;
-}
-
-export interface ContactRow {
-  id: Uuid;
-  list_id: Uuid;
-  household_id: Uuid;
-  name: string;
-  birth_date: IsoDate | null;
-  photo_url: string | null;
-  linked_member_id: Uuid | null;
-}
-
 export interface BirthdayRow {
   id: Uuid;
   household_id: Uuid;
