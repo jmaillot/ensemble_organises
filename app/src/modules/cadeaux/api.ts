@@ -1,5 +1,5 @@
 import { data } from '@/lib/data';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
 import type { BirthdayRow, GiftItemRow, GiftListRow, GiftListShareRow } from '@/types';
 import { roundPrice, type GiftPermission, type GiftShareInput, type NewGiftItemInput, type NewGiftListInput } from './types';
@@ -126,4 +126,90 @@ export async function syncGiftListShares(
     kept.add(created.id);
   }
   await Promise.all(existing.filter((row) => !kept.has(row.id)).map((row) => data.remove('gift_list_shares', row.id)));
+}
+
+/* ------------------------------------------------------------------ */
+/* Partage par code (Edge Function `gift-list-invite`, user-only)       */
+/*                                                                     */
+/* OQ-1 OPTION A (plan 05-03, verrouillée) : aucun chemin anonyme. Le   */
+/* lien `/invitation/cadeau?code=…` mène vers inscription/connexion     */
+/* avec l'e-mail invité, puis l'échange active le partage via la        */
+/* branche e-mail de `redeem_gift_list_invite`.                        */
+/* ------------------------------------------------------------------ */
+
+/** Lien à envoyer à l'externe : affiché une seule fois avec le code (QR). */
+export function giftInviteLink(code: string): string {
+  return `/invitation/cadeau?code=${encodeURIComponent(code)}`;
+}
+
+async function callGiftInvite<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
+  const { data: authData } = await supabase!.auth.getSession();
+  const session = authData.session;
+  const response = await fetch(`${supabaseFunctionsBase}/gift-list-invite`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
+    },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error((detail as { error?: string } | null)?.error ?? 'Partage impossible.');
+  }
+  return (await response.json()) as T;
+}
+
+export interface GiftListInviteCode {
+  code: string;
+  expiresAt: string | null;
+  maxUses: number;
+  listId: string;
+}
+
+export interface GiftListInviteSummary {
+  listId: string;
+  isActive: boolean;
+  hasCode: boolean;
+  expiresAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+}
+
+/** Génère (ou régénère, invalidant le précédent) le code d'une liste. */
+export async function createGiftListInviteCode(
+  listId: string,
+  options?: { expiresAt?: string; maxUses?: number },
+): Promise<GiftListInviteCode> {
+  return callGiftInvite<GiftListInviteCode>('create', {
+    listId,
+    ...(options?.expiresAt ? { expiresAt: options.expiresAt } : {}),
+    ...(options?.maxUses ? { maxUses: options.maxUses } : {}),
+  });
+}
+
+/** Arrête le partage : tous les codes actifs de la liste sont révoqués. */
+export async function revokeGiftListInviteCode(listId: string): Promise<void> {
+  await callGiftInvite('revoke', { listId });
+}
+
+export async function fetchGiftListInviteSummary(listId: string): Promise<GiftListInviteSummary | null> {
+  if (!isSupabaseConfigured) return null;
+  return callGiftInvite<GiftListInviteSummary | null>('summary', { listId });
+}
+
+/**
+ * Échange un code contre un partage `reservation` (idempotent).
+ * Membre du foyer : e-mail inutile. Externe (OPTION A) : passer l'e-mail de
+ * son compte — créé avec l'e-mail invité — pour activer son partage.
+ */
+export async function redeemGiftListInvite(code: string, email?: string): Promise<{ list_id: string; already_shared: boolean }> {
+  const trimmed = code.trim();
+  if (trimmed.length < 22) throw new Error('Un code fait au moins 22 caractères.');
+  return callGiftInvite('redeem', {
+    code: trimmed,
+    ...(email?.trim() ? { email: email.trim() } : {}),
+  });
 }
