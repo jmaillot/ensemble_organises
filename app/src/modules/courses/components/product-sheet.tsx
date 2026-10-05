@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +8,10 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useHouseholdStore } from '@/stores/household-store';
+import { data } from '@/lib/data';
+import type { ProductRow } from '@/types';
+import { compressImage } from '@/modules/cercle/lib/media';
+import { depositHouseholdFile } from '@/lib/storage';
 import { createShoppingItem } from '../api';
 import { isQueryableEan, type OffProduct } from '../off-client';
 import { offCategoriesToRayon } from '../off-rayon';
@@ -56,11 +60,52 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
 
   // La fiche est pré-remplie à chaque ouverture : un scan tardif ne doit
   // jamais écraser une saisie en cours, ni un EAN précédent survivre.
+  // La photo suit le même cycle : vidée à chaque ouverture (D-05).
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   useEffect(() => {
-    if (open) reset({ name: offProduct?.name ?? '', rayon: suggestedRayon });
+    if (open) {
+      reset({ name: offProduct?.name ?? '', rayon: suggestedRayon });
+      setPhotoFile(null);
+      setPhotoError(null);
+      setPhotoPreview((previous) => {
+        if (previous && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(previous);
+        return null;
+      });
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
     // `suggestedRayon` dérive de `offProduct` : le watcher porte sur la source.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, offProduct, reset]);
+
+  /** Sélection photo (D-05) : seules les images partent vers le bucket privé. */
+  const onPhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPhotoError(null);
+    setPhotoPreview((previous) => {
+      if (previous && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(previous);
+      return null;
+    });
+    if (!file) {
+      setPhotoFile(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setPhotoFile(null);
+      setPhotoError('Sélectionnez une image (JPEG, PNG ou WebP).');
+      return;
+    }
+    setPhotoFile(file);
+    // jsdom expose un `createObjectURL` qui lève : l'aperçu est un confort,
+    // jamais un prérequis à l'upload.
+    try {
+      setPhotoPreview(URL.createObjectURL(file));
+    } catch {
+      setPhotoPreview(null);
+    }
+  };
 
   /** Un EAN interrogeable persiste en produit du foyer, sinon article simple. */
   const canPersistProduct = isQueryableEan(ean);
@@ -74,6 +119,18 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
     const rayon = normalizeRayon(values.rayon);
     try {
       if (canPersistProduct) {
+        // D-05 : la photo locale est compressée (WebP/JPEG) puis déposée en
+        // bucket privé AVANT la résolution, pour qu'un échec d'upload ne
+        // laisse jamais un produit créé sans sa photo. L'URL signée 30 jours
+        // est persistée en `photo_url` ; l'image OFF reste un repli
+        // d'affichage jamais persisté (T-04-06).
+        let photoUrl: string | null = null;
+        if (photoFile) {
+          const compressed = await compressImage(photoFile);
+          const uploadable = new File([compressed.blob], compressed.name, { type: compressed.mime });
+          const deposited = await depositHouseholdFile({ householdId, folder: 'products', file: uploadable });
+          photoUrl = deposited.url;
+        }
         const resolution = await productsApi.resolveScannedProduct(
           offProduct
             ? {
@@ -95,6 +152,11 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
                 addedBy: currentMemberId,
               },
         );
+        if (photoUrl) {
+          await data.update<ProductRow>(productsApi.PRODUCTS_TABLE, resolution.product.id, {
+            photo_url: photoUrl,
+          });
+        }
         toast(productsApi.scanAddedToast(resolution.product.name, resolution.incremented), 'success');
       } else {
         // Code non interrogeable (T-04-05) : pas d'appel OFF, article simple.
@@ -129,7 +191,14 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
           </DialogDescription>
         </DialogHeader>
 
-        {offProduct?.imageUrl ? (
+        {photoPreview ? (
+          <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
+            <img src={photoPreview} alt="Aperçu de la photo du produit" className="max-h-44 w-full object-cover" />
+            <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
+              Photo locale — enregistrée avec le produit.
+            </figcaption>
+          </figure>
+        ) : offProduct?.imageUrl ? (
           <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
             <img src={offProduct.imageUrl} alt={`Photo ${offProduct.name} (Open Food Facts)`} className="max-h-44 w-full object-cover" />
             <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
@@ -156,6 +225,23 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, listId }: Pr
                   </option>
                 ))}
               </Select>
+            )}
+          </Field>
+
+          <Field
+            label="Photo"
+            hint="Optionnelle : la photo locale est prioritaire sur Open Food Facts."
+            error={photoError ?? undefined}
+            optional
+          >
+            {(props) => (
+              <Input
+                {...props}
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={onPhotoChange}
+              />
             )}
           </Field>
 
