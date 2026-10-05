@@ -475,6 +475,39 @@ export interface BirthdayRow {
   birth_date: IsoDate;
   photo_url: string | null;
   linked_member_id: Uuid | null;
+  /**
+   * Miroir d'un contact (migration 0078) : NULL pour les anniversaires saisis
+   * à la main, sinon l'identifiant du contact source. Suppression en cascade.
+   */
+  contact_id: string | null;
+}
+
+/**
+ * Liste de contacts du foyer (migration 0077). `owner_member_id` NULL =
+ * liste partagée « Famille », sinon liste personnelle du membre.
+ */
+export interface ContactListRow {
+  id: string;
+  household_id: Uuid;
+  name: string;
+  owner_member_id: string | null;
+  is_default: boolean;
+  created_at: IsoDateTime;
+}
+
+/**
+ * Contact d'une liste (migration 0077). `household_id` est dénormalisé
+ * (aligné par trigger sur la liste parente) ; `birth_date` NULL = fiche
+ * sans date, donc sans miroir anniversaire.
+ */
+export interface ContactRow {
+  id: string;
+  list_id: string;
+  household_id: Uuid;
+  name: string;
+  birth_date: IsoDate | null;
+  photo_url: string | null;
+  linked_member_id: string | null;
 }
 
 export interface PetRow {

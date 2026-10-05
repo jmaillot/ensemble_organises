@@ -22,6 +22,7 @@ const birthdaySchema = z.object({
     .string()
     .trim()
     .refine((value) => value === '' || /^(\/|https?:\/\/)/.test(value), 'Indiquez une adresse de photo valide.'),
+  createContact: z.boolean(),
 });
 
 const defaultValues = (birthday: Birthday | null): BirthdayFormValues =>
@@ -31,8 +32,9 @@ const defaultValues = (birthday: Birthday | null): BirthdayFormValues =>
         birthDate: formatFrDate(birthday.birthDate),
         linkedMemberId: birthday.linkedMemberId ?? '',
         photoUrl: birthday.photoUrl ?? '',
+        createContact: false,
       }
-    : { name: '', birthDate: '', linkedMemberId: '', photoUrl: '' };
+    : { name: '', birthDate: '', linkedMemberId: '', photoUrl: '', createContact: true };
 
 export interface BirthdayFormDialogProps {
   open: boolean;
@@ -129,6 +131,18 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
               alt="Aperçu de la photo"
               className="h-24 w-full rounded-[11px] border border-border object-cover"
             />
+          ) : null}
+
+          {!birthday ? (
+            <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-[11px] border border-border bg-bg px-3.5 py-3 text-xs text-fg">
+              <input type="checkbox" {...register('createContact')} className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent-strong)]" />
+              <span>
+                <strong className="font-extrabold">Créer aussi un contact</strong>
+                <span className="block text-[11px] text-muted">
+                  La fiche rejoint la liste Famille, sans doublon d’anniversaire.
+                </span>
+              </span>
+            </label>
           ) : null}
 
           <DialogActions>

@@ -32,6 +32,7 @@ const ArdoisePage = lazy(() => import('@/modules/ardoise/ardoise-page'));
 const ArdoiseDetailPage = lazy(() => import('@/modules/ardoise/ardoise-detail-page'));
 const CadeauxPage = lazy(() => import('@/modules/cadeaux/cadeaux-page'));
 const AnniversairesPage = lazy(() => import('@/modules/anniversaires/anniversaires-page'));
+const ContactsPage = lazy(() => import('@/modules/contacts/contacts-page'));
 const AnimauxPage = lazy(() => import('@/modules/animaux/animaux-page'));
 const PrestatairesPage = lazy(() => import('@/modules/prestataires/prestataires-page'));
 const FidelitePage = lazy(() => import('@/modules/fidelite/fidelite-page'));
@@ -374,6 +375,14 @@ export function AppRoutes() {
           element={
             <Suspense fallback={<RouteFallback />}>
               <AnniversairesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/contacts"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <ContactsPage />
             </Suspense>
           }
         />

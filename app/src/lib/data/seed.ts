@@ -4,6 +4,8 @@ import type {
   ArdoiseMemberRow,
   ArdoiseRow,
   BirthdayRow,
+  ContactListRow,
+  ContactRow,
   ConversationMemberRow,
   ConversationRow,
   DashboardWidgetRow,
@@ -540,10 +542,30 @@ export const demoGiftShares: GiftListShareRow[] = [
 ];
 
 export const demoBirthdays: BirthdayRow[] = [
-  { id: 'birthday-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Maya Martin', birth_date: '1992-10-07', photo_url: null, linked_member_id: null },
-  { id: 'birthday-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Paul Durand', birth_date: '1988-10-19', photo_url: null, linked_member_id: null },
-  { id: 'birthday-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Nina Leroy', birth_date: '1990-11-03', photo_url: null, linked_member_id: null },
-  { id: 'birthday-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Noé Martin', birth_date: '2016-09-29', photo_url: null, linked_member_id: DEMO_MEMBERS.noe },
+  { id: 'birthday-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Maya Martin', birth_date: '1992-10-07', photo_url: null, linked_member_id: null, contact_id: null },
+  { id: 'birthday-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Paul Durand', birth_date: '1988-10-19', photo_url: null, linked_member_id: null, contact_id: null },
+  { id: 'birthday-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Nina Leroy', birth_date: '1990-11-03', photo_url: null, linked_member_id: null, contact_id: null },
+  { id: 'birthday-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Noé Martin', birth_date: '2016-09-29', photo_url: null, linked_member_id: DEMO_MEMBERS.noe, contact_id: 'contact-noe' },
+];
+
+/**
+ * Listes de contacts de démonstration (migrations 0077/0078) : la liste
+ * partagée « Famille » et la liste personnelle de Camille, avec des fiches
+ * pré-remplies. `contact-noe` est la source du miroir `birthday-4` (paire
+ * miroir : une seule ligne en vue agrégée) ; Maya et Paul existent des deux
+ * côtés sans lien (homonymes indépendants : badge deux-sources).
+ */
+export const demoContactLists: ContactListRow[] = [
+  { id: 'contact-list-famille', household_id: DEMO_HOUSEHOLD_ID, name: 'Famille', owner_member_id: null, is_default: true, created_at: now() },
+  { id: 'contact-list-camille', household_id: DEMO_HOUSEHOLD_ID, name: 'Camille', owner_member_id: DEMO_MEMBERS.camille, is_default: true, created_at: now() },
+];
+
+export const demoContacts: ContactRow[] = [
+  { id: 'contact-camille', list_id: 'contact-list-camille', household_id: DEMO_HOUSEHOLD_ID, name: 'Camille Martin', birth_date: null, photo_url: null, linked_member_id: DEMO_MEMBERS.camille },
+  { id: 'contact-maya', list_id: 'contact-list-famille', household_id: DEMO_HOUSEHOLD_ID, name: 'Maya Martin', birth_date: '1992-10-07', photo_url: null, linked_member_id: null },
+  { id: 'contact-paul', list_id: 'contact-list-famille', household_id: DEMO_HOUSEHOLD_ID, name: 'Paul Durand', birth_date: '1988-10-19', photo_url: null, linked_member_id: null },
+  { id: 'contact-noe', list_id: 'contact-list-famille', household_id: DEMO_HOUSEHOLD_ID, name: 'Noé Martin', birth_date: '2016-09-29', photo_url: null, linked_member_id: DEMO_MEMBERS.noe },
+  { id: 'contact-lea', list_id: 'contact-list-famille', household_id: DEMO_HOUSEHOLD_ID, name: 'Léa Moreau', birth_date: '1995-03-14', photo_url: null, linked_member_id: null },
 ];
 
 export const demoPets: PetRow[] = [
@@ -909,6 +931,8 @@ const seedTables: Record<string, Row[]> = {
   gift_items: demoGiftItems as unknown as Row[],
   gift_list_shares: demoGiftShares as unknown as Row[],
   birthdays: demoBirthdays as unknown as Row[],
+  contact_lists: demoContactLists as unknown as Row[],
+  contacts: demoContacts as unknown as Row[],
   pets: demoPets as unknown as Row[],
   pet_records: demoPetRecords as unknown as Row[],
   provider_types: demoProviderTypes as unknown as Row[],

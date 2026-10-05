@@ -234,14 +234,14 @@ test.describe('Mises en page', () => {
     }
   });
 
-  test('le tiroir mobile expose les dix-sept espaces, filtre et se referme', async ({ page }) => {
+  test('le tiroir mobile expose les dix-huit espaces, filtre et se referme', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'le tiroir n’existe que sous 650 px');
 
     await openDemoSession(page);
     await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(17);
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(18);
 
     await page.getByRole('searchbox', { name: 'Rechercher un espace' }).fill('courses');
     await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(1);

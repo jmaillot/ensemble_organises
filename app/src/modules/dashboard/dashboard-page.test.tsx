@@ -80,14 +80,15 @@ describe('Accueil — rendu', () => {
     expect(within(evenements).queryByText(/À 19:30/)).not.toBeInTheDocument();
   });
 
-  it('propose les seize espaces du foyer dans la grille', async () => {
+  it('propose les dix-sept espaces du foyer dans la grille', async () => {
     renderWithProviders(<DashboardPage />);
     expect(await screen.findByRole('button', { name: /Courses/ })).toBeInTheDocument();
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
     expect(within(grid).getByRole('button', { name: /Courses/ })).toBeInTheDocument();
     expect(within(grid).getByRole('button', { name: /Ardoise/ })).toBeInTheDocument();
     expect(within(grid).getByRole('button', { name: /Fidélité/ })).toBeInTheDocument();
-    expect(within(grid).getAllByRole('button')).toHaveLength(16);
+    expect(within(grid).getByRole('button', { name: /Contacts/ })).toBeInTheDocument();
+    expect(within(grid).getAllByRole('button')).toHaveLength(17);
   });
 
   it('ouvre le mode personnalisation et permet de masquer un widget', async () => {

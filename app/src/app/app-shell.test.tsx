@@ -45,8 +45,8 @@ describe('AppShell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     // L'en-tête porte le nom de l'application, pas un « Menu » générique.
     expect(within(dialog).getByText('Ensemble & Organisés')).toBeInTheDocument();
-    // Maison + seize modules, chacun joignable en un tap.
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(17);
+    // Maison + dix-sept modules, chacun joignable en un tap.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(18);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Courses' })).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe('AppShell', () => {
  * garantie qu'aucun espace du foyer ne devienne inatteignable.
  */
 describe('AppShell — catalogue des espaces', () => {
-  it('expose un bouton pour chacune des seize catégories', () => {
+  it('expose un bouton pour chacune des dix-sept catégories', () => {
     renderShell('/accueil');
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
     const links = within(grid).getAllByRole('link');
@@ -125,7 +125,7 @@ describe('AppShell — catalogue des espaces', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(17);
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(18);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Anniversaires' })).toBeInTheDocument();
   });
 
