@@ -19,6 +19,8 @@
  *
  * CONTRAT DE RÉPONSE
  *   search -> { hits: [{ ean, name, brand, imageUrl, categoriesTags, lang }] }
+ *   (hits triés par pertinence, vide si aucun pertinent : OFF renvoie parfois
+ *   un catalogue non filtré, que le proxy ne met plus en cache tel quel)
  *   erreurs -> { error } (400 validation, 429 quota, 502 OFF injoignable)
  */
 
@@ -99,6 +101,42 @@ function cleanImageUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   if (!value.startsWith('https://')) return null;
   return OFF_IMAGE_HOST.test(value) ? value : null;
+}
+
+/**
+ * Pertinence face à la requête, miroir de `rankSearchHits` (off-client.ts) :
+ * OFF renvoie parfois un catalogue non filtré (sondes live : `count` ~4,79 M,
+ * aucun nom/marque pertinent pour « snickers »). Score nom/marque exact (3),
+ * tous jetons (2), un jeton (1), sinon 0 ; aucun pertinent → vide (le dialogue
+ * affiche sa création manuelle) plutôt que du bruit mis en cache 1 h.
+ */
+function normalizeHitText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function rankHits(hits: OffHit[], query: string): OffHit[] {
+  const full = normalizeHitText(query);
+  const tokens = full.split(/[^a-z0-9]+/).filter((token) => token.length >= 3);
+  const scored = hits.map((hit) => {
+    const name = normalizeHitText(hit.name);
+    const brand = normalizeHitText(hit.brand ?? '');
+    let score = 0;
+    if (full.length > 0 && name.includes(full)) score = 3;
+    else if (tokens.length > 0 && tokens.every((token) => name.includes(token) || brand.includes(token))) score = 2;
+    else if (tokens.some((token) => name.includes(token) || brand.includes(token))) score = 1;
+    return { hit, score };
+  });
+  if (!scored.some((entry) => entry.score > 0)) return [];
+  return scored
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.hit);
 }
 
 function toHit(raw: Record<string, unknown>): OffHit | null {
@@ -201,12 +239,13 @@ Deno.serve(
           .map((item) => (item && typeof item === 'object' ? toHit(item as Record<string, unknown>) : null))
           .filter((hit): hit is OffHit => hit !== null)
           .slice(0, limit);
+        const ranked = rankHits(hits, terms);
         if (cache.size >= CACHE_MAX) {
           const oldest = cache.keys().next();
           if (!oldest.done) cache.delete(oldest.value);
         }
-        cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, hits });
-        return json({ hits });
+        cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, hits: ranked });
+        return json({ hits: ranked });
       }
       if (overloaded) {
         return json({ error: 'Trop de recherches rapprochées ou Open Food Facts surchargé : patientez une minute.' }, 429);
