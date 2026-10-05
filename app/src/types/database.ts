@@ -422,6 +422,12 @@ export interface GiftItemRow {
   url: string | null;
   reserved_by: Uuid | null;
   purchased: boolean;
+  /**
+   * Idée d'origine (migration 0076, D-04) : nullable, ON DELETE SET NULL.
+   * Renseigne la promotion idée→article ; la propagation « offert » (D-06)
+   * est un trigger serveur, jamais un calcul client.
+   */
+  idea_id: string | null;
   created_at: IsoDateTime;
 }
 
