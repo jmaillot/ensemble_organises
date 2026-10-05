@@ -131,7 +131,7 @@ describe('resolveScannedProduct', () => {
     expect(second.product.id).toBe(first.product.id);
     const items = await itemsOf(list.id);
     expect(items).toHaveLength(1);
-    expect(items[0].quantity).toBe((first.item.quantity ?? 0) + 1);
+    expect(items[0].quantity).toBe(2);
   });
 
   it('re-scan d\'un article coche : decoche + quantite +1', async () => {
@@ -148,7 +148,7 @@ describe('resolveScannedProduct', () => {
     const second = await resolveScannedProduct(input);
     expect(second.incremented).toBe(true);
     expect(second.item.checked).toBe(false);
-    expect(second.item.quantity).toBe((first.item.quantity ?? 0) + 1);
+    expect(second.item.quantity).toBe(2);
     expect(await itemsOf(list.id)).toHaveLength(1);
   });
 });

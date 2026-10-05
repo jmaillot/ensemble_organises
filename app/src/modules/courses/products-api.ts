@@ -1,7 +1,7 @@
 import { data, DataError } from '@/lib/data';
 import type { ProductRow, ShoppingListItemRow } from '@/types';
 import { createShoppingItem, SHOPPING_ITEMS_TABLE } from './api';
-import { type OffProduct } from './off-client';
+import { type OffProduct, cleanOffImageUrl } from './off-client';
 import { normalizeRayon } from './types';
 
 /**
@@ -21,6 +21,8 @@ export interface FindProductInput {
   name: string;
   brand?: string | null;
   category?: string | null;
+  /** Photo locale déjà déposée : écrite en UNE fois à la création (CR-05). */
+  photoUrl?: string | null;
   offData?: Record<string, unknown>;
   createdBy?: string | null;
 }
@@ -44,7 +46,7 @@ function productPayload(input: FindProductInput) {
     name: input.name.trim(),
     brand: input.brand?.trim().slice(0, 200) || null,
     category: normalizeRayon(input.category),
-    photo_url: null,
+    photo_url: input.photoUrl ?? null,
     off_data: input.offData ?? {},
     created_by: input.createdBy ?? null,
   };
@@ -93,14 +95,17 @@ export async function findProductByEan(householdId: string, ean: string): Promis
 /** Reconstruit un enrichissement OFF depuis une ligne produit connue. */
 export function offProductFromRow(row: ProductRow): OffProduct {
   const offData = row.off_data ?? {};
-  const imageUrl = typeof offData.image_url === 'string' ? offData.image_url : null;
+  const imageUrl = cleanOffImageUrl(offData.image_url);
   const lang = typeof offData.lang === 'string' ? offData.lang : null;
+  const tags = Array.isArray(offData.categories_tags)
+    ? offData.categories_tags.filter((tag): tag is string => typeof tag === 'string')
+    : [];
   return {
     ean: row.ean,
     name: row.name,
     brand: row.brand,
     imageUrl,
-    categoriesTags: [],
+    categoriesTags: tags,
     lang,
   };
 }
@@ -121,6 +126,7 @@ export function productInputFromOff(
       code: off.ean,
       brands: off.brand,
       image_url: off.imageUrl,
+      categories_tags: off.categoriesTags.filter((tag) => tag.length <= 200).slice(0, 20),
       lang: off.lang,
       fetched_at: new Date().toISOString(),
     },
@@ -142,8 +148,9 @@ export async function resolveScannedProduct(input: ResolveScanInput): Promise<Sc
   });
   const current = siblings[0];
   if (current) {
+    // `null` vaut implicitement une unité : la base du +1 est donc 1 (CR-03).
     const item = await data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, current.id, {
-      quantity: (current.quantity ?? 0) + 1,
+      quantity: (current.quantity ?? 1) + 1,
       checked: false,
     });
     return { product, item, incremented: true };

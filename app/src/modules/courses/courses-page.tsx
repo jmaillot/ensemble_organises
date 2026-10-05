@@ -18,7 +18,7 @@ import { ItemFormDialog } from './components/item-form-dialog';
 import { ScanDialog } from './components/scan-dialog';
 import { ProductSheet } from './components/product-sheet';
 import { ShoppingGroupCard } from './components/shopping-group-card';
-import { fetchOffProduct, isQueryableEan, type OffProduct } from './off-client';
+import { fetchOffResult, isQueryableEan, type OffProduct } from './off-client';
 import { findProductByEan, offProductFromRow } from './products-api';
 import type { Grouping, ItemFormValues, ShoppingItem, ShoppingListView } from './types';
 
@@ -64,6 +64,7 @@ export default function CoursesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scanEan, setScanEan] = useState('');
   const [scanOff, setScanOff] = useState<OffProduct | null>(null);
+  const [scanError, setScanError] = useState(false);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
 
@@ -124,22 +125,33 @@ export default function CoursesPage() {
       return;
     }
     setScanEan(code);
-    void (async () => {
-      try {
-        const known = await findProductByEan(householdId, code);
-        if (known) {
-          setScanOff(offProductFromRow(known));
-        } else if (!isQueryableEan(code)) {
-          setScanOff(null);
-        } else {
-          setScanOff(await fetchOffProduct(code));
-        }
-      } catch {
+    setScanError(false);
+    void resolveOff(code);
+  };
+
+  /** Enrichissement isolé pour le bouton Réessayer de la fiche (WR-04). */
+  const resolveOff = async (code: string) => {
+    if (!householdId) return;
+    try {
+      const known = await findProductByEan(householdId, code);
+      if (known) {
+        setScanOff(offProductFromRow(known));
+      } else if (!isQueryableEan(code)) {
         setScanOff(null);
-      } finally {
-        setSheetOpen(true);
+      } else {
+        const result = await fetchOffResult(code);
+        if (result.status === 'found') setScanOff(result.product);
+        else {
+          setScanOff(null);
+          setScanError(result.status === 'error');
+        }
       }
-    })();
+    } catch {
+      setScanOff(null);
+      setScanError(true);
+    } finally {
+      setSheetOpen(true);
+    }
   };
 
   return (
@@ -310,7 +322,9 @@ export default function CoursesPage() {
           onOpenChange={setSheetOpen}
           offProduct={scanOff}
           ean={scanEan}
-          listId={lists[0].id}
+          lists={lists.map((list) => ({ id: list.id, name: list.name }))}
+          offError={scanError}
+          onRetry={() => void resolveOff(scanEan)}
         />
       ) : null}
 

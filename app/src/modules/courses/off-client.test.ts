@@ -2,7 +2,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import {
+  cleanOffImageUrl,
   fetchOffProduct,
+  fetchOffResult,
   isQueryableEan,
   OFF_TIMEOUT_MS,
   OFF_USER_AGENT,
@@ -93,6 +95,34 @@ describe('fetchOffProduct', () => {
 
   it('le delai par defaut vaut 8 s', () => {
     expect(OFF_TIMEOUT_MS).toBe(8000);
+  });
+});
+
+describe('cleanOffImageUrl (CR-01)', () => {
+  it("accepte l'hote officiel en https", () => {
+    expect(
+      cleanOffImageUrl('https://images.openfoodfacts.org/images/products/301/762/042/2003/front_fr.jpg'),
+    ).toContain('images.openfoodfacts.org');
+  });
+
+  it('rejette hote tiers, http, data: et valeurs non-texte', () => {
+    expect(cleanOffImageUrl('https://evil.example/p.jpg')).toBeNull();
+    expect(cleanOffImageUrl('http://images.openfoodfacts.org/p.jpg')).toBeNull();
+    expect(cleanOffImageUrl('data:image/svg+xml,<svg/>')).toBeNull();
+    expect(cleanOffImageUrl('javascript:alert(1)')).toBeNull();
+    expect(cleanOffImageUrl(null)).toBeNull();
+    expect(cleanOffImageUrl(42)).toBeNull();
+  });
+});
+
+describe('fetchOffResult (WR-04)', () => {
+  it('found / unknown / error sont distincts', async () => {
+    expect(await fetchOffResult(KNOWN_EAN)).toMatchObject({ status: 'found' });
+    expect(await fetchOffResult(UNKNOWN_EAN)).toEqual({ status: 'unknown' });
+    server.use(
+      http.get('https://world.openfoodfacts.org/api/v2/product/:ean.json', () => HttpResponse.error()),
+    );
+    expect(await fetchOffResult(KNOWN_EAN, { timeoutMs: 1000 })).toEqual({ status: 'error' });
   });
 });
 

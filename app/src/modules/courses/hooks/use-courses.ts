@@ -21,6 +21,7 @@ import {
   scanAddedToast,
   type ScanResolution,
 } from '../products-api';
+import { cleanOffImageUrl } from '../off-client';
 import {
   NEW_LIST_OPTION,
   normalizeRayon,
@@ -141,7 +142,7 @@ export function useCourses(): UseCoursesResult {
         .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
         .map((row) => {
           const offData = row.off_data ?? {};
-          const fallback = typeof offData.image_url === 'string' ? offData.image_url : null;
+          const fallback = cleanOffImageUrl(offData.image_url);
           return {
             name: row.name.trim(),
             rayon: normalizeRayon(row.category),

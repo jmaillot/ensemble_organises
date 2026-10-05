@@ -118,10 +118,11 @@ describe('addScannedToList re-scan +1 (D-04)', () => {
       expect(first.incremented).toBe(false);
       firstQuantity = first.item.quantity;
     });
+    expect(firstQuantity).toBeNull();
     await act(async () => {
       const second = await result.current.addScannedToList(list.id, '8002270014901');
       expect(second.incremented).toBe(true);
-      expect(second.item.quantity).toBe((firstQuantity ?? 0) + 1);
+      expect(second.item.quantity).toBe(2);
     });
 
     const items = await data.list<ShoppingListItemRow>('shopping_list_items', { list_id: list.id });

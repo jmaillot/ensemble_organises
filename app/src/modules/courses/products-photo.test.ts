@@ -33,6 +33,7 @@ vi.mock('@/modules/cercle/lib/media', () => ({
 
 vi.mock('@/lib/storage', () => ({
   depositHouseholdFile: vi.fn(),
+  removeHouseholdFile: vi.fn(),
   HOUSEHOLD_MEDIA_BUCKET: 'household-media',
 }));
 
@@ -73,7 +74,7 @@ function renderSheet(listId: string, offProduct: OffProduct | null, ean: string)
       onOpenChange: () => undefined,
       offProduct,
       ean,
-      listId,
+      lists: [{ id: listId, name: 'Hebdo' }],
     }),
   );
 }
@@ -94,6 +95,7 @@ describe('photo produit persistée (D-05)', () => {
     });
     depositMock.mockResolvedValue({
       url: 'https://signed.example/foyer/products/fichier.webp',
+      path: 'foyer/products/fichier.webp',
       name: 'photo.jpg',
       mime: 'image/webp',
       size: 18,
@@ -149,8 +151,58 @@ describe('photo produit persistée (D-05)', () => {
       target: { files: [new File(['%PDF'], 'notes.pdf', { type: 'application/pdf' })] },
     });
 
-    expect(await screen.findByText(/Sélectionnez une image/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sélectionnez une photo/)).toBeInTheDocument();
     expect(compressMock).not.toHaveBeenCalled();
     expect(depositMock).not.toHaveBeenCalled();
+  });
+
+  it('liste destinataire : l’article atterrit dans la liste choisie (CR-04)', async () => {
+    const user = userEvent.setup();
+    const listA = await createList('Fresque');
+    const listB = await createList('Maison');
+
+    renderWithProviders(
+      createElement(ProductSheet, {
+        open: true,
+        onOpenChange: () => undefined,
+        offProduct: nutellaOff(),
+        ean: NUTELLA_EAN,
+        lists: [
+          { id: listA.id, name: 'Fresque' },
+          { id: listB.id, name: 'Maison' },
+        ],
+      }),
+    );
+
+    await user.selectOptions(screen.getByLabelText(/Liste destinataire/), listB.id);
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
+    await screen.findByText(/ajouté à la liste/);
+
+    const itemsA = await data.list('shopping_list_items', { list_id: listA.id });
+    const itemsB = await data.list('shopping_list_items', { list_id: listB.id });
+    expect(itemsA).toHaveLength(0);
+    expect(itemsB).toHaveLength(1);
+  });
+
+  it('enrichissement en échec : réessayer sans créer en double (WR-04)', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    const list = await createList();
+
+    renderWithProviders(
+      createElement(ProductSheet, {
+        open: true,
+        onOpenChange: () => undefined,
+        offProduct: null,
+        ean: NUTELLA_EAN,
+        lists: [{ id: list.id, name: 'Hebdo' }],
+        offError: true,
+        onRetry,
+      }),
+    );
+
+    expect(screen.getByText(/Enrichissement indisponible/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

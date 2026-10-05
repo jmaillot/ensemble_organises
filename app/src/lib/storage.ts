@@ -31,6 +31,8 @@ const ACCEPTED_MIMES = [
 export interface DepositedFile {
   /** URL signée (Supabase) ou aperçu local (mode démo). */
   url: string;
+  /** Chemin dans le bucket (`null` en démo : rien à nettoyer côté serveur). */
+  path: string | null;
   /** Nom d'origine, affiché dans les listes de pièces jointes. */
   name: string;
   mime: string;
@@ -81,7 +83,7 @@ export async function depositHouseholdFile(input: {
   }
 
   if (!isSupabaseConfigured || !supabase) {
-    return { url: URL.createObjectURL(blob), name: file.name, mime, size: blob.size };
+    return { url: URL.createObjectURL(blob), path: null, name: file.name, mime, size: blob.size };
   }
 
   const path = `${householdId}/${folder}/${randomId('file')}.${extensionFor(mime, file.name)}`;
@@ -94,7 +96,18 @@ export async function depositHouseholdFile(input: {
     .from(HOUSEHOLD_MEDIA_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL);
   if (signError) throw new Error(signError.message);
-  return { url: signed.signedUrl, name: file.name, mime, size: blob.size };
+  return { url: signed.signedUrl, path, name: file.name, mime, size: blob.size };
+}
+
+/**
+ * Supprime un objet déposé (compensation d'un échec survenu APRÈS l'upload :
+ * jamais d'orphelin en bucket). En démo (`path: null`), rien à nettoyer.
+ * Best-effort : un échec de nettoyage ne masque jamais l'erreur d'origine.
+ */
+export async function removeHouseholdFile(path: string | null): Promise<void> {
+  if (!path || !isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.storage.from(HOUSEHOLD_MEDIA_BUCKET).remove([path]);
+  if (error) throw new Error(error.message);
 }
 
 /** « ordonnance.pdf · 214 Ko », comme dans le Cercle. */

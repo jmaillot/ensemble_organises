@@ -47,6 +47,13 @@ begin
 end;
 $$;
 
+-- Produit témoin du foyer B (superuser, hors RLS) pour les tests de lien
+-- inter-foyer ci-dessous. Supprimé avant la section Carol, qui exige un
+-- foyer B vide de produits.
+insert into public.products (id, household_id, ean, name)
+select 'prod_b_0022', household_id, '5000159515154', 'Confiture de Carol'
+  from testkit.fx where key = 'carol';
+
 -- ===========================================================================
 -- Alice, administratrice du foyer A
 -- ===========================================================================
@@ -75,8 +82,21 @@ select testkit.expect_denied(format(
   'insert into public.products (id, household_id, ean, name) values (%L, %L, %L, %L)',
   'prod_b', (select household_id from testkit.fx where key = 'carol'), '3017620422003', 'Nutella de Carol'),
   'Alice ne peut pas ecrire dans le foyer B meme avec un EAN partage');
+select testkit.expect_denied(format(
+  'insert into public.shopping_list_items (id, list_id, household_id, name, product_id, added_by) values (%L, %L, %L, %L, %L, %L)',
+  'item_piege', (select row_id from testkit.fx where key = 'list_a'),
+  (select household_id from testkit.fx where key = 'alice'), 'Piege', 'prod_b_0022',
+  (select row_id from testkit.fx where key = 'alice')),
+  'impossible de lier un article au produit d''un autre foyer');
+select testkit.expect_denied(format(
+  'update public.shopping_list_items set product_id = %L where id = %L',
+  'prod_b_0022', (select row_id from testkit.fx where key = 'item_a')),
+  'impossible de re-pointer un article vers un autre foyer');
 
 reset role;
+
+-- Nettoyage du témoin : la section Carol compte les produits du foyer B.
+delete from public.products where id = 'prod_b_0022';
 
 -- ===========================================================================
 -- Carol, administratrice du foyer B : meme EAN, autre foyer

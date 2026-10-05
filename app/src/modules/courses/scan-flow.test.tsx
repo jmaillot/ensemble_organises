@@ -54,7 +54,7 @@ function ScanHarness({ listId }: { listId: string }) {
         }}
       />
       {sheet ? (
-        <ProductSheet open onOpenChange={() => undefined} offProduct={sheet.off} ean={sheet.ean} listId={listId} />
+        <ProductSheet open onOpenChange={() => undefined} offProduct={sheet.off} ean={sheet.ean} lists={[{ id: listId, name: 'Fresque' }]} />
       ) : null}
     </>
   );
