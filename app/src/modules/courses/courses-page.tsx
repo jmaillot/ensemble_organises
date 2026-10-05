@@ -15,7 +15,11 @@ import { useHouseholdStore, useMemberName } from '@/stores/household-store';
 import { formatMediumDate, formatWeekday, pluralize, relativeDayLabel, toLocalDate } from '@/lib/utils';
 import { useCourses } from './hooks/use-courses';
 import { ItemFormDialog } from './components/item-form-dialog';
+import { ScanDialog } from './components/scan-dialog';
+import { ProductSheet } from './components/product-sheet';
 import { ShoppingGroupCard } from './components/shopping-group-card';
+import { fetchOffProduct, isQueryableEan, type OffProduct } from './off-client';
+import { findProductByEan, offProductFromRow } from './products-api';
 import type { Grouping, ItemFormValues, ShoppingItem, ShoppingListView } from './types';
 
 const listSchema = z.object({
@@ -31,6 +35,7 @@ type ListFormValues = z.infer<typeof listSchema>;
 
 export default function CoursesPage() {
   const toast = useToast();
+  const householdId = useHouseholdStore((state) => state.householdId);
   const householdName = useHouseholdStore((state) => state.householdName);
   const currentMemberName = useMemberName();
   const {
@@ -55,6 +60,10 @@ export default function CoursesPage() {
   const [grouping, setGrouping] = useState<Grouping>('rayon');
   const [itemDialog, setItemDialog] = useState<{ open: boolean }>({ open: false });
   const [listDialogOpen, setListDialogOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [scanEan, setScanEan] = useState('');
+  const [scanOff, setScanOff] = useState<OffProduct | null>(null);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
 
@@ -97,11 +106,50 @@ export default function CoursesPage() {
     runQuietly(() => toggleItem(item), 'Mise à jour impossible.');
   };
 
+  /**
+   * EAN détecté ou tapé → enrichissement OFF → fiche. Un EAN déjà connu en
+   * Dexie n'exige pas le réseau (D-06) ; un EAN non interrogeable saute
+   * l'appel OFF vers la création manuelle (T-04-05).
+   */
+  const handleDetected = (value: string) => {
+    const code = value.trim();
+    setScanOpen(false);
+    if (!householdId) {
+      toast('Aucun foyer actif : reconnectez-vous.', 'error');
+      return;
+    }
+    const target = lists[0];
+    if (!target) {
+      toast('Créez d’abord une liste pour y ajouter ce produit.', 'error');
+      return;
+    }
+    setScanEan(code);
+    void (async () => {
+      try {
+        const known = await findProductByEan(householdId, code);
+        if (known) {
+          setScanOff(offProductFromRow(known));
+        } else if (!isQueryableEan(code)) {
+          setScanOff(null);
+        } else {
+          setScanOff(await fetchOffProduct(code));
+        }
+      } catch {
+        setScanOff(null);
+      } finally {
+        setSheetOpen(true);
+      }
+    })();
+  };
+
   return (
     <ModuleShell
       module="courses"
       actions={
         <>
+          <Button variant="secondary" icon="scan" onClick={() => setScanOpen(true)}>
+            Scanner
+          </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
             Nouvelle liste
           </Button>
@@ -245,6 +293,26 @@ export default function CoursesPage() {
         isMutating={isMutating}
         onSubmit={submitItem}
       />
+
+      <ScanDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        onManual={() => {
+          setScanOpen(false);
+          setItemDialog({ open: true });
+        }}
+        onDetected={handleDetected}
+      />
+
+      {lists[0] ? (
+        <ProductSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          offProduct={scanOff}
+          ean={scanEan}
+          listId={lists[0].id}
+        />
+      ) : null}
 
       <Dialog open={listDialogOpen} onOpenChange={setListDialogOpen}>
         <DialogContent>

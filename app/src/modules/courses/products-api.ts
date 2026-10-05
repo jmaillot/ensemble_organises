@@ -78,6 +78,33 @@ export async function findOrCreateProduct(input: FindProductInput): Promise<Prod
   }
 }
 
+/**
+ * Retrouve le produit (foyer, EAN) sans jamais toucher au réseau : lecture
+ * Dexie pure, donc utilisable hors ligne pour un EAN déjà connu (D-06).
+ */
+export async function findProductByEan(householdId: string, ean: string): Promise<ProductRow | null> {
+  const rows = await data.list<ProductRow>(PRODUCTS_TABLE, {
+    household_id: householdId,
+    ean: ean.trim(),
+  });
+  return rows[0] ?? null;
+}
+
+/** Reconstruit un enrichissement OFF depuis une ligne produit connue. */
+export function offProductFromRow(row: ProductRow): OffProduct {
+  const offData = row.off_data ?? {};
+  const imageUrl = typeof offData.image_url === 'string' ? offData.image_url : null;
+  const lang = typeof offData.lang === 'string' ? offData.lang : null;
+  return {
+    ean: row.ean,
+    name: row.name,
+    brand: row.brand,
+    imageUrl,
+    categoriesTags: [],
+    lang,
+  };
+}
+
 /** Construit l'entree `findOrCreateProduct` depuis un enrichissement OFF. */
 export function productInputFromOff(
   householdId: string,
@@ -132,4 +159,12 @@ export async function resolveScannedProduct(input: ResolveScanInput): Promise<Sc
     productId: product.id,
   });
   return { product, item, incremented: false };
+}
+
+/**
+ * Libellé du toast après 1-tap (D-02, D-04) : même texte depuis la fiche et
+ * depuis le hook, re-scan signalé par `+1`.
+ */
+export function scanAddedToast(productName: string, incremented: boolean): string {
+  return incremented ? `« ${productName} » : quantité +1` : `« ${productName} » ajouté à la liste`;
 }
