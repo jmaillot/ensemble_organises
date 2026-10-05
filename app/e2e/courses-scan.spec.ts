@@ -52,7 +52,11 @@ async function mockOff(page: Page) {
 async function openCourses(page: Page) {
   await mockOff(page);
   await page.goto('/courses');
-  await expect(page.getByRole('button', { name: 'Scanner' })).toBeVisible();
+  // Les listes chargent en asynchrone (Dexie + seed) : le bouton Scanner est
+  // désactivé jusque-là, et un scan sans `lists[0]` retomberait sur le toast
+  // « Créez d'abord une liste ». Attendre la région = listes prêtes.
+  await expect(page.getByRole('region', { name: 'Fresque' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Scanner' })).toBeEnabled();
 }
 
 /** Dialogue scan → saisie manuelle (le repli sans caméra des navigateurs). */

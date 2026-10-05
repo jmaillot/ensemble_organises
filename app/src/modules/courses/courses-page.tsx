@@ -147,7 +147,7 @@ export default function CoursesPage() {
       module="courses"
       actions={
         <>
-          <Button variant="secondary" icon="scan" onClick={() => setScanOpen(true)}>
+          <Button variant="secondary" icon="scan" disabled={isLoading} onClick={() => setScanOpen(true)}>
             Scanner
           </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
