@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
 import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
@@ -13,26 +14,29 @@ import { cn, formatMonthLabel, pad, pluralize, todayIso } from '@/lib/utils';
 import { BirthdayFormDialog } from './components/birthday-form-dialog';
 import { useAnniversaires } from './hooks/use-anniversaires';
 import { birthdayCountdown, formatDayMonth, isInMonth, monthDayKey } from './types';
-import type { Birthday } from './types';
+import type { AggregatedBirthday, Birthday } from './types';
 
 const PREVIEW_LIMIT = 5;
 
 export default function AnniversairesPage() {
   const toast = useToast();
-  const { birthdays, isLoading, isError, error, refetch, isMutating, saveBirthday, removeBirthday } = useAnniversaires();
+  const { aggregated, isLoading, isError, error, refetch, isMutating, saveBirthday, removeBirthday } =
+    useAnniversaires();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('liste');
   const [dialog, setDialog] = useState<{ open: boolean; birthday: Birthday | null }>({ open: false, birthday: null });
   const [pendingDelete, setPendingDelete] = useState<Birthday | null>(null);
 
+  // Vue agrégée (D-09) : birthdays + contacts dates en une seule liste.
+  const rows = aggregated;
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (needle === '') return birthdays;
-    return birthdays.filter((birthday) => birthday.name.toLowerCase().includes(needle));
-  }, [birthdays, query]);
+    if (needle === '') return rows;
+    return rows.filter((birthday) => birthday.name.toLowerCase().includes(needle));
+  }, [rows, query]);
 
-  const thisMonth = useMemo(() => birthdays.filter((birthday) => isInMonth(birthday, todayIso())), [birthdays]);
-  const next = birthdays[0] ?? null;
+  const thisMonth = useMemo(() => rows.filter((birthday) => isInMonth(birthday, todayIso())), [rows]);
+  const next = rows[0] ?? null;
 
   const openCreate = () => setDialog({ open: true, birthday: null });
   const openEdit = (birthday: Birthday) => setDialog({ open: true, birthday });
@@ -48,7 +52,7 @@ export default function AnniversairesPage() {
     >
       <MetricRow
         items={[
-          { label: 'Cette année', value: birthdays.length, caption: 'anniversaires suivis' },
+          { label: 'Cette année', value: rows.length, caption: 'anniversaires suivis' },
           {
             label: 'Le prochain',
             value: next ? formatDayMonth(next.nextDate) : '—',
@@ -107,7 +111,7 @@ export default function AnniversairesPage() {
               >
                 {isLoading ? (
                   <LoadingRows rows={4} />
-                ) : birthdays.length === 0 ? (
+                ) : rows.length === 0 ? (
                   <EmptyState
                     icon="heart"
                     title="Aucun anniversaire suivi."
@@ -127,37 +131,63 @@ export default function AnniversairesPage() {
                         role="listitem"
                         className="flex items-center gap-3 border-t border-border py-3.5 first:border-t-0 first:pt-0"
                       >
-                        <MemberAvatar
-                          member={birthday.member}
-                          name={birthday.name}
-                          colorTag={birthday.colorTag}
-                          size="lg"
-                        />
+                        {birthday.displayPhotoUrl ? (
+                          <img
+                            src={birthday.displayPhotoUrl}
+                            alt={`Photo de ${birthday.name}`}
+                            className="size-11 shrink-0 rounded-full border border-border object-cover"
+                          />
+                        ) : (
+                          <MemberAvatar
+                            member={birthday.member}
+                            name={birthday.name}
+                            colorTag={birthday.colorTag}
+                            size="lg"
+                          />
+                        )}
                         <div className="min-w-0 flex-1">
-                          <strong className="block text-[13px]">{birthday.name}</strong>
+                          <strong className="block text-[13px]">
+                            {birthday.name}{' '}
+                            {birthday.twoSources ? (
+                              <span className="ml-1 inline-flex items-center rounded-full bg-accent-faint px-2 py-0.5 align-middle text-[10px] font-extrabold text-accent-strong">
+                                2 sources
+                              </span>
+                            ) : null}
+                          </strong>
                           <small className="text-[11px] text-muted">
                             {birthdayCountdown(birthday)} · {birthday.turning} ans
+                            {birthday.origin === 'contact' ? ' · via Contacts' : ''}
                           </small>
                         </div>
                         <span className="text-[12px] font-extrabold text-accent-strong">{formatDayMonth(birthday.nextDate)}</span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(birthday)}
-                            aria-label={`Modifier l’anniversaire de ${birthday.name}`}
-                            className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                        {birthday.origin === 'contact' ? (
+                          <Link
+                            to="/contacts"
+                            aria-label={`Voir la fiche de ${birthday.name} dans les contacts`}
+                            className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
                           >
-                            <Icon name="edit" size="sm" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(birthday)}
-                            aria-label={`Supprimer l’anniversaire de ${birthday.name}`}
-                            className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
-                          >
-                            <Icon name="trash" size="sm" />
-                          </button>
-                        </div>
+                            <Icon name="people" size="sm" />
+                          </Link>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(birthday)}
+                              aria-label={`Modifier l’anniversaire de ${birthday.name}`}
+                              className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                            >
+                              <Icon name="edit" size="sm" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingDelete(birthday)}
+                              aria-label={`Supprimer l’anniversaire de ${birthday.name}`}
+                              className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                            >
+                              <Icon name="trash" size="sm" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -166,7 +196,7 @@ export default function AnniversairesPage() {
             </TabsContent>
 
             <TabsContent value="calendrier">
-              <BirthdayCalendarView birthdays={birthdays} isLoading={isLoading} onOpen={openEdit} />
+              <BirthdayCalendarView birthdays={rows} isLoading={isLoading} onOpen={openEdit} />
             </TabsContent>
           </Tabs>
 
@@ -177,10 +207,10 @@ export default function AnniversairesPage() {
             </p>
             {isLoading ? (
               <LoadingRows rows={3} />
-            ) : birthdays.length === 0 ? (
+            ) : rows.length === 0 ? (
               <p className="text-xs text-muted">Aucun anniversaire à afficher pour l’instant.</p>
             ) : (
-              birthdays.slice(0, PREVIEW_LIMIT).map((birthday) => (
+              rows.slice(0, PREVIEW_LIMIT).map((birthday) => (
                 <div
                   key={birthday.id}
                   className="flex items-center justify-between gap-2.5 border-t border-accent/20 py-2.5 text-xs"
@@ -220,7 +250,11 @@ export default function AnniversairesPage() {
           if (!open) setPendingDelete(null);
         }}
         title={`Supprimer l’anniversaire de ${pendingDelete?.name ?? ''} ?`}
-        description="Cette date ne sera plus suivie dans le calendrier du foyer."
+        description={
+          (pendingDelete as AggregatedBirthday | null)?.origin === 'miroir'
+            ? 'La ligne miroir sera retirée, mais la fiche contact reste suivie dans Contacts.'
+            : 'Cette date ne sera plus suivie dans le calendrier du foyer.'
+        }
         confirmLabel="Supprimer"
         onConfirm={() => {
           const target = pendingDelete;

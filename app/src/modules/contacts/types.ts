@@ -1,6 +1,6 @@
 import { initials } from '@/lib/utils';
 import type { ContactListRow, ContactRow, HouseholdMemberRow } from '@/types';
-import { formatFrDate, parseFrDate } from '@/modules/anniversaires/types';
+import { formatFrDate, normalizePersonName, parseFrDate, personFusionKey } from '@/modules/anniversaires/types';
 
 export { formatFrDate, parseFrDate };
 
@@ -58,19 +58,15 @@ export function toContact(row: ContactRow, members: readonly HouseholdMemberRow[
 
 /**
  * Normalisation nom de la garde anti-doublon serveur (0078, D-10) :
- * espaces rognés et réduits, casse repliée, forme Unicode canonique.
- * Sans désaccentuation (extension `unaccent` non garantie sur la stack) :
- * les accents restent distinctifs, comme côté serveur.
+ * voir `normalizePersonName` (anniversaires/types) — même fonction, les
+ * accents restent distinctifs des deux côtés.
  */
-export const normalizeContactName = (value: string) =>
-  value.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+export const normalizeContactName = normalizePersonName;
 
 /**
- * Clé de fusion nom normalisé + mois-jour (D-12) : deux lignes partageant
- * cette clé et ce jour parlent de la même personne probable.
+ * Clé de fusion nom normalisé + mois-jour (D-12) : voir `personFusionKey`.
  */
-export const contactFusionKey = (name: string, birthDate: string) =>
-  `${normalizeContactName(name)}|${birthDate.slice(5)}`;
+export const contactFusionKey = personFusionKey;
 
 /**
  * Doublons probables (D-04) : même clé de fusion quand la fiche candidate
