@@ -231,6 +231,40 @@ function toOffProduct(ean: string, payload: z.infer<typeof offResponseSchema>): 
 }
 
 /**
+ * Pertinence d'un résultat face à la requête (OFF renvoie parfois du bruit :
+ * « snickers » peut ramener de l'eau minérale). Score : nom contenant toute
+ * la requête (3), tous les jetons utiles dans nom/marque (2), un jeton (1),
+ * sinon 0. Les zéros sont écartés UNIQUEMENT si au moins un résultat score —
+ * sinon on garde tout (ex. « pâte à tartiner » → Nutella, découverte préservée).
+ */
+export function rankSearchHits(hits: OffSearchHit[], query: string): OffSearchHit[] {
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/œ/g, 'oe')
+      .replace(/æ/g, 'ae')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  const full = normalize(query);
+  const tokens = full.split(/[^a-z0-9]+/).filter((token) => token.length >= 3);
+  const scored = hits.map((hit) => {
+    const name = normalize(hit.name);
+    const brand = normalize(hit.brand ?? '');
+    let score = 0;
+    if (full.length > 0 && name.includes(full)) score = 3;
+    else if (tokens.length > 0 && tokens.every((token) => name.includes(token) || brand.includes(token))) score = 2;
+    else if (tokens.some((token) => name.includes(token) || brand.includes(token))) score = 1;
+    return { hit, score };
+  });
+  const best = Math.max(0, ...scored.map((entry) => entry.score));
+  return scored
+    .filter((entry) => (best > 0 ? entry.score > 0 : true))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.hit);
+}
+
+/**
  * Résultat discriminant (WR-04) : `unknown` (404/valide-absent → création
  * manuelle) n'est PAS `error` (réseau/timeout/5xx/payload → réessayer).
  * Confondre les deux crée des doublons divergents pour un même EAN.

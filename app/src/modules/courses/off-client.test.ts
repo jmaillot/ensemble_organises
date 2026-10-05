@@ -6,6 +6,7 @@ import {
   fetchOffProduct,
   fetchOffResult,
   isQueryableEan,
+  rankSearchHits,
   searchOffProducts,
   OFF_TIMEOUT_MS,
   OFF_USER_AGENT,
@@ -183,6 +184,42 @@ describe('searchOffProducts', () => {
 
   it('n’interroge pas sous 2 caractères', async () => {
     await expect(searchOffProducts('x')).resolves.toEqual([]);
+  });
+});
+
+describe('rankSearchHits', () => {
+  const hit = (name: string, brand: string | null = null) => ({
+    ean: 'x',
+    name,
+    brand,
+    imageUrl: null,
+    categoriesTags: [],
+    lang: 'fr' as const,
+  });
+
+  it('écarte le bruit quand un résultat pertinent existe (snickers ≠ eau)', () => {
+    const hits = [
+      hit('Eau minérale naturelle'),
+      hit('Snickers barre chocolatée', 'Mars'),
+    ];
+    expect(rankSearchHits(hits, 'snickers').map((entry) => entry.name)).toEqual([
+      'Snickers barre chocolatée',
+    ]);
+  });
+
+  it('garde tout quand aucun résultat ne score (découverte préservée)', () => {
+    const hits = [hit('Nutella'), hit('Confiture de fraises')];
+    expect(rankSearchHits(hits, 'pâte à tartiner')).toHaveLength(2);
+  });
+
+  it('classe l’exact avant le partiel, insensible aux accents', () => {
+    const hits = [hit('Comte râpé'), hit('Comté affiné 12 mois')];
+    const ranked = rankSearchHits(hits, 'comté affiné');
+    expect(ranked[0].name).toBe('Comté affiné 12 mois');
+  });
+
+  it('vide en entrée, vide en sortie', () => {
+    expect(rankSearchHits([], 'snickers')).toEqual([]);
   });
 });
 
