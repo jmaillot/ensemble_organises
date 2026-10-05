@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Input, SearchInput, Select } from '@/components/ui/input';
 import { Badge, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
@@ -19,6 +20,7 @@ import {
   useDeleteGiftIdea,
   useDeleteGiftItem,
   useDeleteGiftList,
+  usePromoteGiftIdea,
   useSyncGiftListShares,
   useUpdateGiftIdea,
   useUpdateGiftItem,
@@ -75,6 +77,7 @@ export default function CadeauxPage() {
   const addIdea = useAddGiftIdea();
   const updateIdea = useUpdateGiftIdea();
   const deleteIdea = useDeleteGiftIdea();
+  const promoteIdea = usePromoteGiftIdea();
   const toast = useToast();
 
   const [tab, setTab] = useState<CadeauxTab>('listes');
@@ -91,6 +94,8 @@ export default function CadeauxPage() {
   const [pendingItemDeletion, setPendingItemDeletion] = useState<GiftItem | null>(null);
   const [pendingListDeletion, setPendingListDeletion] = useState<GiftList | null>(null);
   const [pendingIdeaDeletion, setPendingIdeaDeletion] = useState<GiftIdea | null>(null);
+  const [promotedIdea, setPromotedIdea] = useState<GiftIdea | null>(null);
+  const [promoteListId, setPromoteListId] = useState('');
 
   const currentMemberId = currentMember?.id ?? null;
   const activeList = lists.find((list) => list.id === requestedListId) ?? lists[0] ?? null;
@@ -222,6 +227,38 @@ export default function CadeauxPage() {
       toast('Idée supprimée.');
     } catch {
       toast('Suppression impossible.', 'error');
+    }
+  };
+
+  const openPromote = (idea: GiftIdea) => {
+    setPromotedIdea(idea);
+    setPromoteListId(activeList?.id ?? lists[0]?.id ?? '');
+  };
+
+  /**
+   * Promotion idée→article (D-05) : l'article porte `idea_id`. L'UI relit
+   * après mutation : passer l'idée à `offert` y reflète l'achat propagé par
+   * le trigger serveur (D-06).
+   */
+  const handlePromote = async () => {
+    if (!promotedIdea || promoteListId === '') return;
+    const target = lists.find((list) => list.id === promoteListId);
+    try {
+      await promoteIdea.mutateAsync({
+        listId: promoteListId,
+        idea: {
+          id: promotedIdea.id,
+          name: promotedIdea.name,
+          price: promotedIdea.price,
+          url: promotedIdea.url,
+          comment: promotedIdea.comment,
+          photo_url: promotedIdea.photoUrl,
+        },
+      });
+      setPromotedIdea(null);
+      toast(`Article ajouté à « ${target?.name ?? 'la liste'} ».`);
+    } catch (promotionError) {
+      toast(promotionError instanceof Error ? promotionError.message : 'Ajout impossible.', 'error');
     }
   };
 
@@ -590,6 +627,16 @@ export default function CadeauxPage() {
                       </button>
                       <button
                         type="button"
+                        className={ideaAction}
+                        aria-label={`Ajouter l’idée ${idea.name} à une liste`}
+                        onClick={() => openPromote(idea)}
+                        disabled={lists.length === 0}
+                      >
+                        <Icon name="plus" size="sm" />
+                        Ajouter à une liste
+                      </button>
+                      <button
+                        type="button"
                         className={`${ideaAction} hover:bg-coral-soft hover:text-coral`}
                         aria-label={`Supprimer l’idée ${idea.name}`}
                         onClick={() => setPendingIdeaDeletion(idea)}
@@ -667,6 +714,49 @@ export default function CadeauxPage() {
         onSubmit={(listId, next) => void handleShare(listId, next)}
         isPending={syncShares.isPending}
       />
+
+      <Dialog
+        open={Boolean(promotedIdea)}
+        onOpenChange={(open) => {
+          if (!open) setPromotedIdea(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <p className="eyebrow mb-2">Cadeaux</p>
+            <DialogTitle>Ajouter à une liste</DialogTitle>
+            <DialogDescription>
+              {promotedIdea
+                ? `« ${promotedIdea.name} » deviendra un article lié : passer l’idée à « offert » l’y marquera acheté.`
+                : 'Choisissez la liste qui recevra cet article.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3.5">
+            <label className="grid gap-1.5 text-[11px] font-extrabold text-muted">
+              Liste destinataire
+              <Select
+                aria-label="Liste destinataire"
+                value={promoteListId}
+                onChange={(event) => setPromoteListId(event.target.value)}
+              >
+                {lists.map((list) => (
+                  <option key={list.id} value={list.id}>
+                    {list.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <DialogActions>
+              <Button variant="secondary" onClick={() => setPromotedIdea(null)}>
+                Annuler
+              </Button>
+              <Button icon="plus" disabled={promoteIdea.isPending || promoteListId === ''} onClick={() => void handlePromote()}>
+                {promoteIdea.isPending ? 'Ajout…' : 'Ajouter l’article'}
+              </Button>
+            </DialogActions>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={Boolean(pendingItemDeletion)}

@@ -211,6 +211,12 @@ export function useDeleteGiftIdea() {
 export function usePromoteGiftIdea() {
   const householdId = useHouseholdStore((state) => state.householdId);
   return useCadeauxMutation(
-    ({ listId, idea }: { listId: string; idea: GiftIdeaRow }) => promoteIdeaToItem(householdId as string, listId, idea),
+    ({
+      listId,
+      idea,
+    }: {
+      listId: string;
+      idea: Pick<GiftIdeaRow, 'id' | 'name' | 'price' | 'url' | 'comment' | 'photo_url'>;
+    }) => promoteIdeaToItem(householdId as string, listId, idea),
   );
 }

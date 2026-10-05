@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,16 @@ import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, 
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { QrCode } from '@/components/shared/qr-code';
+import { useToast } from '@/components/ui/toast';
 import type { HouseholdMemberRow } from '@/types';
+import {
+  createGiftListInviteCode,
+  fetchGiftListInviteSummary,
+  giftInviteLink,
+  revokeGiftListInviteCode,
+  type GiftListInviteSummary,
+} from '../api';
 import { permissionLabel, type GiftList, type GiftShare, type GiftShareInput } from '../types';
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -36,8 +45,165 @@ export interface GiftShareDialogProps {
 }
 
 /**
+ * Panneau partage par code (D-15/D-18), réplique du panneau ardoise à
+ * l'identique : lien `/invitation/cadeau?code=`, Copier/Partager
+ * (navigator.share avec repli presse-papiers), Générer/Régénérer, code brut
+ * affiché une fois en mono + QR, mention code-actif-créé-ailleurs,
+ * « Arrêter le partage » avec revoke.
+ *
+ * Le code brut vit dans l'état du dialogue : fermer (naviguer) le masque.
+ * Le rachat externe (D-16/D-17) passe par le lien : inscription avec l'e-mail
+ * invité puis activation via la branche e-mail de `redeem_gift_list_invite`
+ * (OQ-1 OPTION A, Edge user-only, plan 05-03).
+ */
+function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
+  const toast = useToast();
+  const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
+  const [lastCode, setLastCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      // Navigation / fermeture : le code brut ne survit pas au dialogue.
+      setLastCode(null);
+      return;
+    }
+    let active = true;
+    fetchGiftListInviteSummary(list.id)
+      .then((result) => {
+        if (active) {
+          setSummary(result);
+          if (result && !result.hasCode) setLastCode(null);
+        }
+      })
+      .catch(() => {
+        if (active) setSummary(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [list.id, open]);
+
+  const refresh = () =>
+    fetchGiftListInviteSummary(list.id)
+      .then(setSummary)
+      .catch(() => setSummary(null));
+
+  const inviteUrl = (code: string) => `${window.location.origin}${giftInviteLink(code)}`;
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast('Code copié.');
+    } catch {
+      toast(code);
+    }
+  };
+
+  const shareCode = async (code: string) => {
+    const link = inviteUrl(code);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: list.name, text: `Partage ma liste « ${list.name} » : ${link}` });
+        return;
+      }
+    } catch {
+      // Partage annulé : repli copie du lien ci-dessous.
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Lien copié.');
+    } catch {
+      toast(link);
+    }
+  };
+
+  const generate = () => {
+    setBusy(true);
+    createGiftListInviteCode(list.id)
+      .then((created) => {
+        setLastCode(created.code);
+        return refresh();
+      })
+      .then(() => toast('Nouveau code généré : l’ancien est invalidé.'))
+      .catch((inviteError: unknown) =>
+        toast(inviteError instanceof Error ? inviteError.message : 'Code impossible.', 'error'),
+      )
+      .finally(() => setBusy(false));
+  };
+
+  const revoke = () => {
+    setBusy(true);
+    revokeGiftListInviteCode(list.id)
+      .then(() => {
+        setLastCode(null);
+        return refresh();
+      })
+      .then(() => toast('Partage arrêté : le code ne passe plus.'))
+      .catch((inviteError: unknown) =>
+        toast(inviteError instanceof Error ? inviteError.message : 'Arrêt impossible.', 'error'),
+      )
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <section aria-label="Partage par code" className="grid gap-3 border-t border-border pt-3.5">
+      <p className="m-0 text-[12px] font-extrabold">Partage par code</p>
+      {summary === null ? (
+        <p className="m-0 text-[12px] text-muted" role="status">
+          Le partage par code exige le backend (Edge Function) : indisponible dans ce mode.
+        </p>
+      ) : (
+        <div className="grid gap-3">
+          <p className="m-0 text-[12px] text-muted" role="status">
+            {summary.hasCode
+              ? `Partage ${summary.isActive ? 'actif' : 'coupé'} · ${summary.useCount}${summary.maxUses ? `/${summary.maxUses}` : ''} utilisations${summary.expiresAt ? ` · expire le ${summary.expiresAt.slice(0, 10)}` : ''}.`
+              : 'Aucun code actif. Générez-en un pour inviter.'}
+          </p>
+          {lastCode ? (
+            <>
+              <p className="m-0 rounded-[11px] bg-bg px-3 py-2.5 font-mono text-[13px] break-all" role="status">
+                {lastCode}
+              </p>
+              <p className="m-0 text-[12px] break-all text-muted">Lien à partager : {inviteUrl(lastCode)}</p>
+              <QrCode value={inviteUrl(lastCode)} label={`QR du partage de ${list.name}`} />
+            </>
+          ) : summary.hasCode ? (
+            <p className="m-0 text-[12px] text-muted">Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon="plus" disabled={busy} onClick={generate}>
+              {summary.hasCode ? 'Régénérer' : 'Générer un code'}
+            </Button>
+            {lastCode ? (
+              <>
+                <Button variant="secondary" disabled={busy} onClick={() => void copyCode(lastCode)}>
+                  Copier
+                </Button>
+                <Button variant="secondary" disabled={busy} onClick={() => void shareCode(lastCode)}>
+                  Partager
+                </Button>
+              </>
+            ) : null}
+            {summary.hasCode ? (
+              <Button variant="secondary" disabled={busy} onClick={revoke}>
+                Arrêter le partage
+              </Button>
+            ) : null}
+          </div>
+          <p className="m-0 text-[11px] text-muted">
+            Le lien mène vers l’inscription avec l’e-mail invité, puis active un partage réservation.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
  * Partage d'une liste de cadeaux : le schéma porte le partage au niveau de la
  * liste (`gift_list_shares`), chaque destinataire ayant sa propre permission.
+ * Le panneau code (D-15/D-18) suit pour les proches hors foyer (D-16/D-17).
  */
 export function GiftShareDialog({
   open,
@@ -141,6 +307,7 @@ export function GiftShareDialog({
             </Button>
           </DialogActions>
         </form>
+        {list ? <GiftCodePanel list={list} open={open} /> : null}
       </DialogContent>
     </Dialog>
   );
