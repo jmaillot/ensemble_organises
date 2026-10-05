@@ -265,13 +265,13 @@ function translateRpcError(error: { code?: string; message: string }): GiftListI
   if (message.includes('gestion de la liste réservée') || error.code === '42501') {
     return new GiftListInviteError(403, 'Seul le propriétaire de la liste ou un administrateur du foyer peut faire cette opération.');
   }
-  if (message.includes('expiration invalide') || message.includes('nombre d’utilisations invalide')) {
+  if (message.includes('expiration invalide') || message.includes("nombre d'utilisations invalide")) {
     return new GiftListInviteError(400, 'Paramètres de partage invalides.');
   }
   if (message.includes('adresse e-mail invalide')) {
     return new GiftListInviteError(400, 'Adresse e-mail invalide.');
   }
-  if (message.includes('empreinte d’invitation invalide')) {
+  if (message.includes("empreinte d'invitation invalide")) {
     return new GiftListInviteError(500, 'Opération impossible.');
   }
   if (error.code === '23505') {
