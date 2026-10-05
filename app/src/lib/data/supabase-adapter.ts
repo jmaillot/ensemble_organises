@@ -13,6 +13,7 @@ const HOUSEHOLD_SCOPED = new Set([
   'household_members',
   'shopping_lists',
   'shopping_list_items',
+  'products',
   'events',
   'event_reminders',
   'notes',

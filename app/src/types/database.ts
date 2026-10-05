@@ -128,7 +128,33 @@ export interface ShoppingListItemRow {
   category: string | null;
   checked: boolean;
   added_by: Uuid | null;
+  /** Produit du foyer d'origine (0071) : NULL si saisi a la main ou produit supprime. */
+  product_id: Uuid | null;
   created_at: IsoDateTime;
+}
+
+/**
+ * Produit du catalogue du foyer (0071, phase Courses scan).
+ *
+ * Une ligne par (foyer, EAN) : le meme EAN peut exister dans deux foyers,
+ * jamais deux fois dans le meme. `photo_url` ne porte qu'une photo locale
+ * signee (D-05) ; l'image OpenFoodFacts reste un repli d'affichage
+ * transitoire stocke dans `off_data`.
+ */
+export interface ProductRow {
+  id: Uuid;
+  household_id: Uuid;
+  ean: string;
+  name: string;
+  brand: string | null;
+  /** Rayon (contrainte applicative : RAYONS via normalizeRayon). */
+  category: string | null;
+  photo_url: string | null;
+  /** Cliche OFF brut valide par zod a l'ingestion. */
+  off_data: Record<string, unknown>;
+  created_by: Uuid | null;
+  created_at: IsoDateTime;
+  updated_at: IsoDateTime;
 }
 
 export interface EventRow {

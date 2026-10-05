@@ -46,6 +46,7 @@ export async function createShoppingItem(input: ShoppingItemInput): Promise<Shop
     category: normalizeRayon(input.rayon),
     checked: false,
     added_by: input.addedBy,
+    product_id: input.productId ?? null,
     created_at: new Date().toISOString(),
   });
 }

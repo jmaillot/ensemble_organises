@@ -89,6 +89,8 @@ export interface ShoppingItemInput {
   unit: string | null;
   rayon: Rayon;
   addedBy: string | null;
+  /** Produit du foyer d'origine (0071) : re-scan +1 via resolveScannedProduct. */
+  productId?: string | null;
 }
 
 /** Valeurs renvoyées par le formulaire article, avant résolution de la liste. */
