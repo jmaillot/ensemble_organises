@@ -35,6 +35,11 @@ export interface ProductUpdate {
   photoUrl?: string | null;
 }
 
+/** Photo seule (2e temps autorisé : produit existant éditable, dépôt nettoyé sinon). */
+export async function updateProductPhoto(id: string, photoUrl: string | null): Promise<ProductRow> {
+  return data.update<ProductRow>(PRODUCTS_TABLE, id, { photo_url: photoUrl });
+}
+
 /** Mise à jour d'un produit du foyer (RLS : créateur ou ligne sans auteur). */
 export async function updateProduct(id: string, input: ProductUpdate): Promise<ProductRow> {
   const name = input.name.trim();

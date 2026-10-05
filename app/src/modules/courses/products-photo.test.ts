@@ -10,7 +10,7 @@ import { ProductSheet } from './components/product-sheet';
 import { PRODUCTS_TABLE } from './products-api';
 import type { OffProduct } from './off-client';
 import { compressImage } from '@/modules/cercle/lib/media';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 
 /**
  * Persistance photo produit (D-05) : la photo locale compressée part en
@@ -39,9 +39,11 @@ vi.mock('@/lib/storage', () => ({
 
 const compressMock = vi.mocked(compressImage);
 const depositMock = vi.mocked(depositHouseholdFile);
+const removeMock = vi.mocked(removeHouseholdFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  removeMock.mockResolvedValue(undefined);
 });
 
 const NUTELLA_EAN = '3017620422003';
@@ -204,5 +206,100 @@ describe('photo produit persistée (D-05)', () => {
     expect(screen.getByText(/Enrichissement indisponible/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('produit existant sans photo : la nouvelle photo est posée', async () => {
+    const user = userEvent.setup();
+    const list = await createList();
+    const existing = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: OTHER_EAN,
+      name: 'Huile',
+      brand: null,
+      category: 'Divers',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      compressMock.mockResolvedValue({
+        blob: new Blob(['p'], { type: 'image/webp' }),
+        mime: 'image/webp',
+        name: 'photo.webp',
+        originalName: 'photo.jpg',
+        size: 18,
+        width: 10,
+        height: 10,
+        previewUrl: 'blob:apercu',
+      });
+      depositMock.mockResolvedValue({
+        url: 'https://signed.example/nouvelle.webp',
+        path: 'foyer/products/nouvelle.webp',
+        name: 'photo.jpg',
+        mime: 'image/webp',
+        size: 18,
+      });
+
+      renderSheet(list.id, null, OTHER_EAN);
+      await user.type(screen.getByLabelText(/Nom/), 'Huile');
+      await user.upload(screen.getByLabelText(/^Photo/), new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }));
+      await user.click(screen.getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
+      await screen.findByText(/ajouté à la liste/);
+
+      const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
+      expect(rows[0].photo_url).toBe('https://signed.example/nouvelle.webp');
+    } finally {
+      await data.remove('products', existing.id).catch(() => undefined);
+    }
+  });
+
+  it("produit d'un autre membre : photo écartée, dépôt nettoyé, message honnête", async () => {
+    const user = userEvent.setup();
+    const list = await createList();
+    const existing = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: OTHER_EAN,
+      name: 'Huile',
+      brand: null,
+      category: 'Divers',
+      photo_url: null,
+      off_data: {},
+      created_by: 'member-autre',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      compressMock.mockResolvedValue({
+        blob: new Blob(['p'], { type: 'image/webp' }),
+        mime: 'image/webp',
+        name: 'photo.webp',
+        originalName: 'photo.jpg',
+        size: 18,
+        width: 10,
+        height: 10,
+        previewUrl: 'blob:apercu',
+      });
+      depositMock.mockResolvedValue({
+        url: 'https://signed.example/nouvelle.webp',
+        path: 'foyer/products/nouvelle.webp',
+        name: 'photo.jpg',
+        mime: 'image/webp',
+        size: 18,
+      });
+
+      renderSheet(list.id, null, OTHER_EAN);
+      await user.type(screen.getByLabelText(/Nom/), 'Huile');
+      await user.upload(screen.getByLabelText(/^Photo/), new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }));
+      await user.click(screen.getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
+
+      expect(await screen.findByText(/produit créé par un autre membre/)).toBeInTheDocument();
+      expect(removeMock).toHaveBeenCalledWith('foyer/products/nouvelle.webp');
+      const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
+      expect(rows[0].photo_url).toBeNull();
+    } finally {
+      await data.remove('products', existing.id).catch(() => undefined);
+    }
   });
 });
