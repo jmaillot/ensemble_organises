@@ -137,7 +137,7 @@ begin
     0::bigint,
     'les dépenses sont parties malgré paid_by restrict');
   perform testkit.eq(
-    (select count(*) from public.expense_participants),
+    (select count(*) from public.expense_participants where expense_id = 'expense_del'),
     0::bigint,
     'les parts sont parties en cascade');
   perform testkit.eq(

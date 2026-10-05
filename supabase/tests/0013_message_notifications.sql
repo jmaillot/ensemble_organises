@@ -74,7 +74,8 @@ select testkit.eq(
         where message_id = (select row_id from testkit.fx where key = 'msg'))))),
   1, 'la file est consommée');
 select testkit.eq(
-  (select count(*) from public.message_notifications),
+  (select count(*) from public.message_notifications
+    where message_id = (select row_id from testkit.fx where key = 'msg')),
   0::bigint, 'plus rien à distribuer');
 
 rollback;

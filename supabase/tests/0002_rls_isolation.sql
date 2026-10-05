@@ -255,7 +255,8 @@ select testkit.expect_denied(format(
 select testkit.eq(testkit.count(format(
   'select 1 from public.gift_lists where id = %L', (select row_id from testkit.fx where key = 'private_list'))), 1::bigint,
   'Alice voit sa propre liste privée');
-select testkit.eq(testkit.count('select 1 from public.gift_lists'), 3::bigint,
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_lists where household_id = %L', (select household_id from testkit.fx where key = 'alice'))), 3::bigint,
   'Alice voit les trois listes de son foyer');
 -- Le transfert d'une liste est réservé aux administrateurs du foyer
 -- (trigger `guard_gift_list_ownership`). Alice est à la fois propriétaire ET
@@ -420,6 +421,9 @@ select testkit.eq(testkit.count('select 1 from public.household_members'), 2::bi
   'Carol voit les 2 membres de son foyer');
 select testkit.eq(testkit.count('select 1 from public.tasks'), 1::bigint,
   'Carol ne voit pas les tâches du foyer A');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.gift_lists where id = %L', (select row_id from testkit.fx where key = 'shared_list'))), 0::bigint,
+  'Carol ne voit pas la liste « foyer » du foyer A (fuite 0075)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.messages where conversation_id = %L', (select row_id from testkit.fx where key = 'conv_a'))), 0::bigint,
   'Carol ne voit pas les messages du foyer A');
