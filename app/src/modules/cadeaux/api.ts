@@ -1,8 +1,8 @@
 import { data } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
-import type { BirthdayRow, GiftItemRow, GiftListRow, GiftListShareRow } from '@/types';
-import { roundPrice, type GiftPermission, type GiftShareInput, type NewGiftItemInput, type NewGiftListInput } from './types';
+import type { BirthdayRow, ContactListRow, ContactRow, GiftIdeaRow, GiftItemRow, GiftListRow, GiftListShareRow } from '@/types';
+import { roundPrice, type GiftPermission, type GiftShareInput, type NewGiftIdeaInput, type NewGiftItemInput, type NewGiftListInput } from './types';
 
 /**
  * Accès aux données des Cadeaux. `gift_list_shares` ne porte pas de
@@ -14,16 +14,22 @@ export interface CadeauxSnapshot {
   items: GiftItemRow[];
   shares: GiftListShareRow[];
   birthdays: BirthdayRow[];
+  ideas: GiftIdeaRow[];
+  contactLists: ContactListRow[];
+  contacts: ContactRow[];
 }
 
 export async function fetchCadeauxSnapshot(householdId: string): Promise<CadeauxSnapshot> {
-  const [lists, items, shares, birthdays] = await Promise.all([
+  const [lists, items, shares, birthdays, ideas, contactLists, contacts] = await Promise.all([
     data.list<GiftListRow>('gift_lists', { household_id: householdId }),
     data.list<GiftItemRow>('gift_items', { household_id: householdId }),
     data.list<GiftListShareRow>('gift_list_shares', {}),
     data.list<BirthdayRow>('birthdays', { household_id: householdId }),
+    data.list<GiftIdeaRow>('gift_ideas', { household_id: householdId }),
+    data.list<ContactListRow>('contact_lists', { household_id: householdId }),
+    data.list<ContactRow>('contacts', { household_id: householdId }),
   ]);
-  return { lists, items, shares, birthdays };
+  return { lists, items, shares, birthdays, ideas, contactLists, contacts };
 }
 
 export async function createGiftItem(householdId: string, input: NewGiftItemInput): Promise<GiftItemRow> {
@@ -37,6 +43,7 @@ export async function createGiftItem(householdId: string, input: NewGiftItemInpu
     url: input.url,
     reserved_by: null,
     purchased: false,
+    idea_id: input.ideaId ?? null,
     created_at: new Date().toISOString(),
   });
 }
@@ -50,6 +57,80 @@ export async function updateGiftItem(
 
 export async function deleteGiftItem(id: string): Promise<void> {
   await data.remove('gift_items', id);
+}
+
+/* ------------------------------------------------------------------ */
+/* Idées cadeau (D-05/D-07/D-08)                                       */
+/*                                                                     */
+/* Mêmes règles que les listes : INSERT sans représentation puis       */
+/* relecture (MVCC 0028/0032). Si la relecture est vide, l'idée vise   */
+/* son propre créateur : la RLS surprise la lui masque aussitôt — on   */
+/* renvoie alors l'écho des valeurs insérées plutôt qu'une erreur.     */
+/* ------------------------------------------------------------------ */
+
+export async function createGiftIdea(
+  householdId: string,
+  createdBy: string | null,
+  input: NewGiftIdeaInput,
+): Promise<GiftIdeaRow> {
+  const values = {
+    household_id: householdId,
+    name: input.name.trim(),
+    price: input.price === null ? null : roundPrice(input.price),
+    url: input.url,
+    comment: input.comment,
+    photo_url: input.photoUrl,
+    status: input.status,
+    giftee_text: input.gifteeText,
+    giftee_contact_id: input.gifteeContactId,
+    created_by: createdBy,
+  };
+  if (isSupabaseConfigured && supabase) {
+    const id = randomId('gift-idea');
+    const stamped = new Date().toISOString();
+    const { error } = await supabase.from('gift_ideas').insert({ ...values, id, created_at: stamped, updated_at: stamped });
+    if (error) throw new Error(error.message);
+    const rows = await data.list<GiftIdeaRow>('gift_ideas', { id });
+    const row = rows[0];
+    if (row) return row;
+    return { ...values, id, created_at: stamped, updated_at: stamped } as GiftIdeaRow;
+  }
+  return data.create<GiftIdeaRow>('gift_ideas', values);
+}
+
+export async function updateGiftIdea(
+  id: string,
+  values: Partial<Pick<GiftIdeaRow, 'name' | 'price' | 'url' | 'comment' | 'photo_url' | 'status' | 'giftee_text' | 'giftee_contact_id'>>,
+): Promise<GiftIdeaRow> {
+  const normalized =
+    values.price === undefined ? values : { ...values, price: values.price === null ? null : roundPrice(values.price) };
+  return data.update<GiftIdeaRow>('gift_ideas', id, normalized as Partial<GiftIdeaRow>);
+}
+
+export async function deleteGiftIdea(id: string): Promise<void> {
+  await data.remove('gift_ideas', id);
+}
+
+/**
+ * Promotion idée→article (D-05) : l'article porte `idea_id`, les onglets
+ * restent sinon indépendants. Passer l'idée à `offert` marque ensuite
+ * l'article acheté via le trigger serveur (D-06) ; l'UI relit après
+ * mutation pour en refléter l'effet.
+ */
+export async function promoteIdeaToItem(
+  householdId: string,
+  listId: string,
+  idea: Pick<GiftIdeaRow, 'id' | 'name' | 'price' | 'url' | 'comment' | 'photo_url'>,
+): Promise<GiftItemRow> {
+  return createGiftItem(householdId, {
+    listId,
+    name: idea.name,
+    price: idea.price === null ? null : Number(idea.price),
+    url: idea.url,
+    comment: idea.comment,
+    photoUrl: idea.photo_url,
+    ideaId: idea.id,
+  });
 }
 
 export async function createGiftList(householdId: string, ownerMemberId: string, input: NewGiftListInput): Promise<GiftListRow> {

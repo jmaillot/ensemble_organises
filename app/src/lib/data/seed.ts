@@ -13,6 +13,7 @@ import type {
   EventRow,
   ExpenseParticipantRow,
   ExpenseRow,
+  GiftIdeaRow,
   GiftItemRow,
   GiftListRow,
   GiftListShareRow,
@@ -507,6 +508,7 @@ export const demoGiftItems: GiftItemRow[] = [
     url: null,
     reserved_by: null,
     purchased: false,
+    idea_id: null,
     created_at: now(),
   },
   {
@@ -520,6 +522,7 @@ export const demoGiftItems: GiftItemRow[] = [
     url: null,
     reserved_by: DEMO_MEMBERS.thomas,
     purchased: false,
+    idea_id: null,
     created_at: now(),
   },
   {
@@ -533,12 +536,66 @@ export const demoGiftItems: GiftItemRow[] = [
     url: 'https://exemple.fr/livre-jardins',
     reserved_by: null,
     purchased: false,
+    idea_id: null,
     created_at: now(),
   },
 ];
 
 export const demoGiftShares: GiftListShareRow[] = [
   { id: 'gift-share-1', list_id: 'gift-list-noe', shared_with_member_id: DEMO_MEMBERS.lina, shared_with_email: null, permission: 'lecture' },
+];
+
+/**
+ * Idées cadeau de démonstration (migration 0076) : `idea-1` vise Camille via
+ * sa fiche contact liée (`contact-camille`) — le repli UX la masque dans sa
+ * session, comme la RLS `can_read_gift_idea` le fait côté serveur.
+ */
+export const demoGiftIdeas: GiftIdeaRow[] = [
+  {
+    id: 'idea-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    name: 'Montre connectée',
+    price: 199,
+    url: null,
+    comment: 'Pour ses sorties running.',
+    photo_url: null,
+    status: 'a_offrir',
+    giftee_text: 'Camille',
+    giftee_contact_id: 'contact-camille',
+    created_by: DEMO_MEMBERS.thomas,
+    created_at: now(),
+    updated_at: now(),
+  },
+  {
+    id: 'idea-2',
+    household_id: DEMO_HOUSEHOLD_ID,
+    name: 'Stage de poterie',
+    price: 120,
+    url: 'https://exemple.fr/stage-poterie',
+    comment: 'Le samedi matin, avec Maya.',
+    photo_url: null,
+    status: 'a_offrir',
+    giftee_text: 'Maya',
+    giftee_contact_id: 'contact-maya',
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+    updated_at: now(),
+  },
+  {
+    id: 'idea-3',
+    household_id: DEMO_HOUSEHOLD_ID,
+    name: 'Coffret thés du monde',
+    price: 32,
+    url: null,
+    comment: null,
+    photo_url: null,
+    status: 'offert',
+    giftee_text: 'Léa',
+    giftee_contact_id: 'contact-lea',
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+    updated_at: now(),
+  },
 ];
 
 export const demoBirthdays: BirthdayRow[] = [
@@ -930,6 +987,7 @@ const seedTables: Record<string, Row[]> = {
   gift_lists: demoGiftLists as unknown as Row[],
   gift_items: demoGiftItems as unknown as Row[],
   gift_list_shares: demoGiftShares as unknown as Row[],
+  gift_ideas: demoGiftIdeas as unknown as Row[],
   birthdays: demoBirthdays as unknown as Row[],
   contact_lists: demoContactLists as unknown as Row[],
   contacts: demoContacts as unknown as Row[],
