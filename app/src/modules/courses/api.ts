@@ -69,7 +69,13 @@ async function searchOffProxy(query: string, limit: number): Promise<OffSearchHi
       body: JSON.stringify({ q: query, limit }),
       signal: controller.signal,
     });
-    if (response.status === 400 || response.status === 401 || response.status === 429) {
+    if (response.status === 401) {
+      // Session absente/expirée (JWT 1 h) : withSupabase répond
+      // MISSING_CREDENTIALS/INVALID_JWT, un format sans champ `error`.
+      // Dire quoi faire plutôt que « Recherche impossible ».
+      throw new Error('Session expirée : reconnectez-vous puis réessayez.');
+    }
+    if (response.status === 400 || response.status === 429) {
       const detail = await response.json().catch(() => null);
       throw new Error((detail as { error?: string } | null)?.error ?? 'Recherche impossible.');
     }
