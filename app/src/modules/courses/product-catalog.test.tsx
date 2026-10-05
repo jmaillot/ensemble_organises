@@ -88,4 +88,38 @@ describe('ProductCatalog', () => {
       await data.remove('products', created.id).catch(() => undefined);
     }
   });
+
+  it('filtre par rayon via les onglets', async () => {
+    const user = userEvent.setup();
+    const frais = await seedProduct();
+    const autre = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: '5000159515154',
+      name: 'Savon',
+      brand: null,
+      category: 'Hygiène',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      renderCatalogue();
+      const heading = await screen.findByRole('heading', { name: 'Catalogue des produits scannés' });
+      const panel = heading.closest('section') as HTMLElement;
+      expect(await within(panel).findByText('Nutella')).toBeInTheDocument();
+      expect(within(panel).getByText('Savon')).toBeInTheDocument();
+
+      await user.click(within(panel).getByRole('tab', { name: 'Hygiène' }));
+      expect(await within(panel).findByText('Savon')).toBeInTheDocument();
+      expect(within(panel).queryByText('Nutella')).not.toBeInTheDocument();
+
+      await user.click(within(panel).getByRole('tab', { name: 'Tous' }));
+      expect(await within(panel).findByText('Nutella')).toBeInTheDocument();
+    } finally {
+      await data.remove('products', frais.id).catch(() => undefined);
+      await data.remove('products', autre.id).catch(() => undefined);
+    }
+  });
 });

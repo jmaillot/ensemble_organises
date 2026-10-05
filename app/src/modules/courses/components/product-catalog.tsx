@@ -13,7 +13,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile } from '@/lib/storage';
 import { isQueryableEan } from '../off-client';
-import { RAYONS } from '../types';
+import { normalizeRayon, RAYONS } from '../types';
 import type { ProductRow } from '@/types';
 
 const editSchema = z.object({
@@ -38,6 +38,13 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
   values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null },
 ) => Promise<void> }) {
   const [editing, setEditing] = useState<ProductRow | null>(null);
+  const [rayonFilter, setRayonFilter] = useState<string | null>(null);
+
+  const rayons = [...new Set(products.map((product) => normalizeRayon(product.category)))].sort((a, b) =>
+    a.localeCompare(b, 'fr'),
+  );
+  const visible =
+    rayonFilter === null ? products : products.filter((product) => normalizeRayon(product.category) === rayonFilter);
 
   return (
     <Panel
@@ -52,8 +59,45 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
           description="Scannez un code-barres pour constituer le catalogue du foyer."
         />
       ) : (
-        <ul className="grid gap-2">
-          {products.map((product) => (
+        <>
+          {rayons.length > 1 ? (
+            <div className="mb-2.5 flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrer par rayon">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rayonFilter === null}
+                onClick={() => setRayonFilter(null)}
+                className={
+                  rayonFilter === null
+                    ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
+                    : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+                }
+              >
+                Tous
+              </button>
+              {rayons.map((rayon) => {
+                const active = rayonFilter === rayon;
+                return (
+                  <button
+                    key={rayon}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setRayonFilter(active ? null : rayon)}
+                    className={
+                      active
+                        ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
+                        : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+                    }
+                  >
+                    {rayon}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          <ul className="grid gap-2">
+            {visible.map((product) => (
             <li
               key={product.id}
               className="flex min-h-11 items-center gap-2.5 rounded-[12px] border border-border px-3 py-2.5"
@@ -77,7 +121,8 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
               />
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
       <ProductEditDialog product={editing} onOpenChange={(open) => { if (!open) setEditing(null); }} onEdit={onEdit} />
     </Panel>
