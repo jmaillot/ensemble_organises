@@ -185,7 +185,7 @@ export default function CalendrierPage() {
           onOpenTask={() => navigate('/taches')}
         />
       </div>
-      {isLoading ? null : (
+      {isLoading ? null : isChild ? null : (
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button
             variant="secondary"
@@ -215,14 +215,16 @@ export default function CalendrierPage() {
     <ModuleShell
       module="calendrier"
       actions={
-        <>
-          <Button icon="plus" onClick={() => openCreate(selected)}>
-            Ajouter un événement
-          </Button>
-          <Button icon="plus" onClick={() => navigate('/taches', { state: { dueDate: selected } })}>
-            Ajouter une tâche
-          </Button>
-        </>
+        isChild ? undefined : (
+          <>
+            <Button icon="plus" onClick={() => openCreate(selected)}>
+              Ajouter un événement
+            </Button>
+            <Button icon="plus" onClick={() => navigate('/taches', { state: { dueDate: selected } })}>
+              Ajouter une tâche
+            </Button>
+          </>
+        )
       }
     >
       <MetricRow

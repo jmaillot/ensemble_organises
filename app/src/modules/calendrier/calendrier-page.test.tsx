@@ -281,6 +281,11 @@ describe('CalendrierPage', () => {
     expect(screen.queryByRole('button', { name: '+ Calendrier perso' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Catégorie' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Zone scolaire du foyer')).not.toBeInTheDocument();
+    // Aucune entrée de création restante : ni ModuleShell ni panneau agenda.
+    expect(screen.queryByRole('button', { name: 'Ajouter un événement' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ajouter une tâche' })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: 'Ajouter un événement' })).toEqual([]);
+    expect(screen.queryAllByRole('button', { name: 'Ajouter une tâche' })).toEqual([]);
   });
 
   it('colore la pastille du jour avec la catégorie, couleur membre inchangée (D-07)', async () => {
