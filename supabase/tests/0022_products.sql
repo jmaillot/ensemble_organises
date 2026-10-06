@@ -135,6 +135,22 @@ select testkit.expect_denied(format(
 reset role;
 
 -- ===========================================================================
+-- Bob, membre non-créateur : édition partagée (0088)
+-- ===========================================================================
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'update public.products set name = %L where id = %L', 'Pate a tartiner Bob', (select row_id from testkit.fx where key = 'prod_a'))), 1::bigint,
+  'un membre modifie le produit d''un autre membre de son foyer');
+select testkit.expect_denied(format(
+  'update public.products set created_by = %L where id = %L',
+  (select row_id from testkit.fx where key = 'bob'), (select row_id from testkit.fx where key = 'prod_a')),
+  'l''auteur d''un produit ne peut pas etre reattribue');
+
+reset role;
+
+-- ===========================================================================
 -- Suppression : l'article survit avec product_id NULL (en FIN de fichier)
 -- ===========================================================================
 -- Le produit `prod_a` est reference par `item_a` : le supprimer prouve le

@@ -40,7 +40,7 @@ export async function updateProductPhoto(id: string, photoUrl: string | null): P
   return data.update<ProductRow>(PRODUCTS_TABLE, id, { photo_url: photoUrl });
 }
 
-/** Mise à jour d'un produit du foyer (RLS : créateur ou ligne sans auteur). */
+/** Mise à jour d'un produit du foyer (RLS 0088 : tout admin/membre ; auteur figé serveur). */
 export async function updateProduct(id: string, input: ProductUpdate): Promise<ProductRow> {
   const name = input.name.trim();
   if (name.length < 1 || name.length > 200) throw new Error('Nommez le produit (1 à 200 caractères).');

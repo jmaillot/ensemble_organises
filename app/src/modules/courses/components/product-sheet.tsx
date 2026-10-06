@@ -216,21 +216,14 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
                 },
           );
           // Produit déjà connu : la photo fournie ici n'est pas dans l'écriture
-          // unique ci-dessus. On la pose si la RLS le permet (créateur ou sans
-          // auteur), sinon on nettoie le dépôt et on le dit franchement.
+          // unique ci-dessus. On la pose si la RLS le permet (tout admin/membre
+          // du foyer depuis 0088), sinon on nettoie le dépôt et on le dit franchement.
           if (photoUrl && resolution.product.photo_url !== photoUrl) {
-            const editable =
-              !resolution.product.created_by || resolution.product.created_by === currentMemberId;
-            if (editable) {
-              try {
-                await productsApi.updateProductPhoto(resolution.product.id, photoUrl);
-              } catch {
-                await removeHouseholdFile(depositedPath).catch(() => {});
-                toast('Produit ajouté, mais la photo n’a pas pu être enregistrée.', 'error');
-              }
-            } else {
+            try {
+              await productsApi.updateProductPhoto(resolution.product.id, photoUrl);
+            } catch {
               await removeHouseholdFile(depositedPath).catch(() => {});
-              toast('Produit ajouté. Photo non enregistrée : produit créé par un autre membre.', 'error');
+              toast('Produit ajouté, mais la photo n’a pas pu être enregistrée.', 'error');
             }
           }
           toast(productsApi.scanAddedToast(resolution.product.name, resolution.incremented), 'success');

@@ -255,7 +255,7 @@ describe('photo produit persistée (D-05)', () => {
     }
   });
 
-  it("produit d'un autre membre : photo écartée, dépôt nettoyé, message honnête", async () => {
+  it("produit d'un autre membre (0088) : photo enregistrée, dépôt conservé", async () => {
     const user = userEvent.setup();
     const list = await createList();
     const existing = await data.create<ProductRow>('products', {
@@ -294,10 +294,10 @@ describe('photo produit persistée (D-05)', () => {
       await user.upload(screen.getByLabelText(/^Photo/), new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }));
       await user.click(screen.getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
 
-      expect(await screen.findByText(/produit créé par un autre membre/)).toBeInTheDocument();
-      expect(removeMock).toHaveBeenCalledWith('foyer/products/nouvelle.webp');
+      expect(await screen.findByText(/ajouté à la liste/)).toBeInTheDocument();
+      expect(removeMock).not.toHaveBeenCalledWith('foyer/products/nouvelle.webp');
       const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
-      expect(rows[0].photo_url).toBeNull();
+      expect(rows[0].photo_url).toBe('https://signed.example/nouvelle.webp');
     } finally {
       await data.remove('products', existing.id).catch(() => undefined);
     }
