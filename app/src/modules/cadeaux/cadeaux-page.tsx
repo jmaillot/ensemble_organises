@@ -406,7 +406,7 @@ export default function CadeauxPage() {
             }
           />
 
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-4 grid gap-2">
             <div role="group" aria-label="Filtrer les listes" className="flex items-center gap-1">
               {(
                 [
@@ -426,6 +426,7 @@ export default function CadeauxPage() {
                 </Button>
               ))}
             </div>
+            <div className="flex flex-wrap items-center gap-2">
             {shownLists.map((list) => (
               <div key={list.id} className="flex items-center gap-2">
                 <Button
@@ -438,6 +439,7 @@ export default function CadeauxPage() {
                 </Button>
               </div>
             ))}
+            </div>
             {shownLists.length === 0 ? (
               <p className="text-sm text-muted">
                 {listFilter === 'privees'
