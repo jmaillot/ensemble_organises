@@ -15,8 +15,10 @@ import {
   fetchGiftListInviteSummary,
   giftInviteLink,
   revokeGiftListInviteCode,
+  sendGiftListInviteEmail,
   type GiftListInviteSummary,
 } from '../api';
+import { GIFT_HOST_MESSAGE_MAX } from '../email-template';
 import { permissionLabel, type GiftList, type GiftShare, type GiftShareInput } from '../types';
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -41,6 +43,12 @@ export interface GiftShareDialogProps {
   members: HouseholdMemberRow[];
   existingShares: GiftShare[];
   onSubmit: (listId: string, shares: GiftShareInput[]) => void;
+  /**
+   * Garantit la part `lecture` du destinataire SANS fermer le dialogue
+   * (D-04, partage d'abord) : le panneau d'envoi l'appelle avant l'envoi
+   * serveur. Fourni par la page (mutation partages, sans toast).
+   */
+  onEnsureLectureShare: (listId: string, email: string) => Promise<void>;
   isPending?: boolean;
 }
 
@@ -56,12 +64,25 @@ export interface GiftShareDialogProps {
  * invité puis activation via la branche e-mail de `redeem_gift_list_invite`
  * (OQ-1 OPTION A, Edge user-only, plan 05-03).
  */
-function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
+function GiftCodePanel({
+  list,
+  open,
+  onEnsureLectureShare,
+}: {
+  list: GiftList;
+  open: boolean;
+  onEnsureLectureShare: (listId: string, email: string) => Promise<void>;
+}) {
   const toast = useToast();
   const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
   const [codeError, setCodeError] = useState(false);
   const [lastCode, setLastCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [hostMessage, setHostMessage] = useState('');
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendOk, setSendOk] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +90,12 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
       setLastCode(null);
       return;
     }
+    // Réouverture : le formulaire d'envoi repart vierge (le code, lui, se
+    // régénère via le bouton — jamais réaffiché depuis le serveur).
+    setRecipient('');
+    setHostMessage('');
+    setSendError(null);
+    setSendOk(null);
     let active = true;
     fetchGiftListInviteSummary(list.id)
       .then((result) => {
@@ -152,6 +179,51 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
       .finally(() => setBusy(false));
   };
 
+  /**
+   * Envoi de l'invitation (D-02/D-03/D-04) : la part `lecture` du
+   * destinataire est créée D'ABORD (chemin de soumission existant, sans
+   * fermer le dialogue), PUIS l'action serveur envoie l'e-mail sobre avec
+   * le message personnel de l'hôte. Le lien embarque le code affiché
+   * ci-dessus (généré sur cet appareil) : sans code visible, pas d'envoi.
+   */
+  const sendEmail = () => {
+    setSendError(null);
+    setSendOk(null);
+    const address = recipient.trim();
+    if (!emailPattern.test(address)) {
+      setSendError('Indiquez un email valide.');
+      return;
+    }
+    const text = hostMessage.trim();
+    if (text.length > GIFT_HOST_MESSAGE_MAX) {
+      setSendError(`Le message personnel fait ${GIFT_HOST_MESSAGE_MAX} caractères au plus.`);
+      return;
+    }
+    if (!lastCode) {
+      setSendError('Générez d’abord un code : l’e-mail embarque son lien.');
+      return;
+    }
+    const code = lastCode;
+    setSendBusy(true);
+    onEnsureLectureShare(list.id, address)
+      .then(() =>
+        sendGiftListInviteEmail({
+          code,
+          email: address,
+          ...(text ? { message: text } : {}),
+          link: inviteUrl(code),
+        }),
+      )
+      .then((sent) => {
+        setSendOk(`Invitation envoyée à ${sent.email}.`);
+        toast('Invitation envoyée.');
+      })
+      .catch((sendFailure: unknown) =>
+        setSendError(sendFailure instanceof Error ? sendFailure.message : 'Envoi impossible.'),
+      )
+      .finally(() => setSendBusy(false));
+  };
+
   return (
     <section aria-label="Partage par code" className="grid gap-3 border-t border-border pt-3.5">
       <p className="m-0 text-[12px] font-extrabold">Partage par code</p>
@@ -198,8 +270,55 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
             ) : null}
           </div>
           <p className="m-0 text-[11px] text-muted">
-            Le lien mène vers l’inscription avec l’e-mail invité, puis active un partage réservation.
+            Le lien mène vers la page invitée : sans compte, un nom suffit pour réserver.
           </p>
+          <div className="grid gap-2.5 border-t border-border pt-3">
+            <p className="m-0 text-[12px] font-extrabold">Envoyer par e-mail</p>
+            <Field label="E-mail du destinataire">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="email"
+                  placeholder="prenom@exemple.fr"
+                  value={recipient}
+                  onChange={(change) => setRecipient(change.target.value)}
+                  autoComplete="email"
+                />
+              )}
+            </Field>
+            <label className="grid gap-1.5 text-[11px] font-extrabold text-muted">
+              Message personnel (optionnel)
+              <textarea
+                aria-label="Message personnel (optionnel)"
+                className="min-h-[68px] rounded-[9px] border border-border bg-bg px-2.5 py-2 text-[12px] font-normal text-fg"
+                placeholder="Un mot pour accompagner l’invitation…"
+                value={hostMessage}
+                onChange={(change) => setHostMessage(change.target.value)}
+                maxLength={GIFT_HOST_MESSAGE_MAX + 20}
+              />
+              <span className="text-[10px] font-normal">
+                {`${hostMessage.trim().length}/${GIFT_HOST_MESSAGE_MAX} caractères.`}
+              </span>
+            </label>
+            {sendOk ? (
+              <p className="m-0 text-[12px] font-semibold text-accent-strong" role="status">
+                {sendOk}
+              </p>
+            ) : null}
+            {sendError ? (
+              <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+                {sendError}
+              </p>
+            ) : null}
+            <div>
+              <Button variant="secondary" icon="share" disabled={sendBusy || busy} onClick={sendEmail}>
+                {sendBusy ? 'Envoi…' : 'Envoyer l’invitation'}
+              </Button>
+            </div>
+            <p className="m-0 text-[11px] text-muted">
+              L’envoi crée d’abord le partage du destinataire, puis transmet l’e-mail sobre avec votre message.
+            </p>
+          </div>
         </div>
       )}
     </section>
@@ -218,6 +337,7 @@ export function GiftShareDialog({
   members,
   existingShares,
   onSubmit,
+  onEnsureLectureShare,
   isPending = false,
 }: GiftShareDialogProps) {
   const {
@@ -313,7 +433,7 @@ export function GiftShareDialog({
             </Button>
           </DialogActions>
         </form>
-        {list ? <GiftCodePanel list={list} open={open} /> : null}
+        {list ? <GiftCodePanel list={list} open={open} onEnsureLectureShare={onEnsureLectureShare} /> : null}
       </DialogContent>
     </Dialog>
   );

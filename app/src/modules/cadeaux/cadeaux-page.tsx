@@ -10,8 +10,9 @@ import { useToast } from '@/components/ui/toast';
 import { MetricRow, ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import type { GiftItemRow } from '@/types';
 import { formatEuro, formatShortDate, pluralize } from '@/lib/utils';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import {
   useAddGiftIdea,
   useAddGiftItem,
@@ -94,6 +95,7 @@ export default function CadeauxPage() {
   const [pendingItemDeletion, setPendingItemDeletion] = useState<GiftItem | null>(null);
   const [pendingListDeletion, setPendingListDeletion] = useState<GiftList | null>(null);
   const [pendingIdeaDeletion, setPendingIdeaDeletion] = useState<GiftIdea | null>(null);
+  const [pendingRelease, setPendingRelease] = useState<GiftItem | null>(null);
   const [promotedIdea, setPromotedIdea] = useState<GiftIdea | null>(null);
   const [promoteListId, setPromoteListId] = useState('');
 
@@ -350,6 +352,57 @@ export default function CadeauxPage() {
     }
   };
 
+  /**
+   * Garantit la part `lecture` d'un destinataire e-mail SANS fermer le
+   * dialogue (D-04, partage d'abord) : le panneau d'envoi l'appelle avant
+   * l'action serveur `send-email`, qui recrée la part côté serveur avant
+   * l'envoi (jamais d'envoi sans part, jamais de dégradation d'une part
+   * `reservation` existante).
+   */
+  const handleEnsureLectureShare = async (listId: string, email: string) => {
+    const normalized = email.trim().toLowerCase();
+    const existing = shares
+      .filter((share) => share.listId === listId)
+      .map((share) => ({
+        id: share.id,
+        list_id: share.listId,
+        shared_with_member_id: share.memberId,
+        shared_with_email: share.email,
+        permission: share.permission,
+      }));
+    const already = shares.some(
+      (share) => share.listId === listId && (share.email ?? '').trim().toLowerCase() === normalized,
+    );
+    const next: GiftShareInput[] = shares
+      .filter((share) => share.listId === listId)
+      .map((share) => ({ memberId: share.memberId, email: share.email, permission: share.permission }));
+    if (!already) next.push({ memberId: null, email: email.trim(), permission: 'lecture' });
+    await syncShares.mutateAsync({ listId, existing, next });
+  };
+
+  // Libération d'une réservation par l'organisateur (D-08) : les deux
+  // formes d'auteur (membre comme nom déclaré) sont effacées en une action
+  // explicite, confirmée par modale comme toute action destructrice. Le
+  // garde serveur refuse la même écriture à un non-gestionnaire (0029).
+  const isAdmin = useIsAdmin();
+  const isManager = (activeList?.isOwned ?? false) || isAdmin;
+
+  const handleRelease = async () => {
+    if (!pendingRelease) return;
+    setPendingRelease(null);
+    try {
+      await updateItem.mutateAsync({
+        id: pendingRelease.id,
+        // `reserved_by_name` existe en base (0089) mais pas encore dans le
+        // type applicatif : la libération efface les deux formes d'auteur.
+        values: { reserved_by: null, purchased: false, reserved_by_name: null } as unknown as Partial<GiftItemRow>,
+      });
+      toast('Réservation libérée.');
+    } catch {
+      toast('Libération impossible.', 'error');
+    }
+  };
+
   return (
     <ModuleShell
       module="cadeaux"
@@ -583,6 +636,16 @@ export default function CadeauxPage() {
                             />
                             Reçu
                           </label>
+                          {item.purchased && isManager ? (
+                            <button
+                              type="button"
+                              className={shareButtonBase}
+                              aria-label={`Libérer la réservation de ${item.name}`}
+                              onClick={() => setPendingRelease(item)}
+                            >
+                              Libérer
+                            </button>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -599,6 +662,16 @@ export default function CadeauxPage() {
                             />
                             Acheté
                           </label>
+                          {item.reservedBy && isManager ? (
+                            <button
+                              type="button"
+                              className={shareButtonBase}
+                              aria-label={`Libérer la réservation de ${item.name}`}
+                              onClick={() => setPendingRelease(item)}
+                            >
+                              Libérer
+                            </button>
+                          ) : null}
                         </div>
                       )}
 
@@ -767,6 +840,7 @@ export default function CadeauxPage() {
         members={members}
         existingShares={activeShares}
         onSubmit={(listId, next) => void handleShare(listId, next)}
+        onEnsureLectureShare={(listId, email) => handleEnsureLectureShare(listId, email)}
         isPending={syncShares.isPending}
       />
 
@@ -812,6 +886,17 @@ export default function CadeauxPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(pendingRelease)}
+        onOpenChange={(open) => {
+          if (!open) setPendingRelease(null);
+        }}
+        title={pendingRelease ? `Libérer « ${pendingRelease.name} »` : 'Libérer la réservation'}
+        description="La réservation sera effacée et l’article redeviendra libre. Cette action est visible par tous."
+        confirmLabel="Libérer"
+        onConfirm={() => void handleRelease()}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingItemDeletion)}
