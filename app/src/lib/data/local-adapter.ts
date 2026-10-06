@@ -21,6 +21,26 @@ export class LocalAdapter implements DataAdapter {
   /** À appeler après un vidage du cache (tests, « effacer les données »). */
   invalidateSeedCache() {
     this.seededTables.clear();
+    this.seedPromise = null;
+  }
+
+  /**
+   * Amorce en cours partagé : N lectures concurrentes au montage (une page
+   * ouvre ~10 requêtes d'un coup) ne doivent amorcer qu'une seule fois, sinon
+   * les N parcours séquentiels des tables se sérialisent dans IndexedDB et le
+   * montage dépasse le budget des `findBy*` (constaté : ~1 s à 10 concurrents
+   * contre ~40 ms en série sur le moteur simulé des tests).
+   */
+  private seedPromise: Promise<void> | null = null;
+
+  private ensureSeeded(): Promise<void> {
+    if (!this.seedPromise) {
+      this.seedPromise = this.seedNow().catch((error: unknown) => {
+        this.seedPromise = null;
+        throw error;
+      });
+    }
+    return this.seedPromise;
   }
 
   /**
@@ -28,7 +48,7 @@ export class LocalAdapter implements DataAdapter {
    * pour chaque table et non sur le total : une écriture tardive (ou un cache
    * partiellement vidé) ne peut pas empêcher le ré-amorçage des autres tables.
    */
-  private async ensureSeeded() {
+  private async seedNow() {
     const db = getDatabase();
     const entries: StoredRow[] = [];
     for (const [table, rows] of Object.entries(seedRows())) {

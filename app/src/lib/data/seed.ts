@@ -32,10 +32,12 @@ import type {
   ProfileRow,
   ProviderRow,
   ProviderTypeRow,
+  PublicHolidayRow,
   RecipeRow,
   RoutineAssigneeRow,
   RoutineCompletionRow,
   RoutineRow,
+  SchoolHolidayRow,
   ShoppingListItemRow,
   ShoppingListRow,
   TaskAssigneeRow,
@@ -598,8 +600,97 @@ export const demoGiftIdeas: GiftIdeaRow[] = [
   },
 ];
 
-export const demoBirthdays: BirthdayRow[] = [
-  { id: 'birthday-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Maya Martin', birth_date: '1992-10-07', photo_url: null, linked_member_id: null, contact_id: null },
+/** Dimanche de Pâques (algorithme de Meeus) : base des fêtes mobiles de démo. */
+function demoEasterSunday(year: number): { month: number; day: number } {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const dayOfMonth = ((h + l - 7 * m + 114) % 31) + 1;
+  return { month, day: dayOfMonth };
+}
+
+const currentYear = new Date().getFullYear();
+
+/**
+ * Cache fériés de démonstration (miroir du seed SQL) : 11 fériés de métropole
+ * pour l'année passée, en cours et suivante, afin que la démo et les tests
+ * restent « vivants » quelle que soit la date d'exécution.
+ */
+function buildDemoHolidays(): PublicHolidayRow[] {
+  const rows: PublicHolidayRow[] = [];
+  for (const year of [currentYear - 1, currentYear, currentYear + 1]) {
+    const easter = new Date(Date.UTC(year, demoEasterSunday(year).month - 1, demoEasterSunday(year).day));
+    const iso = (offsetDays: number) =>
+      new Date(easter.getTime() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+    const fixed: Array<[string, string]> = [
+      [`${year}-01-01`, 'Jour de l’an'],
+      [`${year}-05-01`, 'Fête du Travail'],
+      [`${year}-05-08`, 'Victoire 1945'],
+      [`${year}-07-14`, 'Fête nationale'],
+      [`${year}-08-15`, 'Assomption'],
+      [`${year}-11-01`, 'Toussaint'],
+      [`${year}-11-11`, 'Armistice 1918'],
+      [`${year}-12-25`, 'Noël'],
+    ];
+    const mobile: Array<[string, string]> = [
+      [iso(1), 'Lundi de Pâques'],
+      [iso(39), 'Ascension'],
+      [iso(50), 'Lundi de Pentecôte'],
+    ];
+    for (const [holiday_date, name] of [...fixed, ...mobile]) {
+      rows.push({ holiday_date, name, year });
+    }
+  }
+  return rows;
+}
+
+export const demoPublicHolidays: PublicHolidayRow[] = buildDemoHolidays();
+
+/**
+ * Cache vacances de démonstration : Toussaint et Noël de l'année scolaire en
+ * cours, pour les trois zones. Dates indicatives (la base réelle est
+ * rafraîchie par l'Edge `refresh-calendrier-ref`).
+ */
+function buildDemoVacations(): SchoolHolidayRow[] {
+  const today = new Date();
+  const year = today.getFullYear();
+  const schoolYear = today.getMonth() >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+  const startYear = today.getMonth() >= 8 ? year : year - 1;
+  const rows: SchoolHolidayRow[] = [];
+  for (const zone of ['A', 'B', 'C'] as const) {
+    rows.push({
+      id: `school-holiday-toussaint-${zone}`,
+      zone,
+      school_year: schoolYear,
+      name: 'Vacances de la Toussaint',
+      start_date: `${startYear}-10-18`,
+      end_date: `${startYear}-11-02`,
+    });
+    rows.push({
+      id: `school-holiday-noel-${zone}`,
+      zone,
+      school_year: schoolYear,
+      name: 'Vacances de Noël',
+      start_date: `${startYear}-12-20`,
+      end_date: `${startYear + 1}-01-04`,
+    });
+  }
+  return rows;
+}
+
+export const demoSchoolHolidays: SchoolHolidayRow[] = buildDemoVacations();
+
+export const demoBirthdays: BirthdayRow[] = [  { id: 'birthday-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Maya Martin', birth_date: '1992-10-07', photo_url: null, linked_member_id: null, contact_id: null },
   { id: 'birthday-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Paul Durand', birth_date: '1988-10-19', photo_url: null, linked_member_id: null, contact_id: null },
   { id: 'birthday-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Nina Leroy', birth_date: '1990-11-03', photo_url: null, linked_member_id: null, contact_id: null },
   { id: 'birthday-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Noé Martin', birth_date: '2016-09-29', photo_url: null, linked_member_id: DEMO_MEMBERS.noe, contact_id: 'contact-noe' },
@@ -989,6 +1080,8 @@ const seedTables: Record<string, Row[]> = {
   gift_list_shares: demoGiftShares as unknown as Row[],
   gift_ideas: demoGiftIdeas as unknown as Row[],
   birthdays: demoBirthdays as unknown as Row[],
+  public_holidays: demoPublicHolidays as unknown as Row[],
+  school_holidays: demoSchoolHolidays as unknown as Row[],
   contact_lists: demoContactLists as unknown as Row[],
   contacts: demoContacts as unknown as Row[],
   pets: demoPets as unknown as Row[],

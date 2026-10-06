@@ -1,11 +1,13 @@
 import { data } from '@/lib/data';
-import type { EventCalendarRow, EventCategoryRow, EventReminderRow, EventRow, MemberColorTag } from '@/types';
+import type { EventCalendarRow, EventCategoryRow, EventReminderRow, EventRow, MemberColorTag, PublicHolidayRow, SchoolHolidayRow } from '@/types';
 import type { EventFormValues } from './types';
 
 const EVENTS = 'events';
 const REMINDERS = 'event_reminders';
 const CALENDARS = 'event_calendars';
 const CATEGORIES = 'event_categories';
+const PUBLIC_HOLIDAYS = 'public_holidays';
+const SCHOOL_HOLIDAYS = 'school_holidays';
 
 /** Payload complet accepté par les écritures d'un événement. */
 export interface EventInput extends Omit<EventFormValues, 'categoryId' | 'calendarId'> {
@@ -49,6 +51,16 @@ export async function listCalendars(): Promise<EventCalendarRow[]> {
 
 export async function listCategories(): Promise<EventCategoryRow[]> {
   return data.list<EventCategoryRow>(CATEGORIES);
+}
+
+/** Jours fériés du cache base pour une année (source unique, D-13). */
+export async function listPublicHolidays(year: number): Promise<PublicHolidayRow[]> {
+  return data.list<PublicHolidayRow>(PUBLIC_HOLIDAYS, { year });
+}
+
+/** Vacances du cache base pour une zone (source unique, D-13). */
+export async function listSchoolHolidays(zone: 'A' | 'B' | 'C'): Promise<SchoolHolidayRow[]> {
+  return data.list<SchoolHolidayRow>(SCHOOL_HOLIDAYS, { zone });
 }
 
 /** Id du calendrier Commun du foyer, ou null si absent (le trigger SQL le créera). */

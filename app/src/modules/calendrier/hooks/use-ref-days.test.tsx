@@ -106,9 +106,9 @@ describe('useRefDays sur cache base (D-13/D-15)', () => {
     const { result } = renderHook(() => useRefDays(year, 'A'), { wrapper });
 
     await waitFor(() => expect(result.current.holidays.some((holiday) => holiday.title === 'Armistice')).toBe(true));
-    expect(result.current.vacations).toEqual([
-      { start: '2026-10-17', end: '2026-11-02', label: 'Vacances de la Toussaint' },
-    ]);
+    expect(result.current.vacations).toEqual(
+      expect.arrayContaining([{ start: '2026-10-17', end: '2026-11-02', label: 'Vacances de la Toussaint' }]),
+    );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

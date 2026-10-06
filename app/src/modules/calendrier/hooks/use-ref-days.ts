@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { FrenchHoliday } from '@/hooks/use-french-holidays';
+import type { PublicHolidayRow, SchoolHolidayRow } from '@/types';
+import { listPublicHolidays, listSchoolHolidays } from '../api';
 
 export type SchoolZone = 'A' | 'B' | 'C';
 
@@ -15,14 +17,6 @@ export interface VacationRange {
 const DAY_MS = 86_400_000;
 const STALE_MS = 24 * 3600 * 1000;
 
-const feriesUrl = (year: number) => `https://calendrier.api.gouv.fr/jours-feries/metropole/${year}.json`;
-
-const vacancesUrl = (zone: SchoolZone, schoolYear: string) =>
-  `https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records` +
-  `?where=${encodeURIComponent(`zones="Zone ${zone}"`)}` +
-  `&where=${encodeURIComponent(`annee_scolaire="${schoolYear}"`)}` +
-  `&limit=100&select=description,start_date,end_date,zones,annee_scolaire`;
-
 /** Convertit un instant ISO en jour civil Europe/Paris (`YYYY-MM-DD`). */
 export function toParisDay(isoDateTime: string): string {
   return new Date(isoDateTime).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
@@ -33,15 +27,6 @@ export function schoolYearFor(isoDate: string): string {
   const year = Number(isoDate.slice(0, 4));
   const month = Number(isoDate.slice(5, 7));
   return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-}
-
-export async function fetchFrenchHolidays(year: number, signal?: AbortSignal): Promise<FrenchHoliday[]> {
-  const response = await fetch(feriesUrl(year), { signal });
-  if (!response.ok) throw new Error(`Jours fériés indisponibles (${response.status}).`);
-  const json = (await response.json()) as Record<string, string>;
-  return Object.entries(json)
-    .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([date, title], index) => ({ id: index, date, title, time: 'Toute la journée', kind: 'Jour férié' as const }));
 }
 
 interface VacationRecord {
@@ -63,51 +48,65 @@ export function parseVacationRecords(records: readonly VacationRecord[]): Vacati
   return [...seen.values()].sort((a, b) => (a.start < b.start ? -1 : 1));
 }
 
-export async function fetchSchoolVacations(
-  zone: SchoolZone,
-  schoolYears: readonly string[],
-  signal?: AbortSignal,
-): Promise<VacationRange[]> {
-  const pages = await Promise.all(
-    schoolYears.map(async (schoolYear) => {
-      const response = await fetch(vacancesUrl(zone, schoolYear), { signal });
-      if (!response.ok) throw new Error(`Vacances scolaires indisponibles (${response.status}).`);
-      const json = (await response.json()) as { results?: VacationRecord[] };
-      return json.results ?? [];
-    }),
+/** Mappe les lignes du cache base vers les objets `FrenchHoliday`, triés par date. */
+export function toFrenchHolidays(rows: readonly PublicHolidayRow[]): FrenchHoliday[] {
+  return [...rows]
+    .sort((a, b) => (a.holiday_date < b.holiday_date ? -1 : 1))
+    .map((row, index) => ({
+      id: index,
+      date: row.holiday_date,
+      title: row.name,
+      time: 'Toute la journée',
+      kind: 'Jour férié' as const,
+    }));
+}
+
+/** Mappe les lignes du cache vacances vers les plages (dédupliquées, triées). */
+export function toVacationRanges(rows: readonly SchoolHolidayRow[]): VacationRange[] {
+  return parseVacationRecords(
+    rows.map((row) => ({ description: row.name, start_date: row.start_date, end_date: row.end_date })),
   );
-  return parseVacationRecords(pages.flat());
 }
 
 /**
- * Référentiels du calendrier depuis les API officielles (cache 24 h).
+ * Référentiels du calendrier depuis le cache base (D-13, source unique :
+ * aucun appel réseau direct vers les sources officielles). Le rafraîchissement
+ * est serveur (Edge `refresh-calendrier-ref` + pg_cron) ; en panne, les
+ * dernières données affichées sont conservées (D-15, `placeholderData`).
  * `zone === null` : pas de vacances, avec un état invitant à choisir la zone.
  */
 export function useRefDays(year: number, zone: SchoolZone | null) {
-  const schoolYears = useMemo(
-    () => [...new Set([schoolYearFor(`${year}-01-01`), schoolYearFor(`${year}-12-31`)])],
-    [year],
-  );
-
   const holidaysQuery = useQuery({
-    queryKey: ['ref-days', 'feries', year],
-    queryFn: ({ signal }) => fetchFrenchHolidays(year, signal),
+    queryKey: ['ref-days', 'public_holidays', year],
+    queryFn: () => listPublicHolidays(year),
     staleTime: STALE_MS,
     retry: 1,
+    placeholderData: (previous) => previous,
   });
   const vacationsQuery = useQuery({
-    queryKey: ['ref-days', 'vacances', zone, ...schoolYears],
+    queryKey: ['ref-days', 'school_holidays', zone],
     enabled: zone !== null,
-    queryFn: ({ signal }) => fetchSchoolVacations(zone as SchoolZone, schoolYears, signal),
+    queryFn: () => listSchoolHolidays(zone as SchoolZone),
     staleTime: STALE_MS,
     retry: 1,
+    placeholderData: (previous) => previous,
   });
 
+  const holidays = useMemo(() => toFrenchHolidays(holidaysQuery.data ?? []), [holidaysQuery.data]);
+  const vacations = useMemo(
+    () => (zone === null ? [] : toVacationRanges(vacationsQuery.data ?? [])),
+    [vacationsQuery.data, zone],
+  );
+
   return {
-    holidays: holidaysQuery.data ?? [],
-    vacations: zone === null ? [] : (vacationsQuery.data ?? []),
+    holidays,
+    vacations: zone === null ? [] : vacations,
     isLoading: holidaysQuery.isLoading || vacationsQuery.isLoading,
     isError: holidaysQuery.isError || vacationsQuery.isError,
+    refetch: async () => {
+      await holidaysQuery.refetch();
+      if (zone !== null) await vacationsQuery.refetch();
+    },
   };
 }
 
