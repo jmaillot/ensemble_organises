@@ -43,13 +43,37 @@ beforeEach(() => {
 });
 
 describe('CadeauxPage', () => {
-  it('signale la liste privée et partage une idée, qui passe en « Gérer »', async () => {
+  it("filtre les listes par visibilité au lieu d'un badge accolé au nom", async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    // La liste sélectionnée est la liste privée de Camille.
+    // La liste sélectionnée est la liste privée de Camille : aucun badge accolé.
+    expect(await screen.findByText('Idées pour Maya')).toBeInTheDocument();
+    expect(screen.queryByText('Liste privée')).not.toBeInTheDocument();
+    expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
+
+    // Filtre « Foyer » : la privée disparaît des sélecteurs, la partagée reste.
+    await user.click(screen.getByRole('button', { name: 'Foyer' }));
+    expect(screen.queryByRole('button', { name: 'Idées pour Maya' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+
+    // Filtre « Privées » : seule la privée reste.
+    await user.click(screen.getByRole('button', { name: 'Privées' }));
+    expect(screen.getByRole('button', { name: 'Idées pour Maya' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anniversaire de Noé' })).not.toBeInTheDocument();
+
+    // Filtre « Toutes » : retour à l'ensemble.
+    await user.click(screen.getByRole('button', { name: 'Toutes' }));
+    expect(screen.getByRole('button', { name: 'Idées pour Maya' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+  });
+
+  it('partage une idée, qui passe en « Gérer »', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    // La liste sélectionnée est la liste privée de Camille (sans badge accolé).
     expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
-    expect(screen.getByText('Liste privée')).toBeInTheDocument();
     expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: 'Partager' })[0]);

@@ -98,7 +98,15 @@ export default function CadeauxPage() {
   const [promoteListId, setPromoteListId] = useState('');
 
   const currentMemberId = currentMember?.id ?? null;
-  const activeList = lists.find((list) => list.id === requestedListId) ?? lists[0] ?? null;
+  const [listFilter, setListFilter] = useState<'toutes' | 'privees' | 'foyer'>('toutes');
+  const shownLists = useMemo(
+    () =>
+      listFilter === 'toutes'
+        ? lists
+        : lists.filter((list) => (listFilter === 'privees' ? list.isPrivate : !list.isPrivate)),
+    [listFilter, lists],
+  );
+  const activeList = shownLists.find((list) => list.id === requestedListId) ?? shownLists[0] ?? null;
   const activeItems = useMemo(
     () => items.filter((item) => item.listId === activeList?.id),
     [activeList?.id, items],
@@ -399,7 +407,26 @@ export default function CadeauxPage() {
           />
 
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            {lists.map((list) => (
+            <div role="group" aria-label="Filtrer les listes" className="flex items-center gap-1">
+              {(
+                [
+                  { value: 'toutes', label: 'Toutes' },
+                  { value: 'privees', label: 'Privées' },
+                  { value: 'foyer', label: 'Foyer' },
+                ] as const
+              ).map((option) => (
+                <Button
+                  key={option.value}
+                  variant={listFilter === option.value ? 'primary' : 'secondary'}
+                  size="sm"
+                  aria-pressed={listFilter === option.value}
+                  onClick={() => setListFilter(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+            {shownLists.map((list) => (
               <div key={list.id} className="flex items-center gap-2">
                 <Button
                   variant={list.id === activeList?.id ? 'primary' : 'secondary'}
@@ -409,14 +436,15 @@ export default function CadeauxPage() {
                 >
                   {list.name}
                 </Button>
-                {list.isPrivate ? (
-                  <Badge tone="coral">
-                    <Icon name="users" size="sm" className="mr-1" />
-                    {visibilityLabel.privee}
-                  </Badge>
-                ) : null}
               </div>
             ))}
+            {shownLists.length === 0 ? (
+              <p className="text-sm text-muted">
+                {listFilter === 'privees'
+                  ? 'Aucune liste privée pour le moment.'
+                  : 'Aucune liste partagée avec le foyer pour le moment.'}
+              </p>
+            ) : null}
 
             {creatingList ? (
               <form onSubmit={handleCreateList} className="flex flex-wrap items-center gap-2">
