@@ -2,24 +2,26 @@
  * Edge Function `gift-list-invite`.
  *
  * Point d'entrée : `POST /functions/v1/gift-list-invite`
- * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem', ... }`
+ * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem' | 'guest-view' | 'guest-reserve', ... }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user', 'publishable']`
  *   * `user`        → session utilisateur (`Authorization: Bearer <JWT>`).
- *                     C'est le seul mode qui exécute une action : il donne
- *                     l'identité de l'appelant, indispensable pour vérifier la
- *                     gestion (propriétaire OU admin, revérifiée EN BASE).
- *   * `publishable` → accepté par la passerelle, mais REFUSÉ ici avec 401
- *                     SANS valider le code. Aucun oracle de validité n'est
- *                     donc exposé aux appels non authentifiés.
+ *                     Exigé par create / revoke / summary / redeem (+ send-email
+ *                     en 06-02) : il donne l'identité de l'appelant,
+ *                     indispensable pour vérifier la gestion (propriétaire OU
+ *                     admin, revérifiée EN BASE).
+ *   * `publishable` → accepté par la passerelle SANS session, mais uniquement
+ *                     pour `guest-view` et `guest-reserve` (dispatch avant le
+ *                     contrôle `user`). Aucune autre action ne s'exécute sans
+ *                     session, et le code n'est jamais validé sur le chemin 401.
  *
- * DÉCISION OQ-1 VERROUILLÉE — OPTION A (plan 05-03) : l'Edge reste user-only,
- * sans action publishable/invitée. Le lien envoyé à un externe
- * (`/invitation/cadeau?code=…`) mène vers inscription/connexion avec l'e-mail
- * invité, puis l'échange active le partage via la branche e-mail existante de
- * `redeem_gift_list_invite` (0079). Choisir l'anonymat imposerait une action
- * publishable supplémentaire et rouvrirait T-05-04 : refusé.
+ * DÉCISION D-05 (phase 06, override explicite de OQ-1 OPTION A du plan 05-03
+ * pour la RÉSERVATION uniquement) : un visiteur porteur d'un lien à code
+ * valide peut voir la liste (`guest-view`) et réserver (`guest-reserve` en
+ * déclarant un nom 1-80) sans compte. Le redeem avec compte reste inchangé.
+ * Garde-fous D-06 : code requis, nom requis, rate-limit par action, oracle
+ * unique `code invalide` préservé sur tous les chemins invités (T-06-03).
  *
  *   create / revoke / summary : gestion propriétaire-OU-admin de la liste,
  *                               revérifiée EN BASE par
@@ -57,6 +59,9 @@
  *   revoke  -> { list_id, revoked }
  *   summary -> { listId, isActive, hasCode, expiresAt, maxUses, useCount } | null
  *   redeem  -> { list_id, already_shared }
+ *   guest-view -> { listId, listName, items: [{ id, name, price, comment, reserved }] }
+ *     (jamais d'identifiant d'auteur — D-07 ; `reserved` seul dit l'état)
+ *   guest-reserve -> { itemId, alreadyReserved }
  */
 
 // Spécificateur BARE, comme `household-invite` : le runtime épingle
@@ -114,6 +119,24 @@ function env(name: string): string {
  */
 const listField = z.string().trim().min(1).max(128);
 
+/** Les articles sont des `text` préfixés (`gift-item_<uuid>`), comme les listes. */
+const itemField = z.string().trim().min(1).max(128);
+
+/** Nom auto-déclaré du visiteur (D-06) : même borne 1-80 que les dossiers. */
+const guestNameField = z
+  .string()
+  .trim()
+  .min(1, "Indiquez un nom (1 à 80 caractères).")
+  .max(80, "Indiquez un nom (1 à 80 caractères).");
+
+/** Code brut tel qu'affiché à la génération (base64url, ≥ 22 caractères). */
+const codeField = z
+  .string()
+  .trim()
+  .min(22, 'Un code fait au moins 22 caractères.')
+  .max(512)
+  .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.');
+
 const isoInstant = z
   .string()
   .datetime({ offset: true })
@@ -138,18 +161,28 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('redeem'),
     /** Base64url : ni `+`, ni `/`, ni `=`. */
-    code: z
-      .string()
-      .trim()
-      .min(22, 'Un code fait au moins 22 caractères.')
-      .max(512)
-      .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.'),
+    code: codeField,
     /**
      * E-mail de l'appelant pour la branche externe (OPTION A : compte créé
      * avec l'e-mail invité, partage activé à l'échange). Absent pour un
      * membre du foyer : la branche membre est essayée d'abord en base.
      */
     email: z.string().trim().email('Adresse e-mail invalide.').max(320).optional(),
+  }),
+  z.object({
+    action: z.literal('guest-view'),
+    /** Code brut du lien : EST le contrôle d'accès (D-06, pas de session). */
+    code: codeField,
+  }),
+  z.object({
+    action: z.literal('guest-reserve'),
+    /** Code brut du lien (vérifié actif, non expiré, non épuisé en base). */
+    code: codeField,
+    /** Article visé : l'appartenance à la liste du code est revérifiée en
+     *  base (pas de fuite inter-listes — même oracle `code invalide`). */
+    itemId: itemField,
+    /** Nom auto-déclaré (D-06) : validé ici ET en base (miroir CHECK). */
+    name: guestNameField,
   }),
 ]);
 
@@ -208,7 +241,18 @@ async function hmacSha256Hex(code: string, secret: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { redeem: 8, create: 20, revoke: 20, summary: 30 };
+// Valeurs verrouillées tâche 1 (discrétion agent, CONTEXT.md) : l'envoi
+// d'e-mail (06-02) est le plus serré, la réserve invitée anti-spam au milieu,
+// la lecture invitée large (même ordre que les bornes ardoise-invite).
+const LIMITS: Record<string, number> = {
+  redeem: 8,
+  create: 20,
+  revoke: 20,
+  summary: 30,
+  'send-email': 5,
+  'guest-view': 30,
+  'guest-reserve': 10,
+};
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -260,6 +304,15 @@ function translateRpcError(error: { code?: string; message: string }): GiftListI
   // Même message quel que soit l'état du code : la fonction SQL ne distingue
   // pas (`code invalide`), et on ne rajoute rien.
   if (message.includes('code invalide')) return new GiftListInviteError(404, 'Ce code est invalide.');
+  // Noms et conflits : messages NON-oracle (ils ne révèlent rien de la
+  // validité du code — T-06-03). Chaînes byte-identiques aux `raise
+  // exception` SQL (vérifié : aucune apostrophe dans ces trois libellés).
+  if (message.includes('nom invalide')) {
+    return new GiftListInviteError(400, "Indiquez un nom (1 à 80 caractères).");
+  }
+  if (message.includes("article déjà réservé")) {
+    return new GiftListInviteError(409, 'Cet article est déjà réservé.');
+  }
   if (message.includes('session requise')) return new GiftListInviteError(401, 'Connectez-vous pour continuer.');
   if (message.includes('liste introuvable')) return new GiftListInviteError(404, 'Liste introuvable.');
   if (message.includes('gestion de la liste réservée') || error.code === '42501') {
@@ -381,6 +434,65 @@ async function handleRedeem(admin: AdminClient, userId: string, body: RequestBod
   return json((data ?? {}) as { list_id?: string; already_shared?: boolean });
 }
 
+/**
+ * Lecture invitée sans compte (D-05) : le code EST le contrôle d'accès.
+ * Ne rend que `{ listId, listName, items[{ id, name, price, comment,
+ * reserved }] }` — projection défensive explicite : même si le RPC rendait
+ * un jour plus, aucun identifiant d'auteur ne quitte la fonction (D-07).
+ */
+async function handleGuestView(admin: AdminClient, body: RequestBody & { action: 'guest-view' }) {
+  const secret = checkSecret();
+  const codeHash = await hmacSha256Hex(body.code, secret);
+
+  const { data, error } = await admin.rpc('guest_view_gift_list', {
+    p_token_hash: codeHash,
+  });
+
+  if (error) throw translateRpcError(error);
+
+  const view = (data ?? {}) as {
+    list_id?: string;
+    list_name?: string;
+    items?: { id?: unknown; name?: unknown; price?: unknown; comment?: unknown; reserved?: unknown }[];
+  };
+  const items = Array.isArray(view.items)
+    ? view.items.map((item) => ({
+      id: String(item.id ?? ''),
+      name: String(item.name ?? ''),
+      price: typeof item.price === 'number' ? item.price : Number(item.price ?? 0) || 0,
+      comment: typeof item.comment === 'string' ? item.comment : null,
+      reserved: item.reserved === true,
+    }))
+    : [];
+
+  return json({
+    listId: view.list_id ?? null,
+    listName: view.list_name ?? null,
+    items,
+  });
+}
+
+/**
+ * Réserve invitée sans compte (D-05/D-06) : code + article + nom déclaré.
+ * Idempotence à nom égal (`alreadyReserved: true`), 409 à nom différent,
+ * 404 oracle unique sur tout état de code invalide.
+ */
+async function handleGuestReserve(admin: AdminClient, body: RequestBody & { action: 'guest-reserve' }) {
+  const secret = checkSecret();
+  const codeHash = await hmacSha256Hex(body.code, secret);
+
+  const { data, error } = await admin.rpc('guest_reserve_gift_item', {
+    p_token_hash: codeHash,
+    p_item_id: body.itemId,
+    p_name: body.name,
+  });
+
+  if (error) throw translateRpcError(error);
+
+  const reserved = (data ?? {}) as { item_id?: string; already_reserved?: boolean };
+  return json({ itemId: reserved.item_id ?? body.itemId, alreadyReserved: reserved.already_reserved === true });
+}
+
 // ---------------------------------------------------------------------------
 // Point d'entrée
 // ---------------------------------------------------------------------------
@@ -399,15 +511,21 @@ Deno.serve(
       const body = await parseBody(request);
       enforceRateLimit(request, body.action);
 
-      // Aucune action n'est exécutée pour un appelant non authentifié : le
-      // code n'est pas validé, donc aucune fuite d'information n'est possible
-      // (OQ-1 OPTION A : pas de chemin anonyme).
       const userId = ctx.userClaims?.id;
+      const admin = ctx.supabaseAdmin;
+
+      // `guest-view` et `guest-reserve` sont les seuls chemins sans session
+      // (D-05) : dispatchés AVANT le contrôle `user`, sans valider le code
+      // sur le chemin 401. Tout le reste exige une session.
+      if (body.action === 'guest-view') {
+        return await handleGuestView(admin, body);
+      }
+      if (body.action === 'guest-reserve') {
+        return await handleGuestReserve(admin, body);
+      }
       if (ctx.authMode !== 'user' || !userId) {
         return json({ error: 'Connectez-vous pour partager une liste de cadeaux.' }, 401);
       }
-
-      const admin = ctx.supabaseAdmin;
 
       if (body.action === 'create') return await handleCreate(admin, userId, body);
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);
