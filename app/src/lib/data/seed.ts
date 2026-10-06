@@ -9,6 +9,7 @@ import type {
   ConversationMemberRow,
   ConversationRow,
   DashboardWidgetRow,
+  EventCategoryRow,
   EventReminderRow,
   EventRow,
   ExpenseParticipantRow,
@@ -230,6 +231,14 @@ export const demoEvents: EventRow[] = [
 export const demoEventReminders: EventReminderRow[] = [
   { id: 'event-reminder-1', event_id: 'event-1', remind_at: at('18:30') },
   { id: 'event-reminder-2', event_id: 'event-2', remind_at: at('17:00') },
+];
+
+/** Seed des 4 catégories du foyer de démonstration (miroir du seed SQL). */
+export const demoEventCategories: EventCategoryRow[] = [
+  { id: 'category-repas', household_id: DEMO_HOUSEHOLD_ID, name: 'Repas', color: '#E8930C', icon: null, is_default: true, created_by: null, created_at: now() },
+  { id: 'category-medical', household_id: DEMO_HOUSEHOLD_ID, name: 'Médical', color: '#D64545', icon: null, is_default: true, created_by: null, created_at: now() },
+  { id: 'category-ecole', household_id: DEMO_HOUSEHOLD_ID, name: 'École', color: '#3E7CB1', icon: null, is_default: true, created_by: null, created_at: now() },
+  { id: 'category-sport', household_id: DEMO_HOUSEHOLD_ID, name: 'Sport', color: '#4CAF50', icon: null, is_default: true, created_by: null, created_at: now() },
 ];
 
 export const demoNotes: NoteRow[] = [
@@ -1062,6 +1071,7 @@ const seedTables: Record<string, Row[]> = {
   shopping_list_items: demoShoppingItems as unknown as Row[],
   events: demoEvents as unknown as Row[],
   event_reminders: demoEventReminders as unknown as Row[],
+  event_categories: demoEventCategories as unknown as Row[],
   notes: demoNotes as unknown as Row[],
   tasks: demoTasks as unknown as Row[],
   task_assignees: demoTaskAssignees as unknown as Row[],

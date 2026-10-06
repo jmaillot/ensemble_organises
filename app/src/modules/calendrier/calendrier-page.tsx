@@ -19,8 +19,8 @@ import { useRefDays } from './hooks/use-ref-days';
 import { useSchoolZone } from './hooks/use-school-zone';
 import { createPersonalCalendar, createCategory, CATEGORY_COLORS } from './api';
 import { suggestZoneForCity } from './lib/zone-resolver';
-import { buildAgenda, buildDayMarkers } from './types';
-import type { CalendarEvent } from './types';
+import { buildAgenda, buildDayMarkers, isExitingPerso } from './types';
+import type { CalendarEvent, EventFormValues } from './types';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
@@ -73,13 +73,13 @@ export default function CalendrierPage() {
     date: grid.selected,
   });
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
+  // Sortie du secret (D-04) : déplacement Perso → Commun en attente de confirmation.
+  const [pendingMove, setPendingMove] = useState<{ event: CalendarEvent; values: EventFormValues } | null>(null);
   const [view, setView] = useState<CalendarView>(readStoredView);
   const [categoryFilter, setCategoryFilter] = useState('toutes');
   const [memberFilter, setMemberFilter] = useState('tous');
   const [calendarFilter, setCalendarFilter] = useState('tous');
-  const [showHolidays, setShowHolidays] = useState(true);
   const [showBirthdays, setShowBirthdays] = useState(true);
-  const [showVacations, setShowVacations] = useState(true);
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [calendarName, setCalendarName] = useState('');
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
@@ -112,8 +112,10 @@ export default function CalendrierPage() {
     [events, categoryFilter, memberFilter, calendarFilter],
   );
   const visibleBirthdays = showBirthdays ? birthdays : [];
-  const visibleHolidays = showHolidays ? holidays : [];
-  const visibleVacations = showVacations ? vacations : [];
+  // Couches de référence toujours visibles, en fond non cliquable (D-10) :
+  // aucun interrupteur ne peut les masquer.
+  const visibleHolidays = holidays;
+  const visibleVacations = vacations;
 
   const agenda = useMemo(
     () => buildAgenda(selected, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() }),
@@ -146,6 +148,19 @@ export default function CalendrierPage() {
 
   const openCreate = (date: string) => setDialog({ open: true, event: null, date });
   const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
+
+  // Les enfants taguent sans créer (D-06) : aucun bouton de création affiché.
+  const isChild = currentMember?.role === 'enfant';
+
+  const persistEvent = async (editing: CalendarEvent | null, values: EventFormValues) => {
+    try {
+      await saveEvent({ id: editing?.id ?? null, values });
+      setDialog((current) => ({ ...current, open: false }));
+      toast(editing ? 'Modification enregistrée.' : 'Ajouté au foyer.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'L’événement n’a pas pu être enregistré.', 'error');
+    }
+  };
 
   const handleShift = (delta: number) => {
     const next = new Date(grid.year, grid.month + delta, 1);
@@ -288,6 +303,7 @@ export default function CalendrierPage() {
             setCalendarName('');
             setCalendarDialogOpen(true);
           }}
+          hidden={isChild}
           className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
         >
           + Calendrier perso
@@ -299,21 +315,10 @@ export default function CalendrierPage() {
             setCategoryColor(CATEGORY_COLORS[0]);
             setCategoryDialogOpen(true);
           }}
+          hidden={isChild}
           className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
         >
           + Catégorie
-        </button>
-        <button
-          type="button"
-          aria-pressed={showHolidays}
-          onClick={() => setShowHolidays((current) => !current)}
-          className={
-            showHolidays
-              ? 'rounded-full bg-amber-soft px-3.5 py-2 text-[12px] font-extrabold text-[oklch(52%_0.11_78)]'
-              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
-          }
-        >
-          Fériés
         </button>
         <button
           type="button"
@@ -326,18 +331,6 @@ export default function CalendrierPage() {
           }
         >
           Anniversaires
-        </button>
-        <button
-          type="button"
-          aria-pressed={showVacations}
-          onClick={() => setShowVacations((current) => !current)}
-          className={
-            showVacations
-              ? 'rounded-full bg-[#dbe9f6] px-3.5 py-2 text-[12px] font-extrabold text-[#1f4e79]'
-              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
-          }
-        >
-          Vacances
         </button>
         {isAdmin ? (
           <>
@@ -382,7 +375,7 @@ export default function CalendrierPage() {
         ) : null}
       </div>
 
-      {zone === null && showVacations ? (
+      {zone === null ? (
         <p className="mb-4 text-[12px] text-muted" role="status">
           Choisissez la zone scolaire du foyer (A, B ou C) pour afficher les vacances.
           {isAdmin ? '' : ' Un administrateur du foyer peut la régler ici.'}
@@ -506,13 +499,17 @@ export default function CalendrierPage() {
         isSaving={isMutating}
         onSubmit={async (values) => {
           const editing = dialog.event;
-          try {
-            await saveEvent({ id: editing?.id ?? null, values });
-            setDialog((current) => ({ ...current, open: false }));
-            toast(editing ? 'Modification enregistrée.' : 'Ajouté au foyer.');
-          } catch (error) {
-            toast(error instanceof Error ? error.message : 'L’événement n’a pas pu être enregistré.', 'error');
+          // Sortie du secret (D-04) : un déplacement Perso → Commun exige une
+          // confirmation explicite avant d'être enregistré.
+          if (
+            editing &&
+            values.calendarId !== '' &&
+            isExitingPerso(calendars, editing.calendarId, values.calendarId)
+          ) {
+            setPendingMove({ event: editing, values });
+            return;
           }
+          await persistEvent(editing, values);
         }}
       />
 
@@ -651,6 +648,23 @@ export default function CalendrierPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingMove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingMove(null);
+        }}
+        title="Rendre visible à tout le foyer ?"
+        description="Cet événement quittera votre calendrier perso : tous les membres du foyer pourront le voir. Cette action est réversible en le déplaçant à nouveau."
+        confirmLabel="Rendre visible"
+        destructive={false}
+        onConfirm={() => {
+          const move = pendingMove;
+          setPendingMove(null);
+          if (!move) return;
+          void persistEvent(move.event, move.values);
+        }}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

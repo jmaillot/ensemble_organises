@@ -160,6 +160,9 @@ export function CalendarGrid({
                   {marker.hasTask ? (
                     <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[oklch(55%_0.13_300)]')} />
                   ) : null}
+                  {marker.categoryColor ? (
+                    <span className="size-[5px] rounded-full" style={{ backgroundColor: marker.categoryColor }} />
+                  ) : null}
                   {marker.hasVacation ? (
                     <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[#1f4e79]')} />
                   ) : null}

@@ -4,6 +4,9 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import CalendrierPage from './calendrier-page';
+import { data } from '@/lib/data';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { useHouseholdStore } from '@/stores/household-store';
 import { addDays, daysBetween, formatLongDate, formatMonthLabel, todayIso, toIsoDate } from '@/lib/utils';
 import type { UserEvent } from '@testing-library/user-event';
 
@@ -176,8 +179,7 @@ describe('CalendrierPage', () => {
     expect(screen.queryByRole('button', { name: /^Supprimer/ })).not.toBeInTheDocument();
   });
 
-  it('ouvre le formulaire par appui long sur une date, sans casser le clic', async () => {
-    const user = userEvent.setup();
+  it('ouvre le formulaire par appui long sur une date, sans casser le clic', async () => {    const user = userEvent.setup();
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
     const day = await screen.findByRole('button', { name: new RegExp(`^${dayLabel(freeDay)}`) });
 
@@ -201,5 +203,105 @@ describe('CalendrierPage', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: new RegExp(`^${escape(formatMonthLabel(new Date()))}`) }),
     ).toBeInTheDocument();
+  });
+
+  it('affiche toujours les couches ref sans interrupteur, anniversaires restant masquables (D-10)', async () => {
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    expect(await screen.findByRole('button', { name: 'Anniversaires' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fériés' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Vacances' })).not.toBeInTheDocument();
+  });
+
+  it('demande confirmation avant de déplacer un événement Perso vers le Commun (D-04)', async () => {
+    const user = userEvent.setup();
+    const communId = await data
+      .create<{ id: string }>('event_calendars', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        name: 'Commun',
+        visibility: 'commun',
+        owner_member_id: null,
+      } as never)
+      .then((row) => row.id);
+    const persoId = await data
+      .create<{ id: string }>('event_calendars', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        name: 'Perso',
+        visibility: 'perso',
+        owner_member_id: DEMO_MEMBERS.camille,
+      } as never)
+      .then((row) => row.id);
+    const secretId = await data
+      .create<{ id: string }>('events', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        title: 'Journal intime',
+        description: null,
+        start_at: `${today}T20:00:00`,
+        end_at: `${today}T21:00:00`,
+        all_day: false,
+        location: null,
+        color: 'accent',
+        category_id: null,
+        calendar_id: persoId,
+        created_by: DEMO_MEMBERS.camille,
+      } as never)
+      .then((row) => row.id);
+
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    await user.click(await screen.findByRole('button', { name: 'Modifier Journal intime' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText(/^Calendrier/), communId);
+    await user.click(within(dialog).getByRole('button', { name: /Enregistrer les modifications/ }));
+
+    // La sortie du secret exige une confirmation, pas un enregistrement direct.
+    const alert = await screen.findByRole('alertdialog');
+    expect(within(alert).getByText('Rendre visible à tout le foyer ?')).toBeInTheDocument();
+    await user.click(within(alert).getByRole('button', { name: 'Rendre visible' }));
+
+    expect(await screen.findByText('Modification enregistrée.')).toBeInTheDocument();
+    const rows = await data.list<{ id: string; calendar_id: string }>('events', {
+      household_id: DEMO_HOUSEHOLD_ID,
+    });
+    expect(rows.find((row) => row.id === secretId)?.calendar_id).toBe(communId);
+  });
+
+  it('masque les boutons de création à un enfant, qui tague sans créer (D-06)', async () => {
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    expect(await screen.findByRole('button', { name: '+ Calendrier perso' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Catégorie' })).toBeInTheDocument();
+
+    act(() => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+    });
+
+    expect(screen.queryByRole('button', { name: '+ Calendrier perso' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Catégorie' })).not.toBeInTheDocument();
+  });
+
+  it('colore la pastille du jour avec la catégorie, couleur membre inchangée (D-07)', async () => {
+    await data.create('events', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      title: 'Devoirs du soir',
+      description: null,
+      start_at: `${today}T07:00:00`,
+      end_at: `${today}T07:30:00`,
+      all_day: false,
+      location: null,
+      color: 'accent',
+      category_id: 'category-ecole',
+      calendar_id: 'calendar-commun',
+      created_by: DEMO_MEMBERS.camille,
+    } as never);
+
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    // Attendre les données (le libellé porte le compteur une fois marqué).
+    const dayButton = await screen.findByRole('button', {
+      name: new RegExp(`^${dayLabel(today)}, \\d+ événement`),
+    });
+    const categoryDot = dayButton.querySelector('span[style*="background-color"]');
+    expect(categoryDot).not.toBeNull();
   });
 });

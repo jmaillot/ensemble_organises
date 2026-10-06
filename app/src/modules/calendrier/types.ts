@@ -29,6 +29,9 @@ export interface CalendarEvent {
   categoryId: string | null;
   /** Nom de la catégorie, résolu depuis `event_categories` (pastille catégorie). */
   categoryName: string | null;
+  /** Couleur hex de la catégorie (`event_categories.color`) : colore
+   * l'événement (D-07). La couleur membre reste sur `colorTag`/avatars. */
+  categoryColor: string | null;
   createdBy: string | null;
   /** Jour local (`YYYY-MM-DD`) affiché dans la grille. */
   date: string;
@@ -40,9 +43,10 @@ export interface CalendarEvent {
 export function toCalendarEvent(
   row: EventRow,
   members: readonly HouseholdMemberRow[] = [],
-  categories: readonly { id: string; name: string }[] = [],
+  categories: readonly { id: string; name: string; color?: string | null }[] = [],
 ): CalendarEvent {
   const author = members.find((member) => member.id === row.created_by) ?? null;
+  const category = categories.find((entry) => entry.id === row.category_id) ?? null;
   return {
     id: row.id,
     householdId: row.household_id,
@@ -55,7 +59,8 @@ export function toCalendarEvent(
     color: row.color,
     calendarId: row.calendar_id,
     categoryId: row.category_id,
-    categoryName: categories.find((category) => category.id === row.category_id)?.name ?? null,
+    categoryName: category?.name ?? null,
+    categoryColor: category?.color ?? null,
     createdBy: row.created_by,
     date: row.start_at.slice(0, 10),
     timeLabel: row.all_day ? 'Toute la journée' : row.start_at.slice(11, 16),
@@ -125,6 +130,8 @@ export type AgendaItem =
       title: string;
       subtitle: string | null;
       colorTag: MemberColorTag;
+      /** Couleur hex de la catégorie (D-07), quand l'événement est catégorisé. */
+      categoryColor: string | null;
       chipLabel: string;
       author: HouseholdMemberRow | null;
     }
@@ -213,6 +220,7 @@ export function buildAgenda(
       title: event.title,
       subtitle: event.location,
       colorTag: event.colorTag,
+      categoryColor: event.categoryColor,
       chipLabel: event.categoryName ?? (event.allDay ? 'Journée entière' : 'Événement'),
       author: event.author,
     }))
@@ -274,6 +282,9 @@ export function buildAgenda(
 export interface DayMarker {
   count: number;
   colorTag: MemberColorTag;
+  /** Couleur hex de la catégorie du premier événement (D-07) : la catégorie
+   * colore la pastille, la couleur membre reste sur `colorTag`/avatars. */
+  categoryColor: string | null;
   hasBirthday: boolean;
   hasHoliday: boolean;
   hasVacation: boolean;
@@ -318,6 +329,7 @@ export function buildDayMarkers(
     markers[iso] = {
       count: events.length + birthdays.length,
       colorTag: holiday && events.length === 0 ? 'amber' : (events[0]?.colorTag ?? birthdays[0]?.colorTag ?? 'coral'),
+      categoryColor: events[0]?.categoryColor ?? null,
       hasBirthday: birthdays.length > 0,
       hasHoliday: Boolean(holiday),
       hasVacation,
@@ -328,8 +340,7 @@ export function buildDayMarkers(
   return markers;
 }
 
-/** Libellé complet d'une case : « Vendredi 25 septembre 2026, 2 événements, 1 tâche ». */
-export function dayButtonLabel(iso: string, marker?: DayMarker) {
+/** Libellé complet d'une case : « Vendredi 25 septembre 2026, 2 événements, 1 tâche ». */export function dayButtonLabel(iso: string, marker?: DayMarker) {
   const base = capitalize(formatLongDate(iso));
   if (!marker || (marker.count === 0 && marker.taskCount === 0))
     return marker?.hasHoliday
@@ -342,5 +353,21 @@ export function dayButtonLabel(iso: string, marker?: DayMarker) {
     marker.taskCount > 0 ? pluralize(marker.taskCount, 'tâche') : null,
   ].filter((part): part is string => part !== null);
   return `${base}, ${parts.join(', ')}${marker.hasHoliday ? ', jour férié' : ''}${marker.hasVacation ? ', vacances scolaires' : ''}`;
+}
+
+/**
+ * Sortie du secret (D-04) : l'événement passe d'un calendrier Perso vers le
+ * Commun. Calendrier introuvable (jamais visible via RLS) = pas de
+ * confirmation, la barrière serveur reste seule juge.
+ */
+export function isExitingPerso(
+  calendars: readonly { id: string; visibility: string }[],
+  fromId: string | null,
+  toId: string | null,
+): boolean {
+  if (!fromId || !toId || fromId === toId) return false;
+  const from = calendars.find((calendar) => calendar.id === fromId);
+  const to = calendars.find((calendar) => calendar.id === toId);
+  return from?.visibility === 'perso' && to?.visibility === 'commun';
 }
 
