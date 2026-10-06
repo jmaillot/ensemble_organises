@@ -5,12 +5,18 @@
  * Corps : `{ q: string, limit?: number }`
  *
  * Proxy de recherche Open Food Facts avec cache. Contexte : l'endpoint
- * `/api/v2/search` d'OFF flappe en 503/coupures réseau selon l'hôte et le
- * moment (constaté : world 503 pendant que api répond 200, et inversement),
- * et un 503 ne porte pas d'en-têtes CORS — le navigateur affiche alors
- * « CORS » pour une panne serveur. Le proxy contourne les trois problèmes :
- * bascule entre miroirs côté serveur (insensible au CORS), cache d'une heure
- * (les recherches répétées ne touchent plus OFF), quota miroir d'OFF.
+ * historique `/api/v2/search?search_terms=` ne filtre plus (constaté en
+ * 2026-10 : `count` ~4,79 M, catalogue brut quelle que soit la requête —
+ * `world` répond même du HTML « temporarily unavailable », `fr` du 503).
+ * La recherche passe donc par le moteur officiel `search.openfoodfacts.org`
+ * (search-a-licious), qui ne renvoie ni photo ni `categories_tags` : chaque
+ * code est enrichi via la fiche produit `/api/v2/product/{code}.json`
+ * (le même endpoint que le scan, éprouvé), avec bascule entre miroirs.
+ *
+ * Le proxy contourne trois problèmes : bascule entre miroirs côté serveur
+ * (insensible au CORS — un 503 sans en-têtes CORS affiche « CORS » dans le
+ * navigateur pour une panne serveur), cache d'une heure (les recherches
+ * répétées ne touchent plus OFF), quota miroir d'OFF.
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user']` — session obligatoire. Les lectures OFF sont publiques,
@@ -19,8 +25,8 @@
  *
  * CONTRAT DE RÉPONSE
  *   search -> { hits: [{ ean, name, brand, imageUrl, categoriesTags, lang }] }
- *   (hits triés par pertinence, vide si aucun pertinent : OFF renvoie parfois
- *   un catalogue non filtré, que le proxy ne met plus en cache tel quel)
+ *   (hits triés par pertinence, vide si aucun pertinent : le moteur renvoie
+ *   parfois du bruit, que le proxy ne met plus en cache tel quel)
  *   erreurs -> { error } (400 validation, 429 quota, 502 OFF injoignable)
  */
 
@@ -43,6 +49,8 @@ const OFF_HOSTS = [
   'https://api.openfoodfacts.org',
   'https://fr.openfoodfacts.org',
 ];
+/** Moteur de recherche officiel (search-a-licious) : seul hôte, pas de miroirs. */
+const SEARCH_ENGINE_URL = 'https://search.openfoodfacts.org';
 const OFF_FIELDS = 'code,product_name,product_name_fr,brands,image_front_url,categories_tags,lang';
 const OFF_TIMEOUT_MS = 8000;
 const OFF_IMAGE_HOST = /^https:\/\/images\.openfoodfacts\.org\//;
@@ -139,6 +147,83 @@ function rankHits(hits: OffHit[], query: string): OffHit[] {
     .map((entry) => entry.hit);
 }
 
+const searchResponseSchema = z.object({
+  hits: z.array(z.object({ code: z.string().optional() })).optional(),
+});
+
+const productResponseSchema = z.object({
+  status: z.number(),
+  product: z
+    .object({
+      code: z.string().optional(),
+      product_name: z.string().optional(),
+      product_name_fr: z.string().optional(),
+      brands: z.string().optional(),
+      image_front_url: z.string().optional(),
+      image_url: z.string().optional(),
+      categories_tags: z.array(z.string()).optional(),
+      lang: z.string().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Étape 1 : codes EAN pertinents depuis le moteur de recherche officiel.
+ * `null` = panne technique (429/5xx/réseau) ; `[]` = aucun code.
+ */
+async function fetchSearchCodes(terms: string, fetchN: number): Promise<string[] | null> {
+  const params = new URLSearchParams({ q: terms, page_size: String(fetchN) });
+  let response: Response;
+  try {
+    response = await fetchUpstream(`${SEARCH_ENGINE_URL}/search?${params.toString()}`);
+  } catch {
+    return null;
+  }
+  if (response.status === 429 || response.status >= 500) return null;
+  if (!response.ok) return null;
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return null;
+  }
+  const parsed = searchResponseSchema.safeParse(body);
+  if (!parsed.success) return null;
+  return (parsed.hits ?? [])
+    .map((hit) => (hit.code ?? '').trim())
+    .filter((code) => /^\d{8,14}$/.test(code));
+}
+
+/**
+ * Étape 2 : fiche produit (photo + `categories_tags`), même endpoint que le
+ * scan, avec bascule entre miroirs. `null` = fiche inexploitable.
+ */
+async function fetchProductHit(code: string): Promise<OffHit | null> {
+  const params = new URLSearchParams({ fields: OFF_FIELDS });
+  const path = `/api/v2/product/${encodeURIComponent(code)}.json?${params.toString()}`;
+  for (const host of OFF_HOSTS) {
+    let response: Response;
+    try {
+      response = await fetchUpstream(`${host}${path}`);
+    } catch {
+      continue;
+    }
+    if (response.status === 429) return null;
+    if (response.status >= 500) continue;
+    if (!response.ok) continue;
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      continue;
+    }
+    const parsed = productResponseSchema.safeParse(body);
+    if (!parsed.success || parsed.data.status !== 1 || !parsed.data.product) continue;
+    return toHit({ ...parsed.data.product, code });
+  }
+  return null;
+}
+
 function toHit(raw: Record<string, unknown>): OffHit | null {
   const name = String(raw.product_name_fr ?? raw.product_name ?? '').trim();
   if (name.length < 1 || name.length > 200) return null;
@@ -205,52 +290,26 @@ Deno.serve(
         return json({ hits: cached.hits });
       }
 
-      const params = new URLSearchParams({
-        search_terms: terms,
-        page_size: String(limit),
-        fields: OFF_FIELDS,
-      });
-      const path = `/api/v2/search?${params.toString()}`;
-      let overloaded = false;
-      for (const host of OFF_HOSTS) {
-        let response: Response;
-        try {
-          response = await fetchUpstream(`${host}${path}`);
-        } catch {
-          continue;
-        }
-        if (response.status === 429) {
-          overloaded = true;
-          break;
-        }
-        if (response.status >= 500) continue;
-        if (!response.ok) {
-          return json({ error: `Recherche impossible (${response.status}).` }, 502);
-        }
-        let body: unknown;
-        try {
-          body = await response.json();
-        } catch {
-          continue;
-        }
-        const products = (body as { products?: unknown }).products;
-        if (!Array.isArray(products)) continue;
-        const hits = products
-          .map((item) => (item && typeof item === 'object' ? toHit(item as Record<string, unknown>) : null))
-          .filter((hit): hit is OffHit => hit !== null)
-          .slice(0, limit);
-        const ranked = rankHits(hits, terms);
-        if (cache.size >= CACHE_MAX) {
-          const oldest = cache.keys().next();
-          if (!oldest.done) cache.delete(oldest.value);
-        }
-        cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, hits: ranked });
-        return json({ hits: ranked });
+      // Étape 1 : codes pertinents (moteur officiel), étape 2 : fiches
+      // produit (photo + rayon), en parallèle. Marge d'enrichissement :
+      // certaines fiches sont inexploitables, le rangement tranche ensuite.
+      const fetchN = Math.min(limit + 3, 10);
+      const codes = await fetchSearchCodes(terms, fetchN);
+      if (codes === null) {
+        return json({ error: 'Open Food Facts injoignable pour le moment.' }, 502);
       }
-      if (overloaded) {
-        return json({ error: 'Trop de recherches rapprochées ou Open Food Facts surchargé : patientez une minute.' }, 429);
+      const hits = (
+        await Promise.all(codes.slice(0, fetchN).map((code) => fetchProductHit(code)))
+      )
+        .filter((hit): hit is OffHit => hit !== null)
+        .slice(0, limit);
+      const ranked = rankHits(hits, terms);
+      if (cache.size >= CACHE_MAX) {
+        const oldest = cache.keys().next();
+        if (!oldest.done) cache.delete(oldest.value);
       }
-      return json({ error: 'Open Food Facts injoignable pour le moment.' }, 502);
+      cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, hits: ranked });
+      return json({ hits: ranked });
     } catch (error) {
       console.error('off-search: erreur inattendue', {
         message: error instanceof Error ? error.message : String(error),

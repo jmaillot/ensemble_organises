@@ -157,29 +157,27 @@ describe('searchOffProducts', () => {
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ name: 'Comté affiné', brand: 'Fruitière' });
     expect(hits[0].imageUrl).toContain('images.openfoodfacts.org');
+    // Le moteur ne renvoie que le code : photo et rayon viennent de la fiche.
+    expect(hits[0].categoriesTags).toContain('en:cheeses');
   });
 
   it('tableau vide sans résultat, erreur levée sur panne réseau', async () => {
     await expect(searchOffProducts('xyzintrouvable')).resolves.toEqual([]);
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/search', () => HttpResponse.error()),
+      http.get('https://search.openfoodfacts.org/search', () => HttpResponse.error()),
     );
     await expect(searchOffProducts('comté', { timeoutMs: 1000 })).rejects.toThrow();
   });
 
-  it('503 (quota/incident) : message dédié, sans retry', async () => {
-    let calls = 0;
-    const down = () => {
-      calls += 1;
-      return new HttpResponse(null, { status: 503 });
-    };
+  it('429 : quota, message dédié ; 503 : injoignable, sans retry', async () => {
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/search', down),
-      http.get('https://api.openfoodfacts.org/api/v2/search', down),
-      http.get('https://fr.openfoodfacts.org/api/v2/search', down),
+      http.get('https://search.openfoodfacts.org/search', () => new HttpResponse(null, { status: 429 })),
     );
     await expect(searchOffProducts('comté')).rejects.toThrow(/patientez une minute/);
-    expect(calls).toBe(3);
+    server.use(
+      http.get('https://search.openfoodfacts.org/search', () => new HttpResponse(null, { status: 503 })),
+    );
+    await expect(searchOffProducts('comté')).rejects.toThrow(/injoignable/);
   });
 
   it('n’interroge pas sous 2 caractères', async () => {

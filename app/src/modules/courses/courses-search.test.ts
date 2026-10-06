@@ -65,50 +65,34 @@ describe('searchOffCatalog', () => {
   });
 
   it('401 : session expirée, message explicite, sans repli direct', async () => {
-    let offCalls = 0;
+    let engineCalls = 0;
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
-      }),
-      http.get('https://api.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
-      }),
-      http.get('https://fr.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
+      http.get('https://search.openfoodfacts.org/search', () => {
+        engineCalls += 1;
+        return HttpResponse.json({ hits: [] });
       }),
     );
     mockProxy(() => new HttpResponse(JSON.stringify({ code: 'MISSING_CREDENTIALS' }), { status: 401 }));
     try {
       await expect(searchOffCatalog('comté')).rejects.toThrow(/reconnectez-vous/);
-      expect(offCalls).toBe(0);
+      expect(engineCalls).toBe(0);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
   it('pas de repli sur quota proxy (429)', async () => {
-    let offCalls = 0;
+    let engineCalls = 0;
     server.use(
-      http.get('https://world.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
-      }),
-      http.get('https://api.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
-      }),
-      http.get('https://fr.openfoodfacts.org/api/v2/search', () => {
-        offCalls += 1;
-        return HttpResponse.json({ products: [] });
+      http.get('https://search.openfoodfacts.org/search', () => {
+        engineCalls += 1;
+        return HttpResponse.json({ hits: [] });
       }),
     );
     mockProxy(() => new HttpResponse(JSON.stringify({ error: 'quota' }), { status: 429 }));
     try {
       await expect(searchOffCatalog('comté')).rejects.toThrow();
-      expect(offCalls).toBe(0);
+      expect(engineCalls).toBe(0);
     } finally {
       vi.unstubAllGlobals();
     }

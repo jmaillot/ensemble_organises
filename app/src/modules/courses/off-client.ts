@@ -7,6 +7,8 @@ import { z } from 'zod';
  */
 
 export const OFF_BASE_URL = 'https://world.openfoodfacts.org';
+/** Moteur de recherche officiel (search-a-licious) : codes pertinents. */
+const SEARCH_ENGINE_URL = 'https://search.openfoodfacts.org';
 /** Attribution obligatoire des lectures (D-08). */
 export const OFF_USER_AGENT = 'EnsembleOrganises/1.0 (jeremymaillot@gmail.com)';
 /** Delai d'abandon d'un appel : au-dela, repli creation manuelle (D-01). */
@@ -88,74 +90,56 @@ export interface OffSearchHit {
   lang: string | null;
 }
 
-const offSearchSchema = z.object({
-  products: z
-    .array(
-      z.object({
-        code: z.string().optional(),
-        product_name: z.string().optional(),
-        product_name_fr: z.string().optional(),
-        brands: z.string().optional(),
-        image_front_url: z.string().optional(),
-        image_url: z.string().optional(),
-        categories_tags: z.array(z.string()).optional(),
-        lang: z.string().optional(),
-      }),
-    )
-    .optional(),
+const searchEngineResponseSchema = z.object({
+  hits: z.array(z.object({ code: z.string().optional() })).optional(),
 });
-
-function searchPath(query: string, limit: number): string {
-  const params = new URLSearchParams({
-    search_terms: query.trim(),
-    page_size: String(Math.min(Math.max(limit, 1), 10)),
-    fields: OFF_FIELDS,
-  });
-  return `/api/v2/search?${params.toString()}`;
-}
-
-interface OffSearchPayload {
-  code?: string;
-  product_name?: string;
-  product_name_fr?: string;
-  brands?: string;
-  image_front_url?: string;
-  image_url?: string;
-  categories_tags?: string[];
-  lang?: string;
-}
-
-function toSearchHit(payload: OffSearchPayload): OffSearchHit | null {
-  const name = (payload.product_name_fr ?? payload.product_name ?? '').trim();
-  if (name.length < 1 || name.length > 200) return null;
-  return {
-    ean: (payload.code ?? '').trim(),
-    name,
-    brand: (payload.brands ?? '').trim().slice(0, 200) || null,
-    imageUrl: cleanOffImageUrl(payload.image_front_url) ?? cleanOffImageUrl(payload.image_url),
-    categoriesTags: payload.categories_tags ?? [],
-    lang: payload.lang ?? null,
-  };
-}
 
 /**
  * Recherche par nom (saisie manuelle) : un tap explicite, pas d'autocomplete
  * (10 req/min côté recherche). Lève sur erreur réseau/timeout (le dialogue
  * affiche « réessayer ») ; tableau vide = aucun résultat → création manuelle.
+ *
+ * En deux temps : le moteur officiel `search.openfoodfacts.org` (l'endpoint
+ * historique `/api/v2/search` ne filtre plus : catalogue brut quelle que soit
+ * la requête) fournit les codes, puis chaque fiche produit est enrichie
+ * (photo + rayon) via le même endpoint que le scan, éprouvé.
  */
 export async function searchOffProducts(query: string, options: FetchOffOptions & { limit?: number } = {}): Promise<OffSearchHit[]> {
   const terms = query.trim();
   if (terms.length < 2) return [];
+  const limit = Math.min(Math.max(options.limit ?? 5, 1), 10);
   const timeoutMs = options.timeoutMs ?? OFF_TIMEOUT_MS;
   const userAgent = options.userAgent ?? OFF_USER_AGENT;
-  const response = await getOff(searchPath(terms, options.limit ?? 5), timeoutMs, userAgent);
+  const fetchN = Math.min(limit + 3, 10);
+  const codes = await fetchSearchCodes(terms, fetchN, timeoutMs, userAgent);
+  const enriched = await Promise.all(
+    codes.slice(0, fetchN).map((code) => fetchOffProduct(code, { timeoutMs, userAgent })),
+  );
+  return enriched
+    .filter((product): product is OffProduct => product !== null)
+    .map((product) => ({
+      ean: product.ean,
+      name: product.name,
+      brand: product.brand,
+      imageUrl: product.imageUrl,
+      categoriesTags: product.categoriesTags,
+      lang: product.lang,
+    }))
+    .slice(0, limit);
+}
+
+/** Moteur de recherche officiel : codes EAN (8-14 chiffres), hôte unique. */
+async function fetchSearchCodes(terms: string, fetchN: number, timeoutMs: number, userAgent: string): Promise<string[]> {
+  const params = new URLSearchParams({ q: terms, page_size: String(fetchN) });
+  const response = await getOnce(`${SEARCH_ENGINE_URL}/search?${params.toString()}`, timeoutMs, userAgent);
+  if (response.status === 429) throw new OffOverloadedError();
+  if (response.status >= 500) throw new Error('Open Food Facts injoignable pour le moment.');
   if (!response.ok) throw new Error(`Recherche impossible (${response.status}).`);
-  const parsed = offSearchSchema.safeParse(await response.json().catch(() => null));
+  const parsed = searchEngineResponseSchema.safeParse(await response.json().catch(() => null));
   if (!parsed.success) throw new Error('Réponse de recherche inattendue.');
-  return (parsed.data.products ?? [])
-    .map(toSearchHit)
-    .filter((hit): hit is OffSearchHit => hit !== null)
-    .slice(0, 5);
+  return (parsed.data.hits ?? [])
+    .map((hit) => (hit.code ?? '').trim())
+    .filter((code) => /^\d{8,14}$/.test(code));
 }
 
 function offProductPath(ean: string): string {
