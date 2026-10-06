@@ -185,7 +185,7 @@ function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: 
         if (/déjà réservé/.test(message)) {
           // Conflit (409) : un AUTRE nom tient déjà l'article — distinct de l'oracle.
           setNotice('Quelqu’un vient de réserver cet article : choisissez-en un autre.');
-          void viewQuery.refetch();
+          void viewQuery.refetch().catch(() => {});
         } else if (/nom.*80|Indiquez un nom/.test(message)) {
           setNameError('Indiquez un nom (1 à 80 caractères).');
         } else if (/invalide|ne passe plus|Partage impossible/.test(message)) {
