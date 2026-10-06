@@ -47,14 +47,15 @@ begin
   perform testkit.ok(commun_b is not null, 'calendrier Commun semé foyer B');
 
   -- Calendrier perso de Bob (écriture membre pour soi).
+  -- Perso auto-créé par le trigger 0085 à l'insert du membre (D-02 : un Perso
+  -- par adulte, pas de création libre) : on le relit au lieu de l'insérer —
+  -- un 2e insert pour le même owner violerait event_calendars_perso_owner_unique.
   perform testkit.as_user(bob, 'cal-a-bob@example.fr');
   set local role authenticated;
-  insert into public.event_calendars (id, household_id, name, visibility, owner_member_id)
-  values (private.new_id('event-calendar'), home_a, 'Perso Bob Aaaa', 'perso', bob_m);
-  reset role;
   select id into perso_bob from public.event_calendars
-   where household_id = home_a and name = 'Perso Bob Aaaa';
-  perform testkit.ok(perso_bob is not null, 'calendrier perso créé par son owner');
+   where household_id = home_a and owner_member_id = bob_m and visibility = 'perso';
+  reset role;
+  perform testkit.ok(perso_bob is not null, 'perso auto-créé pour le membre et lisible par son owner');
 
   -- Événements : un Commun, un Perso (seed en postgres, RLS contournée).
   insert into public.events (id, household_id, calendar_id, category_id, title, start_at, created_by)
