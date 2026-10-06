@@ -7,6 +7,7 @@ import { data } from '@/lib/data';
 import {
   parseVacationRecords,
   schoolYearFor,
+  schoolYearsForYear,
   toFrenchHolidays,
   toParisDay,
   useRefDays,
@@ -83,6 +84,62 @@ describe('toFrenchHolidays (mapping lignes base, D-13)', () => {
   });
 });
 
+describe('schoolYearsForYear (D-13)', () => {
+  it('retourne les deux années scolaires couvrant l’année civile', () => {
+    expect(schoolYearsForYear(2026)).toEqual(['2025-2026', '2026-2027']);
+    expect(schoolYearsForYear(2025)).toEqual(['2024-2025', '2025-2026']);
+  });
+});
+
+describe('useRefDays scope les vacances à l’année de la grille (D-13)', () => {
+  it('2026 affiche Toussaint 2026 sans Toussaint 2025, et inversement en 2025', async () => {
+    const zone = 'B' as const;
+    await data.create('school_holidays', {
+      zone,
+      school_year: '2025-2026',
+      name: 'Vacances de la Toussaint 2025',
+      start_date: '2025-10-18',
+      end_date: '2025-11-02',
+    });
+    await data.create('school_holidays', {
+      zone,
+      school_year: '2026-2027',
+      name: 'Vacances de la Toussaint 2026',
+      start_date: '2026-10-17',
+      end_date: '2026-11-02',
+    });
+
+    const listSpy = vi.spyOn(data, 'list');
+    // Un seul client : si la queryKey ne portait pas l'année, les deux hooks
+    // partageraient le même cache (un seul fetch) ; deux clés distinctes
+    // donnent deux lectures base.
+    const client = createTestQueryClient();
+    const sharedWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const hook2026 = renderHook(() => useRefDays(2026, zone), { wrapper: sharedWrapper });
+    const hook2025 = renderHook(() => useRefDays(2025, zone), { wrapper: sharedWrapper });
+
+    await waitFor(() =>
+      expect(hook2026.result.current.vacations.some((range) => range.label === 'Vacances de la Toussaint 2026')).toBe(
+        true,
+      ),
+    );
+    await waitFor(() =>
+      expect(hook2025.result.current.vacations.some((range) => range.label === 'Vacances de la Toussaint 2025')).toBe(
+        true,
+      ),
+    );
+
+    expect(
+      hook2026.result.current.vacations.some((range) => range.label === 'Vacances de la Toussaint 2025'),
+    ).toBe(false);
+    expect(
+      hook2025.result.current.vacations.some((range) => range.label === 'Vacances de la Toussaint 2026'),
+    ).toBe(false);
+    expect(listSpy.mock.calls.filter(([table]) => table === 'school_holidays')).toHaveLength(2);
+  });
+});
 describe('useRefDays sur cache base (D-13/D-15)', () => {
   it('lit les feries et vacances depuis la base, sans appel reseau direct', async () => {
     // Coupe tout acces reseau : un fetch direct vers les sources officielles

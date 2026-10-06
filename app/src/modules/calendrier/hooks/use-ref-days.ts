@@ -29,6 +29,15 @@ export function schoolYearFor(isoDate: string): string {
   return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
 }
 
+/**
+ * Années scolaires couvrant une année civile (porté à l'identique de l'Edge
+ * `refresh-calendrier-ref`, D-13) : janvier et décembre appartiennent
+ * parfois à deux années scolaires différentes.
+ */
+export function schoolYearsForYear(year: number): string[] {
+  return [...new Set([schoolYearFor(`${year}-01-01`), schoolYearFor(`${year}-12-31`)])];
+}
+
 interface VacationRecord {
   description?: string;
   start_date?: string;
@@ -84,7 +93,7 @@ export function useRefDays(year: number, zone: SchoolZone | null) {
     placeholderData: (previous) => previous,
   });
   const vacationsQuery = useQuery({
-    queryKey: ['ref-days', 'school_holidays', zone],
+    queryKey: ['ref-days', 'school_holidays', year, zone],
     enabled: zone !== null,
     queryFn: () => listSchoolHolidays(zone as SchoolZone),
     staleTime: STALE_MS,
@@ -93,10 +102,20 @@ export function useRefDays(year: number, zone: SchoolZone | null) {
   });
 
   const holidays = useMemo(() => toFrenchHolidays(holidaysQuery.data ?? []), [holidaysQuery.data]);
-  const vacations = useMemo(
-    () => (zone === null ? [] : toVacationRanges(vacationsQuery.data ?? [])),
-    [vacationsQuery.data, zone],
-  );
+  const vacations = useMemo(() => {
+    if (zone === null) return [];
+    const years = schoolYearsForYear(year);
+    // L'année scolaire borne la requête (granularité Edge), le chevauchement
+    // avec l'année civile borne l'affichage : Toussaint 2025 appartient à
+    // 2025-2026 (qui couvre janvier-août 2026) mais ne chevauche pas 2026.
+    const first = `${year}-01-01`;
+    const last = `${year}-12-31`;
+    return toVacationRanges(
+      (vacationsQuery.data ?? []).filter(
+        (row) => years.includes(row.school_year) && row.start_date <= last && row.end_date >= first,
+      ),
+    );
+  }, [vacationsQuery.data, zone, year]);
 
   return {
     holidays,
