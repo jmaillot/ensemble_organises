@@ -502,9 +502,12 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   const summary = (summaryQuery.data ?? null) as ArdoiseCodeSummary | null;
 
   // Code arrêté depuis un autre appareil : le cache local est périmé, on le purge.
+  // Garde `isFetching` : pendant le rechargement qui suit une génération, les
+  // données sont encore l'ancien résumé (`hasCode: false`) et purgeraient le
+  // code tout juste créé avant même son affichage (1er clic vide, 2e OK).
   useEffect(() => {
-    if (summaryQuery.isSuccess && !summary?.hasCode && lastCode !== null) rememberCode(null);
-  }, [summaryQuery.isSuccess, summary?.hasCode, lastCode]);
+    if (summaryQuery.isSuccess && !summaryQuery.isFetching && !summary?.hasCode && lastCode !== null) rememberCode(null);
+  }, [summaryQuery.isSuccess, summaryQuery.isFetching, summary?.hasCode, lastCode]);
 
   const currentName = name ?? ardoise?.name ?? '';
   const currentDescription = description ?? ardoise?.description ?? '';
