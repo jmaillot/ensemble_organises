@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { todayIso } from '@/lib/utils';
 import type { ContactListRow, ContactRow, GiftIdeaRow, GiftItemRow, GiftListShareRow, HouseholdMemberRow } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
+import { useSessionUser } from '@/hooks/use-auth';
 import {
   createGiftIdea,
   createGiftItem,
@@ -60,6 +61,7 @@ export function useCadeaux(): CadeauxData {
   const householdId = useHouseholdStore((state) => state.householdId);
   const members = useMembers();
   const currentMember = useCurrentMember();
+  const sessionUser = useSessionUser();
   const currentMemberId = currentMember?.id ?? null;
 
   const query = useQuery({
@@ -71,12 +73,31 @@ export function useCadeaux(): CadeauxData {
   const visibleListIds = useMemo(() => {
     const snapshot = query.data;
     if (!snapshot) return new Set<string>();
+    // Le serveur (RLS `can_read_gift_list`) est l'autorité : une liste privée
+    // explicitement partagée (membre ou e-mail) reste visible à son invité.
+    // Sans ce 3e bras, un partage par code/e-mail sur liste privée était
+    // autorisé en base mais masqué par le client.
+    const userEmail = sessionUser?.email?.trim().toLowerCase() ?? null;
+    const sharedListIds = new Set(
+      snapshot.shares
+        .filter(
+          (share) =>
+            share.shared_with_member_id === currentMemberId ||
+            (userEmail !== null &&
+              share.shared_with_email !== null &&
+              share.shared_with_email.trim().toLowerCase() === userEmail),
+        )
+        .map((share) => share.list_id),
+    );
     return new Set(
       snapshot.lists
-        .filter((row) => row.visibility !== 'privee' || row.owner_member_id === currentMemberId)
+        .filter(
+          (row) =>
+            row.visibility !== 'privee' || row.owner_member_id === currentMemberId || sharedListIds.has(row.id),
+        )
         .map((row) => row.id),
     );
-  }, [currentMemberId, query.data]);
+  }, [currentMemberId, query.data, sessionUser?.email]);
 
   const lists = useMemo<GiftList[]>(() => {
     const snapshot = query.data;
