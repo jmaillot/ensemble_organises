@@ -481,6 +481,17 @@ async function handleRedeem(admin: AdminClient, userId: string, body: RequestBod
 }
 
 /**
+ * Expiration comparée en instants, jamais en chaînes (WR-02) : comparer des
+ * ISO à suffixes hétérogènes (`+00:00` contre `Z`) est un ordre
+ * lexicographique, pas temporel. Une valeur illisible vaut expirée (échec
+ * fermé → oracle 404, jamais un accès indu).
+ */
+function isInviteExpired(expiresAt: string): boolean {
+  const instant = Date.parse(expiresAt);
+  return Number.isNaN(instant) || instant <= Date.now();
+}
+
+/**
  * Envoi réel d'invitation (D-01/D-02/D-03/D-04, phase 06 plan 02).
  *
  * Ordre strict, jamais inversé :
@@ -541,7 +552,7 @@ async function handleSendEmail(admin: AdminClient, userId: string, body: Request
   if (
     !inviteRow?.list_id ||
     inviteRow.is_active !== true ||
-    (inviteRow.expires_at != null && inviteRow.expires_at <= new Date().toISOString()) ||
+    (inviteRow.expires_at != null && isInviteExpired(inviteRow.expires_at)) ||
     (inviteRow.max_uses != null && (inviteRow.use_count ?? 0) >= inviteRow.max_uses)
   ) {
     throw new GiftListInviteError(404, 'Ce code est invalide.');
