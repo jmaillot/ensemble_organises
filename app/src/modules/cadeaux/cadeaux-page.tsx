@@ -529,7 +529,14 @@ export default function CadeauxPage() {
                       </div>
                       {item.comment ? <p className="mb-3 text-[11px] text-muted">{item.comment}</p> : <div className="mb-3" />}
 
-                      {activeList?.isOwned ? null : (
+                      {activeList?.isOwned ? (
+                        // Surprise (0080) : le propriétaire voit QU'un article
+                        // est réservé (`purchased` exposé par la vue), jamais
+                        // PAR QUI (`reserved_by` NULL via la vue).
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          {item.purchased ? <Badge tone="amber">Réservé</Badge> : null}
+                        </div>
+                      ) : (
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                           {item.reservedBy ? (
                             <Badge tone="amber">
