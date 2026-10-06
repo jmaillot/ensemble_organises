@@ -163,6 +163,38 @@ Contraintes :
   se configure dans `volumes/api/envoy/lds.template.yaml` — tester les
   requêtes `OPTIONS` avant de la durcir.
 
+### Relais SMTP : deux familles, un seul relais
+
+Les invitations cadeaux (`send-email` de `gift-list-invite`, phase 06) et
+l'authentification (GoTrue) partagent le **même relais** et donc ses quotas :
+les six variables `SMTP_*` du `.env` alimentent à la fois `GOTRUE_SMTP_*`
+(service `auth`) et le bloc `functions.environment` de
+`docker-compose.traefik.yml` (service `functions`, lus par l'Edge côté
+serveur uniquement — jamais au client, jamais en base, jamais dans les logs).
+
+- **Provenance.** L'exploitant reporte les six valeurs dans
+  `supabase-project/.env` (jamais versionné) : hôte et port du relais,
+  compte et mot de passe, adresse d'expédition fixe (`SMTP_ADMIN_EMAIL`) et
+  nom d'expéditeur (`SMTP_SENDER_NAME`). Ne jamais réutiliser une clé
+  Supabase ou un secret HMAC pour ce relais.
+- **Deux régimes.** Dev : port `2500` sans authentification (Inbucket
+  `supabase-mail:2500`, utilisateur/mot de passe vides — voir le compose de
+  dev). Prod : port `465` (TLS) ou `587` (STARTTLS) **avec** identifiants.
+  L'Edge dérive `secure` du port et omet `auth` quand aucun utilisateur
+  n'est configuré ; des identifiants absents hors port 2500, un hôte ou un
+  port absent, ou une adresse d'expédition absente répondent `500` explicite
+  **avant** toute tentative (échec fermé, D-01).
+- **Après tout changement** (valeurs, rotation, changement de régime) :
+  `cd supabase-project && sh run.sh recreate functions` — l'environnement
+  est figé à la création du conteneur.
+- **Risque résiduel accepté** (T-06-05) : un gestionnaire compromis peut
+  faire envoyer au relais jusqu'à 5 e-mails/minute/IP (rate-limit Edge) ;
+  chaque envoi laisse une part `lecture` en base comme trace d'audit. La
+  réputation du domaine reste sous la responsabilité de l'exploitant.
+- **Recette prod** : un envoi réel supervisé (TLS) reste une étape manuelle,
+  une fois les secrets provisionnés — `scripts/test-gift-mail.sh` prouve le
+  régime dev (Inbucket) ou constate explicitement son absence.
+
 ---
 
 ## 3. Démarrage

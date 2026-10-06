@@ -96,6 +96,21 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # Relais SMTP partagé (invitations cadeaux `send-email`, phase 06 plan
+      # 02) : MÊMES valeurs que `GOTRUE_SMTP_*` (même relais, mêmes quotas —
+      # voir docs/BACKEND.md). Régime dev : port 2500 sans authentification
+      # (Inbucket `supabase-mail:2500`) ; prod : port 465 (TLS) ou 587
+      # (STARTTLS) AVEC identifiants. L'Edge `send-email` lit ces six
+      # variables côté serveur uniquement et échoue fermée en 500 explicite
+      # quand elles manquent (jamais d'envoi sans relais). Le `:-` suit la
+      # convention VAPID ci-dessus (pas de WARN Compose sur les commandes
+      # sans rapport). Après tout changement : `sh run.sh recreate functions`.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-}
       FUNCTIONS_VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-false}
       SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
