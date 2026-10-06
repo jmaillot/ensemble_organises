@@ -224,12 +224,13 @@ export async function syncGiftListShares(
 }
 
 /* ------------------------------------------------------------------ */
-/* Partage par code (Edge Function `gift-list-invite`, user-only)       */
+/* Partage par code (Edge Function `gift-list-invite`)                */
 /*                                                                     */
-/* OQ-1 OPTION A (plan 05-03, verrouillée) : aucun chemin anonyme. Le   */
-/* lien `/invitation/cadeau?code=…` mène vers inscription/connexion     */
-/* avec l'e-mail invité, puis l'échange active le partage via la        */
-/* branche e-mail de `redeem_gift_list_invite`.                        */
+/* Deux parcours (phase 06, D-05) :                                    */
+/* - AVEC compte : `redeem` active le partage (membre ou e-mail invité, */
+/*   OQ-1 OPTION A inchangée) ;                                        */
+/* - SANS compte : `guest-view` / `guest-reserve` publishable, le code */
+/*   EST le contrôle d'accès, nom déclaré 1-80, charge booléenne seule. */
 /* ------------------------------------------------------------------ */
 
 /** Lien à envoyer à l'externe : affiché une seule fois avec le code (QR). */
@@ -387,6 +388,22 @@ function assertGuestName(name: string): string {
 }
 
 /**
+ * Projection défensive côté client (miroir exact du handler Edge) : même si
+ * la charge servie rendait un jour plus, aucun identifiant d'auteur ne
+ * quitte ce helper vers le rendu (D-07). Seul `reserved` dit l'état.
+ */
+function toGuestGiftItem(entry: unknown): GuestGiftItem {
+  const row = (entry ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    price: typeof row.price === 'number' ? row.price : Number(row.price ?? 0) || 0,
+    comment: typeof row.comment === 'string' ? row.comment : null,
+    reserved: row.reserved === true,
+  };
+}
+
+/**
  * Lecture invitée sans compte : rend la liste + les états réservés seuls.
  * Les erreurs Edge sont déjà des messages utilisateurs (`Ce code est
  * invalide.` pour l'oracle, sans distinction d'état) : on les propage tels
@@ -397,9 +414,13 @@ export async function fetchGuestGiftView(code: string): Promise<GuestGiftView> {
   const view = await callGiftInvitePublishable<{
     listId: string | null;
     listName: string | null;
-    items: GuestGiftItem[];
+    items: unknown;
   }>('guest-view', { code: trimmed });
-  return { listId: view.listId, listName: view.listName, items: Array.isArray(view.items) ? view.items : [] };
+  return {
+    listId: typeof view.listId === 'string' ? view.listId : null,
+    listName: typeof view.listName === 'string' ? view.listName : null,
+    items: Array.isArray(view.items) ? view.items.map(toGuestGiftItem) : [],
+  };
 }
 
 /**

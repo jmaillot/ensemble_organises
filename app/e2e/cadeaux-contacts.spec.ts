@@ -80,4 +80,23 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     const line = rows.getByRole('listitem').filter({ hasText: 'E2E Robin' });
     await expect(line).toContainText('2 sources');
   });
+
+  test('invité sans compte : garde code puis refus hors ligne', async ({ page }) => {
+    // Parcours invité (phase 06, D-05) en démonstration : sans backend, la
+    // garde cliente (bouton inactif sous 22 caractères) puis le refus
+    // explicite « serveur indisponible » sont les seuls chemins
+    // déterministes. La réserve réussie, adossée au serveur, est prouvée par
+    // la suite SQL 0029 et les tests Vitest invités — pas rejouable sans relais.
+    await openDemoSession(page);
+    await page.goto('/invitation/cadeau');
+    await expect(page.getByText('Invitation à une liste de cadeaux')).toBeVisible();
+
+    // Garde cliente : un code trop court ne part jamais.
+    await page.getByLabel(/Code d’invitation/).fill('court');
+    await expect(page.getByRole('button', { name: 'Ouvrir l’invitation' })).toBeDisabled();
+
+    await page.getByLabel(/Code d’invitation/).fill('JU6QUzDkv3pLmdGgVYUCqadLLKdsqfCj');
+    await page.getByRole('button', { name: 'Ouvrir l’invitation' }).click();
+    await expect(page.getByText(/Connexion au serveur indisponible/)).toBeVisible();
+  });
 });
