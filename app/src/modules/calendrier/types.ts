@@ -110,7 +110,7 @@ export interface EventFormValues {
   memberId: string;
   /** `event_categories.id`, ou chaîne vide pour sans catégorie. */
   categoryId: string;
-  /** `event_calendars.id`, ou chaîne vide pour le Commun (défaut). */
+  /** `event_calendars.id`, choisi explicitement (D-03, présélection Commun). Chaîne vide : filet serveur 0048 uniquement. */
   calendarId: string;
   /** Rappel au format `datetime-local` (`2026-09-25T18:30`) ou chaîne vide. */
   remindAt: string;

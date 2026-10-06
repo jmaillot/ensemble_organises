@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -40,6 +40,26 @@ const eventSchema = z
     message: 'L’heure de fin doit suivre l’heure de début.',
     path: ['endTime'],
   });
+
+/**
+ * Choix calendrier explicite (D-03) : dès que plusieurs calendriers existent,
+ * un `calendarId` vide est rejeté au formulaire au lieu d'être résolu
+ * silencieusement vers le Commun (le trigger serveur 0048 reste le filet
+ * pour les vieux clients). Avec un seul calendrier (ou aucun chargé), le
+ * schéma de base s'applique : la présélection visible garantit déjà qu'aucune
+ * valeur vide n'est soumise.
+ */
+export function buildEventSchema(calendarCount: number) {
+  if (calendarCount > 1) {
+    // `.extend()` est interdit sur un schéma raffiné (Zod v4) : `.safeExtend()`
+    // reconduit la vérification heure-fin-après-début tout en durcissant
+    // `calendarId` (vérifié : le raffinement reste appliqué).
+    return eventSchema.safeExtend({
+      calendarId: z.string().trim().min(1, 'Choisissez un calendrier.'),
+    });
+  }
+  return eventSchema;
+}
 
 const toTimeValue = (iso: string | null, allDay: boolean) => {
   if (allDay || !iso) return '';
@@ -106,8 +126,16 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
   const memberId = event
     ? (members.find((member) => toColorTag(member.color_tag) === toColorTag(event.color))?.id ?? '')
     : '';
-  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<EventFormValues>({
-    resolver: zodResolver(eventSchema),
+  // Calendrier Commun du foyer : première source la visibilité, repli sur le
+  // nom historique pour les vieux jeux de données.
+  const communCalendar =
+    calendars.find((calendar) => calendar.visibility === 'commun') ??
+    calendars.find((calendar) => calendar.name === 'Commun' && !calendar.owner_member_id) ??
+    null;
+  // Plusieurs calendriers = choix ambigu : la validation refuse le vide (D-03).
+  const schema = useMemo(() => buildEventSchema(calendars.length), [calendars.length]);
+  const { register, handleSubmit, reset, watch, setValue, getValues, formState } = useForm<EventFormValues>({
+    resolver: zodResolver(schema),
     mode: 'onSubmit',
     defaultValues: defaultValues(event, defaultDate, memberId, remindAt),
   });
@@ -121,6 +149,18 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
     // réinitialise pas le formulaire à chaque frappe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, event?.id, defaultDate, remindAt]);
+
+  // D-03 : présélection visible du Commun. Dès que les calendriers sont
+  // chargés et que le champ est encore vide (création ou ancien événement
+  // implicitement Commun), on affiche l'id du Commun au lieu de soumettre
+  // une chaîne vide. Ne se redéclenche pas après un choix utilisateur
+  // (dépendances stables : `open` + calendrier Commun résolu).
+  useEffect(() => {
+    if (!open || !communCalendar) return;
+    if (getValues('calendarId') === '') {
+      setValue('calendarId', communCalendar.id, { shouldDirty: false });
+    }
+  }, [open, communCalendar, getValues, setValue]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,23 +238,31 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
             )}
           </Field>
 
-          {calendars.length > 1 ? (
-            <Field label="Calendrier" optional error={errors.calendarId?.message}>
-              {(props) => (
-                <Select {...props} {...register('calendarId')}>
-                  <option value="">Commun du foyer</option>
-                  {calendars
-                    .filter((calendar) => !(calendar.visibility === 'commun' && calendar.name === 'Commun'))
-                    .map((calendar) => (
-                      <option key={calendar.id} value={calendar.id}>
-                        {calendar.name}
-                        {calendar.visibility === 'perso' ? ' (perso)' : ''}
-                      </option>
-                    ))}
-                </Select>
-              )}
-            </Field>
-          ) : null}
+          <Field
+            label="Calendrier"
+            optional={calendars.length <= 1}
+            error={errors.calendarId?.message}
+          >
+            {(props) => (
+              <Select {...props} {...register('calendarId')}>
+                {communCalendar ? (
+                  <option value={communCalendar.id}>Commun du foyer</option>
+                ) : (
+                  <option value="" disabled>
+                    Chargement des calendriers…
+                  </option>
+                )}
+                {calendars
+                  .filter((calendar) => calendar.id !== communCalendar?.id)
+                  .map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.name}
+                      {calendar.visibility === 'perso' ? ' (perso)' : ''}
+                    </option>
+                  ))}
+              </Select>
+            )}
+          </Field>
 
           <Field label="Couleur du foyer" optional error={errors.memberId?.message}>
             {(props) => (
