@@ -275,6 +275,16 @@ export default function CadeauxPage() {
     }
   };
 
+  // Propriétaire : marquer « reçu » ne touche jamais à `reserved_by` (la
+  // réservation reste l'affaire des invités, et la surprise intacte).
+  const handleToggleReceived = async (item: GiftItem, purchased: boolean) => {
+    try {
+      await updateItem.mutateAsync({ id: item.id, values: { purchased } });
+    } catch {
+      toast('Mise à jour impossible.', 'error');
+    }
+  };
+
   const handleDeleteItem = async () => {
     if (!pendingItemDeletion) return;
     setPendingItemDeletion(null);
@@ -535,6 +545,14 @@ export default function CadeauxPage() {
                         // PAR QUI (`reserved_by` NULL via la vue).
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                           {item.purchased ? <Badge tone="amber">Réservé</Badge> : null}
+                          <label htmlFor={`gift-received-${item.id}`} className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
+                            <Switch
+                              id={`gift-received-${item.id}`}
+                              checked={item.purchased}
+                              onCheckedChange={(checked) => void handleToggleReceived(item, checked)}
+                            />
+                            Reçu
+                          </label>
                         </div>
                       ) : (
                         <div className="mb-3 flex flex-wrap items-center gap-2">
