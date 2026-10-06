@@ -181,9 +181,19 @@ async function fetchSearchCodes(terms: string, fetchN: number): Promise<string[]
   }
   if (response.status === 429 || response.status >= 500) return null;
   if (!response.ok) return null;
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    return null;
+  }
+  // TEMP-DIAG-429 : corps brut, à retirer après résolution.
+  console.log(
+    `off-search diag brut "${terms}" http=${response.status} ctype=${response.headers.get('content-type')} extrait=${JSON.stringify(text.slice(0, 300))}`,
+  );
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(text);
   } catch {
     return null;
   }
