@@ -1,15 +1,22 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 /**
- * Parcours Calendrier (phase 01-calendrier, D-01/D-03/D-09/D-10/D-11) en mode
- * démonstration (aucun backend requis, comme les autres specs e2e) :
+ * Parcours Calendrier (phase 01-calendrier, D-01/D-03/D-09/D-10/D-11, 0090) en
+ * mode démonstration (aucun backend requis, comme les autres specs e2e) :
  * - couches de référence toujours visibles, sans interrupteur ;
  * - appui long sur une case et bouton « + » ouvrent le dialogue avec date
  *   pré-remplie et calendrier explicite ;
- * - choix calendrier explicite (vide refusé dès que 2 calendriers) ;
+ * - un seul Perso par membre (modèle 0085/0090) : la création se referme
+ *   quand le Perso existe, sa suppression le retire des filtres et rouvre
+ *   la création ;
  * - isolation de deux contextes : le calendrier perso et l'événement créés
  *   dans le contexte A n'apparaissent ni dans les vues ni dans les filtres
  *   du contexte B.
+ *
+ * Note D-03 : le refus du calendrier vide « dès que 2 calendriers » est
+ * prouvé au niveau unitaire (`event-form-dialog.test.tsx`, schéma Zod) : en
+ * démo comme en production, l'UI ne peut plus réunir 2 Perso pour le même
+ * membre (unicité 0085), donc ce cas n'est plus atteignable au clic.
  *
  * Limite assumée du mode démo : les deux contextes ont chacun leur base
  * locale isolée, donc l'invisibilité inter-comptes côté SERVEUR (RLS) n'est
@@ -120,24 +127,22 @@ test.describe('Calendrier : couches ref et création explicite', () => {
     await expect(dialog.getByLabel(/^Calendrier/)).toBeVisible();
   });
 
-  test('le calendrier vide est refusé dès que deux calendriers existent', async ({ page }) => {
-    // D-03 : avec 2 calendriers, soumettre sans choix explicite est rejeté.
+  test('le perso créé se supprime et rouvre la création (0090)', async ({ page }) => {
+    // Modèle un-Perso-par-membre : créer referme la création.
     await createPersoCalendar(page, 'Perso E2E A');
-    await createPersoCalendar(page, 'Perso E2E B');
+    await expect(page.getByRole('button', { name: '+ Calendrier perso' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Supprimer « Perso E2E A »' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Ajouter un événement' }).first().click();
-    const dialog = page.getByRole('dialog');
-    const calendar = dialog.getByLabel(/^Calendrier/);
-    await expect(calendar.getByRole('option', { name: 'Perso E2E A (perso)' })).toBeAttached();
-    await expect(calendar.getByRole('option', { name: 'Perso E2E B (perso)' })).toBeAttached();
-
-    await dialog.getByLabel('Titre').fill('Sans calendrier');
-    await dialog.getByRole('button', { name: 'Ajouter l’événement' }).click();
-    await expect(dialog.getByText('Choisissez un calendrier.')).toBeVisible();
-
-    await calendar.selectOption({ label: 'Perso E2E A (perso)' });
-    await dialog.getByRole('button', { name: 'Ajouter l’événement' }).click();
-    await expect(page.getByText('Ajouté au foyer.')).toBeVisible();
+    // Supprimer retire le calendrier des filtres et rouvre la création.
+    await page.getByRole('button', { name: 'Supprimer « Perso E2E A »' }).click();
+    const alert = page.getByRole('alertdialog');
+    await expect(alert.getByText('Ce calendrier perso sera définitivement supprimé.')).toBeVisible();
+    await alert.getByRole('button', { name: 'Supprimer le calendrier' }).click();
+    await expect(page.getByText('Calendrier « Perso E2E A » supprimé.')).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Calendrier perso' })).toBeVisible();
+    await expect(
+      page.getByLabel('Filtrer par calendrier').getByRole('option', { name: 'Perso E2E A (perso)' }),
+    ).toHaveCount(0);
   });
 });
 

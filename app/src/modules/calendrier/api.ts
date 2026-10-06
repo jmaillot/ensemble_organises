@@ -79,6 +79,34 @@ export async function createPersonalCalendar(householdId: string, ownerMemberId:
   });
 }
 
+/**
+ * Suppression d'un calendrier perso par son owner (0090 : la RLS l'autorise,
+ * l'admin ne voit toujours pas le Perso d'autrui). Le Commun est protégé
+ * côté serveur (`name <> 'Commun'`). Les événements du calendrier sont
+ * supprimés en cascade par la contrainte : les déplacer vers le Commun
+ * avant (voir `moveCalendarEvents`) quand ils doivent survivre.
+ */
+export async function deleteCalendar(id: string): Promise<void> {
+  await data.remove(CALENDARS, id);
+}
+
+/** Événements rattachés à un calendrier (pour le bilan avant suppression). */
+export async function listCalendarEvents(calendarId: string): Promise<EventRow[]> {
+  const rows = await data.list<EventRow>(EVENTS);
+  return rows.filter((row) => row.calendar_id === calendarId);
+}
+
+/**
+ * Déplace tous les événements d'un calendrier vers un autre (suppression
+ * d'un Perso non vide, avec confirmation explicite côté appelant — même
+ * exigence que la sortie du secret D-04).
+ */
+export async function moveCalendarEvents(fromCalendarId: string, toCalendarId: string): Promise<number> {
+  const rows = await listCalendarEvents(fromCalendarId);
+  await Promise.all(rows.map((row) => data.update<EventRow>(EVENTS, row.id, { calendar_id: toCalendarId })));
+  return rows.length;
+}
+
 const CATEGORY_COLORS = ['#E8930C', '#D64545', '#3E7CB1', '#4CAF50', '#7C5CBF', '#E86AA0'] as const;
 
 export { CATEGORY_COLORS };

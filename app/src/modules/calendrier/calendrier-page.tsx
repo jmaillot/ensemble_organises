@@ -17,10 +17,11 @@ import { EventFormDialog } from './components/event-form-dialog';
 import { useCalendrier } from './hooks/use-calendrier';
 import { useRefDays } from './hooks/use-ref-days';
 import { useSchoolZone } from './hooks/use-school-zone';
-import { createPersonalCalendar, createCategory, CATEGORY_COLORS } from './api';
+import { createPersonalCalendar, createCategory, deleteCalendar, moveCalendarEvents, CATEGORY_COLORS } from './api';
 import { suggestZoneForCity } from './lib/zone-resolver';
 import { buildAgenda, buildDayMarkers, isExitingPerso } from './types';
 import type { CalendarEvent, EventFormValues } from './types';
+import type { EventCalendarRow } from '@/types';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
@@ -83,12 +84,51 @@ export default function CalendrierPage() {
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [calendarName, setCalendarName] = useState('');
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+  const [pendingCalendarDelete, setPendingCalendarDelete] = useState<EventCalendarRow | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [categoryColor, setCategoryColor] = useState<string>(CATEGORY_COLORS[0]);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   const selected = grid.selected;
+
+  // Perso de l'utilisateur courant (0090 : un seul par adulte, supprimable
+  // par son owner). Tant qu'il existe, la création est masquée : un second
+  // Perso violerait l'unicité par owner.
+  const ownPerso = useMemo(
+    () => calendars.find((calendar) => calendar.visibility === 'perso' && calendar.owner_member_id === currentMember?.id) ?? null,
+    [calendars, currentMember?.id],
+  );
+  const ownPersoEventCount = useMemo(
+    () => (ownPerso ? events.filter((event) => event.calendarId === ownPerso.id).length : 0),
+    [events, ownPerso],
+  );
+
+  const confirmCalendarDelete = async () => {
+    const target = pendingCalendarDelete;
+    setPendingCalendarDelete(null);
+    if (!target) return;
+    try {
+      const eventCount = events.filter((event) => event.calendarId === target.id).length;
+      if (eventCount > 0) {
+        const commun = calendars.find((calendar) => calendar.visibility === 'commun') ?? null;
+        // Sortie du secret collective (même exigence que D-04) : le dialogue
+        // de confirmation ci-dessous l'annonce explicitement avant exécution.
+        if (!commun) throw new Error('Aucun calendrier Commun pour accueillir les événements.');
+        await moveCalendarEvents(target.id, commun.id);
+      }
+      await deleteCalendar(target.id);
+      if (calendarFilter === target.id) setCalendarFilter('tous');
+      refetch();
+      toast(
+        eventCount > 0
+          ? `Calendrier « ${target.name} » supprimé, ${eventCount} événement${eventCount > 1 ? 's' : ''} déplacé${eventCount > 1 ? 's' : ''} vers Commun.`
+          : `Calendrier « ${target.name} » supprimé.`,
+      );
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Le calendrier n’a pas pu être supprimé.', 'error');
+    }
+  };
 
   const changeView = (next: CalendarView) => {
     setView(next);
@@ -299,17 +339,33 @@ export default function CalendrierPage() {
             </option>
           ))}
         </Select>
-        <button
-          type="button"
-          onClick={() => {
-            setCalendarName('');
-            setCalendarDialogOpen(true);
-          }}
-          hidden={isChild}
-          className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
-        >
-          + Calendrier perso
-        </button>
+        {ownPerso === null ? (
+          <button
+            type="button"
+            onClick={() => {
+              setCalendarName('');
+              setCalendarDialogOpen(true);
+            }}
+            hidden={isChild}
+            className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
+          >
+            + Calendrier perso
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPendingCalendarDelete(ownPerso)}
+            hidden={isChild}
+            title={
+              ownPersoEventCount > 0
+                ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} seront déplacés vers Commun`
+                : 'Supprimer ce calendrier perso'
+            }
+            className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral"
+          >
+            Supprimer « {ownPerso.name} »
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -665,6 +721,23 @@ export default function CalendrierPage() {
           setPendingMove(null);
           if (!move) return;
           void persistEvent(move.event, move.values);
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingCalendarDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingCalendarDelete(null);
+        }}
+        title={`Supprimer « ${pendingCalendarDelete?.name ?? ''} » ?`}
+        description={
+          ownPersoEventCount > 0
+            ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} de ce calendrier seront déplacés vers le calendrier Commun et deviendront visibles par tout le foyer.`
+            : 'Ce calendrier perso sera définitivement supprimé.'
+        }
+        confirmLabel="Supprimer le calendrier"
+        onConfirm={() => {
+          void confirmCalendarDelete();
         }}
       />
 

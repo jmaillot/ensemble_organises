@@ -312,4 +312,92 @@ describe('CalendrierPage', () => {
     const categoryDot = dayButton.querySelector('span[style*="background-color"]');
     expect(categoryDot).not.toBeNull();
   });
+
+  it('supprime son calendrier perso vide après confirmation (0090)', async () => {
+    const user = userEvent.setup();
+    await data.create('event_calendars', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Commun',
+      visibility: 'commun',
+      owner_member_id: null,
+    } as never);
+    await data.create('event_calendars', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Perso',
+      visibility: 'perso',
+      owner_member_id: DEMO_MEMBERS.camille,
+    } as never);
+
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    // Le Perso existant remplace la création : pas de second Perso possible.
+    expect(await screen.findByRole('button', { name: 'Supprimer « Perso »' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Calendrier perso' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer « Perso »' }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(within(alert).getByText('Ce calendrier perso sera définitivement supprimé.')).toBeInTheDocument();
+    await user.click(within(alert).getByRole('button', { name: 'Supprimer le calendrier' }));
+
+    expect(await screen.findByText('Calendrier « Perso » supprimé.')).toBeInTheDocument();
+    // Le Perso supprimé libère la création : le bouton réapparaît.
+    expect(await screen.findByRole('button', { name: '+ Calendrier perso' })).toBeInTheDocument();
+    const remaining = await data.list<{ id: string; name: string }>('event_calendars', {
+      household_id: DEMO_HOUSEHOLD_ID,
+    });
+    expect(remaining.some((row) => row.name === 'Perso')).toBe(false);
+  });
+
+  it('déplace les événements vers Commun avant de supprimer le Perso (0090)', async () => {
+    const user = userEvent.setup();
+    const communId = await data
+      .create<{ id: string }>('event_calendars', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        name: 'Commun',
+        visibility: 'commun',
+        owner_member_id: null,
+      } as never)
+      .then((row) => row.id);
+    const persoId = await data
+      .create<{ id: string }>('event_calendars', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        name: 'Perso',
+        visibility: 'perso',
+        owner_member_id: DEMO_MEMBERS.camille,
+      } as never)
+      .then((row) => row.id);
+    const secretId = await data
+      .create<{ id: string }>('events', {
+        household_id: DEMO_HOUSEHOLD_ID,
+        title: 'Séance discrète',
+        description: null,
+        start_at: `${today}T20:00:00`,
+        end_at: `${today}T21:00:00`,
+        all_day: false,
+        location: null,
+        color: 'accent',
+        category_id: null,
+        calendar_id: persoId,
+        created_by: DEMO_MEMBERS.camille,
+      } as never)
+      .then((row) => row.id);
+
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    await user.click(await screen.findByRole('button', { name: 'Supprimer « Perso »' }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(within(alert).getByText(/seront déplacés vers le calendrier Commun/)).toBeInTheDocument();
+    await user.click(within(alert).getByRole('button', { name: 'Supprimer le calendrier' }));
+
+    expect(await screen.findByText(/déplacé vers Commun/)).toBeInTheDocument();
+    const rows = await data.list<{ id: string; calendar_id: string }>('events', {
+      household_id: DEMO_HOUSEHOLD_ID,
+    });
+    expect(rows.find((row) => row.id === secretId)?.calendar_id).toBe(communId);
+    expect(
+      (await data.list<{ id: string }>('event_calendars', { household_id: DEMO_HOUSEHOLD_ID })).some(
+        (row) => row.id === persoId,
+      ),
+    ).toBe(false);
+  });
 });
