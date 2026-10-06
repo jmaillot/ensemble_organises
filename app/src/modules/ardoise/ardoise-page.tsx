@@ -10,7 +10,8 @@ import { useToast } from '@/components/ui/toast';
 import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
-import { useMembers } from '@/stores/household-store';
+import { useHouseholdStore, useMembers } from '@/stores/household-store';
+import { depositHouseholdFile } from '@/lib/storage';
 import { useArdoises } from './hooks/use-ardoise';
 import { joinArdoise, redeemGuestTicket } from './api';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -21,6 +22,7 @@ export default function ArdoisePage() {
   const toast = useToast();
   const navigate = useNavigate();
   const sessionUser = useSessionUser();
+  const householdId = useHouseholdStore((state) => state.householdId);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -127,7 +129,19 @@ export default function ArdoisePage() {
         isSaving={isMutating}
         onSubmit={async (values) => {
           try {
-            const created = await addArdoise(values);
+            // Photo de couverture optionnelle : déposée avant création, comme
+            // dans l'onglet Paramètres (même dossier `ardoises`).
+            let coverUrl: string | undefined;
+            if (values.coverFile) {
+              if (!householdId) throw new Error('Aucun foyer sélectionné.');
+              coverUrl = (await depositHouseholdFile({ householdId, folder: 'ardoises', file: values.coverFile })).url;
+            }
+            const created = await addArdoise({
+              name: values.name,
+              description: values.description,
+              memberIds: values.memberIds,
+              coverUrl,
+            });
             setCreateOpen(false);
             toast(`Ardoise « ${created.name} » créée.`);
             navigate(`/ardoise/${created.id}`);
@@ -171,10 +185,12 @@ function CreateArdoiseDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSaving: boolean;
-  onSubmit: (values: { name: string; description?: string; memberIds: string[] }) => Promise<void>;
+  onSubmit: (values: { name: string; description?: string; memberIds: string[]; coverFile: File | null }) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [isSending, setIsSending] = useState(false);
   // `null` = tous cochés (régime historique) ; décochez pour exclure.
   const [selected, setSelected] = useState<string[] | null>(null);
   const householdMembers = useMembers();
@@ -184,6 +200,7 @@ function CreateArdoiseDialog({
   const reset = () => {
     setName('');
     setDescription('');
+    setCoverFile(null);
     setSelected(null);
   };
 
@@ -215,7 +232,9 @@ function CreateArdoiseDialog({
           className="grid gap-3.5"
           onSubmit={(event) => {
             event.preventDefault();
-            void onSubmit({ name, description, memberIds: effective });
+            if (isSending) return;
+            setIsSending(true);
+            void onSubmit({ name, description, memberIds: effective, coverFile }).finally(() => setIsSending(false));
           }}
         >
           <Field label="Nom de l’ardoise">
@@ -226,6 +245,16 @@ function CreateArdoiseDialog({
           <Field label="Description" optional>
             {(props) => (
               <Textarea {...props} value={description} onChange={(change) => setDescription(change.target.value)} rows={2} />
+            )}
+          </Field>
+          <Field label="Photo de couverture" optional>
+            {(props) => (
+              <Input
+                {...props}
+                type="file"
+                accept="image/*"
+                onChange={(change) => setCoverFile(change.target.files?.[0] ?? null)}
+              />
             )}
           </Field>
           {eligible.length > 0 ? (
@@ -257,7 +286,7 @@ function CreateArdoiseDialog({
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
-            <Button type="submit" icon="plus" disabled={isSaving || name.trim() === ''}>
+            <Button type="submit" icon="plus" disabled={isSaving || isSending || name.trim() === ''}>
               Créer l’ardoise
             </Button>
           </DialogActions>

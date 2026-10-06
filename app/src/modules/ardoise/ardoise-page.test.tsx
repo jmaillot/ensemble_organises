@@ -27,6 +27,20 @@ describe('ArdoisePage — liste', () => {
     expect(await screen.findByText('Week-end ski')).toBeInTheDocument();
   });
 
+  it('propose une photo de couverture optionnelle', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArdoisePage />, { route: '/ardoise' });
+
+    await user.click(await screen.findByRole('button', { name: 'Créer une ardoise' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/Photo de couverture/)).toBeInTheDocument();
+    // Optionnelle : la création reste possible sans photo.
+    await user.type(within(dialog).getByLabelText(/Nom de l’ardoise/), 'Week-end sans photo');
+    await user.click(within(dialog).getByRole('button', { name: 'Créer l’ardoise' }));
+
+    expect(await screen.findByText('Week-end sans photo')).toBeInTheDocument();
+  });
+
   it('crée une ardoise avec une sélection de membres', async () => {
     const user = userEvent.setup();
     renderWithProviders(
