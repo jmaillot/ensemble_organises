@@ -189,6 +189,9 @@ async function fetchSearchCodes(terms: string, fetchN: number): Promise<string[]
   }
   const parsed = searchResponseSchema.safeParse(body);
   if (!parsed.success) return null;
+  // TEMP-DIAG-429 : réponse brute du moteur, à retirer après résolution.
+  const rawSample = JSON.stringify((parsed.hits ?? []).slice(0, 3).map((hit) => hit.code));
+  console.log(`off-search diag moteur "${terms}" hits=${(parsed.hits ?? []).length} echantillon=${rawSample}`);
   return (parsed.hits ?? [])
     .map((hit) => (hit.code ?? '').trim())
     .filter((code) => /^\d{8,14}$/.test(code));
