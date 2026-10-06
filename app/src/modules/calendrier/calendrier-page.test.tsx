@@ -271,6 +271,8 @@ describe('CalendrierPage', () => {
 
     expect(await screen.findByRole('button', { name: '+ Calendrier perso' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '+ Catégorie' })).toBeInTheDocument();
+    // La zone scolaire reste un réglage admin (D-16, households_update admin-only).
+    expect(screen.getByLabelText('Zone scolaire du foyer')).toBeInTheDocument();
 
     act(() => {
       useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
@@ -278,6 +280,7 @@ describe('CalendrierPage', () => {
 
     expect(screen.queryByRole('button', { name: '+ Calendrier perso' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Catégorie' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Zone scolaire du foyer')).not.toBeInTheDocument();
   });
 
   it('colore la pastille du jour avec la catégorie, couleur membre inchangée (D-07)', async () => {
