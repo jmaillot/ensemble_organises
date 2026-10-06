@@ -255,6 +255,16 @@ export interface ShoppingItemInput {
   productId?: string | null;
 }
 
+/** Référence OFF jointe à un ajout manuel : même forme que `OffProduct`. */
+export interface ItemOffRef {
+  ean: string;
+  name: string;
+  brand: string | null;
+  imageUrl: string | null;
+  categoriesTags: string[];
+  lang: string | null;
+}
+
 /** Valeurs renvoyées par le formulaire article, avant résolution de la liste. */
 export interface ItemFormValues {
   name: string;
@@ -263,6 +273,8 @@ export interface ItemFormValues {
   rayon: Rayon;
   listId: string;
   newListName: string;
+  /** Résultat OFF choisi via « Rechercher photo et rayon » : crée la fiche catalogue. */
+  off: ItemOffRef | null;
 }
 
 export const toShoppingList = (row: ShoppingListRow): ShoppingList => ({

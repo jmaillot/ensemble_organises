@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
-import { RAYONS, NEW_LIST_OPTION, guessRayon, type ItemFormValues, type ShoppingItem, type ShoppingListView } from '../types';
+import { RAYONS, NEW_LIST_OPTION, guessRayon, type ItemFormValues, type ItemOffRef, type ShoppingItem, type ShoppingListView } from '../types';
 import { offCategoriesToRayon } from '../off-rayon';
 import { searchOffCatalog } from '../api';
 import { rankSearchHits, type OffSearchHit } from '../off-client';
@@ -30,6 +30,8 @@ const schema = z
     rayon: z.enum(RAYONS),
     listId: z.string().min(1, 'Choisissez une liste.'),
     newListName: z.string().trim().max(60, '60 caractères maximum.'),
+    // Référence OFF gérée hors champs (état `pickedHit`), jamais saisie.
+    off: z.custom<ItemOffRef | null>((value) => value === null || value === undefined || typeof value === 'object'),
   })
   .superRefine((values, context) => {
     if (values.listId === NEW_LIST_OPTION && values.newListName.trim().length < 2) {
@@ -49,6 +51,7 @@ const emptyValues = (lists: ShoppingListView[]): ItemFormValues => ({
   rayon: 'Divers',
   listId: lists[0]?.id ?? NEW_LIST_OPTION,
   newListName: '',
+  off: null,
 });
 
 export interface ItemFormDialogProps {
@@ -90,6 +93,7 @@ export function ItemFormDialog({
           rayon: initialItem.rayon,
           listId: initialItem.listId,
           newListName: '',
+          off: null,
         }
       : emptyValues(lists),
   });
@@ -113,12 +117,14 @@ export function ItemFormDialog({
               rayon: initialItem.rayon,
               listId: initialItem.listId,
               newListName: '',
+              off: null,
             }
           : emptyValues(lists),
       );
       rayonTouched.current = editing;
       setSearchState({ status: 'idle' });
       setSearchPhoto(null);
+      setPickedHit(null);
     }
     if (!open) wasOpen.current = false;
   }, [lists, open, reset, initialItem, editing]);
@@ -133,6 +139,8 @@ export function ItemFormDialog({
     | { status: 'error'; message: string }
   >({ status: 'idle' });
   const [searchPhoto, setSearchPhoto] = useState<{ url: string; label: string } | null>(null);
+  /** Résultat OFF choisi : joint à la création (fiche catalogue + lien). */
+  const [pickedHit, setPickedHit] = useState<OffSearchHit | null>(null);
 
   const runSearch = () => {
     const terms = articleName.trim();
@@ -164,7 +172,18 @@ export function ItemFormDialog({
     markRayonTouched();
     setValue('rayon', offCategoriesToRayon(hit.categoriesTags), { shouldValidate: true });
     setSearchPhoto(hit.imageUrl ? { url: hit.imageUrl, label: hit.name } : null);
+    setPickedHit(hit);
     setSearchState({ status: 'idle' });
+  };
+
+  /**
+   * Le lien catalogue vaut « cet article EST ce produit » : si le nom est
+   * retouché après le choix, le lien et la photo tombent (le rayon, lui,
+   * reste — l'utilisateur peut l'avoir ajusté).
+   */
+  const clearPickOnRename = () => {
+    setPickedHit(null);
+    setSearchPhoto(null);
   };
 
   // Le formulaire n'est réinitialisé qu'à l'ouverture : une arrivée tardive des
@@ -175,6 +194,7 @@ export function ItemFormDialog({
       reset(emptyValues(lists));
       setSearchState({ status: 'idle' });
       setSearchPhoto(null);
+      setPickedHit(null);
     }
     if (!open) wasOpen.current = false;
   }, [lists, open, reset]);
@@ -191,11 +211,23 @@ export function ItemFormDialog({
           className="grid gap-3.5"
           noValidate
           onSubmit={handleSubmit(async (values) => {
-            await onSubmit(values);
+            await onSubmit({
+              ...values,
+              off: pickedHit
+                ? {
+                    ean: pickedHit.ean,
+                    name: pickedHit.name,
+                    brand: pickedHit.brand,
+                    imageUrl: pickedHit.imageUrl,
+                    categoriesTags: pickedHit.categoriesTags,
+                    lang: pickedHit.lang,
+                  }
+                : null,
+            });
           })}
         >
           <Field label="Article" error={errors.name?.message}>
-            {(props) => <Input placeholder="Ex. Lait d’agne" {...props} {...register('name')} />}
+            {(props) => <Input placeholder="Ex. Lait d’agne" {...props} {...register('name', { onChange: clearPickOnRename })} />}
           </Field>
           <div>
             <Button

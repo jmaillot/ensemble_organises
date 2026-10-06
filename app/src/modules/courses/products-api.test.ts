@@ -5,6 +5,7 @@ import {
   findOrCreateProduct,
   PRODUCTS_TABLE,
   productInputFromOff,
+  resolveManualOffProduct,
   resolveScannedProduct,
 } from './products-api';
 import { SHOPPING_ITEMS_TABLE } from './api';
@@ -95,6 +96,43 @@ describe('productInputFromOff', () => {
     const product = await findOrCreateProduct(productInputFromOff(HOUSEHOLD, NUTELLA_OFF));
     expect(product.photo_url).toBeNull();
     expect(product.off_data.image_url).toBe(NUTELLA_OFF.imageUrl);
+  });
+});
+
+describe('resolveManualOffProduct', () => {
+  it('cree la fiche catalogue (photo OFF) et lie l’article, sans doublon', async () => {
+    const list = await createList(HOUSEHOLD, 'Manuelle');
+    const first = await resolveManualOffProduct({
+      householdId: HOUSEHOLD,
+      listId: list.id,
+      name: 'Nutella bio',
+      quantity: null,
+      unit: null,
+      rayon: 'Divers',
+      off: NUTELLA_OFF,
+    });
+    expect(first.product.ean).toBe(NUTELLA_OFF.ean);
+    expect(first.product.photo_url).toBeNull();
+    expect(first.product.off_data.image_url).toBe(NUTELLA_OFF.imageUrl);
+    expect(first.item.product_id).toBe(first.product.id);
+    expect(first.item.name).toBe('Nutella bio');
+
+    const second = await resolveManualOffProduct({
+      householdId: HOUSEHOLD,
+      listId: list.id,
+      name: 'Nutella',
+      quantity: null,
+      unit: null,
+      rayon: 'Divers',
+      off: NUTELLA_OFF,
+    });
+    expect(second.product.id).toBe(first.product.id);
+    const sameEan = await data.list<ProductRow>(PRODUCTS_TABLE, {
+      household_id: HOUSEHOLD,
+      ean: NUTELLA_OFF.ean,
+    });
+    expect(sameEan).toHaveLength(1);
+    expect(await itemsOf(list.id)).toHaveLength(2);
   });
 });
 

@@ -19,12 +19,13 @@ import {
 import {
   findProductByEan,
   PRODUCTS_TABLE,
+  resolveManualOffProduct,
   resolveScannedProduct,
   scanAddedToast,
   updateProduct,
   type ScanResolution,
 } from '../products-api';
-import { cleanOffImageUrl } from '../off-client';
+import { cleanOffImageUrl, isQueryableEan } from '../off-client';
 import {
   NEW_LIST_OPTION,
   guessRayon,
@@ -225,15 +226,31 @@ export function useCourses(): UseCoursesResult {
             ).id
           : values.listId;
       const rawQuantity = values.quantity.trim() === '' ? null : Number(values.quantity);
-      await createShoppingItem({
-        householdId,
-        listId,
-        name: values.name.trim(),
-        quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) ? rawQuantity : null,
-        unit: values.unit.trim() || null,
-        rayon: normalizeRayon(values.rayon),
-        addedBy: currentMemberId || null,
-      });
+      const quantity = typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) ? rawQuantity : null;
+      // Résultat OFF choisi : la fiche catalogue est créée (ou retrouvée) et
+      // l'article est lié, comme après un scan. Sinon, article simple.
+      if (values.off && isQueryableEan(values.off.ean)) {
+        await resolveManualOffProduct({
+          householdId,
+          listId,
+          name: values.name.trim(),
+          quantity,
+          unit: values.unit.trim() || null,
+          rayon: values.rayon,
+          off: values.off,
+          addedBy: currentMemberId || null,
+        });
+      } else {
+        await createShoppingItem({
+          householdId,
+          listId,
+          name: values.name.trim(),
+          quantity,
+          unit: values.unit.trim() || null,
+          rayon: normalizeRayon(values.rayon),
+          addedBy: currentMemberId || null,
+        });
+      }
       await invalidate();
     },
     [currentMemberId, householdId, invalidate],

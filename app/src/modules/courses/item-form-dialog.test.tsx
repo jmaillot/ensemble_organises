@@ -124,4 +124,39 @@ describe('ItemFormDialog — recherche Open Food Facts', () => {
 
     expect(await within(dialog).findByText(/Aucun résultat/)).toBeInTheDocument();
   });
+
+  it('joint la référence OFF au submit pour la fiche catalogue', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <ItemFormDialog open onOpenChange={() => undefined} lists={[list]} currentMemberName="Camille" onSubmit={onSubmit} />,
+    );
+    const dialog = await screen.findByRole('dialog');
+
+    await user.type(within(dialog).getByLabelText(/Article/), 'Comté');
+    await user.click(within(dialog).getByRole('button', { name: 'Rechercher photo et rayon' }));
+    await user.click(await within(dialog).findByRole('button', { name: /Comté affiné/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’article' }));
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Comté', off: { ean: '2487332034183' } });
+  });
+
+  it('retoucher le nom après le choix rompt le lien catalogue', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <ItemFormDialog open onOpenChange={() => undefined} lists={[list]} currentMemberName="Camille" onSubmit={onSubmit} />,
+    );
+    const dialog = await screen.findByRole('dialog');
+
+    await user.type(within(dialog).getByLabelText(/Article/), 'Comté');
+    await user.click(within(dialog).getByRole('button', { name: 'Rechercher photo et rayon' }));
+    await user.click(await within(dialog).findByRole('button', { name: /Comté affiné/ }));
+    await user.type(within(dialog).getByLabelText(/Article/), ' râpé');
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’article' }));
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Comté râpé', off: null });
+  });
 });

@@ -169,6 +169,46 @@ export function productInputFromOff(
 }
 
 /**
+ * Ajout manuel adossé à un résultat OFF : la fiche catalogue est créée (ou
+ * retrouvée par EAN, jamais dupliquée) avec photo et rayon, puis l'article
+ * est lié (`product_id`) comme après un scan. Le nom d'article reste celui
+ * saisi par l'utilisateur ; la fiche garde le nom OFF canonique.
+ */
+export interface ResolveManualOffInput {
+  householdId: string;
+  listId: string;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  rayon: string;
+  off: OffProduct;
+  addedBy?: string | null;
+}
+
+export async function resolveManualOffProduct(
+  input: ResolveManualOffInput,
+): Promise<{ product: ProductRow; item: ShoppingListItemRow }> {
+  const product = await findOrCreateProduct(
+    productInputFromOff(
+      input.householdId,
+      input.off,
+      { category: input.rayon, createdBy: input.addedBy ?? null },
+    ),
+  );
+  const item = await createShoppingItem({
+    householdId: input.householdId,
+    listId: input.listId,
+    name: input.name.trim(),
+    quantity: input.quantity,
+    unit: input.unit?.trim() || null,
+    rayon: normalizeRayon(input.rayon),
+    addedBy: input.addedBy ?? null,
+    productId: product.id,
+  });
+  return { product, item };
+}
+
+/**
  * Totale 1-tap de la fiche (D-02) : enregistre le produit ET l'ajoute a la
  * liste courante. Re-scan d'un produit deja present : quantite +1 sur
  * l'article existant (decoché au passage), zero nouvelle ligne (D-04).
