@@ -59,6 +59,7 @@ export interface GiftShareDialogProps {
 function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
   const toast = useToast();
   const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
+  const [codeError, setCodeError] = useState(false);
   const [lastCode, setLastCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,11 +74,12 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
       .then((result) => {
         if (active) {
           setSummary(result);
+          setCodeError(false);
           if (result && !result.hasCode) setLastCode(null);
         }
       })
       .catch(() => {
-        if (active) setSummary(null);
+        if (active) setCodeError(true);
       });
     return () => {
       active = false;
@@ -86,8 +88,11 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
 
   const refresh = () =>
     fetchGiftListInviteSummary(list.id)
-      .then(setSummary)
-      .catch(() => setSummary(null));
+      .then((result) => {
+        setSummary(result);
+        setCodeError(false);
+      })
+      .catch(() => setCodeError(true));
 
   const inviteUrl = (code: string) => `${window.location.origin}${giftInviteLink(code)}`;
 
@@ -123,6 +128,7 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
     createGiftListInviteCode(list.id)
       .then((created) => {
         setLastCode(created.code);
+        setCodeError(false);
         return refresh();
       })
       .then(() => toast('Nouveau code généré : l’ancien est invalidé.'))
@@ -149,14 +155,14 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
   return (
     <section aria-label="Partage par code" className="grid gap-3 border-t border-border pt-3.5">
       <p className="m-0 text-[12px] font-extrabold">Partage par code</p>
-      {summary === null ? (
+      {codeError ? (
         <p className="m-0 text-[12px] text-muted" role="status">
           Le partage par code exige le backend (Edge Function) : indisponible dans ce mode.
         </p>
       ) : (
         <div className="grid gap-3">
           <p className="m-0 text-[12px] text-muted" role="status">
-            {summary.hasCode
+            {summary?.hasCode
               ? `Partage ${summary.isActive ? 'actif' : 'coupé'} · ${summary.useCount}${summary.maxUses ? `/${summary.maxUses}` : ''} utilisations${summary.expiresAt ? ` · expire le ${summary.expiresAt.slice(0, 10)}` : ''}.`
               : 'Aucun code actif. Générez-en un pour inviter.'}
           </p>
@@ -168,12 +174,12 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
               <p className="m-0 text-[12px] break-all text-muted">Lien à partager : {inviteUrl(lastCode)}</p>
               <QrCode value={inviteUrl(lastCode)} label={`QR du partage de ${list.name}`} />
             </>
-          ) : summary.hasCode ? (
+          ) : summary?.hasCode ? (
             <p className="m-0 text-[12px] text-muted">Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.</p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" icon="plus" disabled={busy} onClick={generate}>
-              {summary.hasCode ? 'Régénérer' : 'Générer un code'}
+              {summary?.hasCode ? 'Régénérer' : 'Générer un code'}
             </Button>
             {lastCode ? (
               <>
@@ -185,7 +191,7 @@ function GiftCodePanel({ list, open }: { list: GiftList; open: boolean }) {
                 </Button>
               </>
             ) : null}
-            {summary.hasCode ? (
+            {summary?.hasCode ? (
               <Button variant="secondary" disabled={busy} onClick={revoke}>
                 Arrêter le partage
               </Button>
