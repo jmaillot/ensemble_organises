@@ -294,15 +294,15 @@ Deno.serve(
       // produit (photo + rayon), en parallèle. Marge d'enrichissement :
       // certaines fiches sont inexploitables, le rangement tranche ensuite.
       const fetchN = Math.min(limit + 3, 10);
+      // TEMP-DIAG-429 : journal de diagnostic, à retirer après résolution.
       const codes = await fetchSearchCodes(terms, fetchN);
+      const enriched = await Promise.all(codes === null ? [] : codes.slice(0, fetchN).map((code) => fetchProductHit(code)));
+      const usable = enriched.filter((hit): hit is OffHit => hit !== null);
+      console.log(`off-search diag q="${terms}" engine=${codes === null ? 'PANNE' : codes.length} codes enrichis=${usable.length}/${enriched.length}`);
       if (codes === null) {
         return json({ error: 'Open Food Facts injoignable pour le moment.' }, 502);
       }
-      const hits = (
-        await Promise.all(codes.slice(0, fetchN).map((code) => fetchProductHit(code)))
-      )
-        .filter((hit): hit is OffHit => hit !== null)
-        .slice(0, limit);
+      const hits = usable.slice(0, limit);
       const ranked = rankHits(hits, terms);
       if (cache.size >= CACHE_MAX) {
         const oldest = cache.keys().next();
