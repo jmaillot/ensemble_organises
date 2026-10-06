@@ -687,7 +687,7 @@ export default function CadeauxPage() {
           ) : (
             <div className="panel-surface grid gap-3 rounded-[16px] p-[15px]">
               <p className="m-0 text-[12px] text-muted">
-                {`${contactLists.length} ${pluralize(contactLists.length, 'liste')} · ${contacts.length} ${pluralize(contacts.length, 'contact')} suivi(s).`}
+                {`${pluralize(contactLists.length, 'liste')} · ${pluralize(contacts.length, 'contact suivi', 'contacts suivis')}.`}
               </p>
               <p className="m-0 text-[12px] text-muted">
                 Liez une idée à un contact pour voir sa prochaine occasion — et la surprise suit automatiquement.

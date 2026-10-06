@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useMembers } from '@/stores/household-store';
+import { useHouseholdStore } from '@/stores/household-store';
+import { depositHouseholdFile } from '@/lib/storage';
 import type { Birthday, BirthdayFormValues } from '../types';
 import { formatDayMonth, formatFrDate, parseFrDate } from '../types';
 
@@ -21,7 +23,7 @@ const birthdaySchema = z.object({
   photoUrl: z
     .string()
     .trim()
-    .refine((value) => value === '' || /^(\/|https?:\/\/)/.test(value), 'Indiquez une adresse de photo valide.'),
+    .refine((value) => value === '' || /^(\/|https?:\/\/|blob:)/.test(value), 'Indiquez une adresse de photo valide.'),
   createContact: z.boolean(),
 });
 
@@ -46,10 +48,13 @@ export interface BirthdayFormDialogProps {
 
 export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = false, onSubmit }: BirthdayFormDialogProps) {
   const members = useMembers();
-  const { register, handleSubmit, reset, watch, formState } = useForm<BirthdayFormValues>({
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<BirthdayFormValues>({
     resolver: zodResolver(birthdaySchema),
     defaultValues: defaultValues(birthday),
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const errors = formState.errors;
   const photoUrl = watch('photoUrl') ?? '';
   const birthDate = watch('birthDate') ?? '';
@@ -59,9 +64,24 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(birthday));
+    setUploadError(null);
     // L'identifiant de l'anniversaire edited identifie une ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, birthday?.id]);
+
+  const handlePhotoFile = async (file: File | undefined) => {
+    if (!file || !householdId) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const deposited = await depositHouseholdFile({ householdId, folder: 'anniversaires', file });
+      setValue('photoUrl', deposited.url, { shouldDirty: true });
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'La photo n’a pas pu être déposée.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,8 +141,22 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
             )}
           </Field>
 
-          <Field label="Photo" optional error={errors.photoUrl?.message}>
-            {(props) => <Input {...props} {...register('photoUrl')} placeholder="https://… ou /assets/…" />}
+          <Field label="Photo" optional error={errors.photoUrl?.message ?? uploadError ?? undefined}>
+            {(props) => (
+              <div className="grid gap-2">
+                <Input {...props} {...register('photoUrl')} placeholder="https://… ou déposez un fichier" />
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-border bg-bg px-3.5 text-xs font-extrabold text-fg">
+                  {uploading ? 'Dépôt en cours…' : 'Choisir une photo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={(event) => void handlePhotoFile(event.target.files?.[0])}
+                  />
+                </label>
+              </div>
+            )}
           </Field>
 
           {photoUrl.trim().startsWith('http') ? (
