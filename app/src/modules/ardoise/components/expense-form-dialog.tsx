@@ -21,6 +21,9 @@ const isRealDate = (value: string) => {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 };
 
+/** Payeur invité : nom libre (« Autre personne… ») ou invité existant (`invite:`). Liste vide = offert. */
+const isGuestPayerValue = (paidBy: string) => paidBy === FREE_PAYER_VALUE || paidBy.startsWith(GUEST_KEY_PREFIX);
+
 const schema = z
   .object({
     title: z.string().trim().min(1, 'Donnez un libellé à la dépense.').max(80, '80 caractères maximum.'),
@@ -33,8 +36,12 @@ const schema = z
     payerName: z.string().trim().max(120, '120 caractères maximum.').optional(),
     date: z.string().refine(isRealDate, 'Indiquez une date valide (AAAA-MM-JJ).'),
     splitType: z.enum(['egal', 'personnalise']),
-    participants: z.array(z.string()).min(1, 'Choisissez au moins une personne qui partage.'),
+    participants: z.array(z.string()),
     customShares: z.record(z.string(), z.string()),
+  })
+  .refine((values) => isGuestPayerValue(values.paidBy) || values.participants.length >= 1, {
+    message: 'Choisissez au moins une personne qui partage.',
+    path: ['participants'],
   })
   .refine(
     (values) =>
@@ -274,6 +281,10 @@ export function ExpenseFormDialog({
                 {splitType === 'egal' && amount > 0
                   ? `${formatEuro(amount / shareCount)} par personne`
                   : 'Les parts seront définies dans les options avancées.'}
+              </p>
+            ) : isGuestPayerValue(paidByValue ?? '') ? (
+              <p className="m-0 text-[10px] text-muted">
+                Aucun membre coché : l’invité prend toute la dépense à sa charge (offert, aucun remboursement).
               </p>
             ) : null}
           </fieldset>

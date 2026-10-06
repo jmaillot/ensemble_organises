@@ -12,6 +12,7 @@ import type {
 import {
   GUEST_KEY_PREFIX,
   MEMBER_KEY_PREFIX,
+  guestKey,
   normalizeShares,
   participantKey,
   roundCents,
@@ -59,6 +60,19 @@ export function clearGuestTicket(ardoiseId: string): void {
   } catch {
     // Rien à nettoyer.
   }
+}
+
+/**
+ * Liste vide = offert par l'invité payeur (aucun membre coché dans
+ * « Qui partage ») : une part unique à 100 % sur le payeur, solde nul.
+ * Réservé au payeur invité ; un payeur membre exige toujours au moins
+ * un participant (garde contre les dépenses sans partage par erreur).
+ */
+function resolveParticipantKeys(input: NewExpenseInput): string[] {
+  if (input.participants.length > 0) return input.participants;
+  const paidByKind = input.paidByKind ?? 'membre';
+  if (paidByKind === 'guest' && input.paidBy !== '') return [guestKey(input.paidBy)];
+  throw new Error('Choisissez au moins une personne qui partage la dépense.');
 }
 
 /** Les clés `membre:`/`invite:` portent le kind ; toute autre forme est rejetée (`null`). */
@@ -331,15 +345,13 @@ export async function redeemGuestTicket(code: string, displayName: string): Prom
  */
 export async function createExpense(householdId: string, input: NewExpenseInput): Promise<ExpenseRow> {
   if (!input.ardoiseId) throw new Error('Choisissez une ardoise pour la dépense.');
-  if (input.participants.length === 0) {
-    throw new Error('Choisissez au moins une personne qui partage la dépense.');
-  }
-  assertParticipantKeys(input.participants);
+  const participants = resolveParticipantKeys(input);
+  assertParticipantKeys(participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');
   }
-  const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  const shares = normalizeShares(amount, participants, input.splitType === 'personnalise' ? input.customShares : undefined);
   const paidByKind = input.paidByKind ?? 'membre';
   if (isSupabaseConfigured) {
     return callExpenseRpc('create_expense', {
@@ -351,7 +363,7 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
       p_paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
       p_expense_date: input.date,
       p_split_type: input.splitType,
-      p_parts: expensePartsPayload(input.participants, shares),
+      p_parts: expensePartsPayload(participants, shares),
     });
   }
   const expense = await data.create<ExpenseRow>('expenses', {
@@ -367,7 +379,7 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
   });
 
   try {
-    for (const [index, key] of input.participants.entries()) {
+    for (const [index, key] of participants.entries()) {
       const { kind, id } = requireSplitParticipantKey(key);
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expense.id,
@@ -398,15 +410,13 @@ export async function deleteExpense(expenseId: string): Promise<void> {
  * restauration best-effort de l'ancien état.
  */
 export async function updateExpense(expenseId: string, input: NewExpenseInput): Promise<ExpenseRow> {
-  if (input.participants.length === 0) {
-    throw new Error('Choisissez au moins une personne qui partage la dépense.');
-  }
-  assertParticipantKeys(input.participants);
+  const participants = resolveParticipantKeys(input);
+  assertParticipantKeys(participants);
   const amount = roundCents(input.amount);
   if (amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.');
   }
-  const shares = normalizeShares(amount, input.participants, input.splitType === 'personnalise' ? input.customShares : undefined);
+  const shares = normalizeShares(amount, participants, input.splitType === 'personnalise' ? input.customShares : undefined);
   const paidByKind = input.paidByKind ?? 'membre';
   if (isSupabaseConfigured) {
     return callExpenseRpc('update_expense', {
@@ -417,7 +427,7 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
       p_paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
       p_expense_date: input.date,
       p_split_type: input.splitType,
-      p_parts: expensePartsPayload(input.participants, shares),
+      p_parts: expensePartsPayload(participants, shares),
     });
   }
 
@@ -436,7 +446,7 @@ export async function updateExpense(expenseId: string, input: NewExpenseInput): 
 
   try {
     await Promise.all(oldParts.map((participant) => data.remove('expense_participants', participant.id)));
-    for (const [index, key] of input.participants.entries()) {
+    for (const [index, key] of participants.entries()) {
       const { kind, id } = requireSplitParticipantKey(key);
       await data.create<ExpenseParticipantRow>('expense_participants', {
         expense_id: expenseId,

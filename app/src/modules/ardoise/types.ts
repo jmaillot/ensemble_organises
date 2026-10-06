@@ -208,14 +208,17 @@ export interface Share {
  * il ne peut donc pas être coché. Avec `include`, il rejoint le partage égal
  * (ex. « Norman a payé pour nous deux ») ; sans, il avance seul (ex. Mamie
  * offre les courses). En personnalisé, les montants saisis priment : inchangé.
+ * Liste vide = offert : aucun membre coché, l'invité prend tout à sa charge
+ * (une part unique à 100 %, solde nul).
  */
 export function applyFreePayerShare(
   participants: string[],
   guestId: string,
   options: { include: boolean; splitType: SplitType },
 ): string[] {
-  if (!options.include || options.splitType !== 'egal') return participants;
   const key = guestKey(guestId);
+  if (participants.length === 0) return [key];
+  if (!options.include || options.splitType !== 'egal') return participants;
   return participants.includes(key) ? participants : [...participants, key];
 }
 
