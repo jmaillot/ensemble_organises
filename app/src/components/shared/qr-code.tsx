@@ -22,7 +22,9 @@ export function QrCode({ value, size = 168, label, className }: QrCodeProps) {
       width: size,
       margin: 1,
       errorCorrectionLevel: 'M',
-      color: { dark: 'oklch(20% 0.02 240)', light: 'oklch(100% 0 0)' },
+      // Hex impératif : la lib `qrcode` rejette les autres formats
+      // (`Invalid hex color`) et le dialogue resterait sur le placeholder.
+      color: { dark: '#1c2b26', light: '#ffffff' },
     })
       .then((result) => {
         if (active) setSvg(result);
