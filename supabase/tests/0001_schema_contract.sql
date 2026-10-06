@@ -54,7 +54,7 @@ begin
           ('expenses', ARRAY['id', 'household_id', 'ardoise_id', 'title', 'amount', 'paid_by', 'paid_by_guest', 'expense_date', 'split_type', 'created_at']::text[]),
           ('expense_participants', ARRAY['id', 'expense_id', 'participant_type', 'member_id', 'guest_id', 'share_amount']::text[]),
           ('gift_lists', ARRAY['id', 'household_id', 'owner_member_id', 'name', 'visibility', 'created_at']::text[]),
-          ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'purchased', 'idea_id', 'created_at']::text[]),
+          ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'reserved_by_name', 'purchased', 'idea_id', 'created_at']::text[]),
           ('gift_list_shares', ARRAY['id', 'list_id', 'shared_with_member_id', 'shared_with_email', 'permission']::text[]),
           ('gift_list_invites', ARRAY['id', 'list_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('birthdays', ARRAY['id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id', 'contact_id']::text[]),
