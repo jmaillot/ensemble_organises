@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/toast';
 import { MetricRow, ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
-import type { GiftItemRow } from '@/types';
 import { formatEuro, formatShortDate, pluralize } from '@/lib/utils';
 import { useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import {
@@ -393,9 +392,10 @@ export default function CadeauxPage() {
     try {
       await updateItem.mutateAsync({
         id: pendingRelease.id,
-        // `reserved_by_name` existe en base (0089) mais pas encore dans le
-        // type applicatif : la libération efface les deux formes d'auteur.
-        values: { reserved_by: null, purchased: false, reserved_by_name: null } as unknown as Partial<GiftItemRow>,
+        // Les deux formes d'auteur (membre comme nom déclaré) sont effacées
+        // en une action explicite : `reserved_by_name` est désormais typé
+        // (WR-03), plus de contournement nécessaire.
+        values: { reserved_by: null, purchased: false, reserved_by_name: null },
       });
       toast('Réservation libérée.');
     } catch {

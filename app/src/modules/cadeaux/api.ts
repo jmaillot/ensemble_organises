@@ -54,6 +54,7 @@ export async function createGiftItem(householdId: string, input: NewGiftItemInpu
     photo_url: input.photoUrl,
     url: input.url,
     reserved_by: null,
+    reserved_by_name: null,
     purchased: false,
     idea_id: input.ideaId ?? null,
     created_at: new Date().toISOString(),
@@ -62,7 +63,7 @@ export async function createGiftItem(householdId: string, input: NewGiftItemInpu
 
 export async function updateGiftItem(
   id: string,
-  values: Partial<Pick<GiftItemRow, 'name' | 'price' | 'comment' | 'photo_url' | 'url' | 'reserved_by' | 'purchased'>>,
+  values: Partial<Pick<GiftItemRow, 'name' | 'price' | 'comment' | 'photo_url' | 'url' | 'reserved_by' | 'reserved_by_name' | 'purchased'>>,
 ): Promise<GiftItemRow> {
   return data.update<GiftItemRow>('gift_items', id, values as Partial<GiftItemRow>);
 }

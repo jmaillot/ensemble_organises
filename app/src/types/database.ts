@@ -421,6 +421,12 @@ export interface GiftItemRow {
   photo_url: string | null;
   url: string | null;
   reserved_by: Uuid | null;
+  /**
+   * Nom auto-déclaré d'un visiteur sans compte (migration 0089, D-05) :
+   * exclusif avec `reserved_by`, masqué au propriétaire par la vue
+   * `gift_items_for_list` (D-07). Écrit uniquement par la voie invitée serveur.
+   */
+  reserved_by_name: string | null;
   purchased: boolean;
   /**
    * Idée d'origine (migration 0076, D-04) : nullable, ON DELETE SET NULL.
