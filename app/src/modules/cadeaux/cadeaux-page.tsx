@@ -272,6 +272,13 @@ export default function CadeauxPage() {
   };
 
   const handleTogglePurchased = async (item: GiftItem, purchased: boolean) => {
+    // Tenu anonymement (CR-01) : refuser AVANT l'UPDATE avec un message
+    // propre, plutôt que de manger une violation CHECK
+    // (`gift_items_single_author_check`) en toast d'erreur.
+    if (purchased && item.heldAnonymously && item.reservedBy !== currentMemberId) {
+      toast('Cet article est déjà réservé.', 'error');
+      return;
+    }
     try {
       await updateItem.mutateAsync({
         id: item.id,
@@ -624,10 +631,11 @@ export default function CadeauxPage() {
 
                       {activeList?.isOwned ? (
                         // Surprise (0080) : le propriétaire voit QU'un article
-                        // est réservé (`purchased` exposé par la vue), jamais
-                        // PAR QUI (`reserved_by` NULL via la vue).
+                        // est réservé (`purchased` exposé par la vue, ou tenue
+                        // anonyme visible), jamais PAR QUI (`reserved_by` NULL
+                        // via la vue, nom déclaré jamais exposé — D-07).
                         <div className="mb-3 flex flex-wrap items-center gap-2">
-                          {item.purchased ? <Badge tone="amber">Réservé</Badge> : null}
+                          {item.purchased || item.heldAnonymously ? <Badge tone="amber">Réservé</Badge> : null}
                           <label htmlFor={`gift-received-${item.id}`} className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
                             <Switch
                               id={`gift-received-${item.id}`}
@@ -636,7 +644,7 @@ export default function CadeauxPage() {
                             />
                             Reçu
                           </label>
-                          {item.purchased && isManager ? (
+                          {(item.purchased || item.heldAnonymously) && isManager ? (
                             <button
                               type="button"
                               className={shareButtonBase}
@@ -653,6 +661,10 @@ export default function CadeauxPage() {
                             <Badge tone="amber">
                               {reservedByMe ? 'Réservé par vous' : `Réservé par ${item.reservedByName}`}
                             </Badge>
+                          ) : item.heldAnonymously ? (
+                            // Tenue anonyme (D-05) : réservé, sans auteur
+                            // (D-07 — le nom déclaré ne sort jamais du mapping).
+                            <Badge tone="amber">Réservé</Badge>
                           ) : null}
                           <label htmlFor={`gift-purchased-${item.id}`} className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
                             <Switch
@@ -662,7 +674,7 @@ export default function CadeauxPage() {
                             />
                             Acheté
                           </label>
-                          {item.reservedBy && isManager ? (
+                          {(item.reservedBy || item.heldAnonymously) && isManager ? (
                             <button
                               type="button"
                               className={shareButtonBase}

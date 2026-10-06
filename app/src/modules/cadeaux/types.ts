@@ -39,6 +39,12 @@ export interface GiftItem {
   reservedBy: string | null;
   reservedByName: string | null;
   reservedByColorTag: MemberColorTag | null;
+  /**
+   * Tenu par un visiteur sans compte (D-05) : `reserved_by_name` renseigné,
+   * `reserved_by` NULL. Le nom déclaré n'est JAMAIS exposé (D-07) —
+   * `reservedByName` reste NULL dans ce cas, l'UI affiche « Réservé » seul.
+   */
+  heldAnonymously: boolean;
   purchased: boolean;
   /** Idée d'origine (D-04), `null` pour un article saisi à la main. */
   ideaId: string | null;
@@ -192,6 +198,10 @@ export function toGiftList(
 
 export function toGiftItem(row: GiftItemRow, members: HouseholdMemberRow[]): GiftItem {
   const reserver = row.reserved_by ? members.find((member) => member.id === row.reserved_by) : undefined;
+  // L'une ou l'autre forme d'auteur vaut « réservé » (CR-01) : un article
+  // tenu anonymement n'est jamais proposé comme libre, et le nom déclaré ne
+  // sort jamais d'ici (D-07 — `reservedByName` reste NULL dans ce cas).
+  const heldAnonymously = (row.reserved_by_name ?? '').trim() !== '';
   return {
     id: row.id,
     listId: row.list_id,
@@ -203,6 +213,7 @@ export function toGiftItem(row: GiftItemRow, members: HouseholdMemberRow[]): Gif
     reservedBy: row.reserved_by,
     reservedByName: reserver?.display_name ?? null,
     reservedByColorTag: reserver?.color_tag ?? null,
+    heldAnonymously,
     purchased: row.purchased,
     ideaId: row.idea_id,
   };

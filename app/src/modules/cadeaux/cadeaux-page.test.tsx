@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { data } from '@/lib/data';
 import { nextBirthdayDate } from '@/modules/anniversaires/types';
 import { renderWithProviders } from '@/test/render';
-import type { GiftItemRow } from '@/types';
+import type { GiftItemRow, HouseholdMemberRow } from '@/types';
 import CadeauxPage from './cadeaux-page';
-import { nextAnniversary, nextIdeaOccasion } from './types';
+import { nextAnniversary, nextIdeaOccasion, toGiftItem } from './types';
 
 const TEST_CODE = 'CODECADEAU22CHARS012345';
 
@@ -178,5 +178,67 @@ describe('CadeauxPage', () => {
     expect(
       within(reopened).getByText('Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('toGiftItem — tenue anonyme (CR-01)', () => {
+  const rowBase: GiftItemRow = {
+    id: 'gift-x',
+    list_id: 'gift-list-noe',
+    household_id: 'hh-1',
+    name: 'Puzzle',
+    price: 20,
+    comment: null,
+    photo_url: null,
+    url: null,
+    reserved_by: null,
+    reserved_by_name: null,
+    purchased: false,
+    idea_id: null,
+    created_at: '2026-01-01T00:00:00Z',
+  };
+  const members = [
+    {
+      id: 'member-thomas',
+      household_id: 'hh-1',
+      user_id: 'user-thomas',
+      display_name: 'Thomas',
+      avatar_url: null,
+      color_tag: 'amber',
+      role: 'membre',
+      created_at: '2026-01-01T00:00:00Z',
+    } as HouseholdMemberRow,
+  ];
+
+  it('une tenue anonyme vaut réservé sans exposer le nom déclaré (D-07)', () => {
+    const item = toGiftItem({ ...rowBase, reserved_by_name: 'Mamie' }, members);
+
+    expect(item.heldAnonymously).toBe(true);
+    expect(item.reservedBy).toBeNull();
+    // Le nom déclaré ne sort jamais du mapping : badge « Réservé » seul.
+    expect(item.reservedByName).toBeNull();
+    expect(item.purchased).toBe(false);
+  });
+
+  it('un nom déclaré blanc ne vaut pas tenue (miroir du CHECK base)', () => {
+    const item = toGiftItem({ ...rowBase, reserved_by_name: '   ' }, members);
+
+    expect(item.heldAnonymously).toBe(false);
+  });
+
+  it('une réserve membre garde son auteur résolu, sans tenue anonyme', () => {
+    const item = toGiftItem({ ...rowBase, reserved_by: 'member-thomas' }, members);
+
+    expect(item.heldAnonymously).toBe(false);
+    expect(item.reservedBy).toBe('member-thomas');
+    expect(item.reservedByName).toBe('Thomas');
+  });
+
+  it('un article libre ne porte ni auteur ni tenue', () => {
+    const item = toGiftItem(rowBase, members);
+
+    expect(item.heldAnonymously).toBe(false);
+    expect(item.reservedBy).toBeNull();
+    expect(item.reservedByName).toBeNull();
   });
 });
