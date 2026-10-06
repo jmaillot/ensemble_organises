@@ -85,13 +85,18 @@ reset role;
 select testkit.as_user(user_id, 'dave28@example.fr') from testkit.fx where key = 'dave';
 set local role authenticated;
 
-select testkit.expect_denied(
-  'update public.gift_items set purchased = true where id = ''gitem28''',
-  'un partage lecture ne coche pas achete');
-select testkit.expect_denied(format(
-  'update public.gift_items set reserved_by = %L where id = ''gitem28''',
-  (select row_id from testkit.fx where key = 'dave')),
-  'un partage lecture ne reserve pas');
+-- RLS : sans ligne visible, l'UPDATE touche 0 ligne sans erreur — on asserte
+-- donc l'état inchangé, pas une exception.
+update public.gift_items set purchased = true where id = 'gitem28';
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items where id = ''gitem28'' and purchased = false'),
+  1::bigint,
+  'un partage lecture ne coche pas achete (ligne inchangee)');
+update public.gift_items set reserved_by = (select row_id from testkit.fx where key = 'dave') where id = 'gitem28';
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items where id = ''gitem28'' and reserved_by is null'),
+  1::bigint,
+  'un partage lecture ne reserve pas (ligne inchangee)');
 
 reset role;
 
