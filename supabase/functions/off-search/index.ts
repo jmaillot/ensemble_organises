@@ -181,28 +181,15 @@ async function fetchSearchCodes(terms: string, fetchN: number): Promise<string[]
   }
   if (response.status === 429 || response.status >= 500) return null;
   if (!response.ok) return null;
-  let text: string;
-  try {
-    text = await response.text();
-  } catch {
-    return null;
-  }
-  // TEMP-DIAG-429 : corps brut, à retirer après résolution.
-  console.log(
-    `off-search diag brut "${terms}" http=${response.status} ctype=${response.headers.get('content-type')} extrait=${JSON.stringify(text.slice(0, 300))}`,
-  );
   let body: unknown;
   try {
-    body = JSON.parse(text);
+    body = await response.json();
   } catch {
     return null;
   }
   const parsed = searchResponseSchema.safeParse(body);
   if (!parsed.success) return null;
-  // TEMP-DIAG-429 : réponse brute du moteur, à retirer après résolution.
-  const rawSample = JSON.stringify((parsed.hits ?? []).slice(0, 3).map((hit) => hit.code));
-  console.log(`off-search diag moteur "${terms}" hits=${(parsed.hits ?? []).length} echantillon=${rawSample}`);
-  return (parsed.hits ?? [])
+  return (parsed.data.hits ?? [])
     .map((hit) => (hit.code ?? '').trim())
     .filter((code) => /^\d{8,14}$/.test(code));
 }
@@ -307,15 +294,15 @@ Deno.serve(
       // produit (photo + rayon), en parallèle. Marge d'enrichissement :
       // certaines fiches sont inexploitables, le rangement tranche ensuite.
       const fetchN = Math.min(limit + 3, 10);
-      // TEMP-DIAG-429 : journal de diagnostic, à retirer après résolution.
       const codes = await fetchSearchCodes(terms, fetchN);
-      const enriched = await Promise.all(codes === null ? [] : codes.slice(0, fetchN).map((code) => fetchProductHit(code)));
-      const usable = enriched.filter((hit): hit is OffHit => hit !== null);
-      console.log(`off-search diag q="${terms}" engine=${codes === null ? 'PANNE' : codes.length} codes enrichis=${usable.length}/${enriched.length}`);
       if (codes === null) {
         return json({ error: 'Open Food Facts injoignable pour le moment.' }, 502);
       }
-      const hits = usable.slice(0, limit);
+      const hits = (
+        await Promise.all(codes.slice(0, fetchN).map((code) => fetchProductHit(code)))
+      )
+        .filter((hit): hit is OffHit => hit !== null)
+        .slice(0, limit);
       const ranked = rankHits(hits, terms);
       if (cache.size >= CACHE_MAX) {
         const oldest = cache.keys().next();
