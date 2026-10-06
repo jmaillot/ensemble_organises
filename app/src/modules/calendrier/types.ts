@@ -299,7 +299,10 @@ function isSameMonthDay(iso: string, monthDay: string) {
   return iso.slice(5) === monthDay;
 }
 
-/** Pastilles de la grille : couleur du membre pour un événement, violet pour une tâche, ambre pour un férié. */
+/** Pastilles de la grille : une pastille par couche (événement, tâche,
+ * catégorie, anniversaire, férié, vacances). Un férié ou un anniversaire
+ * reste signalé même un jour chargé : sans pastille dédiée, la couleur de
+ * l'événement l'écrasait et le jour de référence devenait invisible. */
 export function buildDayMarkers(
   days: readonly { iso: string }[],
   sources: {
@@ -328,7 +331,7 @@ export function buildDayMarkers(
     if (events.length === 0 && tasks.length === 0 && birthdays.length === 0 && !holiday && !hasVacation) return;
     markers[iso] = {
       count: events.length + birthdays.length,
-      colorTag: holiday && events.length === 0 ? 'amber' : (events[0]?.colorTag ?? birthdays[0]?.colorTag ?? 'coral'),
+      colorTag: events[0]?.colorTag ?? birthdays[0]?.colorTag ?? (holiday ? 'amber' : 'coral'),
       categoryColor: events[0]?.categoryColor ?? null,
       hasBirthday: birthdays.length > 0,
       hasHoliday: Boolean(holiday),

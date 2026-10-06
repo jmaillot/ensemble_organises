@@ -151,17 +151,25 @@ export function CalendarGrid({
               <span aria-hidden="true">{day.number}</span>
               {marker ? (
                 <span aria-hidden="true" className="absolute bottom-[7px] left-2 flex items-center gap-[3px]">
-                  <span
-                    className={cn(
-                      'size-[5px] rounded-full',
-                      isToday ? 'bg-surface' : memberTagClass(marker.colorTag),
-                    )}
-                  />
+                  {marker.count > 0 ? (
+                    <span
+                      className={cn(
+                        'size-[5px] rounded-full',
+                        isToday ? 'bg-surface' : memberTagClass(marker.colorTag),
+                      )}
+                    />
+                  ) : null}
                   {marker.hasTask ? (
                     <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[oklch(55%_0.13_300)]')} />
                   ) : null}
                   {marker.categoryColor ? (
                     <span className="size-[5px] rounded-full" style={{ backgroundColor: marker.categoryColor }} />
+                  ) : null}
+                  {marker.hasBirthday ? (
+                    <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-accent')} />
+                  ) : null}
+                  {marker.hasHoliday ? (
+                    <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-amber')} />
                   ) : null}
                   {marker.hasVacation ? (
                     <span className={cn('size-[5px] rounded-full', isToday ? 'bg-surface' : 'bg-[#1f4e79]')} />
