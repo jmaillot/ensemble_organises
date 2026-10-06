@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createTestQueryClient } from '@/test/render';
 import { data } from '@/lib/data';
 import {
+  computeMetroHolidays,
   parseVacationRecords,
   schoolYearFor,
   schoolYearsForYear,
@@ -81,6 +82,35 @@ describe('toFrenchHolidays (mapping lignes base, D-13)', () => {
       { id: 0, date: '2026-01-01', title: '1er janvier', time: 'Toute la journée', kind: 'Jour férié' },
       { id: 1, date: '2026-12-25', title: 'Jour de Noël', time: 'Toute la journée', kind: 'Jour férié' },
     ]);
+  });
+});
+
+describe('computeMetroHolidays (repli cache vide)', () => {
+  it('retourne les 11 fériés de métropole, dates officielles 2026', () => {
+    const holidays = computeMetroHolidays(2026);
+    expect(holidays).toHaveLength(11);
+    const byDate = new Map(holidays.map((holiday) => [holiday.date, holiday.title]));
+    expect(byDate.get('2026-01-01')).toBe('Jour de l’an');
+    expect(byDate.get('2026-04-06')).toBe('Lundi de Pâques');
+    expect(byDate.get('2026-05-14')).toBe('Ascension');
+    expect(byDate.get('2026-05-25')).toBe('Lundi de Pentecôte');
+    expect(byDate.get('2026-12-25')).toBe('Noël');
+  });
+
+  it('le cache base prime sur le calcul dès qu’il contient des lignes', async () => {
+    // Hors des années du seed de démo : le cache est vide, le repli s’affiche.
+    const farYear = new Date().getFullYear() + 5;
+    const { result } = renderHook(() => useRefDays(farYear, null), { wrapper });
+    await waitFor(() => expect(result.current.holidays.length).toBe(11));
+    expect(result.current.holidays.some((holiday) => holiday.date === `${farYear}-07-14`)).toBe(true);
+
+    // Puis la base se remplit : ses lignes reprennent la main (source unique).
+    await data.create('public_holidays', { holiday_date: `${farYear}-07-14`, name: 'Fête nationale', year: farYear });
+    await data.create('public_holidays', { holiday_date: `${farYear}-12-25`, name: 'Noël', year: farYear });
+    await act(async () => {
+      await result.current.refetch();
+    });
+    await waitFor(() => expect(result.current.holidays.length).toBe(2));
   });
 });
 
@@ -181,7 +211,11 @@ describe('useRefDays sur cache base (D-13/D-15)', () => {
     await data.create('public_holidays', { holiday_date: `${year}-01-01`, name: '1er janvier', year });
 
     const { result } = renderHook(() => useRefDays(year, null), { wrapper });
-    await waitFor(() => expect(result.current.holidays.length).toBeGreaterThan(0));
+    // Attendre la base (le repli calculé affiche 11 fériés avant son arrivée :
+    // seule la ligne créée prouve que le cache a répondu).
+    await waitFor(() =>
+      expect(result.current.holidays.some((holiday) => holiday.title === '1er janvier')).toBe(true),
+    );
     const shown = result.current.holidays;
 
     // La base tombe en panne au rechargement : l'ecran garde l'ancien cache.
