@@ -222,9 +222,8 @@ describe('rankSearchHits', () => {
 });
 
 describe('offCategoriesToRayon', () => {
-  it('mappe les tartinades vers le garde-manger (Divers par defaut de table)', () => {
-    // `en:spreads` n'a pas de rayon dedie : repli Divers, jamais invente.
-    expect(offCategoriesToRayon(['en:spreads', 'fr:Pâtes à tartiner'])).toBe('Divers');
+  it('mappe les tartinades vers l’épicerie', () => {
+    expect(offCategoriesToRayon(['en:spreads', 'fr:Pâtes à tartiner'])).toBe('Épicerie');
   });
 
   it('mappe les familles connues', () => {
@@ -233,6 +232,10 @@ describe('offCategoriesToRayon', () => {
     expect(offCategoriesToRayon(['en:beverages'])).toBe('Boissons');
     expect(offCategoriesToRayon(['en:frozen-foods'])).toBe('Surgelés');
     expect(offCategoriesToRayon(['fr:Hygiène'])).toBe('Hygiène');
+    expect(offCategoriesToRayon(['en:fishes'])).toBe('Poissonnerie');
+    expect(offCategoriesToRayon(['en:diapers'])).toBe('Bébé');
+    expect(offCategoriesToRayon(['en:pet-foods'])).toBe('Animalerie');
+    expect(offCategoriesToRayon(['en:pastas'])).toBe('Épicerie');
   });
 
   it('replie vers Divers sur vide ou inconnu', () => {

@@ -20,14 +20,35 @@ const TAG_TO_RAYON: Record<string, Rayon> = {
   // Boucherie / poisson
   meats: 'Boucherie',
   'cold-cuts': 'Boucherie',
-  fishes: 'Boucherie',
-  seafood: 'Boucherie',
   // Boulangerie
   breads: 'Boulangerie',
   'breakfast-cereals': 'Boulangerie',
   biscuits: 'Boulangerie',
   pastries: 'Boulangerie',
   viennoiseries: 'Boulangerie',
+  // Poissonnerie (séparée de la Boucherie)
+  fishes: 'Poissonnerie',
+  seafood: 'Poissonnerie',
+  // Épicerie
+  pastas: 'Épicerie',
+  rice: 'Épicerie',
+  'pâtes alimentaires': 'Épicerie',
+  riz: 'Épicerie',
+  condiments: 'Épicerie',
+  sauces: 'Épicerie',
+  chocolates: 'Épicerie',
+  spreads: 'Épicerie',
+  flours: 'Épicerie',
+  sugars: 'Épicerie',
+  oils: 'Épicerie',
+  // Bébé
+  'baby-foods': 'Bébé',
+  'infant-formulas': 'Bébé',
+  diapers: 'Bébé',
+  // Animalerie
+  'pet-foods': 'Animalerie',
+  'dog-foods': 'Animalerie',
+  'cat-foods': 'Animalerie',
   // Fruits & legumes
   'fruits-and-vegetables': 'Fruits & légumes',
   fruits: 'Fruits & légumes',
@@ -38,7 +59,6 @@ const TAG_TO_RAYON: Record<string, Rayon> = {
   'oral-hygiene': 'Hygiène',
   soaps: 'Hygiène',
   shampoos: 'Hygiène',
-  diapers: 'Hygiène',
   // Menage
   'household-maintenance': 'Ménage',
   detergents: 'Ménage',
