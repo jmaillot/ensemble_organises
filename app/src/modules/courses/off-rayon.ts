@@ -1,4 +1,4 @@
-import { DEFAULT_RAYON, normalizeRayon, RAYONS, type Rayon } from './types';
+import { DEFAULT_RAYON, normalizeRayon, type Rayon } from './types';
 
 /**
  * Derive le rayon d'un produit OpenFoodFacts depuis `categories_tags`.
@@ -10,37 +10,39 @@ import { DEFAULT_RAYON, normalizeRayon, RAYONS, type Rayon } from './types';
  */
 
 const TAG_TO_RAYON: Record<string, Rayon> = {
-  // Frais / laitages
-  dairies: 'Frais',
-  'fresh-foods': 'Frais',
-  yogurts: 'Frais',
-  cheeses: 'Frais',
-  eggs: 'Frais',
-  'plant-based-foods': 'Frais',
-  // Boucherie / poisson
-  meats: 'Boucherie',
-  'cold-cuts': 'Boucherie',
+  // Crèmerie
+  dairies: 'Crèmerie & Produits laitiers',
+  'fresh-foods': 'Crèmerie & Produits laitiers',
+  yogurts: 'Crèmerie & Produits laitiers',
+  cheeses: 'Crèmerie & Produits laitiers',
+  eggs: 'Crèmerie & Produits laitiers',
+  'plant-based-foods': 'Crèmerie & Produits laitiers',
+  // Viande & Poissons
+  meats: 'Viande & Poissons',
+  fishes: 'Viande & Poissons',
+  seafood: 'Viande & Poissons',
+  // Charcuterie & Traiteur
+  'cold-cuts': 'Charcuterie & Traiteur',
   // Boulangerie
   breads: 'Boulangerie',
   'breakfast-cereals': 'Boulangerie',
   biscuits: 'Boulangerie',
   pastries: 'Boulangerie',
   viennoiseries: 'Boulangerie',
-  // Poissonnerie (séparée de la Boucherie)
-  fishes: 'Poissonnerie',
-  seafood: 'Poissonnerie',
-  // Épicerie
-  pastas: 'Épicerie',
-  rice: 'Épicerie',
-  'pâtes alimentaires': 'Épicerie',
-  riz: 'Épicerie',
-  condiments: 'Épicerie',
-  sauces: 'Épicerie',
-  chocolates: 'Épicerie',
-  spreads: 'Épicerie',
-  flours: 'Épicerie',
-  sugars: 'Épicerie',
-  oils: 'Épicerie',
+  // Épicerie salée
+  pastas: 'Épicerie salée',
+  rice: 'Épicerie salée',
+  'pâtes alimentaires': 'Épicerie salée',
+  riz: 'Épicerie salée',
+  condiments: 'Épicerie salée',
+  sauces: 'Épicerie salée',
+  oils: 'Épicerie salée',
+  'canned-foods': 'Épicerie salée',
+  // Épicerie sucrée
+  chocolates: 'Épicerie sucrée',
+  spreads: 'Épicerie sucrée',
+  flours: 'Épicerie sucrée',
+  sugars: 'Épicerie sucrée',
   // Bébé
   'baby-foods': 'Bébé',
   'infant-formulas': 'Bébé',
@@ -54,15 +56,15 @@ const TAG_TO_RAYON: Record<string, Rayon> = {
   fruits: 'Fruits & légumes',
   vegetables: 'Fruits & légumes',
   legumes: 'Fruits & légumes',
-  // Hygiene
-  hygiene: 'Hygiène',
-  'oral-hygiene': 'Hygiène',
-  soaps: 'Hygiène',
-  shampoos: 'Hygiène',
-  // Menage
-  'household-maintenance': 'Ménage',
-  detergents: 'Ménage',
-  'laundry-detergents': 'Ménage',
+  // Hygiene & Beauté
+  hygiene: 'Hygiène & Beauté',
+  'oral-hygiene': 'Hygiène & Beauté',
+  soaps: 'Hygiène & Beauté',
+  shampoos: 'Hygiène & Beauté',
+  // Entretien & Nettoyage
+  'household-maintenance': 'Entretien & Nettoyage',
+  detergents: 'Entretien & Nettoyage',
+  'laundry-detergents': 'Entretien & Nettoyage',
   // Surgeles
   'frozen-foods': 'Surgelés',
   'ice-creams': 'Surgelés',
@@ -92,11 +94,12 @@ export function offCategoriesToRayon(categoriesTags: string[] | null | undefined
   for (const tag of categoriesTags) {
     const key = tagKey(tag);
     if (key.length === 0) continue;
-    // Un libelle qui EST un rayon l'emporte sur la table.
-    const direct = RAYONS.find((rayon) => rayon.toLowerCase() === key.replace(/-/g, ' '));
-    if (direct) return direct;
+    // Table des slugs d'abord ; sinon nom de rayon (ou ancien nom, via les
+    // alias de `normalizeRayon` : les lignes existantes convergent sans migration).
     const mapped = TAG_TO_RAYON[key];
     if (mapped) return mapped;
+    const renamed = normalizeRayon(key);
+    if (renamed !== DEFAULT_RAYON) return renamed;
   }
   return DEFAULT_RAYON;
 }

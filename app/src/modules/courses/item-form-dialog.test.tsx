@@ -45,7 +45,7 @@ describe('ItemFormDialog — rayon suggéré', () => {
 
     expect(rayon.value).toBe('Divers');
     await user.type(within(dialog).getByLabelText(/Article/), 'Lait demi-écrémé');
-    expect(rayon.value).toBe('Frais');
+    expect(rayon.value).toBe('Crèmerie & Produits laitiers');
   });
 
   it('le choix manuel n’est plus écrasé par la frappe', async () => {
@@ -91,10 +91,10 @@ describe('ItemFormDialog — édition', () => {
     expect(within(dialog).queryByLabelText(/Liste/)).not.toBeInTheDocument();
     expect((within(dialog).getByLabelText(/Article/) as HTMLInputElement).value).toBe('Savon');
 
-    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Hygiène');
+    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Hygiène & Beauté');
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
     expect(onSubmit).toHaveBeenCalledOnce();
-    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Savon', rayon: 'Hygiène' });
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Savon', rayon: 'Hygiène & Beauté' });
   });
 });
 

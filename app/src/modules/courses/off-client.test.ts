@@ -222,20 +222,30 @@ describe('rankSearchHits', () => {
 });
 
 describe('offCategoriesToRayon', () => {
-  it('mappe les tartinades vers l’épicerie', () => {
-    expect(offCategoriesToRayon(['en:spreads', 'fr:Pâtes à tartiner'])).toBe('Épicerie');
+  it('mappe les tartinades vers l’épicerie sucrée', () => {
+    expect(offCategoriesToRayon(['en:spreads', 'fr:Pâtes à tartiner'])).toBe('Épicerie sucrée');
   });
 
   it('mappe les familles connues', () => {
-    expect(offCategoriesToRayon(['en:dairies'])).toBe('Frais');
+    expect(offCategoriesToRayon(['en:dairies'])).toBe('Crèmerie & Produits laitiers');
     expect(offCategoriesToRayon(['en:breads'])).toBe('Boulangerie');
     expect(offCategoriesToRayon(['en:beverages'])).toBe('Boissons');
     expect(offCategoriesToRayon(['en:frozen-foods'])).toBe('Surgelés');
-    expect(offCategoriesToRayon(['fr:Hygiène'])).toBe('Hygiène');
-    expect(offCategoriesToRayon(['en:fishes'])).toBe('Poissonnerie');
+    expect(offCategoriesToRayon(['fr:Hygiène'])).toBe('Hygiène & Beauté');
+    expect(offCategoriesToRayon(['en:fishes'])).toBe('Viande & Poissons');
+    expect(offCategoriesToRayon(['en:cold-cuts'])).toBe('Charcuterie & Traiteur');
     expect(offCategoriesToRayon(['en:diapers'])).toBe('Bébé');
     expect(offCategoriesToRayon(['en:pet-foods'])).toBe('Animalerie');
-    expect(offCategoriesToRayon(['en:pastas'])).toBe('Épicerie');
+    expect(offCategoriesToRayon(['en:pastas'])).toBe('Épicerie salée');
+  });
+
+  it('replit les anciens noms vers les nouveaux (sans migration)', () => {
+    expect(offCategoriesToRayon(['Frais'])).toBe('Crèmerie & Produits laitiers');
+    expect(offCategoriesToRayon(['Boucherie'])).toBe('Viande & Poissons');
+    expect(offCategoriesToRayon(['Poissonnerie'])).toBe('Viande & Poissons');
+    expect(offCategoriesToRayon(['Épicerie'])).toBe('Épicerie salée');
+    expect(offCategoriesToRayon(['Hygiène'])).toBe('Hygiène & Beauté');
+    expect(offCategoriesToRayon(['Ménage'])).toBe('Entretien & Nettoyage');
   });
 
   it('replie vers Divers sur vide ou inconnu', () => {

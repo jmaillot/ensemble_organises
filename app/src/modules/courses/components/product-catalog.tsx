@@ -171,7 +171,7 @@ function ProductEditDialog({
       reset({
         name: product.name,
         brand: product.brand ?? '',
-        rayon: (RAYONS as readonly string[]).includes(product.category ?? '') ? (product.category as EditFormValues['rayon']) : 'Divers',
+        rayon: normalizeRayon(product.category ?? ''),
         ean: product.ean,
       });
       setPhotoFile(null);

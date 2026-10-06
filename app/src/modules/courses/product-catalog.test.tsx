@@ -57,7 +57,7 @@ describe('ProductCatalog', () => {
 
       await user.clear(within(dialog).getByLabelText(/Nom/));
       await user.type(within(dialog).getByLabelText(/Nom/), 'Pâte à tartiner');
-      await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Frais');
+      await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Épicerie sucrée');
       await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
 
       expect(await screen.findAllByText('Pâte à tartiner')).not.toHaveLength(0);
@@ -65,7 +65,7 @@ describe('ProductCatalog', () => {
       const panel = heading.closest('section') as HTMLElement;
       expect(await within(panel).findByText('Pâte à tartiner')).toBeInTheDocument();
       const rows = await data.list<ProductRow>('products', { id: created.id });
-      expect(rows[0]).toMatchObject({ name: 'Pâte à tartiner', category: 'Frais' });
+      expect(rows[0]).toMatchObject({ name: 'Pâte à tartiner', category: 'Épicerie sucrée' });
     } finally {
       await data.remove('products', created.id).catch(() => undefined);
     }
@@ -111,7 +111,7 @@ describe('ProductCatalog', () => {
       expect(await within(panel).findByText('Nutella')).toBeInTheDocument();
       expect(within(panel).getByText('Savon')).toBeInTheDocument();
 
-      await user.click(within(panel).getByRole('tab', { name: 'Hygiène' }));
+      await user.click(within(panel).getByRole('tab', { name: 'Hygiène & Beauté' }));
       expect(await within(panel).findByText('Savon')).toBeInTheDocument();
       expect(within(panel).queryByText('Nutella')).not.toBeInTheDocument();
 

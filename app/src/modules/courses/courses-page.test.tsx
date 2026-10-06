@@ -49,7 +49,7 @@ describe('Module Courses', () => {
 
     // Inconnu du catalogue : mini-formulaire rayon (deviné) + quantité.
     expect(await screen.findByText(/n’est pas au catalogue/)).toBeInTheDocument();
-    expect((screen.getByLabelText(/Rayon/) as HTMLSelectElement).value).toBe('Ménage');
+    expect((screen.getByLabelText(/Rayon/) as HTMLSelectElement).value).toBe('Entretien & Nettoyage');
     await user.click(screen.getByRole('button', { name: 'Confirmer l’ajout de Éponges' }));
 
     await waitFor(() => {
@@ -73,14 +73,14 @@ describe('Module Courses', () => {
     await user.type(within(dialog).getByLabelText(/^Article/), 'Œufs');
     await user.type(within(dialog).getByLabelText(/^Quantité/), '12');
     await user.type(within(dialog).getByLabelText(/^Unité/), 'pièces');
-    await user.selectOptions(within(dialog).getByLabelText(/^Rayon/), 'Frais');
+    await user.selectOptions(within(dialog).getByLabelText(/^Rayon/), 'Crèmerie & Produits laitiers');
     await user.selectOptions(within(dialog).getByLabelText(/^Liste/), 'Fresque');
     await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’article' }));
 
     await waitFor(() => {
       expect(within(listRegion('Fresque')).getByText('Œufs')).toBeInTheDocument();
     });
-    expect(within(listRegion('Fresque')).getByText('12 pièces · Frais')).toBeInTheDocument();
+    expect(within(listRegion('Fresque')).getByText('12 pièces · Crèmerie & Produits laitiers')).toBeInTheDocument();
   });
 
   it('regroupe les articles par rayon puis par ordre d’ajout', async () => {
@@ -90,11 +90,11 @@ describe('Module Courses', () => {
 
     const maison = await screen.findByRole('region', { name: 'Maison' });
     // Vue par défaut : les articles sont rangés sous un en-tête de rayon.
-    expect(within(maison).getByText('Hygiène')).toBeInTheDocument();
+    expect(within(maison).getByText('Hygiène & Beauté')).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Regroupement'), 'ajout');
     await waitFor(() => {
-      expect(within(listRegion('Maison')).queryByText('Hygiène')).not.toBeInTheDocument();
+      expect(within(listRegion('Maison')).queryByText('Hygiène & Beauté')).not.toBeInTheDocument();
     });
     expect(within(listRegion('Maison')).getByText('Savon liquide')).toBeInTheDocument();
   });
@@ -192,14 +192,14 @@ describe('Module Courses', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Modifier Savon liquide' }));
     const dialog = await screen.findByRole('dialog', { name: 'Modifier l’article' });
-    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Ménage');
+    await user.selectOptions(within(dialog).getByLabelText(/Rayon/), 'Entretien & Nettoyage');
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
-    expect(within(row).getByText(/Ménage/)).toBeInTheDocument();
+    expect(within(row).getByText(/Entretien & Nettoyage/)).toBeInTheDocument();
   });
 
   it('le bouton Catalogue ouvre la page catalogue', async () => {
