@@ -66,7 +66,7 @@ export async function listSchoolHolidays(zone: 'A' | 'B' | 'C'): Promise<SchoolH
 /** Id du calendrier Commun du foyer, ou null si absent (le trigger SQL le créera). */
 export async function resolveCommunCalendarId(householdId: string): Promise<string | null> {
   const calendars = await listCalendars();
-  return calendars.find((cal) => cal.household_id === householdId && cal.name === 'Commun')?.id ?? null;
+  return calendars.find((cal) => cal.household_id === householdId && cal.visibility === 'commun')?.id ?? null;
 }
 
 export async function createPersonalCalendar(householdId: string, ownerMemberId: string, name: string): Promise<EventCalendarRow> {  const trimmed = name.trim();

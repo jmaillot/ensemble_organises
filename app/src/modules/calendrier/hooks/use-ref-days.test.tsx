@@ -12,6 +12,7 @@ import {
   useRefDays,
   vacationsOfDay,
 } from './use-ref-days';
+import { resolveCommunCalendarId } from '../api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -134,5 +135,38 @@ describe('useRefDays sur cache base (D-13/D-15)', () => {
 
     expect(result.current.holidays).toEqual(shown);
     expect(result.current.holidays.length).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveCommunCalendarId visibility-first (D-03)', () => {
+  it('ignore un Perso nommé « Commun », retourne le Commun par visibility', async () => {
+    const householdId = 'household-anti-hijack-d03';
+    const impostor = await data.create<{ id: string }>('event_calendars', {
+      household_id: householdId,
+      name: 'Commun',
+      visibility: 'perso',
+      owner_member_id: 'member-impostor',
+    } as never);
+    const commun = await data.create<{ id: string }>('event_calendars', {
+      household_id: householdId,
+      name: 'Calendrier du foyer',
+      visibility: 'commun',
+      owner_member_id: null,
+    } as never);
+
+    expect(await resolveCommunCalendarId(householdId)).toBe(commun.id);
+    expect(await resolveCommunCalendarId(householdId)).not.toBe(impostor.id);
+  });
+
+  it('retourne null quand le foyer n’a que le Perso nommé « Commun »', async () => {
+    const householdId = 'household-no-commun-d03';
+    await data.create('event_calendars', {
+      household_id: householdId,
+      name: 'Commun',
+      visibility: 'perso',
+      owner_member_id: 'member-solo',
+    } as never);
+
+    expect(await resolveCommunCalendarId(householdId)).toBeNull();
   });
 });
