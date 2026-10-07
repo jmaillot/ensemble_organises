@@ -183,6 +183,14 @@ describe('GiftShareDialog — indépendance partages / lien (G-06-1d)', () => {
     expect(within(dialog).queryByText(/existe encore/)).not.toBeInTheDocument();
   });
 
+  it('champ e-mail redondant supprimé (G-06-1e) : aucun champ « Inviter un proche »', async () => {
+    renderDialog();
+    const dialog = await openDialog();
+    expect(within(dialog).queryByLabelText(/Inviter un proche/)).not.toBeInTheDocument();
+    // Le bloc d'envoi par e-mail (panneau code) reste : c'est lui qui crée la part.
+    expect(within(dialog).getByLabelText(/E-mail du destinataire/)).toBeInTheDocument();
+  });
+
   it('partages non vides + code actif : enregistrement direct, sans rappel', async () => {
     inviteState = { hasCode: true, isActive: true };
     const { onSubmit } = renderDialog();
@@ -197,6 +205,15 @@ describe('GiftShareDialog — indépendance partages / lien (G-06-1d)', () => {
     expect(onSubmit).toHaveBeenCalledWith('gift-list-test', [
       { memberId: 'member-lina', email: null, permission: 'lecture' },
     ]);
+    // G-06-1e : aucune part e-mail fabriquée par le formulaire — chaque part
+    // porte un memberId et un email nul (la création e-mail vit dans
+    // redeem/send-email, jamais dans la soumission membres).
+    const shares = onSubmit.mock.calls[0]?.[1] ?? [];
+    expect(shares.length).toBeGreaterThan(0);
+    for (const share of shares) {
+      expect(share.memberId).not.toBeNull();
+      expect(share.email).toBeNull();
+    }
     expect(within(dialog).queryByText(/existe encore/)).not.toBeInTheDocument();
   });
 });
