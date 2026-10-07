@@ -2,7 +2,7 @@
  * Edge Function `gift-list-invite`.
  *
  * Point d'entrée : `POST /functions/v1/gift-list-invite`
- * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem' | 'send-email' | 'guest-view' | 'guest-reserve', ... }`
+ * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem' | 'send-email' | 'guest-view' | 'guest-reserve' | 'member-reserve', ... }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user', 'publishable']`
@@ -49,6 +49,14 @@
  *                               compte après signup, OPTION A), partage
  *                               `reservation` idempotent. Jamais d'admin, jamais
  *                               de réserve aveugle (D-17).
+ *                               member-reserve              : `user` + `public.member_reserve_gift_item`
+ *                               (G-06-1b-bis) : réserve attribuée, y compris
+ *                               inter-foyers. L'identité (nom du profil
+ *                               vérifié) et le partage `reservation` sont
+ *                               établis EN BASE depuis la session — le client
+ *                               n'envoie que l'article, jamais `reserved_by`
+ *                               ni un nom. Même forme conflit-vs-refus que
+ *                               `guest-reserve` (409 propre, 403 sans donnée).
  *
  * Ces quatre fonctions SQL sont `SECURITY DEFINER` et leur `EXECUTE` n'est
  * accordé qu'à `service_role` : un client porteur d'un JWT utilisateur est
@@ -82,6 +90,7 @@
  *     brute `photo_url`, ou l'URL http(s) héritée telle quelle — null en
  *     échec fermé, jamais persistée)
  *   guest-reserve -> { itemId, alreadyReserved }
+*   member-reserve -> { itemId, alreadyReserved }
  */
 
 // Spécificateur BARE, comme `household-invite` : le runtime épingle
@@ -234,6 +243,12 @@ const requestSchema = z.discriminatedUnion('action', [
     /** Nom auto-déclaré (D-06) : validé ici ET en base (miroir CHECK). */
     name: guestNameField,
   }),
+  z.object({
+    action: z.literal('member-reserve'),
+    /** Article visé : le partage `reservation` de l'appelant sur la liste de
+     *  l'article est vérifié EN BASE (jamais un `reserved_by` fourni). */
+    itemId: itemField,
+  }),
 ]);
 
 type RequestBody = z.infer<typeof requestSchema>;
@@ -302,6 +317,7 @@ const LIMITS: Record<string, number> = {
   'send-email': 5,
   'guest-view': 30,
   'guest-reserve': 10,
+  'member-reserve': 10,
 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
@@ -362,6 +378,9 @@ function translateRpcError(error: { code?: string; message: string }): GiftListI
   }
   if (message.includes("article déjà réservé")) {
     return new GiftListInviteError(409, 'Cet article est déjà réservé.');
+  }
+  if (message.includes("réservation non autorisée")) {
+    return new GiftListInviteError(403, 'Vous ne pouvez pas réserver cet article.');
   }
   if (message.includes('session requise')) return new GiftListInviteError(401, 'Connectez-vous pour continuer.');
   if (message.includes('liste introuvable')) return new GiftListInviteError(404, 'Liste introuvable.');
@@ -789,6 +808,26 @@ async function handleGuestReserve(admin: AdminClient, body: RequestBody & { acti
   return json({ itemId: reserved.item_id ?? body.itemId, alreadyReserved: reserved.already_reserved === true });
 }
 
+/**
+ * Réserve attribuée d'un membre connecté (G-06-1b-bis, D-05/D-17) : article
+ * + session, sans code. L'identité (nom du profil) et le partage
+ * `reservation` sont établis EN BASE par `member_reserve_gift_item` depuis
+ * `userId` (session vérifiée) : le client n'envoie ni membre ni nom.
+ * Idempotence à membre/nom égal (`alreadyReserved: true`), 409 à tenue
+ * d'autrui, 403 sans donnée sinon — même forme que `guest-reserve`.
+ */
+async function handleMemberReserve(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-reserve' }) {
+  const { data, error } = await admin.rpc('member_reserve_gift_item', {
+    p_actor_id: userId,
+    p_item_id: body.itemId,
+  });
+
+  if (error) throw translateRpcError(error);
+
+  const reserved = (data ?? {}) as { item_id?: string; already_reserved?: boolean };
+  return json({ itemId: reserved.item_id ?? body.itemId, alreadyReserved: reserved.already_reserved === true });
+}
+
 // ---------------------------------------------------------------------------
 // Point d'entrée
 // ---------------------------------------------------------------------------
@@ -821,6 +860,10 @@ Deno.serve(
       }
       if (ctx.authMode !== 'user' || !userId) {
         return json({ error: 'Connectez-vous pour partager une liste de cadeaux.' }, 401);
+      }
+
+      if (body.action === 'member-reserve') {
+        return await handleMemberReserve(admin, userId, body);
       }
 
       if (body.action === 'create') return await handleCreate(admin, userId, body);
