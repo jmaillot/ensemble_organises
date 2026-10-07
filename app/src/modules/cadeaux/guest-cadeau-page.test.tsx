@@ -131,11 +131,17 @@ describe('GuestCadeauPage', () => {
         ],
       },
     });
+    const user = userEvent.setup();
     try {
       const { container } = renderGuest(CODE);
       expect(await screen.findByText('Foulard')).toBeInTheDocument();
 
-      // Article avec contenu : une photo paresseuse et un lien externe explicite.
+      // Replié : résumé seul, aucun contenu servi (G-06-1a-bis).
+      expect(container.querySelector('li img')).toBeNull();
+      expect(container.querySelector('li a')).toBeNull();
+
+      // Tap : le détail déplié porte la photo et le lien.
+      await user.click(screen.getByRole('button', { name: /Foulard/ }));
       const photos = container.querySelectorAll('li img');
       expect(photos).toHaveLength(1);
       expect(photos[0]?.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
@@ -152,6 +158,155 @@ describe('GuestCadeauPage', () => {
       expect(rows[1]?.querySelector('a')).toBeNull();
 
       // Masquage intact : aucun auteur nulle part dans le DOM.
+      expect(container.textContent).not.toMatch(/Thomas|member-/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('lignes repliées : résumé seul, détail absent, bascule annoncée (G-06-1a-bis)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          {
+            id: 'gift-item-1',
+            name: 'Foulard',
+            price: 29,
+            comment: 'Laine mérinos',
+            url: 'https://boutique.example.fr/foulard-32',
+            photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
+            reserved: false,
+          },
+        ],
+      },
+    });
+    try {
+      const { container } = renderGuest(CODE);
+      expect(await screen.findByText('Foulard')).toBeInTheDocument();
+
+      // Le résumé (nom + prix) est visible, le détail est absent du DOM.
+      const toggle = screen.getByRole('button', { name: /Foulard/ });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle.getAttribute('aria-controls')).toBe('guest-item-detail-gift-item-1');
+      expect(container.querySelector('#guest-item-detail-gift-item-1')).toBeNull();
+      expect(screen.queryByText('Laine mérinos')).not.toBeInTheDocument();
+      expect(container.querySelector('li img')).toBeNull();
+      expect(container.querySelector('li a')).toBeNull();
+      // La réserve reste joignable même repliée.
+      expect(screen.getByRole('button', { name: 'Réserver' })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('tap : le détail se déplie puis se replie, clavier et lecteur d’écran (G-06-1a-bis)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          {
+            id: 'gift-item-1',
+            name: 'Foulard',
+            price: 29,
+            comment: 'Laine mérinos',
+            url: 'https://boutique.example.fr/foulard-32',
+            photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
+            reserved: false,
+          },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    try {
+      const { container } = renderGuest(CODE);
+      expect(await screen.findByText('Foulard')).toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: /Foulard/ });
+
+      // Ouverture : photo large, commentaire entier, prix, lien externe.
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const detail = container.querySelector('#guest-item-detail-gift-item-1');
+      expect(detail).not.toBeNull();
+      expect(detail?.querySelector('img')?.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
+      expect(screen.getByText('Laine mérinos')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Voir : Foulard/ })).toHaveAttribute(
+        'href',
+        'https://boutique.example.fr/foulard-32',
+      );
+      // Masquage intact jusque dans le détail (D-07).
+      expect(container.textContent).not.toMatch(/Thomas|member-/);
+
+      // Refermeture : le détail quitte le DOM, le résumé demeure.
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(container.querySelector('#guest-item-detail-gift-item-1')).toBeNull();
+      expect(screen.getByText('Foulard')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('réserve depuis le détail déplié : succès, sans nouvel appel (G-06-1a-bis)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          {
+            id: 'gift-item-1',
+            name: 'Foulard',
+            price: 29,
+            comment: 'Laine',
+            url: 'https://boutique.example.fr/foulard-32',
+            photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
+            reserved: false,
+          },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      expect(await screen.findByText('Foulard')).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText(/Votre nom/), 'Mamie');
+      await user.click(screen.getByRole('button', { name: /Foulard/ }));
+      expect(screen.getByRole('link', { name: /Voir : Foulard/ })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Réserver' }));
+
+      expect(await screen.findByText(/réservé au nom de Mamie/)).toBeInTheDocument();
+      // Le flux de réserve est inchangé : le détail n'a ajouté aucun fetch.
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('détail déplié sans photo ni lien : rendu propre, sans erreur (G-06-1a-bis)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          { id: 'gift-item-2', name: 'Théière', price: 45, comment: null, url: null, photoUrl: null, reserved: false },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    try {
+      const { container } = renderGuest(CODE);
+      expect(await screen.findByText('Théière')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Théière/ }));
+      const detail = container.querySelector('#guest-item-detail-gift-item-2');
+      expect(detail).not.toBeNull();
+      expect(detail?.querySelector('img')).toBeNull();
+      expect(detail?.querySelector('a')).toBeNull();
+      // Prix présent même sans contenu, réserve toujours joignable.
+      expect(detail?.textContent).toMatch(/45/);
+      expect(screen.getByRole('button', { name: 'Réserver' })).toBeInTheDocument();
       expect(container.textContent).not.toMatch(/Thomas|member-/);
     } finally {
       vi.unstubAllGlobals();
@@ -176,11 +331,15 @@ describe('GuestCadeauPage', () => {
         ],
       },
     });
+    const user = userEvent.setup();
     try {
       const { container } = renderGuest(CODE);
       expect(await screen.findByText('Piège')).toBeInTheDocument();
 
-      // La couche données laisse passer la chaîne, le rendu refuse le schéma.
+      // La couche données laisse passer la chaîne, le rendu refuse le schéma —
+      // jusque dans le détail déplié (même garde que la vignette).
+      await user.click(screen.getByRole('button', { name: /Piège/ }));
+      expect(container.querySelector('#guest-item-detail-gift-item-1')).not.toBeNull();
       expect(container.querySelector('li img')).toBeNull();
       expect(container.querySelector('li a')).toBeNull();
     } finally {
