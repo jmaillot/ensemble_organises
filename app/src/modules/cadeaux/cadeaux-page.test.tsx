@@ -175,12 +175,12 @@ describe('CadeauxPage', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Lina Martin/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le partage' }));
 
-    // Le partage porte sur la liste : le bouton unique passe en « Gérer »,
+    // Le partage porte sur la liste : le bouton reste « Partager »
+    // (l'état partagé se lit au surlignage + au panneau code),
     // toujours dans la même rangée d'outils.
-    await waitFor(() => expect(screen.getByRole('button', { name: /Gérer/ })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /Partager/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Partager/ })).toBeInTheDocument());
     expect(
-      within(screen.getByRole('group', { name: 'Actions de la liste' })).getByRole('button', { name: /Gérer/ }),
+      within(screen.getByRole('group', { name: 'Actions de la liste' })).getByRole('button', { name: /Partager/ }),
     ).toBeInTheDocument();
   });
 

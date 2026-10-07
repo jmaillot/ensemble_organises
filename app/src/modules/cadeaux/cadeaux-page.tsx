@@ -610,11 +610,11 @@ export default function CadeauxPage() {
                 <button
                   type="button"
                   className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
-                  aria-label={isShared ? `Gérer le partage de ${activeList.name}` : `Partager ${activeList.name}`}
+                  aria-label={`Partager ${activeList.name}`}
                   onClick={() => setShareOpen(true)}
                 >
                   <Icon name="share" size="sm" />
-                  {isShared ? 'Gérer' : 'Partager'}
+                  Partager
                 </button>
               ) : null}
               {activeList?.isOwned ? (
