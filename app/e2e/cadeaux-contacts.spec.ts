@@ -100,28 +100,60 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await expect(page.getByText(/Connexion au serveur indisponible/)).toBeVisible();
   });
 
-  test('liste étrangère rejointe : badge d’origine puis réserve via le serveur', async ({ page }) => {
-    // Parcours inter-foyers (phase 06, G-06-1b-bis) en démonstration : sans
-    // backend, seuls le badge d'origine (fusion par partage) et le refus
+  test('liste étrangère rejointe : interrupteurs actifs puis réserve via le serveur', async ({ page }) => {
+    // Parcours inter-foyers (phase 06, G-06-1b-bis/G-06-23/G-06-24) en
+    // démonstration : sans backend, seuls l'absence de badge (le filtre
+    // Partagées porte le sens), les interrupteurs actifs et le refus
     // explicite de la réserve serveur sont déterministes. La réserve
-    // attribuée réussie est prouvée par la suite SQL 0033 et les tests
+    // attribuée réussie est prouvée par la suite SQL 0035 et les tests
     // Vitest — pas rejouable sans relais.
     await openDemoSession(page);
     await page.goto('/cadeaux');
     await expect(page.getByText('Atelier céramique')).toBeVisible();
 
     await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Noël des Voisins' }).click();
-    // La liste rejointe apparaît avec sa marque d'origine et son contenu.
-    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    // G-06-24 : aucun badge d'origine accolé, et son contenu est là.
+    await expect(page.getByText(/Liste partagée/)).toHaveCount(0);
     await expect(page.getByText('Bougie parfumée')).toBeVisible();
     // Lecture seule : aucune gestion offerte sur une liste étrangère.
     await expect(page.getByRole('button', { name: /Partager|Gérer/ })).toHaveCount(0);
 
+    // G-06-23 : les deux interrupteurs sont actifs, même sur article tenu.
+    const toggles = page.getByRole('switch', { name: 'Acheté', exact: true });
+    await expect(toggles).toHaveCount(2);
+    for (const toggle of await toggles.all()) await expect(toggle).toBeEnabled();
+
     // La réserve ne part jamais en écriture directe : elle appelle la voie
     // serveur, indisponible en démo — le refus explicite le prouve (un
     // chemin client aurait silencieusement coché l'interrupteur).
-    await page.getByRole('switch', { name: 'Acheté', exact: true }).click();
+    await toggles.first().click();
     await expect(page.getByText('Edge Function indisponible.')).toBeVisible();
+  });
+
+  test('aucun bouton de libération autonome : le décochage Reçu est la seule voie', async ({ page }) => {
+    // G-06-22 en démonstration : l'écriture locale suffit — aucun serveur
+    // requis pour prouver l'absence du bouton et la modale au décochage.
+    await openDemoSession(page);
+    await page.goto('/cadeaux');
+    await expect(page.getByText('Atelier céramique')).toBeVisible();
+
+    await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Anniversaire de Noé' }).click();
+    await expect(page.getByText('Casque pour le vélo')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Libérer/ })).toHaveCount(0);
+
+    const card = page.locator('li', { hasText: 'Casque pour le vélo' });
+    await card.getByRole('switch', { name: 'Reçu' }).click();
+    await expect(card.getByText('Réservé')).toBeVisible();
+    // Toujours aucun bouton autonome une fois la réserve affichée.
+    await expect(page.getByRole('button', { name: /Libérer/ })).toHaveCount(0);
+
+    // Le décochage ouvre la confirmation existante, annulée sans effet.
+    await card.getByRole('switch', { name: 'Reçu' }).click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog.getByText('Libérer « Casque pour le vélo »')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Annuler' }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(card.getByText('Réservé')).toBeVisible();
   });
 
   test('quitter une liste étrangère : bouton, modale, annulation sans effet', async ({ page }) => {
@@ -137,19 +169,24 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await expect(page.getByRole('button', { name: /Quitter/ })).toHaveCount(0);
 
     await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Noël des Voisins' }).click();
-    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
-    await page.getByRole('button', { name: /Quitter la liste/ }).click();
+    // G-06-24 : aucun badge d'origine ; Quitter est un danger rouge hors
+    // de la barre d'outils générique, directement sous le sélecteur.
+    await expect(page.getByText(/Liste partagée/)).toHaveCount(0);
+    const quit = page.getByRole('button', { name: /Quitter la liste/ });
+    await expect(quit).toHaveClass(/bg-coral-soft/);
+    await expect(page.getByRole('group', { name: 'Actions de la liste' }).getByRole('button', { name: /Quitter/ })).toHaveCount(0);
+    await quit.click();
 
     const dialog = page.getByRole('alertdialog');
     await expect(dialog.getByText('Quitter « Noël des Voisins »')).toBeVisible();
     await expect(dialog.getByText(/Vos réservations à votre nom sont conservées/)).toBeVisible();
     await expect(dialog.getByText(/rejoindre à nouveau/)).toBeVisible();
 
-    // Annuler : aucun appel, liste toujours là.
+    // Annuler : aucun appel, liste toujours là, toujours sans badge.
     await dialog.getByRole('button', { name: 'Annuler' }).click();
     await expect(dialog).not.toBeVisible();
     await expect(page.getByText('Bougie parfumée')).toBeVisible();
-    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    await expect(page.getByText(/Liste partagée/)).toHaveCount(0);
   });
 
   test('quitter sans serveur : le refus explicite prouve la voie serveur', async ({ page }) => {
@@ -166,7 +203,7 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
 
     await expect(page.getByText('Edge Function indisponible.')).toBeVisible();
     // La liste est toujours là : rien n'a été supprimé en local.
-    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    await expect(page.getByText(/Liste partagée/)).toHaveCount(0);
     await expect(page.getByText('Bougie parfumée')).toBeVisible();
   });
 });
