@@ -229,6 +229,14 @@ function GuestAnonymousView({
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [mineIds, setMineIds] = useState<string[]>(() => readGuestReservedIds(code));
+  // Détail inline par article (G-06-1a-bis) : bascules indépendantes — chaque
+  // ligne s'ouvre sans refermer les autres. Aucune donnée nouvelle : le
+  // détail ne relit que les clés déjà servies (url, photoUrl, comment).
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const toggleExpanded = (itemId: string) =>
+    setExpandedIds((previous) =>
+      previous.includes(itemId) ? previous.filter((id) => id !== itemId) : [...previous, itemId],
+    );
 
   const viewQuery = useQuery({
     queryKey: ['cadeaux', 'guest-view', code],
@@ -321,45 +329,72 @@ function GuestAnonymousView({
       <ul className="m-0 grid list-none gap-2.5 p-0">
         {view.items.map((item) => {
           const looksMine = mineIds.includes(item.id);
+          const expanded = expandedIds.includes(item.id);
           return (
-            <li
-              key={item.id}
-              className="panel-surface flex items-center justify-between gap-3 rounded-[14px] p-3.5"
-            >
-              {isServableHttpUrl(item.photoUrl) ? (
-                <img
-                  src={item.photoUrl}
-                  alt=""
-                  loading="lazy"
-                  className="h-14 w-14 shrink-0 rounded-[10px] object-cover"
-                />
-              ) : null}
-              <div className="grid min-w-0 flex-1 gap-0.5">
-                <strong className="text-[14px]">{item.name}</strong>
-                {item.comment ? <span className="text-[11px] text-muted">{item.comment}</span> : null}
-                <span className="text-[12px] font-semibold">{item.price ? formatEuro(item.price) : '—'}</span>
-                {isServableHttpUrl(item.url) ? (
-                  <span>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener"
-                      aria-label={`Voir : ${item.name} (nouvel onglet)`}
-                      className="text-[12px] font-semibold text-accent-strong underline underline-offset-2"
-                    >
-                      Voir
-                    </a>
+            <li key={item.id} className="panel-surface grid gap-2 rounded-[14px] p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={`guest-item-detail-${item.id}`}
+                  onClick={() => toggleExpanded(item.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  <span className="grid min-w-0 flex-1 gap-0.5">
+                    <strong className="text-[14px]">{item.name}</strong>
+                    <span className="text-[12px] font-semibold">
+                      {item.price ? formatEuro(item.price) : '—'}
+                    </span>
                   </span>
-                ) : null}
+                  <span aria-hidden="true" className="shrink-0 text-[13px] text-muted">
+                    {expanded ? '▾' : '▸'}
+                  </span>
+                  <span className="sr-only">{expanded ? 'Masquer le détail' : 'Afficher le détail'}</span>
+                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {item.reserved ? (
+                    <Badge tone="amber">{looksMine ? 'Réservé par vous' : 'Réservé'}</Badge>
+                  ) : null}
+                  {!item.reserved ? (
+                    <Button
+                      size="sm"
+                      disabled={pendingItemId !== null}
+                      onClick={() => reserve(item.id, item.name)}
+                    >
+                      {pendingItemId === item.id ? 'Réservation…' : 'Réserver'}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {item.reserved ? <Badge tone="amber">{looksMine ? 'Réservé par vous' : 'Réservé'}</Badge> : null}
-                {!item.reserved ? (
-                  <Button size="sm" disabled={pendingItemId !== null} onClick={() => reserve(item.id, item.name)}>
-                    {pendingItemId === item.id ? 'Réservation…' : 'Réserver'}
-                  </Button>
-                ) : null}
-              </div>
+              {expanded ? (
+                <div id={`guest-item-detail-${item.id}`} className="grid gap-1.5 pt-1">
+                  {isServableHttpUrl(item.photoUrl) ? (
+                    <img
+                      src={item.photoUrl}
+                      alt=""
+                      loading="lazy"
+                      className="h-44 w-full rounded-[10px] object-cover"
+                    />
+                  ) : null}
+                  {item.comment ? <p className="m-0 text-[12px]">{item.comment}</p> : null}
+                  <span className="text-[12px] font-semibold">
+                    {item.price ? formatEuro(item.price) : '—'}
+                  </span>
+                  {isServableHttpUrl(item.url) ? (
+                    <span>
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener"
+                        aria-label={`Voir : ${item.name} (nouvel onglet)`}
+                        className="text-[12px] font-semibold text-accent-strong underline underline-offset-2"
+                      >
+                        Voir
+                      </a>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           );
         })}
