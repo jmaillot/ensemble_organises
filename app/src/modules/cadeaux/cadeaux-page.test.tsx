@@ -154,7 +154,9 @@ describe('CadeauxPage', () => {
     });
 
     // L’article apparaît dans sa liste, l’idée reste dans son onglet.
-    await user.click(screen.getByRole('tab', { name: /Listes/ }));
+    // findBy (06-07) : la fermeture du dialogue attend le refetch snapshot,
+    // allongé par la fusion inter-foyers — getBy synchrone = course critique.
+    await user.click(await screen.findByRole('tab', { name: /Listes/ }));
     await user.selectOptions(
       await screen.findByLabelText('Sélection de la liste de cadeaux'),
       'Anniversaire de Noé',
