@@ -461,10 +461,17 @@ export default function CadeauxPage() {
           <Button icon="plus" onClick={openCreateIdea}>
             Noter une idée
           </Button>
-        ) : tab === 'listes' && !isForeignList ? (
-          <Button icon="plus" onClick={openCreate} disabled={!activeList}>
-            Ajouter une idée
-          </Button>
+        ) : tab === 'listes' ? (
+          <>
+            <Button variant="secondary" icon="plus" onClick={() => setCreatingList(true)}>
+              Créer une liste
+            </Button>
+            {!isForeignList ? (
+              <Button icon="plus" onClick={openCreate} disabled={!activeList}>
+                Ajouter une idée
+              </Button>
+            ) : null}
+          </>
         ) : null
       }
     >
@@ -530,25 +537,21 @@ export default function CadeauxPage() {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {shownLists.length > 0 ? (
-                <label className="grid gap-1.5 text-[11px] font-extrabold text-muted">
-                  Sélection de la liste de cadeaux
-                  {shownLists.length > 1 ? (
-                    <Select
-                      value={activeList?.id ?? ''}
-                      onChange={(event) => setRequestedListId(event.target.value)}
-                      className="w-[220px]"
+              {shownLists.length > 1 ? (
+                <div role="group" aria-label="Listes de cadeaux" className="flex flex-wrap items-center gap-2">
+                  {shownLists.map((list) => (
+                    <Button
+                      key={list.id}
+                      variant={list.id === activeList?.id ? 'primary' : 'secondary'}
+                      aria-pressed={list.id === activeList?.id}
+                      onClick={() => setRequestedListId(list.id)}
                     >
-                      {shownLists.map((list) => (
-                        <option key={list.id} value={list.id}>
-                          {list.name}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <span className="text-[13px] font-bold text-fg">{shownLists[0].name}</span>
-                  )}
-                </label>
+                      {list.name}
+                    </Button>
+                  ))}
+                </div>
+              ) : shownLists.length === 1 ? (
+                <span className="text-[13px] font-bold text-fg">{shownLists[0].name}</span>
               ) : null}
             </div>
             {shownLists.length === 0 ? (
@@ -584,11 +587,7 @@ export default function CadeauxPage() {
                   Annuler
                 </Button>
               </form>
-            ) : (
-              <Button variant="secondary" size="sm" icon="plus" onClick={() => setCreatingList(true)}>
-                Créer une liste
-              </Button>
-            )}
+            ) : null}
 
             {activeList && !isForeignList ? (
               <button
