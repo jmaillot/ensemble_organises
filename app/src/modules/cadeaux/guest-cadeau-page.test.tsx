@@ -7,15 +7,23 @@ import { useSessionStore } from '@/stores/session-store';
 import { demoProfile } from '@/lib/data/seed';
 import GuestCadeauPage from './guest-cadeau-page';
 
+const { mockGetSession } = vi.hoisted(() => {
+  const mockGetSession = vi.fn(
+    async (): Promise<{ data: { session: { access_token: string } | null } }> => ({ data: { session: null } }),
+  );
+  return { mockGetSession };
+});
+
 vi.mock('@/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
-  supabase: { auth: { getSession: async () => ({ data: { session: null } }) } },
+  supabase: { auth: { getSession: mockGetSession } },
   supabaseFunctionsBase: 'http://localhost/functions/v1',
   supabaseUrl: 'http://localhost',
   supabasePublishableKey: 'pk_test',
 }));
 
 const CODE = 'JU6QUzDkv3pLmdGgVYUCqadLLKdsqfCj';
+type SeenCall = { url: string; init: RequestInit; body: Record<string, unknown> };
 
 const GUEST_VIEW = {
   listId: 'gift-list-1',
@@ -27,13 +35,16 @@ const GUEST_VIEW = {
 };
 
 function mockRedeemFetch(ok = true, payload: unknown = { list_id: 'gift-list-1', already_shared: false }) {
+  const seen: SeenCall[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockImplementation(async () => {
+    vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      seen.push({ url, init: (init ?? {}) as RequestInit, body: JSON.parse(String(init?.body ?? '{}')) });
       if (!ok) return { ok: false, json: async () => ({ error: 'code invalide' }) };
       return { ok: true, json: async () => payload };
     }),
   );
+  return seen;
 }
 
 /** Stub orienté action pour la branche invitée (guest-view / guest-reserve). */
@@ -41,10 +52,12 @@ function mockGuestFetch(handlers: {
   view?: unknown | Error;
   reserve?: unknown | Error | ((body: Record<string, unknown>) => unknown | Error);
 }) {
+  const seen: SeenCall[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      seen.push({ url: _url, init: (init ?? {}) as RequestInit, body });
       const outcome =
         body.action === 'guest-view'
           ? handlers.view ?? GUEST_VIEW
@@ -55,6 +68,7 @@ function mockGuestFetch(handlers: {
       return { ok: true, json: async () => outcome };
     }),
   );
+  return seen;
 }
 
 function renderGuest(code: string | null) {
@@ -71,6 +85,8 @@ describe('GuestCadeauPage', () => {
     vi.unstubAllGlobals();
     localStorage.clear();
     useSessionStore.setState({ status: 'guest', user: null });
+    mockGetSession.mockResolvedValue({ data: { session: null } });
+    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'pk_test');
   });
 
   it('sans session : nom déclaré puis réserve, sans compte', async () => {
@@ -219,14 +235,17 @@ describe('GuestCadeauPage', () => {
     }
   });
 
-  it('en session : échange le code et propose d’ouvrir les cadeaux', async () => {
+  it('en session : choix explicite, rejoindre échange puis propose d’ouvrir les cadeaux', async () => {
     mockRedeemFetch();
     useSessionStore.setState({
       status: 'authenticated',
       user: { ...demoProfile, email: 'bob-cal@example.fr' } as never,
     });
+    const user = userEvent.setup();
     try {
       renderGuest(CODE);
+      // Le choix précède tout échange : rejoindre déclenche le redeem historique.
+      await user.click(await screen.findByRole('button', { name: /Rejoindre via mon compte/ }));
       expect(await screen.findByText(/Partage activé/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /Ouvrir les cadeaux/ })).toHaveAttribute('href', '/cadeaux');
     } finally {
@@ -243,9 +262,88 @@ describe('GuestCadeauPage', () => {
     const user = userEvent.setup();
     try {
       renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: /Rejoindre via mon compte/ }));
       expect(await screen.findByText(/ne passe plus/)).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: /Réessayer/ }));
       expect(screen.getByLabelText(/Code d’invitation/)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('en session : les deux options sont proposées et aucun échange ne part avant le choix (G-06-1b)', async () => {
+    const seen = mockGuestFetch({});
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { ...demoProfile, email: 'bob-cal@example.fr' } as never,
+    });
+    try {
+      renderGuest(CODE);
+
+      expect(await screen.findByRole('button', { name: /Rejoindre via mon compte/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Continuer sans lier mon compte/ })).toBeInTheDocument();
+      // La copie précise que la seconde voie reste anonyme.
+      expect(screen.getByText(/rien ne sera rattaché à votre compte/)).toBeInTheDocument();
+      // Ni redeem ni vue invitée : le choix précède tout appel réseau.
+      expect(seen).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('en session : continuer sans lier réserve en anonyme, sans porteur (G-06-1b, T-06-11)', async () => {
+    // Une session Supabase réelle existe : la preuve exige son absence des appels.
+    mockGetSession.mockResolvedValue({ data: { session: { access_token: 'jwt-test' } } });
+    const seen = mockGuestFetch({});
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { ...demoProfile, email: 'bob-cal@example.fr' } as never,
+    });
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: /Continuer sans lier mon compte/ }));
+
+      // La même vue que les visiteurs : nom déclaré puis réserve.
+      await user.type(await screen.findByLabelText(/Votre nom/), 'Mamie');
+      await user.click(screen.getByRole('button', { name: 'Réserver' }));
+      expect(await screen.findByText(/réservé au nom de Mamie/)).toBeInTheDocument();
+
+      // Copie d'attribution anonyme, pas d'invite à se connecter (déjà en session).
+      expect(screen.getByText(/sans lier votre compte/)).toBeInTheDocument();
+      expect(screen.queryByText(/Connectez-vous avec l’e-mail invité/)).not.toBeInTheDocument();
+
+      // guest-view ET guest-reserve sans porteur, malgré la session présente…
+      const guestCalls = seen.filter(
+        (call) => call.body.action === 'guest-view' || call.body.action === 'guest-reserve',
+      );
+      expect(guestCalls.length).toBeGreaterThan(0);
+      for (const call of guestCalls) {
+        expect((call.init.headers as Record<string, string>).authorization).toBeUndefined();
+      }
+      // …et aucun redeem : le compte n'est jamais lié sur cette voie.
+      expect(seen.some((call) => call.body.action === 'redeem')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('en session : rejoindre appelle le redeem historique avec les mêmes arguments', async () => {
+    const seen = mockRedeemFetch();
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { ...demoProfile, email: 'bob-cal@example.fr' } as never,
+    });
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: /Rejoindre via mon compte/ }));
+      expect(await screen.findByText(/Partage activé/)).toBeInTheDocument();
+
+      // Sémantique redeem inchangée : un seul appel, code + e-mail du compte.
+      const redeemCalls = seen.filter((call) => call.body.action === 'redeem');
+      expect(redeemCalls).toHaveLength(1);
+      expect(redeemCalls[0]?.body).toMatchObject({ action: 'redeem', code: CODE, email: 'bob-cal@example.fr' });
     } finally {
       vi.unstubAllGlobals();
     }
