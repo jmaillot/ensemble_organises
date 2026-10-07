@@ -33,8 +33,8 @@
  *                               d'invitation fourni par le dialogue). La gestion
  *                               est revérifiée EN BASE via
  *                               `public.gift_list_invite_summary`, le partage
- *                               `lecture` du destinataire est créé AVANT tout
- *                               envoi (D-04 : jamais d'envoi sans part, jamais
+ *                               `reservation` du destinataire est créé AVANT tout
+ *                               envoi (D-04 amendée 2026-10-07, G-06-21 : jamais d'envoi sans part, jamais
  *                               de dégradation d'une part `reservation`), puis
  *                               l'e-mail sobre part via le relais SMTP de la
  *                               stack (`SMTP_*`, lus côté serveur uniquement —
@@ -93,7 +93,7 @@
  *   summary -> { listId, isActive, hasCode, expiresAt, maxUses, useCount } | null
  *   redeem  -> { list_id, already_shared }
  *   send-email -> { listId, email, sent: true }
- *     (jamais d'envoi sans part `lecture` créée d'abord — D-04)
+ *     (jamais d'envoi sans part `reservation` créée d'abord — D-04 amendée 2026-10-07, G-06-21)
  *   guest-view -> { listId, listName, items: [{ id, name, price, comment, url, photoUrl, reserved }] }
  *     (jamais d'identifiant d'auteur — D-07 ; `reserved` seul dit l'état ;
  *     `url` est le lien organizer tel quel (chaîne ou null) ; `photoUrl` est
@@ -541,16 +541,16 @@ function isInviteExpired(expiresAt: string): boolean {
 }
 
 /**
- * Envoi réel d'invitation (D-01/D-02/D-03/D-04, phase 06 plan 02).
+ * Envoi réel d'invitation (D-01/D-02/D-03/D-04 amendée 2026-10-07, G-06-21, phase 06 plan 02).
  *
  * Ordre strict, jamais inversé :
  *   1. secrets relais vérifiés (échec fermé AVANT toute tentative) ;
  *   2. code validé (même oracle `code invalide` que redeem) ;
  *   3. gestion propriétaire-OU-admin revérifiée EN BASE via le RPC
  *      `gift_list_invite_summary` (un 403 en sort pour un non-gestionnaire) ;
- *   4. part `lecture` du destinataire créée (idempotente, jamais de
+ *   4. part `reservation` du destinataire créée (idempotente, jamais de
  *      dégradation d'une part `reservation` existante) ;
- *   5. e-mail sobre envoyé via le relais (jamais d'envoi sans part — D-04).
+ *   5. e-mail sobre envoyé via le relais (jamais d'envoi sans part — D-04 amendée).
  *
  * Le redeem avec compte suit toujours la branche e-mail existante (OQ-1 A
  * inchangée) : l'e-mail embarque le lien à code, rien d'autre ne change.
@@ -616,8 +616,9 @@ async function handleSendEmail(admin: AdminClient, userId: string, body: Request
   });
   if (summaryError) throw translateRpcError(summaryError);
 
-  // 4. Part `lecture` d'abord (D-04) : idempotente, sans compteur, sans
-  //    dégradation d'une part `reservation` déjà surclassée au redeem.
+  // 4. Part `reservation` d'abord (D-04 amendée 2026-10-07, G-06-21) :
+  //    idempotente, sans compteur, sans dégradation d'une part `reservation`
+  //    déjà surclassée au redeem.
   const recipientEmail = body.email.trim().toLowerCase();
   const { data: existingShare, error: shareReadError } = await admin
     .from('gift_list_shares')
@@ -634,7 +635,7 @@ async function handleSendEmail(admin: AdminClient, userId: string, body: Request
       list_id: listId,
       shared_with_member_id: null,
       shared_with_email: recipientEmail,
-      permission: 'lecture',
+      permission: 'reservation',
     });
     // Course perdue contre un envoi concurrent du même destinataire :
     // l'unicité (liste, e-mail) fait foi, la part existe — on continue.

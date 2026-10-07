@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input, Select } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { QrCode } from '@/components/shared/qr-code';
 import { useToast } from '@/components/ui/toast';
@@ -19,13 +19,12 @@ import {
   type GiftListInviteSummary,
 } from '../api';
 import { GIFT_HOST_MESSAGE_MAX } from '../email-template';
-import { permissionLabel, type GiftList, type GiftShare, type GiftShareInput } from '../types';
+import type { GiftList, GiftShare, GiftShareInput } from '../types';
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const schema = z.object({
   members: z.array(z.string()),
-  permissions: z.record(z.string(), z.enum(['lecture', 'reservation'])),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -38,9 +37,10 @@ export interface GiftShareDialogProps {
   existingShares: GiftShare[];
   onSubmit: (listId: string, shares: GiftShareInput[]) => void;
   /**
-   * Garantit la part `lecture` du destinataire SANS fermer le dialogue
-   * (D-04, partage d'abord) : le panneau d'envoi l'appelle avant l'envoi
-   * serveur. Fourni par la page (mutation partages, sans toast).
+   * Garantit la part `reservation` du destinataire SANS fermer le dialogue
+   * (D-04 amendée 2026-10-07, G-06-21, partage d'abord) : le panneau d'envoi
+   * l'appelle avant l'envoi serveur. Fourni par la page (mutation partages,
+   * sans toast).
    */
   onEnsureLectureShare: (listId: string, email: string) => Promise<void>;
   isPending?: boolean;
@@ -161,11 +161,12 @@ function GiftCodePanel({
   };
 
   /**
-   * Envoi de l'invitation (D-02/D-03/D-04) : la part `lecture` du
-   * destinataire est créée D'ABORD (chemin de soumission existant, sans
-   * fermer le dialogue), PUIS l'action serveur envoie l'e-mail sobre avec
-   * le message personnel de l'hôte. Le lien embarque le code affiché
-   * ci-dessus (généré sur cet appareil) : sans code visible, pas d'envoi.
+   * Envoi de l'invitation (D-02/D-03/D-04 amendée 2026-10-07, G-06-21) : la
+   * part `reservation` du destinataire est créée D'ABORD (chemin de
+   * soumission existant, sans fermer le dialogue), PUIS l'action serveur
+   * envoie l'e-mail sobre avec le message personnel de l'hôte. Le lien
+   * embarque le code affiché ci-dessus (généré sur cet appareil) : sans code
+   * visible, pas d'envoi.
    */
   const sendEmail = () => {
     setSendError(null);
@@ -308,8 +309,9 @@ function GiftCodePanel({
 
 /**
  * Partage d'une liste de cadeaux : le schéma porte le partage au niveau de la
- * liste (`gift_list_shares`), chaque destinataire ayant sa propre permission.
- * Le panneau code (D-15/D-18) suit pour les proches hors foyer (D-16/D-17).
+ * liste (`gift_list_shares`) ; depuis G-06-21 (D-04 amendée 2026-10-07) chaque
+ * part créée est `reservation` — la seule issue du partage. Le panneau code
+ * (D-15/D-18) suit pour les proches hors foyer (D-16/D-17).
  */
 export function GiftShareDialog({
   open,
@@ -329,7 +331,7 @@ export function GiftShareDialog({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { members: [], permissions: {} },
+    defaultValues: { members: [] },
   });
   const toast = useToast();
   /**
@@ -351,9 +353,6 @@ export function GiftShareDialog({
     if (!open || !list) return;
     reset({
       members: existingShares.filter((share) => share.memberId).map((share) => share.memberId as string),
-      permissions: Object.fromEntries(
-        existingShares.filter((share) => share.memberId).map((share) => [share.memberId as string, share.permission]),
-      ),
     });
     setLinkReminder(false);
   }, [existingShares, list, open, reset]);
@@ -392,10 +391,14 @@ export function GiftShareDialog({
 
   const submit = (values: FormValues) => {
     if (!list) return;
+    // G-06-21 (D-04 amendée 2026-10-07) : la réservation est la seule issue
+    // du partage — chaque part membre créée est `reservation`, sans option
+    // `lecture` dans l'UI. Les parts `lecture` déjà stockées restent honorées
+    // (le rachat les surclasse, jamais de migration, jamais de RLS).
     const shares: GiftShareInput[] = values.members.map((memberId) => ({
       memberId,
       email: null,
-      permission: values.permissions[memberId] === 'reservation' ? 'reservation' : 'lecture',
+      permission: 'reservation',
     }));
     if (shares.length === 0 && linkLive) {
       // G-06-1d : retirer les partages ne révoque pas le lien — l'invitée
@@ -451,21 +454,14 @@ export function GiftShareDialog({
           <fieldset className="grid gap-2">
             <legend className="text-[11px] font-extrabold text-muted">Membres du foyer</legend>
             {shareable.map((member) => (
-              <div key={member.id} className="flex items-center gap-3">
-                <label className="inline-flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[12px] font-semibold text-muted has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong">
-                  <input type="checkbox" value={member.id} className="accent-accent" {...register('members')} />
-                  <MemberAvatar member={member} size="sm" />
-                  {member.display_name}
-                </label>
-                <Select
-                  aria-label={`Permission pour ${member.display_name}`}
-                  className="w-[150px] shrink-0"
-                  {...register(`permissions.${member.id}`)}
-                >
-                  <option value="lecture">{permissionLabel.lecture}</option>
-                  <option value="reservation">{permissionLabel.reservation}</option>
-                </Select>
-              </div>
+              <label
+                key={member.id}
+                className="inline-flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[12px] font-semibold text-muted has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong"
+              >
+                <input type="checkbox" value={member.id} className="accent-accent" {...register('members')} />
+                <MemberAvatar member={member} size="sm" />
+                {member.display_name}
+              </label>
             ))}
             {errors.members?.message ? (
               <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
