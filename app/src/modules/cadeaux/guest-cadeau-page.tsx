@@ -32,7 +32,8 @@ import {
  * - SANS compte (branche invitée, override D-05) : le visiteur déclare un
  *   nom (1 à 80 caractères) et réserve via les actions publishable
  *   `guest-view` / `guest-reserve`. Le code EST le contrôle d'accès ; la
- *   charge utile ne porte qu'un booléen `reserved` par article (D-07).
+ *   charge utile porte le contenu (url, photoUrl) et un booléen `reserved`
+ *   par article (D-07, G-06-1a).
  */
 export default function GuestCadeauPage() {
   const [params] = useSearchParams();
@@ -135,6 +136,16 @@ export default function GuestCadeauPage() {
       </Panel>
     </ModuleShell>
   );
+}
+
+/**
+ * Garde de rendu des valeurs servies (T-06-10) : seules les URL http(s)
+ * — liens organizers et photoUrl forgées par l'Edge (passage hérité ou
+ * signée https) — atteignent le DOM. Toute autre forme (donnée corrompue,
+ * schéma non-http) ne rend rien : échec fermé côté client aussi.
+ */
+function isServableHttpUrl(value: string | null): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
 }
 
 /**
@@ -246,10 +257,31 @@ function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: 
               key={item.id}
               className="panel-surface flex items-center justify-between gap-3 rounded-[14px] p-3.5"
             >
-              <div className="grid gap-0.5">
+              {isServableHttpUrl(item.photoUrl) ? (
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  loading="lazy"
+                  className="h-14 w-14 shrink-0 rounded-[10px] object-cover"
+                />
+              ) : null}
+              <div className="grid min-w-0 flex-1 gap-0.5">
                 <strong className="text-[14px]">{item.name}</strong>
                 {item.comment ? <span className="text-[11px] text-muted">{item.comment}</span> : null}
                 <span className="text-[12px] font-semibold">{item.price ? formatEuro(item.price) : '—'}</span>
+                {isServableHttpUrl(item.url) ? (
+                  <span>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener"
+                      aria-label={`Voir : ${item.name} (nouvel onglet)`}
+                      className="text-[12px] font-semibold text-accent-strong underline underline-offset-2"
+                    >
+                      Voir
+                    </a>
+                  </span>
+                ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {item.reserved ? <Badge tone="amber">{looksMine ? 'Réservé par vous' : 'Réservé'}</Badge> : null}

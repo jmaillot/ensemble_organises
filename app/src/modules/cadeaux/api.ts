@@ -317,16 +317,21 @@ export async function redeemGiftListInvite(code: string, email?: string): Promis
 /* Même Edge Function, forme d'appel publishable : la clé publiable    */
 /* part toujours, le jeton porteur seulement quand une session existe. */
 /* Un visiteur sans compte n'envoie donc aucun identifiant au-delà du  */
-/* code (EST le contrôle d'accès). La charge utile invitée ne porte    */
-/* qu'un booléen `reserved` par article — jamais d'auteur (D-07).      */
+/* code (EST le contrôle d'accès). La charge utile invitée porte le    */
+/* contenu (url, photoUrl) et un booléen `reserved` par article —      */
+/* jamais d'auteur (D-07).                                             */
 /* ------------------------------------------------------------------ */
 
-/** Article tel que le voit un visiteur : état réservé seul, sans auteur. */
+/** Article tel que le voit un visiteur : contenu + état réservé seul, sans auteur. */
 export interface GuestGiftItem {
   id: string;
   name: string;
   price: number;
   comment: string | null;
+  /** Lien organizer tel quel (chaîne non vide) ou null. */
+  url: string | null;
+  /** Photo servable (URL signée éphémère ou URL héritée) ou null. */
+  photoUrl: string | null;
   reserved: boolean;
 }
 
@@ -391,8 +396,16 @@ function assertGuestName(name: string): string {
 /**
  * Projection défensive côté client (miroir exact du handler Edge) : même si
  * la charge servie rendait un jour plus, aucun identifiant d'auteur ne
- * quitte ce helper vers le rendu (D-07). Seul `reserved` dit l'état.
+ * quitte ce helper vers le rendu (D-07). Seuls `url`/`photoUrl` (chaînes non
+ * vides, sinon null — même normalisation que l'Edge) et `reserved` disent
+ * le contenu et l'état.
  */
+function asGuestText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
 function toGuestGiftItem(entry: unknown): GuestGiftItem {
   const row = (entry ?? {}) as Record<string, unknown>;
   return {
@@ -400,15 +413,17 @@ function toGuestGiftItem(entry: unknown): GuestGiftItem {
     name: String(row.name ?? ''),
     price: typeof row.price === 'number' ? row.price : Number(row.price ?? 0) || 0,
     comment: typeof row.comment === 'string' ? row.comment : null,
+    url: asGuestText(row.url),
+    photoUrl: asGuestText(row.photoUrl),
     reserved: row.reserved === true,
   };
 }
 
 /**
- * Lecture invitée sans compte : rend la liste + les états réservés seuls.
- * Les erreurs Edge sont déjà des messages utilisateurs (`Ce code est
- * invalide.` pour l'oracle, sans distinction d'état) : on les propage tels
- * quels, sans les reformuler.
+ * Lecture invitée sans compte : rend la liste + le contenu et les états
+ * réservés seuls. Les erreurs Edge sont déjà des messages utilisateurs
+ * (`Ce code est invalide.` pour l'oracle, sans distinction d'état) : on les
+ * propage tels quels, sans les reformuler.
  */
 export async function fetchGuestGiftView(code: string): Promise<GuestGiftView> {
   const trimmed = assertGuestCode(code);

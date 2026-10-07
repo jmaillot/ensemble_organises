@@ -96,6 +96,82 @@ describe('GuestCadeauPage', () => {
     }
   });
 
+  it('contenu invité : photo et lien rendus quand présents, rien quand absents (G-06-1a)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          {
+            id: 'gift-item-1',
+            name: 'Foulard',
+            price: 29,
+            comment: 'Laine',
+            url: 'https://boutique.example.fr/foulard-32',
+            photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
+            reserved: false,
+          },
+          { id: 'gift-item-2', name: 'Théière', price: 45, comment: null, url: null, photoUrl: null, reserved: false },
+        ],
+      },
+    });
+    try {
+      const { container } = renderGuest(CODE);
+      expect(await screen.findByText('Foulard')).toBeInTheDocument();
+
+      // Article avec contenu : une photo paresseuse et un lien externe explicite.
+      const photos = container.querySelectorAll('li img');
+      expect(photos).toHaveLength(1);
+      expect(photos[0]?.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
+      expect(photos[0]?.getAttribute('loading')).toBe('lazy');
+      const link = screen.getByRole('link', { name: /Voir : Foulard/ });
+      expect(link).toHaveAttribute('href', 'https://boutique.example.fr/foulard-32');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('rel')).toContain('noopener');
+
+      // Article nu : aucune photo ni lien — rendu propre, sans erreur.
+      const rows = container.querySelectorAll('li');
+      expect(rows).toHaveLength(2);
+      expect(rows[1]?.querySelector('img')).toBeNull();
+      expect(rows[1]?.querySelector('a')).toBeNull();
+
+      // Masquage intact : aucun auteur nulle part dans le DOM.
+      expect(container.textContent).not.toMatch(/Thomas|member-/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('lien ou photo non-http : rien rendu (échec fermé, T-06-10)', async () => {
+    mockGuestFetch({
+      view: {
+        listId: 'gift-list-1',
+        listName: 'Noël Mamie',
+        items: [
+          {
+            id: 'gift-item-1',
+            name: 'Piège',
+            price: 1,
+            comment: null,
+            url: 'javascript:alert(1)',
+            photoUrl: 'data:image/png;base64,eG1s',
+            reserved: false,
+          },
+        ],
+      },
+    });
+    try {
+      const { container } = renderGuest(CODE);
+      expect(await screen.findByText('Piège')).toBeInTheDocument();
+
+      // La couche données laisse passer la chaîne, le rendu refuse le schéma.
+      expect(container.querySelector('li img')).toBeNull();
+      expect(container.querySelector('li a')).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('réserve idempotente à nom égal : succès affiché comme succès', async () => {
     mockGuestFetch({ reserve: { itemId: 'gift-item-1', alreadyReserved: true } });
     const user = userEvent.setup();

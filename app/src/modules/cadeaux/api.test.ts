@@ -152,6 +152,8 @@ describe('guest helpers (D-05/D-06/D-07)', () => {
           price: 29,
           comment: null,
           reserved: true,
+          url: 'https://boutique.example.fr/foulard-32',
+          photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
           // Charge indésirable : un serveur futur qui en rendrait trop.
           reserved_by: 'member-thomas',
           reserved_by_name: 'Thomas',
@@ -165,10 +167,32 @@ describe('guest helpers (D-05/D-06/D-07)', () => {
     expect(view.items).toHaveLength(1);
     for (const item of view.items) {
       // Jamais un test de texte source : on inspecte les clés réellement rendues.
-      expect(Object.keys(item).sort()).toEqual(['comment', 'id', 'name', 'price', 'reserved']);
+      expect(Object.keys(item).sort()).toEqual(['comment', 'id', 'name', 'photoUrl', 'price', 'reserved', 'url']);
       expect('reserved_by' in item).toBe(false);
       expect('reserved_by_name' in item).toBe(false);
     }
+    // Le contenu servi atteint l'article mappé, intact.
+    expect(view.items[0]?.url).toBe('https://boutique.example.fr/foulard-32');
+    expect(view.items[0]?.photoUrl).toBe('https://cdn.example.fr/foulard-32.jpg');
+  });
+
+  it('url/photoUrl non-chaînes ou vides : null défensif (miroir Edge)', async () => {
+    stubGuestFetch(() => ({
+      listId: 'gift-list-1',
+      listName: 'Noël Mamie',
+      items: [
+        { id: 'gift-item-1', name: 'Foulard', price: 29, comment: null, reserved: false, url: 42, photoUrl: '' },
+        { id: 'gift-item-2', name: 'Théière', price: 45, comment: null, reserved: false, url: '   ', photoUrl: null },
+      ],
+    }));
+
+    const view = await fetchGuestGiftView(GUEST_CODE);
+
+    expect(view.items).toHaveLength(2);
+    expect(view.items[0]?.url).toBeNull();
+    expect(view.items[0]?.photoUrl).toBeNull();
+    expect(view.items[1]?.url).toBeNull();
+    expect(view.items[1]?.photoUrl).toBeNull();
   });
 
   it('forme publishable sans session : clé publiable seule, sans porteur', async () => {
