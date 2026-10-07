@@ -50,13 +50,15 @@
  *                               `reservation` idempotent. Jamais d'admin, jamais
  *                               de réserve aveugle (D-17).
  *                               member-reserve              : `user` + `public.member_reserve_gift_item`
- *                               (G-06-1b-bis) : réserve attribuée, y compris
- *                               inter-foyers. L'identité (nom du profil
- *                               vérifié) et le partage `reservation` sont
- *                               établis EN BASE depuis la session — le client
- *                               n'envoie que l'article, jamais `reserved_by`
- *                               ni un nom. Même forme conflit-vs-refus que
- *                               `guest-reserve` (409 propre, 403 sans donnée).
+ *                               (G-06-1b-bis, G-06-23) : réserve-ou-libère
+ *                               attribuée, y compris inter-foyers. L'identité
+ *                               (nom du profil vérifié) et le partage
+ *                               `reservation` sont établis EN BASE depuis la
+ *                               session — le client n'envoie que l'article,
+ *                               jamais `reserved_by` ni un nom : libre→tenue,
+ *                               sienne→libération, autrui→409. Même forme
+ *                               conflit-vs-refus que `guest-reserve` (409
+ *                               propre, 403 sans donnée).
  *   member-leave                : `user` + `public.member_leave_gift_list`
  *                               (G-06-1c) : départ volontaire d'une liste
  *                               rejointe inter-foyers. Le client n'envoie que
@@ -101,7 +103,7 @@
  *     brute `photo_url`, ou l'URL http(s) héritée telle quelle — null en
  *     échec fermé, jamais persistée)
  *   guest-reserve -> { itemId, alreadyReserved }
-*   member-reserve -> { itemId, alreadyReserved }
+ *   member-reserve -> { itemId, alreadyReserved, released }
  *   member-leave -> { list_id, left }
  */
 
@@ -836,12 +838,13 @@ async function handleGuestReserve(admin: AdminClient, body: RequestBody & { acti
 }
 
 /**
- * Réserve attribuée d'un membre connecté (G-06-1b-bis, D-05/D-17) : article
- * + session, sans code. L'identité (nom du profil) et le partage
- * `reservation` sont établis EN BASE par `member_reserve_gift_item` depuis
- * `userId` (session vérifiée) : le client n'envoie ni membre ni nom.
- * Idempotence à membre/nom égal (`alreadyReserved: true`), 409 à tenue
- * d'autrui, 403 sans donnée sinon — même forme que `guest-reserve`.
+ * Réserve-ou-libère attribuée d'un membre connecté (G-06-1b-bis, G-06-23,
+ * D-05/D-17) : article + session, sans code. L'identité (nom du profil) et
+ * le partage `reservation` sont établis EN BASE par
+ * `member_reserve_gift_item` depuis `userId` (session vérifiée) : le client
+ * n'envoie ni membre ni nom. Libre→tenue, sienne→libération
+ * (`released: true`), tenue d'autrui→409, sans partage→403 — même forme
+ * que `guest-reserve`, sans donnée d'auteur.
  */
 async function handleMemberReserve(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-reserve' }) {
   const { data, error } = await admin.rpc('member_reserve_gift_item', {
@@ -851,8 +854,12 @@ async function handleMemberReserve(admin: AdminClient, userId: string, body: Req
 
   if (error) throw translateRpcError(error);
 
-  const reserved = (data ?? {}) as { item_id?: string; already_reserved?: boolean };
-  return json({ itemId: reserved.item_id ?? body.itemId, alreadyReserved: reserved.already_reserved === true });
+  const reserved = (data ?? {}) as { item_id?: string; already_reserved?: boolean; released?: boolean };
+  return json({
+    itemId: reserved.item_id ?? body.itemId,
+    alreadyReserved: reserved.already_reserved === true,
+    released: reserved.released === true,
+  });
 }
 
 /**

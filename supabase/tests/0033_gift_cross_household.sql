@@ -190,9 +190,25 @@ select testkit.eq(
 select testkit.eq(
   (public.member_reserve_gift_item(
     (select user_id from testkit.fx where key = 'carol'), 'gitem33_a'
-  ) ->> 'already_reserved')::boolean,
+  ) ->> 'released')::boolean,
   true,
-  'rejouer sa propre reserve est un succes idempotent');
+  'rejouer sa propre reserve la libere (G-06-23, 0096 : reserve-ou-libere)');
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items where id = ''gitem33_a'' and reserved_by is null and reserved_by_name is null and purchased = false'),
+  1::bigint,
+  'la liberation efface les deux formes d''auteur et le signal');
+-- On retient à nouveau pour la suite (§4 : lecture propriétaire du signal,
+-- libération organisatrice sur tenue inter-foyers) — inchangée.
+select testkit.eq(
+  (public.member_reserve_gift_item(
+    (select user_id from testkit.fx where key = 'carol'), 'gitem33_a'
+  ) ->> 'already_reserved')::boolean,
+  false,
+  'un article libere est tenable a nouveau par la voie serveur');
+select testkit.eq(testkit.count(
+  'select 1 from public.gift_items where id = ''gitem33_a'' and reserved_by is null and reserved_by_name = ''Carol Trente-Trois'' and purchased = true'),
+  1::bigint,
+  'la nouvelle tenue porte a nouveau le nom verifie de carol');
 
 -- Second membre : conflit propre, pas de fuite CHECK.
 do $$
