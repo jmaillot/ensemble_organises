@@ -505,6 +505,12 @@ export const demoExpenseParticipants: ExpenseParticipantRow[] = [
 export const demoGiftLists: GiftListRow[] = [
   { id: 'gift-list-maya', household_id: DEMO_HOUSEHOLD_ID, owner_member_id: DEMO_MEMBERS.camille, name: 'Idées pour Maya', visibility: 'privee', created_at: now() },
   { id: 'gift-list-noe', household_id: DEMO_HOUSEHOLD_ID, owner_member_id: DEMO_MEMBERS.camille, name: 'Anniversaire de Noé', visibility: 'foyer', created_at: now() },
+  // Liste rejointe d'un autre foyer (G-06-1b-bis) : son foyer n'est pas le
+  // foyer courant, Camille y détient un partage `reservation` (voir
+  // demoGiftShares). Le foyer d'origine est semé pour prouver le badge
+  // nommé ; l'absence de foyer prouverait le badge neutre (couvert en
+  // api.test.ts, pas ici).
+  { id: 'gift-list-voisins', household_id: 'household-voisins', owner_member_id: 'member-sam-voisin', name: 'Noël des Voisins', visibility: 'partagee', created_at: now() },
 ];
 
 export const demoGiftItems: GiftItemRow[] = [
@@ -553,10 +559,47 @@ export const demoGiftItems: GiftItemRow[] = [
     idea_id: null,
     created_at: now(),
   },
+  // Articles de la liste voisine (G-06-1b-bis) : un libre (réserve via la
+  // voie serveur en démonstration = refus explicite, prouvé en e2e) et un
+  // tenu sous nom attribué (badge « Réservé » sans auteur, interrupteur
+  // inerte).
+  {
+    id: 'gift-4',
+    list_id: 'gift-list-voisins',
+    household_id: 'household-voisins',
+    name: 'Bougie parfumée',
+    price: 18,
+    comment: null,
+    photo_url: null,
+    url: null,
+    reserved_by: null,
+    reserved_by_name: null,
+    purchased: false,
+    idea_id: null,
+    created_at: now(),
+  },
+  {
+    id: 'gift-5',
+    list_id: 'gift-list-voisins',
+    household_id: 'household-voisins',
+    name: 'Plante verte',
+    price: 22,
+    comment: null,
+    photo_url: null,
+    url: null,
+    reserved_by: null,
+    reserved_by_name: 'Sam Voisin',
+    purchased: true,
+    idea_id: null,
+    created_at: now(),
+  },
 ];
 
 export const demoGiftShares: GiftListShareRow[] = [
   { id: 'gift-share-1', list_id: 'gift-list-noe', shared_with_member_id: DEMO_MEMBERS.lina, shared_with_email: null, permission: 'lecture' },
+  // Camille détient un partage `reservation` sur la liste voisine : c'est
+  // cette part qui fait fusionner la liste dans sa vue Cadeaux (G-06-1b-bis).
+  { id: 'gift-share-2', list_id: 'gift-list-voisins', shared_with_member_id: DEMO_MEMBERS.camille, shared_with_email: null, permission: 'reservation' },
 ];
 
 /**
@@ -1068,7 +1111,21 @@ export const demoWidgets: DashboardWidgetRow[] = [
 /** Clé de la copie locale (`table` dans `src/lib/data/local-adapter.ts`). */
 const seedTables: Record<string, Row[]> = {
   profiles: [demoProfile as unknown as Row],
-  households: [demoHousehold as unknown as Row],
+  households: [
+    demoHousehold as unknown as Row,
+    // Foyer d'origine de la liste voisine (G-06-1b-bis) : lisible en démo
+    // (pas de RLS hors ligne), il prouve le badge nommé. En production, un
+    // foyer illisible donne le badge neutre (couvert en api.test.ts).
+    {
+      id: 'household-voisins',
+      name: 'Les Voisins',
+      avatar_color: 'coral',
+      school_zone: null,
+      created_by: null,
+      created_at: now(),
+      updated_at: now(),
+    } as unknown as Row,
+  ],
   household_members: demoMembers as unknown as Row[],
   shopping_lists: demoShoppingLists as unknown as Row[],
   shopping_list_items: demoShoppingItems as unknown as Row[],

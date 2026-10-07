@@ -21,6 +21,7 @@ import {
   useDeleteGiftItem,
   useDeleteGiftList,
   usePromoteGiftIdea,
+  useReserveMemberGiftItem,
   useSyncGiftListShares,
   useUpdateGiftIdea,
   useUpdateGiftItem,
@@ -78,6 +79,7 @@ export default function CadeauxPage() {
   const updateIdea = useUpdateGiftIdea();
   const deleteIdea = useDeleteGiftIdea();
   const promoteIdea = usePromoteGiftIdea();
+  const reserveForeign = useReserveMemberGiftItem();
   const toast = useToast();
 
   const [tab, setTab] = useState<CadeauxTab>('listes');
@@ -391,7 +393,26 @@ export default function CadeauxPage() {
   // explicite, confirmée par modale comme toute action destructrice. Le
   // garde serveur refuse la même écriture à un non-gestionnaire (0029).
   const isAdmin = useIsAdmin();
-  const isManager = (activeList?.isOwned ?? false) || isAdmin;
+  // Liste rejointe d'un autre foyer (G-06-1b-bis) : lecture seule côté
+  // client — pas de gestion (partage, suppression, libération), réserve
+  // via la voie serveur attribuée uniquement.
+  const isForeignList = activeList?.isForeign ?? false;
+  const isManager = !isForeignList && ((activeList?.isOwned ?? false) || isAdmin);
+
+  /**
+   * Réserve sur liste étrangère : le garde 0083 refuse l'écriture directe
+   * (prouvé en 0033 §1), seule la voie serveur attribue l'identité vérifiée.
+   * Hors ligne / sans serveur, l'erreur Edge est dite telle quelle (repli
+   * déterministe du mode démo).
+   */
+  const handleForeignReserve = async (item: GiftItem) => {
+    try {
+      const outcome = await reserveForeign.mutateAsync(item.id);
+      toast(outcome.alreadyReserved ? 'Déjà réservé par vous.' : 'Article réservé.');
+    } catch (reserveError) {
+      toast(reserveError instanceof Error ? reserveError.message : 'Réserve impossible.', 'error');
+    }
+  };
 
   const handleRelease = async () => {
     if (!pendingRelease) return;
@@ -418,7 +439,7 @@ export default function CadeauxPage() {
           <Button icon="plus" onClick={openCreateIdea}>
             Noter une idée
           </Button>
-        ) : tab === 'listes' ? (
+        ) : tab === 'listes' && !isForeignList ? (
           <Button icon="plus" onClick={openCreate} disabled={!activeList}>
             Ajouter une idée
           </Button>
@@ -547,7 +568,7 @@ export default function CadeauxPage() {
               </Button>
             )}
 
-            {activeList ? (
+            {activeList && !isForeignList ? (
               <button
                 type="button"
                 className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
@@ -557,6 +578,11 @@ export default function CadeauxPage() {
                 <Icon name="share" size="sm" />
                 {isShared ? 'Gérer' : 'Partager'}
               </button>
+            ) : null}
+            {activeList?.isForeign ? (
+              <Badge tone="muted">
+                {activeList.originLabel ? `Liste partagée · ${activeList.originLabel}` : 'Liste partagée'}
+              </Badge>
             ) : null}
             {activeList?.isOwned ? (
               <button
@@ -678,21 +704,62 @@ export default function CadeauxPage() {
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                           {item.reservedBy ? (
                             <Badge tone="amber">
-                              {reservedByMe ? 'Réservé par vous' : `Réservé par ${item.reservedByName}`}
+                              {reservedByMe
+                                ? 'Réservé par vous'
+                                : item.reservedByName
+                                  ? `Réservé par ${item.reservedByName}`
+                                  : // Membre d'un autre foyer (G-06-1b-bis) :
+                                    // l'id ne se résout pas ici — « Réservé »
+                                    // seul, sans auteur inconnu.
+                                    'Réservé'}
                             </Badge>
                           ) : item.heldAnonymously ? (
-                            // Tenue anonyme (D-05) : réservé, sans auteur
-                            // (D-07 — le nom déclaré ne sort jamais du mapping).
+                            // Tenue anonyme (D-05) ou attribuée inter-foyers
+                            // (G-06-1b-bis) : réservé, sans auteur (D-07 — le
+                            // nom déclaré ne sort jamais du mapping).
                             <Badge tone="amber">Réservé</Badge>
                           ) : null}
-                          <label htmlFor={`gift-purchased-${item.id}`} className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
-                            <Switch
-                              id={`gift-purchased-${item.id}`}
-                              checked={item.purchased}
-                              onCheckedChange={(checked) => void handleTogglePurchased(item, checked)}
-                            />
-                            Acheté
-                          </label>
+                          {isForeignList ? (
+                            item.reservedBy || item.heldAnonymously ? (
+                              // Tenue d'autrui sur liste étrangère : état
+                              // visible, aucune action (ni réserve directe —
+                              // garde 0083 — ni libération non-gestionnaire).
+                              <span className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
+                                <Switch
+                                  id={`gift-purchased-${item.id}`}
+                                  checked={item.purchased}
+                                  disabled
+                                  aria-label={`Acheté (réservé, ${item.name})`}
+                                />
+                                Acheté
+                              </span>
+                            ) : (
+                              <label
+                                htmlFor={`gift-purchased-${item.id}`}
+                                className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted"
+                              >
+                                <Switch
+                                  id={`gift-purchased-${item.id}`}
+                                  checked={item.purchased}
+                                  disabled={reserveForeign.isPending}
+                                  onCheckedChange={() => void handleForeignReserve(item)}
+                                />
+                                Acheté
+                              </label>
+                            )
+                          ) : (
+                            <label
+                              htmlFor={`gift-purchased-${item.id}`}
+                              className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted"
+                            >
+                              <Switch
+                                id={`gift-purchased-${item.id}`}
+                                checked={item.purchased}
+                                onCheckedChange={(checked) => void handleTogglePurchased(item, checked)}
+                              />
+                              Acheté
+                            </label>
+                          )}
                           {(item.reservedBy || item.heldAnonymously) && isManager ? (
                             <button
                               type="button"

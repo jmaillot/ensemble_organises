@@ -8,10 +8,11 @@ import {
   readGuestName,
   readGuestReservedIds,
   reserveGuestGiftItem,
+  reserveMemberGiftItem,
   writeGuestName,
 } from './api';
 
-const { calls, mockList, mockRemove, viewRows } = vi.hoisted(() => {
+const { calls, mockList, mockRemove, viewRows, mergeFixture } = vi.hoisted(() => {
   const calls: Array<{ table: string; filter: Record<string, unknown> }> = [];
   // Ce que la vue `gift_items_for_list` (0080) rendrait côté serveur :
   // `reserved_by` déjà NULL pour la liste possédée, intact sinon.
@@ -45,15 +46,31 @@ const { calls, mockList, mockRemove, viewRows } = vi.hoisted(() => {
       created_at: '2026-01-01T00:00:00Z',
     },
   ];
+  // Lignes de fusion inter-foyers (G-06-1b-bis), posées par test : la RLS
+  // réelle filtrerait déjà ici ; le mock ne fait que servir.
+  const mergeFixture: Record<string, Array<Record<string, unknown>>> = {
+    gift_lists: [],
+    gift_items_for_list: [],
+    gift_list_shares: [],
+    households: [],
+  };
+  const matches = (row: Record<string, unknown>, filter: Record<string, unknown>) =>
+    Object.entries(filter).every(([key, value]) => {
+      if (value === undefined) return true;
+      if (Array.isArray(value)) return (value as unknown[]).includes(row[key]);
+      return row[key] === value;
+    });
   const mockList = vi.fn(async (table: string, filter: Record<string, unknown> = {}) => {
     calls.push({ table, filter });
-    if (table !== 'gift_items_for_list') return [];
-    return viewRows.filter((row) =>
-      Object.entries(filter).every(([key, value]) => (row as Record<string, unknown>)[key] === value),
-    );
+    if (table === 'gift_items_for_list') {
+      return [...viewRows, ...mergeFixture.gift_items_for_list].filter((row) => matches(row, filter));
+    }
+    const served = mergeFixture[table];
+    if (!served) return [];
+    return served.filter((row) => matches(row, filter));
   });
   const mockRemove = vi.fn(async () => {});
-  return { calls, mockList, mockRemove, viewRows };
+  return { calls, mockList, mockRemove, viewRows, mergeFixture };
 });
 
 vi.mock('@/lib/data', async (importOriginal) => {
@@ -78,6 +95,10 @@ vi.mock('@/lib/supabase/client', () => ({
 
 beforeEach(() => {
   calls.length = 0;
+  mergeFixture.gift_lists = [];
+  mergeFixture.gift_items_for_list = [];
+  mergeFixture.gift_list_shares = [];
+  mergeFixture.households = [];
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -257,5 +278,153 @@ describe('guest helpers (D-05/D-06/D-07)', () => {
     expect(() => markGuestReservedItem(GUEST_CODE, 'gift-item-1')).not.toThrow();
     // Environnement sans stockage persistant garanti : la lecture reste sûre.
     expect(readGuestReservedIds(GUEST_CODE)).toEqual(expect.any(Array));
+  });
+});
+
+describe('fetchCadeauxSnapshot — fusion inter-foyers (G-06-1b-bis)', () => {
+  const ownList = {
+    id: 'list-owned',
+    household_id: 'hh-1',
+    owner_member_id: 'member-camille',
+    name: 'Propre',
+    visibility: 'privee',
+    created_at: '2026-01-01T00:00:00Z',
+  };
+  const foreignList = {
+    id: 'list-voisins',
+    household_id: 'hh-2',
+    owner_member_id: 'member-sam',
+    name: 'Voisins',
+    visibility: 'partagee',
+    created_at: '2026-01-01T00:00:00Z',
+  };
+  const sealedList = {
+    id: 'list-scellee',
+    household_id: 'hh-2',
+    owner_member_id: 'member-sam',
+    name: 'Scellée',
+    visibility: 'privee',
+    created_at: '2026-01-01T00:00:00Z',
+  };
+  const foreignItem = {
+    id: 'gift-foreign-1',
+    list_id: 'list-voisins',
+    household_id: 'hh-2',
+    name: 'Bougie',
+    price: 18,
+    comment: null,
+    photo_url: null,
+    url: null,
+    reserved_by: null,
+    reserved_by_name: null,
+    purchased: false,
+    idea_id: null,
+    created_at: '2026-01-01T00:00:00Z',
+  };
+
+  function seedMerge(options?: { households?: boolean; orphanShare?: boolean }) {
+    mergeFixture.gift_lists = [ownList, foreignList, sealedList];
+    mergeFixture.gift_items_for_list = [foreignItem];
+    mergeFixture.gift_list_shares = [
+      { id: 'sh-1', list_id: 'list-voisins', shared_with_member_id: 'member-camille', shared_with_email: null, permission: 'reservation' },
+      ...(options?.orphanShare
+        ? [{ id: 'sh-2', list_id: 'list-disparue', shared_with_member_id: 'member-camille', shared_with_email: null, permission: 'reservation' }]
+        : []),
+    ];
+    mergeFixture.households = options?.households === false ? [] : [{ id: 'hh-2', name: 'Les Voisins' }];
+  }
+
+  it('fusionne la liste partagée et ses articles, avec le nom du foyer', async () => {
+    seedMerge();
+
+    const snapshot = await fetchCadeauxSnapshot('hh-1');
+
+    expect(snapshot.lists.map((list) => list.id)).toContain('list-voisins');
+    expect(snapshot.items.map((item) => item.id)).toContain('gift-foreign-1');
+    expect(snapshot.householdNames).toEqual({ 'hh-2': 'Les Voisins' });
+  });
+
+  it('ne demande que les listes porteuses d’une part — jamais la scellée', async () => {
+    seedMerge();
+
+    await fetchCadeauxSnapshot('hh-1');
+
+    const listFetches = calls.filter((call) => call.table === 'gift_lists' && 'id' in call.filter);
+    expect(listFetches).toHaveLength(1);
+    expect(listFetches[0]?.filter).toEqual({ id: ['list-voisins'] });
+    const itemFetches = calls.filter((call) => call.table === 'gift_items_for_list' && 'list_id' in call.filter);
+    expect(itemFetches).toHaveLength(1);
+    expect(itemFetches[0]?.filter).toEqual({ list_id: ['list-voisins'] });
+    const snapshot = await fetchCadeauxSnapshot('hh-1');
+    expect(snapshot.lists.map((list) => list.id)).not.toContain('list-scellee');
+  });
+
+  it('sans part : aucune lecture par id, aucun nom de foyer', async () => {
+    await fetchCadeauxSnapshot('hh-1');
+
+    expect(calls.some((call) => call.table === 'gift_lists' && 'id' in call.filter)).toBe(false);
+    expect(calls.some((call) => call.table === 'households')).toBe(false);
+  });
+
+  it('foyer d’origine illisible : la liste fusionne quand même, sans nom (badge neutre)', async () => {
+    seedMerge({ households: false });
+
+    const snapshot = await fetchCadeauxSnapshot('hh-1');
+
+    expect(snapshot.lists.map((list) => list.id)).toContain('list-voisins');
+    expect(snapshot.householdNames).toEqual({});
+  });
+
+  it('part orpheline : rien ne fusionne pour elle', async () => {
+    seedMerge({ orphanShare: true });
+
+    const snapshot = await fetchCadeauxSnapshot('hh-1');
+
+    expect(snapshot.lists.map((list) => list.id)).toContain('list-voisins');
+    expect(snapshot.lists.map((list) => list.id)).not.toContain('list-disparue');
+  });
+});
+
+describe('reserveMemberGiftItem (G-06-1b-bis)', () => {
+  it('n’envoie que l’article — aucun reserved_by ni nom dans la charge', async () => {
+    const seen = stubGuestFetch(() => ({ itemId: 'gift-foreign-1', alreadyReserved: false }));
+
+    const outcome = await reserveMemberGiftItem('gift-foreign-1');
+
+    expect(outcome).toEqual({ itemId: 'gift-foreign-1', alreadyReserved: false });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.url).toContain('/gift-list-invite');
+    const body = JSON.parse(String(seen[0]?.init.body ?? '{}')) as Record<string, unknown>;
+    expect(body).toEqual({ action: 'member-reserve', itemId: 'gift-foreign-1' });
+    expect('reserved_by' in body).toBe(false);
+    expect('reserved_by_name' in body).toBe(false);
+    expect('name' in body).toBe(false);
+  });
+
+  it('chemin session attachée : clé publiable + porteur', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: { access_token: 'jwt-test' } } });
+    const seen = stubGuestFetch(() => ({ itemId: 'gift-foreign-1', alreadyReserved: true }));
+
+    const outcome = await reserveMemberGiftItem('gift-foreign-1');
+
+    expect(outcome.alreadyReserved).toBe(true);
+    const headers = (seen[0]?.init.headers ?? {}) as Record<string, string>;
+    expect(headers.apikey).toBe('pk_test');
+    expect(headers.authorization).toBe('Bearer jwt-test');
+  });
+
+  it('article vide : aucun appel réseau (garde cliente)', async () => {
+    const seen = stubGuestFetch(() => ({}));
+
+    await expect(reserveMemberGiftItem('   ')).rejects.toThrow('Article introuvable');
+    expect(seen).toHaveLength(0);
+  });
+
+  it('conflit et refus serveur propagés tels quels', async () => {
+    stubGuestFetch(() => new Error('Cet article est déjà réservé.'));
+    await expect(reserveMemberGiftItem('gift-foreign-1')).rejects.toThrow('déjà réservé');
+
+    stubGuestFetch(() => new Error('Vous ne pouvez pas réserver cet article.'));
+    await expect(reserveMemberGiftItem('gift-foreign-1')).rejects.toThrow('ne pouvez pas réserver');
   });
 });

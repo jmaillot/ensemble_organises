@@ -17,6 +17,13 @@ export interface CadeauxSnapshot {
   ideas: GiftIdeaRow[];
   contactLists: ContactListRow[];
   contacts: ContactRow[];
+  /**
+   * Noms des foyers d'origine des listes partagées inter-foyers
+   * (G-06-1b-bis) : renseigné uniquement quand le foyer est lisible sous la
+   * RLS existante (`households_select` = membre du foyer). Absent = badge
+   * neutre « Liste partagée », jamais une nouvelle lecture inter-foyers.
+   */
+  householdNames: Record<string, string>;
 }
 
 /**
@@ -41,7 +48,57 @@ export async function fetchCadeauxSnapshot(householdId: string): Promise<Cadeaux
     data.list<ContactListRow>('contact_lists', { household_id: householdId }),
     data.list<ContactRow>('contacts', { household_id: householdId }),
   ]);
-  return { lists, items, shares, birthdays, ideas, contactLists, contacts };
+  const foreign = await fetchSharedForeignLists(lists, shares);
+  return {
+    lists: [...lists, ...foreign.lists],
+    items: [...items, ...foreign.items],
+    shares,
+    birthdays,
+    ideas,
+    contactLists,
+    contacts,
+    householdNames: foreign.householdNames,
+  };
+}
+
+/**
+ * Listes partagées inter-foyers (G-06-1b-bis) : une part visible dans le
+ * cliché sur une liste hors foyer courant prouve que la RLS
+ * (`can_read_gift_list`, branche partage explicite) l'autorise — on ne
+ * rapatrie alors QUE ces listes-là (jamais un balayage inter-foyers sans
+ * part) avec leurs articles. Chaque lecture reste cadrée par la RLS : une
+ * part orpheline ou illisible ne fusionne rien (échec fermé).
+ */
+async function fetchSharedForeignLists(
+  ownLists: GiftListRow[],
+  shares: GiftListShareRow[],
+): Promise<{ lists: GiftListRow[]; items: GiftItemRow[]; householdNames: Record<string, string> }> {
+  const empty = { lists: [], items: [], householdNames: {} } as {
+    lists: GiftListRow[];
+    items: GiftItemRow[];
+    householdNames: Record<string, string>;
+  };
+  const ownIds = new Set(ownLists.map((list) => list.id));
+  const foreignIds = [...new Set(shares.map((share) => share.list_id).filter((id) => !ownIds.has(id)))];
+  if (foreignIds.length === 0) return empty;
+  const [lists, items] = await Promise.all([
+    data.list<GiftListRow>('gift_lists', { id: foreignIds }),
+    data.list<GiftItemRow>(GIFT_ITEMS_VIEW, { list_id: foreignIds }),
+  ]);
+  // Articles strictement rattachés aux listes effectivement rendues (une
+  // part vers une liste illisible ne doit rien traîner).
+  const readableIds = new Set(lists.map((list) => list.id));
+  const householdIds = [...new Set(lists.map((list) => list.household_id))];
+  const householdNames: Record<string, string> = {};
+  if (householdIds.length > 0) {
+    const households = await data.list<{ id: string; name: string }>('households', { id: householdIds });
+    for (const household of households) householdNames[household.id] = household.name;
+  }
+  return {
+    lists,
+    items: items.filter((item) => readableIds.has(item.list_id)),
+    householdNames,
+  };
 }
 
 export async function createGiftItem(householdId: string, input: NewGiftItemInput): Promise<GiftItemRow> {
@@ -309,6 +366,35 @@ export async function redeemGiftListInvite(code: string, email?: string): Promis
     code: trimmed,
     ...(email?.trim() ? { email: email.trim() } : {}),
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Réserve attribuée inter-foyers (phase 06, G-06-1b-bis)               */
+/*                                                                     */
+/* Chemin session attachée (user-only) vers l'action Edge              */
+/* `member-reserve` : le client n'envoie QUE l'article — ni            */
+/* `reserved_by`, ni nom. L'identité (nom du profil vérifié) et le     */
+/* partage `reservation` sont établis EN BASE depuis la session. Le    */
+/* garde 0083 continue de refuser les écritures directes clientes      */
+/* inter-foyers ; seul ce chemin serveur les rend possibles.           */
+/* ------------------------------------------------------------------ */
+
+/** Réserve attribuée : idempotente à membre/nom égal (`alreadyReserved`). */
+export interface MemberReserveResult {
+  itemId: string;
+  alreadyReserved: boolean;
+}
+
+/**
+ * Réserve un article d'une liste partagée sous l'identité vérifiée du
+ * membre connecté (y compris inter-foyers). Le conflit à tenue d'autrui
+ * (`Cet article est déjà réservé.`, 409) et le refus sans partage (403)
+ * sont propagés tels quels, comme la voie invitée.
+ */
+export async function reserveMemberGiftItem(itemId: string): Promise<MemberReserveResult> {
+  const trimmed = itemId.trim();
+  if (!trimmed) throw new Error('Article introuvable.');
+  return callGiftInvite<MemberReserveResult>('member-reserve', { itemId: trimmed });
 }
 
 /* ------------------------------------------------------------------ */

@@ -13,6 +13,7 @@ import {
   deleteGiftList,
   fetchCadeauxSnapshot,
   promoteIdeaToItem,
+  reserveMemberGiftItem,
   syncGiftListShares,
   updateGiftIdea,
   updateGiftItem,
@@ -104,15 +105,20 @@ export function useCadeaux(): CadeauxData {
     if (!snapshot) return [];
     return snapshot.lists
       .filter((row) => visibleListIds.has(row.id))
-      .map((row) =>
-        toGiftList(
+      .map((row) => {
+        // Les listes fusionnées hors foyer (G-06-1b-bis) portent leur marque
+        // d'origine : nom du foyer quand la RLS l'a rendu, sinon badge
+        // neutre (originLabel null → « Liste partagée »).
+        const isForeign = householdId !== null && row.household_id !== householdId;
+        return toGiftList(
           row,
           members.find((member) => member.id === row.owner_member_id),
           snapshot.shares.filter((share) => share.list_id === row.id).length,
           currentMemberId,
-        ),
-      );
-  }, [currentMemberId, members, query.data, visibleListIds]);
+          isForeign ? { isForeign, originLabel: snapshot.householdNames[row.household_id] ?? null } : undefined,
+        );
+      });
+  }, [currentMemberId, householdId, members, query.data, visibleListIds]);
 
   const items = useMemo<GiftItem[]>(() => {
     const snapshot = query.data;
@@ -188,6 +194,15 @@ export function useUpdateGiftItem() {
   return useCadeauxMutation(
     ({ id, values }: { id: string; values: Partial<GiftItemRow> }) => updateGiftItem(id, values),
   );
+}
+
+/**
+ * Réserve attribuée inter-foyers (G-06-1b-bis) : ne sert QUE les listes
+ * étrangères (la voie directe reste la norme dans le foyer). Le serveur
+ * attribue l'identité vérifiée ; la mutation ne fait que relire après.
+ */
+export function useReserveMemberGiftItem() {
+  return useCadeauxMutation((itemId: string) => reserveMemberGiftItem(itemId));
 }
 
 export function useDeleteGiftItem() {

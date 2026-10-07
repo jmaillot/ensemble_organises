@@ -26,6 +26,17 @@ export interface GiftList {
   /** La liste appartient-elle au membre connecté ? */
   isOwned: boolean;
   isPrivate: boolean;
+  /**
+   * Liste d'un autre foyer, rejointe par partage (G-06-1b-bis) : lecture
+   * seule côté client (réserve via la voie serveur, aucune gestion).
+   */
+  isForeign: boolean;
+  /**
+   * Nom du foyer d'origine quand il est lisible sous la RLS existante,
+   * sinon null → badge neutre « Liste partagée » (jamais une nouvelle
+   * lecture inter-foyers pour l'obtenir).
+   */
+  originLabel: string | null;
 }
 
 export interface GiftItem {
@@ -182,6 +193,7 @@ export function toGiftList(
   owner: HouseholdMemberRow | undefined,
   shareCount: number,
   currentMemberId: string | null,
+  extra?: { isForeign?: boolean; originLabel?: string | null },
 ): GiftList {
   return {
     id: row.id,
@@ -193,6 +205,8 @@ export function toGiftList(
     shareCount,
     isOwned: row.owner_member_id === currentMemberId,
     isPrivate: row.visibility === 'privee',
+    isForeign: extra?.isForeign ?? false,
+    originLabel: extra?.originLabel ?? null,
   };
 }
 

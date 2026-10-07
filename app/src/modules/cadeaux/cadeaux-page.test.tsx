@@ -26,6 +26,7 @@ const mockCreate = vi.fn(async (_listId: string) => {
 const mockRevoke = vi.fn(async (_listId: string) => {
   codeActive = false;
 });
+const mockReserveMember = vi.fn(async (itemId: string) => ({ itemId, alreadyReserved: false }));
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>();
@@ -34,6 +35,7 @@ vi.mock('./api', async (importOriginal) => {
     fetchGiftListInviteSummary: (...args: [string]) => mockSummary(...args),
     createGiftListInviteCode: (...args: [string]) => mockCreate(...args),
     revokeGiftListInviteCode: (...args: [string]) => mockRevoke(...args),
+    reserveMemberGiftItem: (...args: [string]) => mockReserveMember(...args),
   };
 });
 
@@ -57,10 +59,12 @@ describe('CadeauxPage', () => {
     expect(within(selector).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
     expect(within(selector).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
 
-    // Filtre « Foyer » : une seule liste → nom affiché en texte, pas de déroulant.
+    // Filtre « Foyer » : les deux listes non privées — dont la liste
+    // voisine rejointe (G-06-1b-bis), marquée par son badge d'origine.
     await user.click(screen.getByRole('button', { name: 'Foyer' }));
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.getByText('Anniversaire de Noé')).toBeInTheDocument();
+    const foyerSelector = screen.getByLabelText('Sélection de la liste de cadeaux');
+    expect(within(foyerSelector).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    expect(within(foyerSelector).getByRole('option', { name: 'Noël des Voisins' })).toBeInTheDocument();
     expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
 
     // Filtre « Privées » : seule la privée reste, en texte.
@@ -68,11 +72,12 @@ describe('CadeauxPage', () => {
     expect(screen.getByText('Idées pour Maya')).toBeInTheDocument();
     expect(screen.queryByText('Anniversaire de Noé')).not.toBeInTheDocument();
 
-    // Filtre « Toutes » : retour du déroulant avec les deux listes.
+    // Filtre « Toutes » : retour du déroulant avec les trois listes.
     await user.click(screen.getByRole('button', { name: 'Toutes' }));
     const reselected = screen.getByLabelText('Sélection de la liste de cadeaux');
     expect(within(reselected).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
     expect(within(reselected).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    expect(within(reselected).getByRole('option', { name: 'Noël des Voisins' })).toBeInTheDocument();
   });
 
   it('partage la liste depuis son niveau, pas depuis chaque idée', async () => {
@@ -257,5 +262,58 @@ describe('toGiftItem — tenue anonyme (CR-01)', () => {
     expect(item.heldAnonymously).toBe(false);
     expect(item.reservedBy).toBeNull();
     expect(item.reservedByName).toBeNull();
+  });
+});
+
+describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
+  it('la liste rejointe porte son badge d’origine, sans aucune gestion', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+
+    expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
+    expect(screen.getByText('Plante verte')).toBeInTheDocument();
+    // Lecture seule : ni partage, ni ajout, ni suppression de liste.
+    expect(screen.queryByRole('button', { name: /Partager|Gérer/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ajouter une idée' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Supprimer la liste/ })).not.toBeInTheDocument();
+  });
+
+  it('tenue attribuée sur liste étrangère : « Réservé » sans auteur, interrupteur inerte', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+
+    expect(await screen.findByText('Plante verte')).toBeInTheDocument();
+    // Le nom attribué ne sort jamais vers le rendu (D-07).
+    expect(screen.queryByText('Sam Voisin')).not.toBeInTheDocument();
+    expect(screen.getByText('Réservé')).toBeInTheDocument();
+    expect(screen.getByLabelText('Acheté (réservé, Plante verte)')).toBeDisabled();
+    expect(mockReserveMember).not.toHaveBeenCalled();
+  });
+
+  it('réserve sur liste étrangère : un seul appel serveur, sans reserved_by', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+
+    await user.click(await screen.findByRole('switch', { name: 'Acheté' }));
+
+    expect(mockReserveMember).toHaveBeenCalledTimes(1);
+    expect(mockReserveMember).toHaveBeenCalledWith('gift-4');
+    expect(await screen.findByText('Article réservé.')).toBeInTheDocument();
   });
 });
