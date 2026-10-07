@@ -2,7 +2,7 @@
  * Edge Function `gift-list-invite`.
  *
  * Point d'entrée : `POST /functions/v1/gift-list-invite`
- * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem' | 'send-email' | 'guest-view' | 'guest-reserve' | 'member-reserve', ... }`
+ * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem' | 'send-email' | 'guest-view' | 'guest-reserve' | 'member-reserve' | 'member-leave', ... }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user', 'publishable']`
@@ -57,8 +57,19 @@
  *                               n'envoie que l'article, jamais `reserved_by`
  *                               ni un nom. Même forme conflit-vs-refus que
  *                               `guest-reserve` (409 propre, 403 sans donnée).
+ *   member-leave                : `user` + `public.member_leave_gift_list`
+ *                               (G-06-1c) : départ volontaire d'une liste
+ *                               rejointe inter-foyers. Le client n'envoie que
+ *                               la liste — l'identité (lignes membre de tous
+ *                               ses foyers + e-mail du compte) est résolue EN
+ *                               BASE depuis la session. Supprime exactement
+ *                               ses parts, jamais les tenues ni les parts
+ *                               d'autrui. Oracle uniforme `quitter
+ *                               impossible` (404) : liste inconnue, sans part
+ *                               propre, ou propre foyer — jamais d'existence
+ *                               révélée (T-06-15).
  *
- * Ces quatre fonctions SQL sont `SECURITY DEFINER` et leur `EXECUTE` n'est
+ * Ces cinq fonctions SQL sont `SECURITY DEFINER` et leur `EXECUTE` n'est
  * accordé qu'à `service_role` : un client porteur d'un JWT utilisateur est
  * `authenticated` et se voit refuser l'appel direct. Elles revérifient la
  * gestion en base, donc même cette fonction compromise ne peut pas agir pour
@@ -91,6 +102,7 @@
  *     échec fermé, jamais persistée)
  *   guest-reserve -> { itemId, alreadyReserved }
 *   member-reserve -> { itemId, alreadyReserved }
+ *   member-leave -> { list_id, left }
  */
 
 // Spécificateur BARE, comme `household-invite` : le runtime épingle
@@ -249,6 +261,12 @@ const requestSchema = z.discriminatedUnion('action', [
      *  l'article est vérifié EN BASE (jamais un `reserved_by` fourni). */
     itemId: itemField,
   }),
+  z.object({
+    action: z.literal('member-leave'),
+    /** Liste rejointe à quitter : l'identité (lignes membre + e-mail) est
+     *  résolue EN BASE depuis la session — jamais fournie par le client. */
+    listId: listField,
+  }),
 ]);
 
 type RequestBody = z.infer<typeof requestSchema>;
@@ -318,6 +336,7 @@ const LIMITS: Record<string, number> = {
   'guest-view': 30,
   'guest-reserve': 10,
   'member-reserve': 10,
+  'member-leave': 10,
 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
@@ -383,6 +402,13 @@ function translateRpcError(error: { code?: string; message: string }): GiftListI
     return new GiftListInviteError(403, 'Vous ne pouvez pas réserver cet article.');
   }
   if (message.includes('session requise')) return new GiftListInviteError(401, 'Connectez-vous pour continuer.');
+  // Oracle uniforme du départ (0095, T-06-15) : liste inconnue, sans part
+  // propre, ou propre foyer — le client n'apprend jamais si la liste existe.
+  // Copie « lien ne passe plus » : le lien d'invitation reste le seul chemin
+  // pour rejoindre à nouveau.
+  if (message.includes('quitter impossible')) {
+    return new GiftListInviteError(404, 'Ce lien ne passe plus. Demandez un nouveau lien à l’organisateur pour rejoindre à nouveau.');
+  }
   if (message.includes('liste introuvable')) return new GiftListInviteError(404, 'Liste introuvable.');
   if (message.includes('gestion de la liste réservée') || error.code === '42501') {
     return new GiftListInviteError(403, 'Seul le propriétaire de la liste ou un administrateur du foyer peut faire cette opération.');
@@ -828,6 +854,27 @@ async function handleMemberReserve(admin: AdminClient, userId: string, body: Req
   return json({ itemId: reserved.item_id ?? body.itemId, alreadyReserved: reserved.already_reserved === true });
 }
 
+/**
+ * Départ volontaire d'une liste rejointe inter-foyers (G-06-1c) : liste +
+ * session, sans code. L'identité (lignes membre de tous les foyers de
+ * l'appelant + e-mail du compte) et la suppression cadrée (liste × identité
+ * propre, les deux formes de part) sont établies EN BASE par
+ * `member_leave_gift_list` depuis `userId` (session vérifiée) : le client
+ * n'envoie ni membre, ni part, ni e-mail. Oracle uniforme `quitter
+ * impossible` (404 « lien ne passe plus », T-06-15) sur tout refus — jamais
+ * de distinction entre liste inconnue, sans part propre et propre foyer.
+ */
+async function handleMemberLeave(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-leave' }) {
+  const { data, error } = await admin.rpc('member_leave_gift_list', {
+    p_actor_id: userId,
+    p_list_id: body.listId,
+  });
+
+  if (error) throw translateRpcError(error);
+
+  return json((data ?? {}) as { list_id?: string; left?: boolean });
+}
+
 // ---------------------------------------------------------------------------
 // Point d'entrée
 // ---------------------------------------------------------------------------
@@ -864,6 +911,10 @@ Deno.serve(
 
       if (body.action === 'member-reserve') {
         return await handleMemberReserve(admin, userId, body);
+      }
+
+      if (body.action === 'member-leave') {
+        return await handleMemberLeave(admin, userId, body);
       }
 
       if (body.action === 'create') return await handleCreate(admin, userId, body);
