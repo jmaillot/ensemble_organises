@@ -524,11 +524,10 @@ describe('CadeauxPage — décocher Reçu (G-06-20)', () => {
     expect(rows[0].purchased).toBe(true);
     expect(rows[0].reserved_by).toBe(DEMO_MEMBERS.thomas);
 
-    // Le contrôle de modération porte son libellé explicite, et l'ancien
-    // libellé court n'existe plus nulle part.
-    expect(
-      scope.getByRole('button', { name: 'Libérer la réserve de Casque pour le vélo' }),
-    ).toBeInTheDocument();
+    // G-06-22 : aucun bouton de libération autonome — le décochage
+    // « Reçu » sur un article affiché réservé est la seule voie (modale),
+    // et l'ancien libellé n'existe plus nulle part.
+    expect(scope.queryByRole('button', { name: /Libérer/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Libérer$/ })).not.toBeInTheDocument();
 
     // Décocher : la confirmation existante s'ouvre ; le drapeau reste posé
@@ -585,7 +584,7 @@ describe('CadeauxPage — décocher Reçu (G-06-20)', () => {
     expect(rows[0].reserved_by_name).toBeNull();
   });
 
-  it('« Libérer la réserve » ne paraît que pour les gestionnaires, jamais sur liste étrangère', async () => {
+  it('G-06-22 : aucun bouton « Libérer la réserve » nulle part, jamais sur liste étrangère', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 

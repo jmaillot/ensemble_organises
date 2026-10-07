@@ -757,7 +757,12 @@ export default function CadeauxPage() {
                                 // modale n'est pas confirmée ; annuler ne
                                 // touche à rien. Hors réserve affichée,
                                 // simple suivi sans toucher aux auteurs.
-                                if (!checked && (item.purchased || item.heldAnonymously)) {
+                                // G-06-22 : ce décochage est la seule voie de
+                                // libération (plus de bouton autonome) ;
+                                // `isManager` y est identiquement vrai
+                                // (branche propriétaire), le garde D-08
+                                // tranche côté serveur.
+                                if (!checked && isManager && (item.purchased || item.heldAnonymously)) {
                                   setPendingRelease(item);
                                   return;
                                 }
@@ -766,16 +771,6 @@ export default function CadeauxPage() {
                             />
                             Reçu
                           </label>
-                          {(item.purchased || item.heldAnonymously) && isManager ? (
-                            <button
-                              type="button"
-                              className={shareButtonBase}
-                              aria-label={`Libérer la réserve de ${item.name}`}
-                              onClick={() => setPendingRelease(item)}
-                            >
-                              Libérer la réserve
-                            </button>
-                          ) : null}
                         </div>
                       ) : (
                         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -837,16 +832,6 @@ export default function CadeauxPage() {
                               Acheté
                             </label>
                           )}
-                          {(item.reservedBy || item.heldAnonymously) && isManager ? (
-                            <button
-                              type="button"
-                              className={shareButtonBase}
-                              aria-label={`Libérer la réserve de ${item.name}`}
-                              onClick={() => setPendingRelease(item)}
-                            >
-                              Libérer la réserve
-                            </button>
-                          ) : null}
                         </div>
                       )}
 
