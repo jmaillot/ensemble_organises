@@ -128,6 +128,16 @@ describe('CadeauxPage', () => {
     expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
     expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
 
+    // G-06-21 : sélecteur étiqueté en petites bascules, actions de liste en
+    // une seule rangée d'outils.
+    expect(screen.getByText(/Sélection de la liste de cadeaux/)).toBeInTheDocument();
+    const selector = screen.getByRole('group', { name: 'Listes de cadeaux' });
+    for (const toggle of within(selector).getAllByRole('button')) {
+      expect(toggle).toHaveClass('min-h-9');
+    }
+    const toolbar = screen.getByRole('group', { name: 'Actions de la liste' });
+    expect(within(toolbar).getByRole('button', { name: /Partager/ })).toBeInTheDocument();
+
     // Un seul bouton Partager au niveau de la liste, aucun sur les cartes d'idées.
     expect(screen.getByRole('button', { name: /Partager/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Partager|Gérer/ })).toHaveLength(1);
@@ -136,13 +146,19 @@ describe('CadeauxPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Le partage porte sur toute la liste/)).toBeInTheDocument();
 
+    // G-06-21 : aucune option de permission — cocher suffit, la part créée
+    // est `reservation` (D-04 amendée).
+    expect(within(dialog).queryByLabelText(/Permission pour/)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('checkbox', { name: /Lina Martin/ }));
-    await user.selectOptions(within(dialog).getByLabelText('Permission pour Lina Martin'), 'reservation');
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le partage' }));
 
-    // Le partage porte sur la liste : le bouton unique passe en « Gérer ».
+    // Le partage porte sur la liste : le bouton unique passe en « Gérer »,
+    // toujours dans la même rangée d'outils.
     await waitFor(() => expect(screen.getByRole('button', { name: /Gérer/ })).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Partager/ })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Actions de la liste' })).getByRole('button', { name: /Gérer/ }),
+    ).toBeInTheDocument();
   });
 
   it('cache les réservations des autres pour le propriétaire de la liste', async () => {

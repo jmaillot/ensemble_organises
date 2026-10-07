@@ -198,12 +198,15 @@ describe('GiftShareDialog — indépendance partages / lien (G-06-1d)', () => {
     const dialog = await openDialog();
     await within(dialog).findByText(/Partage actif/);
 
+    // G-06-21 : aucun choix de permission — la réservation est la seule issue.
+    expect(within(dialog).queryByLabelText(/Permission pour/)).not.toBeInTheDocument();
+
     await user.click(within(dialog).getByRole('checkbox', { name: /Lina Martin/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le partage' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith('gift-list-test', [
-      { memberId: 'member-lina', email: null, permission: 'lecture' },
+      { memberId: 'member-lina', email: null, permission: 'reservation' },
     ]);
     // G-06-1e : aucune part e-mail fabriquée par le formulaire — chaque part
     // porte un memberId et un email nul (la création e-mail vit dans

@@ -664,10 +664,11 @@ export function markGuestReservedItem(code: string, itemId: string): void {
 /* Envoi de l'invitation par e-mail (phase 06, D-02/D-03/D-04)          */
 /*                                                                     */
 /* Chemin session attachée (user-only) : le dialogue crée D'ABORD la   */
-/* part `lecture` via son chemin existant, PUIS appelle ce helper qui  */
-/* fait créer la part côté serveur avant l'envoi (D-04, jamais d'envoi */
-/* sans part). Le lien complet vient du dialogue (qui connaît l'origine */
-/* de l'application) : le serveur ne devine jamais l'hôte.             */
+/* part `reservation` via son chemin existant, PUIS appelle ce helper qui  */
+/* fait créer la part côté serveur avant l'envoi (D-04 amendée 2026-10-07,  */
+/* G-06-21, jamais d'envoi sans part). Le lien complet vient du dialogue   */
+/* (qui connaît l'origine de l'application) : le serveur ne devine      */
+/* jamais l'hôte.                                                        */
 /* ------------------------------------------------------------------ */
 
 const guestEmailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -689,7 +690,7 @@ export interface SendGiftInviteEmailResult {
   sent: boolean;
 }
 
-/** Envoie l'e-mail d'invitation (hôte connecté, part `lecture` d'abord). */
+/** Envoie l'e-mail d'invitation (hôte connecté, part `reservation` d'abord). */
 export async function sendGiftListInviteEmail(input: SendGiftInviteEmailInput): Promise<SendGiftInviteEmailResult> {
   const code = assertGuestCode(input.code);
   const email = input.email.trim();

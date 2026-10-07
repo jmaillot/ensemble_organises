@@ -555,7 +555,6 @@ export default function CadeauxPage() {
                   <div
                     role="group"
                     aria-label="Listes de cadeaux"
-                    aria-labelledby="cadeaux-list-selector-label"
                     className="flex flex-wrap items-center gap-2"
                   >
                     {shownLists.map((list) => (
@@ -578,7 +577,7 @@ export default function CadeauxPage() {
             {/* Barre d'actions de liste (G-06-21) : tous les contrôles de la
                 liste active en une seule rangée — conditions inchangées,
                 placement seul. */}
-            <div aria-label="Actions de la liste" className="flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Actions de la liste" className="flex flex-wrap items-center gap-2">
               {activeList && !isForeignList ? (
                 <button
                   type="button"
