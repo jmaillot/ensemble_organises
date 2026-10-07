@@ -23,16 +23,11 @@ import { permissionLabel, type GiftList, type GiftShare, type GiftShareInput } f
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-const schema = z
-  .object({
-    members: z.array(z.string()),
-    permissions: z.record(z.string(), z.enum(['lecture', 'reservation'])),
-    email: z.string().trim().refine((value) => value === '' || emailPattern.test(value), 'Indiquez un email valide.'),
-  })
-  .refine((values) => values.members.length > 0 || values.email !== '', {
-    message: 'Choisissez un membre du foyer ou invitez un proche.',
-    path: ['members'],
-  });
+const schema = z.object({
+  members: z.array(z.string()),
+  permissions: z.record(z.string(), z.enum(['lecture', 'reservation'])),
+  email: z.string().trim().refine((value) => value === '' || emailPattern.test(value), 'Indiquez un email valide.'),
+});
 
 type FormValues = z.infer<typeof schema>;
 
@@ -67,15 +62,24 @@ export interface GiftShareDialogProps {
 function GiftCodePanel({
   list,
   open,
+  summary,
+  codeError,
+  onRefresh,
   onEnsureLectureShare,
 }: {
   list: GiftList;
   open: boolean;
+  /**
+   * Résumé d'invitation déjà chargé par le dialogue (G-06-1d) : le panneau
+   * ne refait aucun fetch, il lit cet état partagé — le rappel lien-actif du
+   * formulaire et ce panneau disent toujours la même chose.
+   */
+  summary: GiftListInviteSummary | null;
+  codeError: boolean;
+  onRefresh: () => Promise<void>;
   onEnsureLectureShare: (listId: string, email: string) => Promise<void>;
 }) {
   const toast = useToast();
-  const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
-  const [codeError, setCodeError] = useState(false);
   const [lastCode, setLastCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [recipient, setRecipient] = useState('');
@@ -96,30 +100,9 @@ function GiftCodePanel({
     setHostMessage('');
     setSendError(null);
     setSendOk(null);
-    let active = true;
-    fetchGiftListInviteSummary(list.id)
-      .then((result) => {
-        if (active) {
-          setSummary(result);
-          setCodeError(false);
-          if (result && !result.hasCode) setLastCode(null);
-        }
-      })
-      .catch(() => {
-        if (active) setCodeError(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [list.id, open]);
+  }, [open]);
 
-  const refresh = () =>
-    fetchGiftListInviteSummary(list.id)
-      .then((result) => {
-        setSummary(result);
-        setCodeError(false);
-      })
-      .catch(() => setCodeError(true));
+  const refresh = () => onRefresh();
 
   const inviteUrl = (code: string) => `${window.location.origin}${giftInviteLink(code)}`;
 
@@ -155,7 +138,6 @@ function GiftCodePanel({
     createGiftListInviteCode(list.id)
       .then((created) => {
         setLastCode(created.code);
-        setCodeError(false);
         return refresh();
       })
       .then(() => toast('Nouveau code généré : l’ancien est invalidé.'))
@@ -350,9 +332,22 @@ export function GiftShareDialog({
     resolver: zodResolver(schema),
     defaultValues: { members: [], permissions: {}, email: '' },
   });
+  const toast = useToast();
+  /**
+   * Résumé d'invitation (G-06-1d) : chargé une fois par le dialogue, partagé
+   * entre le formulaire (rappel lien-actif) et le panneau code — aucun
+   * nouveau fetch, aucun nouvel endpoint, l'assistant existant
+   * `revokeGiftListInviteCode` est réutilisé tel quel.
+   */
+  const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
+  const [codeError, setCodeError] = useState(false);
+  const [linkReminder, setLinkReminder] = useState(false);
+  const [revokeBusy, setRevokeBusy] = useState(false);
 
   const shareable = members.filter((member) => member.id !== list?.ownerMemberId);
   const selected = watch('members') ?? [];
+  const emailValue = watch('email') ?? '';
+  const listId = list?.id;
 
   useEffect(() => {
     if (!open || !list) return;
@@ -363,7 +358,40 @@ export function GiftShareDialog({
       ),
       email: existingShares.find((share) => share.email)?.email ?? '',
     });
+    setLinkReminder(false);
   }, [existingShares, list, open, reset]);
+
+  useEffect(() => {
+    if (!open || !listId) return;
+    let active = true;
+    fetchGiftListInviteSummary(listId)
+      .then((result) => {
+        if (active) {
+          setSummary(result);
+          setCodeError(false);
+        }
+      })
+      .catch(() => {
+        if (active) setCodeError(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listId, open]);
+
+  const refreshSummary = () => {
+    if (!listId) return Promise.resolve();
+    return fetchGiftListInviteSummary(listId)
+      .then((result) => {
+        setSummary(result);
+        setCodeError(false);
+      })
+      .catch(() => setCodeError(true));
+  };
+
+  const linkLive = summary?.hasCode === true && summary?.isActive === true;
+  const zeroShare = selected.length === 0 && emailValue.trim() === '';
+  const showLinkReminder = linkReminder && zeroShare && linkLive;
 
   const submit = (values: FormValues) => {
     if (!list) return;
@@ -375,7 +403,38 @@ export function GiftShareDialog({
     if (values.email !== '') {
       shares.push({ memberId: null, email: values.email, permission: 'lecture' });
     }
+    if (shares.length === 0 && linkLive) {
+      // G-06-1d : retirer les partages ne révoque pas le lien — l'invitée
+      // garde l'accès via le code. Pas de coupe silencieuse : l'enregistrement
+      // attend un choix explicite (révoquer, ou garder le lien et enregistrer).
+      setLinkReminder(true);
+      return;
+    }
+    setLinkReminder(false);
     onSubmit(list.id, shares);
+  };
+
+  /**
+   * Révocation depuis le rappel (G-06-1d) : même assistant que le panneau
+   * code, puis rafraîchissement du résumé partagé pour que panneau et rappel
+   * disent la même chose (le rappel disparaît : plus de lien actif).
+   */
+  const revokeFromReminder = () => {
+    if (!list) return;
+    setRevokeBusy(true);
+    revokeGiftListInviteCode(list.id)
+      .then(() => refreshSummary())
+      .then(() => toast('Partage arrêté : le code ne passe plus.'))
+      .catch((inviteError: unknown) =>
+        toast(inviteError instanceof Error ? inviteError.message : 'Arrêt impossible.', 'error'),
+      )
+      .finally(() => setRevokeBusy(false));
+  };
+
+  const keepLinkAndSave = () => {
+    if (!list) return;
+    setLinkReminder(false);
+    onSubmit(list.id, []);
   };
 
   return (
@@ -391,6 +450,10 @@ export function GiftShareDialog({
           </DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={handleSubmit(submit)} className="grid gap-3.5">
+          <p className="m-0 text-[11px] text-muted">
+            Retirer un partage ici ne révoque pas le lien d’invitation ci-dessous : celui-ci continue de donner accès
+            aux invités.
+          </p>
           <fieldset className="grid gap-2">
             <legend className="text-[11px] font-extrabold text-muted">Membres du foyer</legend>
             {shareable.map((member) => (
@@ -424,6 +487,22 @@ export function GiftShareDialog({
             {(props) => <Input {...props} type="email" placeholder="prenom@exemple.fr" {...register('email')} />}
           </Field>
 
+          {showLinkReminder ? (
+            <div className="grid gap-2 rounded-[11px] border border-border bg-bg px-3 py-2.5" role="alert">
+              <p className="m-0 text-[12px] font-semibold">
+                Un lien d’invitation actif existe encore — les invités gardent l’accès via ce lien, même sans partage.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" disabled={revokeBusy} onClick={revokeFromReminder}>
+                  {revokeBusy ? 'Révocation…' : 'Révoquer le lien'}
+                </Button>
+                <Button variant="secondary" disabled={revokeBusy} onClick={keepLinkAndSave}>
+                  Garder le lien et enregistrer
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Annuler
@@ -433,7 +512,16 @@ export function GiftShareDialog({
             </Button>
           </DialogActions>
         </form>
-        {list ? <GiftCodePanel list={list} open={open} onEnsureLectureShare={onEnsureLectureShare} /> : null}
+        {list ? (
+          <GiftCodePanel
+            list={list}
+            open={open}
+            summary={summary}
+            codeError={codeError}
+            onRefresh={refreshSummary}
+            onEnsureLectureShare={onEnsureLectureShare}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
