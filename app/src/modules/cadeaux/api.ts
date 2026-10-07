@@ -369,27 +369,31 @@ export async function redeemGiftListInvite(code: string, email?: string): Promis
 }
 
 /* ------------------------------------------------------------------ */
-/* Réserve attribuée inter-foyers (phase 06, G-06-1b-bis)               */
+/* Bascule réserve-ou-libère inter-foyers (phase 06, G-06-1b-bis/G-06-23)  */
 /*                                                                     */
 /* Chemin session attachée (user-only) vers l'action Edge              */
 /* `member-reserve` : le client n'envoie QUE l'article — ni            */
 /* `reserved_by`, ni nom. L'identité (nom du profil vérifié) et le     */
-/* partage `reservation` sont établis EN BASE depuis la session. Le    */
-/* garde 0083 continue de refuser les écritures directes clientes      */
-/* inter-foyers ; seul ce chemin serveur les rend possibles.           */
+/* partage `reservation` sont établis EN BASE depuis la session :       */
+/* libre→tenue, sienne→libération, autrui→409. Le garde 0083 continue  */
+/* de refuser les écritures directes clientes inter-foyers ; seul ce   */
+/* chemin serveur les rend possibles.                                  */
 /* ------------------------------------------------------------------ */
 
-/** Réserve attribuée : idempotente à membre/nom égal (`alreadyReserved`). */
+/** Réserve-ou-libère attribuée : `released` dit la libération de sa propre tenue. */
 export interface MemberReserveResult {
   itemId: string;
   alreadyReserved: boolean;
+  released: boolean;
 }
 
 /**
- * Réserve un article d'une liste partagée sous l'identité vérifiée du
- * membre connecté (y compris inter-foyers). Le conflit à tenue d'autrui
- * (`Cet article est déjà réservé.`, 409) et le refus sans partage (403)
- * sont propagés tels quels, comme la voie invitée.
+ * Bascule réserve-ou-libère d'un article d'une liste partagée sous
+ * l'identité vérifiée du membre connecté (y compris inter-foyers, G-06-23).
+ * Le client ne décide jamais mien/autrui : libre→tenue, sienne→libération
+ * (`released: true`), tenue d'autrui→conflit (`Cet article est déjà
+ * réservé.`, 409), sans partage→refus (403) — propagés tels quels, comme la
+ * voie invitée, sans jamais transporter d'auteur (D-07).
  */
 export async function reserveMemberGiftItem(itemId: string): Promise<MemberReserveResult> {
   const trimmed = itemId.trim();

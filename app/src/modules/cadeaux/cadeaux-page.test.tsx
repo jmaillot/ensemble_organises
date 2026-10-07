@@ -27,7 +27,29 @@ const mockCreate = vi.fn(async (_listId: string) => {
 const mockRevoke = vi.fn(async (_listId: string) => {
   codeActive = false;
 });
-const mockReserveMember = vi.fn(async (itemId: string) => ({ itemId, alreadyReserved: false }));
+const mockReserveMember = vi.fn(async (itemId: string) => {
+  // Bascule fidèle (G-06-23) : comme le RPC serveur, tenir un article libre
+  // pose la tenue (nom de démo, signal), rejouer une tenue la libère (trois
+  // colonnes effacées, `released: true`). Le distinguo mien/autrui est le
+  // verdict serveur (prouvé en 0035) : le mock ne simule que le transport
+  // du verdict. La base de démo est ré-amorcée après chaque test (setup.ts).
+  const rows = await data.list<GiftItemRow>('gift_items', { id: itemId });
+  const row = rows[0];
+  if (!row) throw new Error('Article introuvable.');
+  if (row.reserved_by ?? row.reserved_by_name) {
+    await data.update<GiftItemRow>('gift_items', itemId, {
+      reserved_by: null,
+      reserved_by_name: null,
+      purchased: false,
+    } as Partial<GiftItemRow>);
+    return { itemId, alreadyReserved: false, released: true };
+  }
+  await data.update<GiftItemRow>('gift_items', itemId, {
+    reserved_by_name: 'Camille Martin',
+    purchased: true,
+  } as Partial<GiftItemRow>);
+  return { itemId, alreadyReserved: false, released: false };
+});
 // Départ fidèle (G-06-1c) : comme le RPC serveur, quitter supprime la part
 // qui faisait fusionner la liste — le refetch la fait sortir de la vue. La
 // base de démo est ré-amorcée après chaque test (setup.ts), sans pollution.
@@ -88,10 +110,11 @@ describe('CadeauxPage', () => {
     expect(screen.queryByText('Noël des Voisins')).not.toBeInTheDocument();
     expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
 
-    // Filtre « Partagées » : exactement la liste étrangère rejointe.
+    // Filtre « Partagées » : exactement la liste étrangère rejointe —
+    // G-06-24 : le filtre porte le sens, aucun badge d'origine accolé.
     await user.click(screen.getByRole('button', { name: 'Partagées' }));
     expect(screen.getByText('Noël des Voisins')).toBeInTheDocument();
-    expect(screen.getByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(screen.queryByText(/Liste partagée/)).not.toBeInTheDocument();
     expect(screen.queryByText('Anniversaire de Noé')).not.toBeInTheDocument();
     expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
 
@@ -325,8 +348,8 @@ describe('toGiftItem — tenue anonyme (CR-01)', () => {
   });
 });
 
-describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
-  it('la liste rejointe porte son badge d’origine, sans aucune gestion', async () => {
+describe('CadeauxPage — liste étrangère (G-06-1b-bis, G-06-24)', () => {
+  it('la liste rejointe n’a plus de badge d’origine ; Quitter est un danger sous le sélecteur', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
@@ -336,16 +359,22 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
       }),
     );
 
-    expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
-    expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
+    expect(await screen.findByText('Bougie parfumée')).toBeInTheDocument();
     expect(screen.getByText('Plante verte')).toBeInTheDocument();
+    // G-06-24 : le filtre Partagées porte le sens — aucun badge accolé.
+    expect(screen.queryByText(/Liste partagée/)).not.toBeInTheDocument();
     // Lecture seule : ni partage, ni ajout, ni suppression de liste.
     expect(screen.queryByRole('button', { name: /Partager|Gérer/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ajouter une idée' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Supprimer la liste/ })).not.toBeInTheDocument();
+    // Quitter : bouton danger rouge, hors de la barre d'outils générique.
+    const quit = screen.getByRole('button', { name: /Quitter la liste/ });
+    expect(quit).toHaveClass('bg-coral-soft');
+    const toolbar = screen.getByRole('group', { name: 'Actions de la liste' });
+    expect(within(toolbar).queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
   });
 
-  it('tenue attribuée sur liste étrangère : « Réservé » sans auteur, interrupteur inerte', async () => {
+  it('tenue attribuée sur liste étrangère : « Réservé » sans auteur, interrupteur actif (G-06-23)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
@@ -355,11 +384,15 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
       }),
     );
 
-    expect(await screen.findByText('Plante verte')).toBeInTheDocument();
+    const card = (await screen.findByText('Plante verte')).closest('li');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
     // Le nom attribué ne sort jamais vers le rendu (D-07).
     expect(screen.queryByText('Sam Voisin')).not.toBeInTheDocument();
-    expect(screen.getByText('Réservé')).toBeInTheDocument();
-    expect(screen.getByLabelText('Acheté (réservé, Plante verte)')).toBeDisabled();
+    expect(scope.getByText('Réservé')).toBeInTheDocument();
+    // G-06-23 : l'interrupteur reste actif même sur article tenu — le
+    // serveur tranche (libération de sa tenue, ou 409 à tenue d'autrui).
+    expect(scope.getByRole('switch', { name: 'Acheté' })).toBeEnabled();
     expect(mockReserveMember).not.toHaveBeenCalled();
   });
 
@@ -373,11 +406,64 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
       }),
     );
 
-    await user.click(await screen.findByRole('switch', { name: 'Acheté' }));
+    const card = (await screen.findByText('Bougie parfumée')).closest('li');
+    await user.click(within(card as HTMLElement).getByRole('switch', { name: 'Acheté' }));
 
     expect(mockReserveMember).toHaveBeenCalledTimes(1);
     expect(mockReserveMember).toHaveBeenCalledWith('gift-4');
     expect(await screen.findByText('Article réservé.')).toBeInTheDocument();
+  });
+
+  it('bascule sur tenue : libération serveur, toast, badge effacé après refetch', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
+    );
+
+    const card = (await screen.findByText('Plante verte')).closest('li');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
+    await user.click(scope.getByRole('switch', { name: 'Acheté' }));
+
+    expect(mockReserveMember).toHaveBeenCalledTimes(1);
+    expect(mockReserveMember).toHaveBeenCalledWith('gift-5');
+    expect(await screen.findByText('Réservation libérée.')).toBeInTheDocument();
+    // Le refetch invalide le cliché : la tenue effacée, le badge suit.
+    await waitFor(() => expect(scope.queryByText('Réservé')).not.toBeInTheDocument());
+    const rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-5' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].purchased).toBe(false);
+    expect(rows[0].reserved_by).toBeNull();
+    expect(rows[0].reserved_by_name).toBeNull();
+  });
+
+  it('tenue d’autrui : le 409 affiche la notice établie et relit, sans auteur', async () => {
+    const user = userEvent.setup();
+    mockReserveMember.mockRejectedValueOnce(new Error('Cet article est déjà réservé.'));
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
+    );
+
+    const card = (await screen.findByText('Plante verte')).closest('li');
+    expect(card).not.toBeNull();
+    await user.click(within(card as HTMLElement).getByRole('switch', { name: 'Acheté' }));
+
+    expect(mockReserveMember).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText('Cet article est déjà réservé, choisissez-en un autre.'),
+    ).toBeInTheDocument();
+    // Aucun auteur ne fuite : le nom attribué reste masqué (D-07).
+    expect(screen.queryByText('Sam Voisin')).not.toBeInTheDocument();
+    // La tenue est toujours là après le refetch.
+    expect(screen.getByText('Réservé')).toBeInTheDocument();
   });
 });
 
@@ -399,13 +485,14 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     expect(await screen.findByText('Casque pour le vélo')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
 
-    // Liste étrangère : le bouton paraît avec le badge d'origine.
+    // Liste étrangère : le bouton paraît, sans badge d'origine (G-06-24).
     await user.click(
       within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
         name: 'Noël des Voisins',
       }),
     );
-    expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(await screen.findByText('Bougie parfumée')).toBeInTheDocument();
+    expect(screen.queryByText(/Liste partagée/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Quitter la liste/ })).toBeInTheDocument();
   });
 
@@ -444,7 +531,7 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(mockLeaveList).not.toHaveBeenCalled();
     expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
-    expect(screen.getByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(screen.queryByText(/Liste partagée/)).not.toBeInTheDocument();
   });
 
   it('confirmer appelle une fois le serveur puis la liste disparaît', async () => {
@@ -464,8 +551,8 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     expect(mockLeaveList).toHaveBeenCalledTimes(1);
     expect(mockLeaveList).toHaveBeenCalledWith('gift-list-voisins');
     expect(await screen.findByText('Liste quittée. Vos réservations à votre nom sont conservées.')).toBeInTheDocument();
-    // La part supprimée, le refetch sort la liste de la vue : ni badge…
-    await waitFor(() => expect(screen.queryByText('Liste partagée · Les Voisins')).not.toBeInTheDocument());
+    // La part supprimée, le refetch sort la liste de la vue : son contenu…
+    await waitFor(() => expect(screen.queryByText('Bougie parfumée')).not.toBeInTheDocument());
     // …ni bascule au sélecteur (repli sur la première liste du foyer).
     const selector = screen.getByRole('group', { name: 'Listes de cadeaux' });
     expect(within(selector).queryByRole('button', { name: 'Noël des Voisins' })).not.toBeInTheDocument();

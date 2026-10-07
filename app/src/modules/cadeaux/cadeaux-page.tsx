@@ -431,17 +431,29 @@ export default function CadeauxPage() {
   const isManager = !isForeignList && ((activeList?.isOwned ?? false) || isAdmin);
 
   /**
-   * Réserve sur liste étrangère : le garde 0083 refuse l'écriture directe
-   * (prouvé en 0033 §1), seule la voie serveur attribue l'identité vérifiée.
-   * Hors ligne / sans serveur, l'erreur Edge est dite telle quelle (repli
-   * déterministe du mode démo).
+   * Bascule réserve-ou-libère sur liste étrangère (G-06-23) : le client ne
+   * décide jamais mien/autrui — l'interrupteur est une demande, le serveur
+   * tranche (tenue, libération de sa propre tenue, 409 à tenue d'autrui).
+   * Le conflit propre affiche la notice établie et relit (miroir de la voie
+   * invitée — jamais un nom d'auteur, D-07). Hors ligne / sans serveur,
+   * l'erreur Edge est dite telle quelle (repli déterministe du mode démo).
    */
-  const handleForeignReserve = async (item: GiftItem) => {
+  const handleForeignToggle = async (item: GiftItem) => {
     try {
       const outcome = await reserveForeign.mutateAsync(item.id);
-      toast(outcome.alreadyReserved ? 'Déjà réservé par vous.' : 'Article réservé.');
-    } catch (reserveError) {
-      toast(reserveError instanceof Error ? reserveError.message : 'Réserve impossible.', 'error');
+      if (outcome.released) {
+        toast('Réservation libérée.');
+      } else {
+        toast(outcome.alreadyReserved ? 'Déjà réservé par vous.' : 'Article réservé.');
+      }
+    } catch (toggleError) {
+      const message = toggleError instanceof Error ? toggleError.message : 'Réserve impossible.';
+      if (/déjà réservé/.test(message)) {
+        toast('Cet article est déjà réservé, choisissez-en un autre.', 'error');
+        refetch();
+      } else {
+        toast(message, 'error');
+      }
     }
   };
 
@@ -574,9 +586,25 @@ export default function CadeauxPage() {
                 <span className="text-[13px] font-bold text-fg">{shownLists[0].name}</span>
               ) : null}
             </div>
-            {/* Barre d'actions de liste (G-06-21) : tous les contrôles de la
-                liste active en une seule rangée — conditions inchangées,
-                placement seul. */}
+            {/* Départ volontaire (G-06-1c, G-06-24) : bouton danger rouge,
+                hors de la barre d'outils générique, directement sous le
+                sélecteur de liste — même condition d'étrangeté (jamais sur
+                les listes du foyer) et même modale obligatoire (AGENTS.md
+                §6). Le badge d'origine redondant avec le filtre Partagées
+                est supprimé (G-06-24). */}
+            {isForeignList ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="danger"
+                  aria-label={`Quitter la liste ${activeList?.name ?? ''}`}
+                  onClick={() => activeList && setPendingLeave(activeList)}
+                >
+                  Quitter cette liste
+                </Button>
+              </div>
+            ) : null}
+            {/* Barre d'actions de liste (G-06-21) : partage et suppression en
+                une seule rangée — conditions inchangées, placement seul. */}
             <div role="group" aria-label="Actions de la liste" className="flex flex-wrap items-center gap-2">
               {activeList && !isForeignList ? (
                 <button
@@ -587,25 +615,6 @@ export default function CadeauxPage() {
                 >
                   <Icon name="share" size="sm" />
                   {isShared ? 'Gérer' : 'Partager'}
-                </button>
-              ) : null}
-              {activeList?.isForeign ? (
-                <Badge tone="muted">
-                  {activeList.originLabel ? `Liste partagée · ${activeList.originLabel}` : 'Liste partagée'}
-                </Badge>
-              ) : null}
-              {isForeignList ? (
-                // Départ volontaire (G-06-1c) : même condition d'étrangeté que
-                // le badge — jamais sur les listes du foyer, jamais pour un
-                // gestionnaire (toujours faux sur liste étrangère : isManager
-                // exige !isForeignList). Modale obligatoire (AGENTS.md §6).
-                <button
-                  type="button"
-                  className={shareButtonBase}
-                  aria-label={`Quitter la liste ${activeList?.name ?? ''}`}
-                  onClick={() => activeList && setPendingLeave(activeList)}
-                >
-                  Quitter cette liste
                 </button>
               ) : null}
               {activeList?.isOwned ? (
@@ -792,33 +801,22 @@ export default function CadeauxPage() {
                             <Badge tone="amber">Réservé</Badge>
                           ) : null}
                           {isForeignList ? (
-                            item.reservedBy || item.heldAnonymously ? (
-                              // Tenue d'autrui sur liste étrangère : état
-                              // visible, aucune action (ni réserve directe —
-                              // garde 0083 — ni libération non-gestionnaire).
-                              <span className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted">
-                                <Switch
-                                  id={`gift-purchased-${item.id}`}
-                                  checked={item.purchased}
-                                  disabled
-                                  aria-label={`Acheté (réservé, ${item.name})`}
-                                />
-                                Acheté
-                              </span>
-                            ) : (
-                              <label
-                                htmlFor={`gift-purchased-${item.id}`}
-                                className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted"
-                              >
-                                <Switch
-                                  id={`gift-purchased-${item.id}`}
-                                  checked={item.purchased}
-                                  disabled={reserveForeign.isPending}
-                                  onCheckedChange={() => void handleForeignReserve(item)}
-                                />
-                                Acheté
-                              </label>
-                            )
+                            // Bascule serveur (G-06-23) : tenue comme
+                            // libération passent par la voie serveur, qui
+                            // tranche mien/autrui — l'interrupteur reste
+                            // actif en tout état non-pending, jamais inerte.
+                            <label
+                              htmlFor={`gift-purchased-${item.id}`}
+                              className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted"
+                            >
+                              <Switch
+                                id={`gift-purchased-${item.id}`}
+                                checked={item.purchased}
+                                disabled={reserveForeign.isPending}
+                                onCheckedChange={() => void handleForeignToggle(item)}
+                              />
+                              Acheté
+                            </label>
                           ) : (
                             <label
                               htmlFor={`gift-purchased-${item.id}`}

@@ -386,13 +386,13 @@ describe('fetchCadeauxSnapshot — fusion inter-foyers (G-06-1b-bis)', () => {
   });
 });
 
-describe('reserveMemberGiftItem (G-06-1b-bis)', () => {
+describe('reserveMemberGiftItem (G-06-1b-bis, G-06-23)', () => {
   it('n’envoie que l’article — aucun reserved_by ni nom dans la charge', async () => {
-    const seen = stubGuestFetch(() => ({ itemId: 'gift-foreign-1', alreadyReserved: false }));
+    const seen = stubGuestFetch(() => ({ itemId: 'gift-foreign-1', alreadyReserved: false, released: false }));
 
     const outcome = await reserveMemberGiftItem('gift-foreign-1');
 
-    expect(outcome).toEqual({ itemId: 'gift-foreign-1', alreadyReserved: false });
+    expect(outcome).toEqual({ itemId: 'gift-foreign-1', alreadyReserved: false, released: false });
     expect(seen).toHaveLength(1);
     expect(seen[0]?.url).toContain('/gift-list-invite');
     const body = JSON.parse(String(seen[0]?.init.body ?? '{}')) as Record<string, unknown>;
@@ -400,6 +400,15 @@ describe('reserveMemberGiftItem (G-06-1b-bis)', () => {
     expect('reserved_by' in body).toBe(false);
     expect('reserved_by_name' in body).toBe(false);
     expect('name' in body).toBe(false);
+  });
+
+  it('la libération de sa propre tenue remonte released (G-06-23)', async () => {
+    stubGuestFetch(() => ({ itemId: 'gift-foreign-1', alreadyReserved: false, released: true }));
+
+    const outcome = await reserveMemberGiftItem('gift-foreign-1');
+
+    expect(outcome.released).toBe(true);
+    expect(outcome.alreadyReserved).toBe(false);
   });
 
   it('chemin session attachée : clé publiable + porteur', async () => {
