@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 
 describe('CadeauxPage', () => {
-  it("filtre les listes par visibilité au lieu d'un badge accolé au nom", async () => {
+  it('filtre les listes par visibilité, l’étrangère dans son propre filtre Partagées', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
@@ -62,17 +62,36 @@ describe('CadeauxPage', () => {
     expect(screen.queryByText('Liste privée')).not.toBeInTheDocument();
     expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
 
-    // Plusieurs listes : sélecteur déroulant libellé avec une option par liste.
-    const selector = screen.getByLabelText('Sélection de la liste de cadeaux');
-    expect(within(selector).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
-    expect(within(selector).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    // Trois listes : sélecteur à bascules, une par liste, l'active enfoncée.
+    const selector = screen.getByRole('group', { name: 'Listes de cadeaux' });
+    expect(within(selector).getByRole('button', { name: 'Idées pour Maya' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(selector).getByRole('button', { name: 'Anniversaire de Noé' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(within(selector).getByRole('button', { name: 'Noël des Voisins' })).toBeInTheDocument();
 
-    // Filtre « Foyer » : les deux listes non privées — dont la liste
-    // voisine rejointe (G-06-1b-bis), marquée par son badge d'origine.
+    // La bascule change la liste active et ses idées.
+    await user.click(within(selector).getByRole('button', { name: 'Anniversaire de Noé' }));
+    expect(await screen.findByText('Casque pour le vélo')).toBeInTheDocument();
+    expect(screen.queryByText('Atelier céramique')).not.toBeInTheDocument();
+
+    // Filtre « Foyer » : la seule liste non privée du foyer — l'étrangère
+    // rejointe a son propre filtre ; liste unique en texte simple.
     await user.click(screen.getByRole('button', { name: 'Foyer' }));
-    const foyerSelector = screen.getByLabelText('Sélection de la liste de cadeaux');
-    expect(within(foyerSelector).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
-    expect(within(foyerSelector).getByRole('option', { name: 'Noël des Voisins' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Listes de cadeaux' })).not.toBeInTheDocument();
+    expect(screen.getByText('Anniversaire de Noé')).toBeInTheDocument();
+    expect(screen.queryByText('Noël des Voisins')).not.toBeInTheDocument();
+    expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
+
+    // Filtre « Partagées » : exactement la liste étrangère rejointe.
+    await user.click(screen.getByRole('button', { name: 'Partagées' }));
+    expect(screen.getByText('Noël des Voisins')).toBeInTheDocument();
+    expect(screen.getByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(screen.queryByText('Anniversaire de Noé')).not.toBeInTheDocument();
     expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
 
     // Filtre « Privées » : seule la privée reste, en texte.
@@ -80,12 +99,24 @@ describe('CadeauxPage', () => {
     expect(screen.getByText('Idées pour Maya')).toBeInTheDocument();
     expect(screen.queryByText('Anniversaire de Noé')).not.toBeInTheDocument();
 
-    // Filtre « Toutes » : retour du déroulant avec les trois listes.
+    // Filtre « Toutes » : retour des trois bascules.
     await user.click(screen.getByRole('button', { name: 'Toutes' }));
-    const reselected = screen.getByLabelText('Sélection de la liste de cadeaux');
-    expect(within(reselected).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
-    expect(within(reselected).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
-    expect(within(reselected).getByRole('option', { name: 'Noël des Voisins' })).toBeInTheDocument();
+    const reselected = screen.getByRole('group', { name: 'Listes de cadeaux' });
+    expect(within(reselected).getByRole('button', { name: 'Idées pour Maya' })).toBeInTheDocument();
+    expect(within(reselected).getByRole('button', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    expect(within(reselected).getByRole('button', { name: 'Noël des Voisins' })).toBeInTheDocument();
+  });
+
+  it('« Créer une liste » en haut ouvre le même formulaire en ligne', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await screen.findByText('Atelier céramique');
+    expect(screen.queryByLabelText('Nom de la nouvelle liste')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Créer une liste' }));
+    expect(await screen.findByLabelText('Nom de la nouvelle liste')).toBeInTheDocument();
+    expect(screen.getByLabelText('Visibilité de la liste')).toBeInTheDocument();
   });
 
   it('partage la liste depuis son niveau, pas depuis chaque idée', async () => {
@@ -117,9 +148,10 @@ describe('CadeauxPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Anniversaire de Noé',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Anniversaire de Noé',
+      }),
     );
 
     // « Casque pour le vélo » est réservé par Thomas : le propriétaire ne le voit pas.
@@ -165,9 +197,10 @@ describe('CadeauxPage', () => {
     // findBy (06-07) : la fermeture du dialogue attend le refetch snapshot,
     // allongé par la fusion inter-foyers — getBy synchrone = course critique.
     await user.click(await screen.findByRole('tab', { name: /Listes/ }));
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Anniversaire de Noé',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Anniversaire de Noé',
+      }),
     );
     expect(await screen.findByText('Stage de poterie')).toBeInTheDocument();
   });
@@ -280,9 +313,10 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
 
     expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
@@ -298,9 +332,10 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
 
     expect(await screen.findByText('Plante verte')).toBeInTheDocument();
@@ -315,9 +350,10 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
 
     await user.click(await screen.findByRole('switch', { name: 'Acheté' }));
@@ -338,17 +374,19 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
 
     // Liste non privée du foyer (gestionnaire) : toujours aucun départ.
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Anniversaire de Noé',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Anniversaire de Noé',
+      }),
     );
     expect(await screen.findByText('Casque pour le vélo')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
 
     // Liste étrangère : le bouton paraît avec le badge d'origine.
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
     expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Quitter la liste/ })).toBeInTheDocument();
@@ -358,9 +396,10 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
     await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
 
@@ -375,9 +414,10 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
     await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
 
@@ -394,9 +434,10 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
     await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
 
@@ -408,9 +449,9 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     expect(await screen.findByText('Liste quittée. Vos réservations à votre nom sont conservées.')).toBeInTheDocument();
     // La part supprimée, le refetch sort la liste de la vue : ni badge…
     await waitFor(() => expect(screen.queryByText('Liste partagée · Les Voisins')).not.toBeInTheDocument());
-    // …ni option au sélecteur (repli sur la première liste du foyer).
-    const selector = screen.getByLabelText('Sélection de la liste de cadeaux');
-    expect(within(selector).queryByRole('option', { name: 'Noël des Voisins' })).not.toBeInTheDocument();
+    // …ni bascule au sélecteur (repli sur la première liste du foyer).
+    const selector = screen.getByRole('group', { name: 'Listes de cadeaux' });
+    expect(within(selector).queryByRole('button', { name: 'Noël des Voisins' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
   });
 
@@ -421,9 +462,10 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     );
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.selectOptions(
-      await screen.findByLabelText('Sélection de la liste de cadeaux'),
-      'Noël des Voisins',
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
     );
     await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
 

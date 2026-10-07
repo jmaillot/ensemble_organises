@@ -110,7 +110,7 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await page.goto('/cadeaux');
     await expect(page.getByText('Atelier céramique')).toBeVisible();
 
-    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Noël des Voisins' }).click();
     // La liste rejointe apparaît avec sa marque d'origine et son contenu.
     await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
     await expect(page.getByText('Bougie parfumée')).toBeVisible();
@@ -136,7 +136,7 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     // Liste du foyer : aucun départ proposé.
     await expect(page.getByRole('button', { name: /Quitter/ })).toHaveCount(0);
 
-    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Noël des Voisins' }).click();
     await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
     await page.getByRole('button', { name: /Quitter la liste/ }).click();
 
@@ -160,7 +160,7 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await page.goto('/cadeaux');
     await expect(page.getByText('Atelier céramique')).toBeVisible();
 
-    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    await page.getByRole('group', { name: 'Listes de cadeaux' }).getByRole('button', { name: 'Noël des Voisins' }).click();
     await page.getByRole('button', { name: /Quitter la liste/ }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Quitter' }).click();
 

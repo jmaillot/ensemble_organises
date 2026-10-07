@@ -104,12 +104,16 @@ export default function CadeauxPage() {
   const [promoteListId, setPromoteListId] = useState('');
 
   const currentMemberId = currentMember?.id ?? null;
-  const [listFilter, setListFilter] = useState<'toutes' | 'privees' | 'foyer'>('toutes');
+  const [listFilter, setListFilter] = useState<'toutes' | 'privees' | 'foyer' | 'partagees'>('toutes');
   const shownLists = useMemo(
     () =>
       listFilter === 'toutes'
         ? lists
-        : lists.filter((list) => (listFilter === 'privees' ? list.isPrivate : !list.isPrivate)),
+        : listFilter === 'privees'
+          ? lists.filter((list) => list.isPrivate)
+          : listFilter === 'foyer'
+            ? lists.filter((list) => !list.isPrivate && !list.isForeign)
+            : lists.filter((list) => list.isForeign),
     [listFilter, lists],
   );
   const activeList = shownLists.find((list) => list.id === requestedListId) ?? shownLists[0] ?? null;
@@ -523,6 +527,7 @@ export default function CadeauxPage() {
                   { value: 'toutes', label: 'Toutes' },
                   { value: 'privees', label: 'Privées' },
                   { value: 'foyer', label: 'Foyer' },
+                  { value: 'partagees', label: 'Partagées' },
                 ] as const
               ).map((option) => (
                 <Button
@@ -558,7 +563,9 @@ export default function CadeauxPage() {
               <p className="text-sm text-muted">
                 {listFilter === 'privees'
                   ? 'Aucune liste privée pour le moment.'
-                  : 'Aucune liste partagée avec le foyer pour le moment.'}
+                  : listFilter === 'partagees'
+                    ? 'Aucune liste partagée rejointe pour le moment.'
+                    : 'Aucune liste partagée avec le foyer pour le moment.'}
               </p>
             ) : null}
 
