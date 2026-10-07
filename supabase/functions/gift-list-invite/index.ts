@@ -75,8 +75,12 @@
  *   redeem  -> { list_id, already_shared }
  *   send-email -> { listId, email, sent: true }
  *     (jamais d'envoi sans part `lecture` créée d'abord — D-04)
- *   guest-view -> { listId, listName, items: [{ id, name, price, comment, reserved }] }
- *     (jamais d'identifiant d'auteur — D-07 ; `reserved` seul dit l'état)
+ *   guest-view -> { listId, listName, items: [{ id, name, price, comment, url, photoUrl, reserved }] }
+ *     (jamais d'identifiant d'auteur — D-07 ; `reserved` seul dit l'état ;
+ *     `url` est le lien organizer tel quel (chaîne ou null) ; `photoUrl` est
+ *     une URL signée ÉPHÉMÈRE (une heure) forgée par requête depuis la valeur
+ *     brute `photo_url`, ou l'URL http(s) héritée telle quelle — null en
+ *     échec fermé, jamais persistée)
  *   guest-reserve -> { itemId, alreadyReserved }
  */
 
@@ -685,10 +689,49 @@ function stripMailBreaks(value: string): string {
 
 /**
  * Lecture invitée sans compte (D-05) : le code EST le contrôle d'accès.
- * Ne rend que `{ listId, listName, items[{ id, name, price, comment,
- * reserved }] }` — projection défensive explicite : même si le RPC rendait
- * un jour plus, aucun identifiant d'auteur ne quitte la fonction (D-07).
+ * Ne rend que `{ listId, listName, items[{ id, name, price, comment, url,
+ * photoUrl, reserved }] }` — projection défensive explicite : même si le RPC
+ * rendait un jour plus, aucun identifiant d'auteur ne quitte la fonction
+ * (D-07). `url` passe tel quel (chaîne ou null) ; `photoUrl` est forgée par
+ * requête (voir `resolveGuestPhotoUrl`) — éphémère, jamais persistée.
  */
+
+/** Bucket privé des fichiers du foyer : seul nom que les politiques connaissent. */
+const HOUSEHOLD_MEDIA_BUCKET = 'household-media';
+/** Validité des URL photo invitées : courte (une heure), forgée par requête. */
+const GUEST_PHOTO_TTL_SECONDS = 3600;
+
+/** Chaîne non vide telle quelle, sinon null (échec fermé, jamais ''). */
+function asTextOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Résout la valeur brute `photo_url` du RPC en URL servable (G-06-1a) :
+ * une URL http(s) héritée passe telle quelle ; un chemin relatif au bucket
+ * `household-media` (forme actuelle des dépôts) reçoit une URL signée
+ * courte ; TOUT le reste (absent, forme inconnue, erreur de signature)
+ * rend null — échec fermé, sans erreur, sans journaliser ni le code ni
+ * l'URL (T-06-09 : rien de sensible ne fuite dans les logs).
+ */
+async function resolveGuestPhotoUrl(admin: AdminClient, raw: unknown): Promise<string | null> {
+  const value = asTextOrNull(raw);
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    const path = value.replace(/^\/+/, '');
+    const { data, error } = await admin.storage
+      .from(HOUSEHOLD_MEDIA_BUCKET)
+      .createSignedUrl(path, GUEST_PHOTO_TTL_SECONDS);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
 async function handleGuestView(admin: AdminClient, body: RequestBody & { action: 'guest-view' }) {
   const secret = checkSecret();
   const codeHash = await hmacSha256Hex(body.code, secret);
@@ -702,16 +745,20 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
   const view = (data ?? {}) as {
     list_id?: string;
     list_name?: string;
-    items?: { id?: unknown; name?: unknown; price?: unknown; comment?: unknown; reserved?: unknown }[];
+    items?: { id?: unknown; name?: unknown; price?: unknown; comment?: unknown; url?: unknown; photo_url?: unknown; reserved?: unknown }[];
   };
   const items = Array.isArray(view.items)
-    ? view.items.map((item) => ({
-      id: String(item.id ?? ''),
-      name: String(item.name ?? ''),
-      price: typeof item.price === 'number' ? item.price : Number(item.price ?? 0) || 0,
-      comment: typeof item.comment === 'string' ? item.comment : null,
-      reserved: item.reserved === true,
-    }))
+    ? await Promise.all(
+      view.items.map(async (item) => ({
+        id: String(item.id ?? ''),
+        name: String(item.name ?? ''),
+        price: typeof item.price === 'number' ? item.price : Number(item.price ?? 0) || 0,
+        comment: typeof item.comment === 'string' ? item.comment : null,
+        url: asTextOrNull(item.url),
+        photoUrl: await resolveGuestPhotoUrl(admin, item.photo_url),
+        reserved: item.reserved === true,
+      })),
+    )
     : [];
 
   return json({
