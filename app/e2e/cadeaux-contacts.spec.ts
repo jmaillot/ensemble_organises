@@ -99,4 +99,28 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await page.getByRole('button', { name: 'Ouvrir l’invitation' }).click();
     await expect(page.getByText(/Connexion au serveur indisponible/)).toBeVisible();
   });
+
+  test('liste étrangère rejointe : badge d’origine puis réserve via le serveur', async ({ page }) => {
+    // Parcours inter-foyers (phase 06, G-06-1b-bis) en démonstration : sans
+    // backend, seuls le badge d'origine (fusion par partage) et le refus
+    // explicite de la réserve serveur sont déterministes. La réserve
+    // attribuée réussie est prouvée par la suite SQL 0033 et les tests
+    // Vitest — pas rejouable sans relais.
+    await openDemoSession(page);
+    await page.goto('/cadeaux');
+    await expect(page.getByText('Atelier céramique')).toBeVisible();
+
+    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    // La liste rejointe apparaît avec sa marque d'origine et son contenu.
+    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    await expect(page.getByText('Bougie parfumée')).toBeVisible();
+    // Lecture seule : aucune gestion offerte sur une liste étrangère.
+    await expect(page.getByRole('button', { name: /Partager|Gérer/ })).toHaveCount(0);
+
+    // La réserve ne part jamais en écriture directe : elle appelle la voie
+    // serveur, indisponible en démo — le refus explicite le prouve (un
+    // chemin client aurait silencieusement coché l'interrupteur).
+    await page.getByRole('switch', { name: 'Acheté', exact: true }).click();
+    await expect(page.getByText('Edge Function indisponible.')).toBeVisible();
+  });
 });
