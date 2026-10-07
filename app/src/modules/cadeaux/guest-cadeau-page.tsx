@@ -34,6 +34,11 @@ import {
  *   `guest-view` / `guest-reserve`. Le code EST le contrôle d'accès ; la
  *   charge utile porte le contenu (url, photoUrl) et un booléen `reserved`
  *   par article (D-07, G-06-1a).
+ *
+ * Un visiteur CONNECTÉ choisit explicitement (G-06-1b) : « Rejoindre via mon
+ * compte » déclenche le redeem historique (inchangé), « Continuer sans lier
+ * mon compte » rend la même vue invitée en mode détaché (`withoutSession` :
+ * aucun porteur joint, T-06-11) avec une copie d'attribution anonyme.
  */
 export default function GuestCadeauPage() {
   const [params] = useSearchParams();
@@ -45,10 +50,13 @@ export default function GuestCadeauPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const isAuthenticated = useIsAuthenticated();
   const user = useSessionUser();
+  // Choix explicite du visiteur connecté (G-06-1b) : le redeem ne part
+  // qu'après « Rejoindre via mon compte ». `null` = choix pas encore fait.
+  const [choice, setChoice] = useState<'join' | 'anonymous' | null>(null);
 
   const redeemQuery = useQuery({
     queryKey: ['cadeaux', 'invite-redeem', activeCode ?? ''],
-    enabled: activeCode !== null && isAuthenticated && isSupabaseConfigured,
+    enabled: activeCode !== null && isAuthenticated && choice === 'join' && isSupabaseConfigured,
     retry: false,
     queryFn: () => redeemGiftListInvite(activeCode as string, user?.email ?? undefined),
   });
@@ -65,7 +73,14 @@ export default function GuestCadeauPage() {
       setFormError('Ce lien semble incomplet.');
       return;
     }
+    setChoice(null);
     setActiveCode(trimmed);
+  };
+
+  /** Retour au formulaire de code (le choix est oublié avec le code). */
+  const resetCode = () => {
+    setChoice(null);
+    setActiveCode(null);
   };
 
   const result = redeemQuery.data ?? null;
@@ -76,9 +91,9 @@ export default function GuestCadeauPage() {
         id="guest-cadeau-panel"
         title="Invitation à une liste de cadeaux"
         description={
-          isAuthenticated
-            ? 'Votre compte active le partage : vous pourrez réserver (D-17).'
-            : 'Réservez sans compte : indiquez un nom, choisissez un article.'
+          !isAuthenticated || choice === 'anonymous'
+            ? 'Réservez sans compte : indiquez un nom, choisissez un article.'
+            : 'Votre compte active le partage : vous pourrez réserver (D-17).'
         }
       >
         {!activeCode ? (
@@ -102,27 +117,69 @@ export default function GuestCadeauPage() {
           </form>
         ) : !isAuthenticated ? (
           <GuestAnonymousView code={activeCode} onResetCode={() => setActiveCode(null)} />
-        ) : redeemQuery.isLoading ? (
-          <LoadingRows rows={2} />
-        ) : redeemQuery.isError || !result ? (
-          <ErrorState
-            message="Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur."
-            onRetry={() => setActiveCode(null)}
-          />
-        ) : (
-          <div className="grid gap-3">
+        ) : choice === 'anonymous' ? (
+          <div className="grid gap-3.5">
             <p className="m-0 text-[13px]">
-              {result.already_shared
-                ? 'Vous participez déjà à cette liste : vos réservations sont conservées.'
-                : 'Partage activé : vous pouvez désormais réserver des articles de cette liste.'}
+              Vous continuez <strong>sans lier votre compte</strong> : votre réservation sera{' '}
+              <strong>anonyme</strong> (nom déclaré seul, comme pour les visiteurs sans compte) —
+              rien ne sera rattaché à votre compte.
             </p>
+            <GuestAnonymousView code={activeCode} detached onResetCode={resetCode} />
             <div>
-              <Link
-                to="/cadeaux"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
-              >
-                Ouvrir les cadeaux
-              </Link>
+              <Button variant="quiet" size="sm" onClick={() => setChoice(null)}>
+                Revenir au choix
+              </Button>
+            </div>
+          </div>
+        ) : choice === 'join' ? (
+          redeemQuery.isLoading ? (
+            <LoadingRows rows={2} />
+          ) : redeemQuery.isError || !result ? (
+            <ErrorState
+              message="Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur."
+              onRetry={resetCode}
+            />
+          ) : (
+            <div className="grid gap-3">
+              <p className="m-0 text-[13px]">
+                {result.already_shared
+                  ? 'Vous participez déjà à cette liste : vos réservations sont conservées.'
+                  : 'Partage activé : vous pouvez désormais réserver des articles de cette liste.'}
+              </p>
+              <div>
+                <Link
+                  to="/cadeaux"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
+                >
+                  Ouvrir les cadeaux
+                </Link>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="grid gap-3.5">
+            <p className="m-0 text-[13px]">Ce lien vous propose deux façons de participer :</p>
+            <div className="grid gap-1.5">
+              <div>
+                <Button icon="arrow" onClick={() => setChoice('join')}>
+                  Rejoindre via mon compte
+                </Button>
+              </div>
+              <p className="m-0 text-[12px] text-muted">
+                Active le partage sur votre compte : vos réservations seront liées à votre membre,
+                la liste apparaîtra dans vos cadeaux.
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <div>
+                <Button variant="secondary" onClick={() => setChoice('anonymous')}>
+                  Continuer sans lier mon compte
+                </Button>
+              </div>
+              <p className="m-0 text-[12px] text-muted">
+                Votre réservation sera anonyme (nom déclaré seul, comme les visiteurs sans compte) :
+                rien ne sera rattaché à votre compte ni à un foyer.
+              </p>
             </div>
           </div>
         )}
@@ -152,8 +209,20 @@ function isServableHttpUrl(value: string | null): value is string {
  * Parcours invité sans compte (D-05/D-06/D-07/D-09) : nom déclaré + réserve.
  * La vérité reste côté serveur (relecture après chaque réserve) ; le nom
  * mémorisé et le surlignage local sont purement cosmétiques.
+ *
+ * `detached` (G-06-1b) : un visiteur CONNECTÉ qui continue sans lier son
+ * compte voit exactement la même vue, mais aucun porteur n'est joint aux
+ * appels publishable (`withoutSession`, T-06-11) — la réserve reste anonyme.
  */
-function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: () => void }) {
+function GuestAnonymousView({
+  code,
+  detached = false,
+  onResetCode,
+}: {
+  code: string;
+  detached?: boolean;
+  onResetCode: () => void;
+}) {
   const toast = useToast();
   const [name, setName] = useState(() => readGuestName(code) ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -165,7 +234,7 @@ function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: 
     queryKey: ['cadeaux', 'guest-view', code],
     enabled: isSupabaseConfigured,
     retry: false,
-    queryFn: () => fetchGuestGiftView(code),
+    queryFn: () => fetchGuestGiftView(code, detached ? { withoutSession: true } : undefined),
   });
 
   const reserve = (itemId: string, itemName: string) => {
@@ -177,7 +246,7 @@ function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: 
       return;
     }
     setPendingItemId(itemId);
-    reserveGuestGiftItem(code, itemId, trimmed)
+    reserveGuestGiftItem(code, itemId, trimmed, detached ? { withoutSession: true } : undefined)
       .then((outcome) => {
         writeGuestName(code, trimmed);
         markGuestReservedItem(code, outcome.itemId);
@@ -301,11 +370,17 @@ function GuestAnonymousView({ code, onResetCode }: { code: string; onResetCode: 
         </p>
       ) : null}
       <p className="m-0 text-[11px] text-muted">
-        Un compte ?{' '}
-        <Link to="/connexion" className="font-semibold text-accent-strong">
-          Connectez-vous avec l’e-mail invité
-        </Link>{' '}
-        pour activer le partage durable.
+        {detached ? (
+          <>Votre réservation restera anonyme : seul le nom déclaré sera transmis.</>
+        ) : (
+          <>
+            Un compte ?{' '}
+            <Link to="/connexion" className="font-semibold text-accent-strong">
+              Connectez-vous avec l’e-mail invité
+            </Link>{' '}
+            pour activer le partage durable.
+          </>
+        )}
       </p>
     </div>
   );

@@ -351,19 +351,39 @@ export interface GuestReserveResult {
 /** Borne du nom auto-déclaré (D-06) : miroir exact du CHECK base + Zod Edge. */
 export const GUEST_NAME_MAX = 80;
 
-async function callGiftInvitePublishable<T>(action: string, body: Record<string, unknown>): Promise<T> {
+/**
+ * Option publishable (G-06-1b, T-06-11) : `withoutSession` force l'absence de
+ * porteur même quand une session existe. C'est le parcours « continuer sans
+ * lier mon compte » d'un visiteur connecté : la réserve ne doit jamais être
+ * rattachée à son compte, le nom déclaré seul fait foi. Par défaut (visiteur
+ * sans compte), le porteur est déjà absent ; le redeem avec compte, lui, ne
+ * passe jamais par ici.
+ */
+export interface GuestPublishableOptions {
+  withoutSession?: boolean;
+}
+
+async function callGiftInvitePublishable<T>(
+  action: string,
+  body: Record<string, unknown>,
+  options?: GuestPublishableOptions,
+): Promise<T> {
   if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
   };
   // Jeton porteur seulement en session : le visiteur sans compte reste
-  // strictement anonyme (aucune session attachée au-delà du code).
-  try {
-    const session = (await supabase?.auth.getSession())?.data.session ?? null;
-    if (session?.access_token) headers.authorization = `Bearer ${session.access_token}`;
-  } catch {
-    // Stockage de session illisible : on part sans jeton (chemin visiteur).
+  // strictement anonyme (aucune session attachée au-delà du code). Un compte
+  // qui continue SANS lier son compte l'exige aussi : `withoutSession`
+  // saute la lecture de session pour ne jamais joindre le porteur.
+  if (!options?.withoutSession) {
+    try {
+      const session = (await supabase?.auth.getSession())?.data.session ?? null;
+      if (session?.access_token) headers.authorization = `Bearer ${session.access_token}`;
+    } catch {
+      // Stockage de session illisible : on part sans jeton (chemin visiteur).
+    }
   }
   const response = await fetch(`${supabaseFunctionsBase}/gift-list-invite`, {
     method: 'POST',
@@ -425,13 +445,13 @@ function toGuestGiftItem(entry: unknown): GuestGiftItem {
  * (`Ce code est invalide.` pour l'oracle, sans distinction d'état) : on les
  * propage tels quels, sans les reformuler.
  */
-export async function fetchGuestGiftView(code: string): Promise<GuestGiftView> {
+export async function fetchGuestGiftView(code: string, options?: GuestPublishableOptions): Promise<GuestGiftView> {
   const trimmed = assertGuestCode(code);
   const view = await callGiftInvitePublishable<{
     listId: string | null;
     listName: string | null;
     items: unknown;
-  }>('guest-view', { code: trimmed });
+  }>('guest-view', { code: trimmed }, options);
   return {
     listId: typeof view.listId === 'string' ? view.listId : null,
     listName: typeof view.listName === 'string' ? view.listName : null,
@@ -445,16 +465,25 @@ export async function fetchGuestGiftView(code: string): Promise<GuestGiftView> {
  * autres ; le conflit à nom différent (`Cet article est déjà réservé.`,
  * 409) et l'oracle (`Ce code est invalide.`, 404) restent distincts.
  */
-export async function reserveGuestGiftItem(code: string, itemId: string, name: string): Promise<GuestReserveResult> {
+export async function reserveGuestGiftItem(
+  code: string,
+  itemId: string,
+  name: string,
+  options?: GuestPublishableOptions,
+): Promise<GuestReserveResult> {
   const trimmedCode = assertGuestCode(code);
   const trimmedName = assertGuestName(name);
   const trimmedItem = itemId.trim();
   if (!trimmedItem) throw new Error('Article introuvable.');
-  return callGiftInvitePublishable<GuestReserveResult>('guest-reserve', {
-    code: trimmedCode,
-    itemId: trimmedItem,
-    name: trimmedName,
-  });
+  return callGiftInvitePublishable<GuestReserveResult>(
+    'guest-reserve',
+    {
+      code: trimmedCode,
+      itemId: trimmedItem,
+      name: trimmedName,
+    },
+    options,
+  );
 }
 
 /* ------------------------------------------------------------------ */
