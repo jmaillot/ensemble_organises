@@ -123,4 +123,50 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await page.getByRole('switch', { name: 'Acheté', exact: true }).click();
     await expect(page.getByText('Edge Function indisponible.')).toBeVisible();
   });
+
+  test('quitter une liste étrangère : bouton, modale, annulation sans effet', async ({ page }) => {
+    // Départ volontaire (phase 06, G-06-1c) en démonstration : sans backend,
+    // seuls la visibilité du bouton, la copie de la modale et l'annulation
+    // sans effet sont déterministes. La suppression réussie est prouvée par
+    // la suite SQL 0034 et les tests Vitest — pas rejouable sans relais.
+    await openDemoSession(page);
+    await page.goto('/cadeaux');
+    await expect(page.getByText('Atelier céramique')).toBeVisible();
+
+    // Liste du foyer : aucun départ proposé.
+    await expect(page.getByRole('button', { name: /Quitter/ })).toHaveCount(0);
+
+    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    await page.getByRole('button', { name: /Quitter la liste/ }).click();
+
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog.getByText('Quitter « Noël des Voisins »')).toBeVisible();
+    await expect(dialog.getByText(/Vos réservations à votre nom sont conservées/)).toBeVisible();
+    await expect(dialog.getByText(/rejoindre à nouveau/)).toBeVisible();
+
+    // Annuler : aucun appel, liste toujours là.
+    await dialog.getByRole('button', { name: 'Annuler' }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText('Bougie parfumée')).toBeVisible();
+    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+  });
+
+  test('quitter sans serveur : le refus explicite prouve la voie serveur', async ({ page }) => {
+    // Le départ ne part jamais en écriture directe : il appelle la voie
+    // serveur, indisponible en démo — le refus explicite le prouve (un
+    // chemin client aurait silencieusement retiré la liste).
+    await openDemoSession(page);
+    await page.goto('/cadeaux');
+    await expect(page.getByText('Atelier céramique')).toBeVisible();
+
+    await page.getByLabel('Sélection de la liste de cadeaux').selectOption('Noël des Voisins');
+    await page.getByRole('button', { name: /Quitter la liste/ }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Quitter' }).click();
+
+    await expect(page.getByText('Edge Function indisponible.')).toBeVisible();
+    // La liste est toujours là : rien n'a été supprimé en local.
+    await expect(page.getByText('Liste partagée · Les Voisins')).toBeVisible();
+    await expect(page.getByText('Bougie parfumée')).toBeVisible();
+  });
 });
