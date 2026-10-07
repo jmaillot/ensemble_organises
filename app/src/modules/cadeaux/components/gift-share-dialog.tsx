@@ -383,7 +383,7 @@ export function GiftShareDialog({
       <DialogContent>
         <DialogHeader>
           <p className="eyebrow mb-2">Cadeaux</p>
-          <DialogTitle>Partager cette idée</DialogTitle>
+          <DialogTitle>Partager la liste</DialogTitle>
           <DialogDescription>
             {list
               ? `Choisissez les personnes du foyer ou un proche externe. Le partage porte sur toute la liste « ${list.name} ».`

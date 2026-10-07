@@ -52,23 +52,30 @@ describe('CadeauxPage', () => {
     expect(screen.queryByText('Liste privée')).not.toBeInTheDocument();
     expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
 
-    // Filtre « Foyer » : la privée disparaît des sélecteurs, la partagée reste.
+    // Plusieurs listes : sélecteur déroulant libellé avec une option par liste.
+    const selector = screen.getByLabelText('Sélection de la liste de cadeaux');
+    expect(within(selector).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
+    expect(within(selector).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+
+    // Filtre « Foyer » : une seule liste → nom affiché en texte, pas de déroulant.
     await user.click(screen.getByRole('button', { name: 'Foyer' }));
-    expect(screen.queryByRole('button', { name: 'Idées pour Maya' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByText('Anniversaire de Noé')).toBeInTheDocument();
+    expect(screen.queryByText('Idées pour Maya')).not.toBeInTheDocument();
 
-    // Filtre « Privées » : seule la privée reste.
+    // Filtre « Privées » : seule la privée reste, en texte.
     await user.click(screen.getByRole('button', { name: 'Privées' }));
-    expect(screen.getByRole('button', { name: 'Idées pour Maya' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Anniversaire de Noé' })).not.toBeInTheDocument();
+    expect(screen.getByText('Idées pour Maya')).toBeInTheDocument();
+    expect(screen.queryByText('Anniversaire de Noé')).not.toBeInTheDocument();
 
-    // Filtre « Toutes » : retour à l'ensemble.
+    // Filtre « Toutes » : retour du déroulant avec les deux listes.
     await user.click(screen.getByRole('button', { name: 'Toutes' }));
-    expect(screen.getByRole('button', { name: 'Idées pour Maya' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
+    const reselected = screen.getByLabelText('Sélection de la liste de cadeaux');
+    expect(within(reselected).getByRole('option', { name: 'Idées pour Maya' })).toBeInTheDocument();
+    expect(within(reselected).getByRole('option', { name: 'Anniversaire de Noé' })).toBeInTheDocument();
   });
 
-  it('partage une idée, qui passe en « Gérer »', async () => {
+  it('partage la liste depuis son niveau, pas depuis chaque idée', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
@@ -76,7 +83,11 @@ describe('CadeauxPage', () => {
     expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
     expect(screen.getByText('Ne partagez pas cette liste : elle est votre surprise.')).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: 'Partager' })[0]);
+    // Un seul bouton Partager au niveau de la liste, aucun sur les cartes d'idées.
+    expect(screen.getByRole('button', { name: /Partager/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Partager|Gérer/ })).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: /Partager/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Le partage porte sur toute la liste/)).toBeInTheDocument();
 
@@ -84,16 +95,19 @@ describe('CadeauxPage', () => {
     await user.selectOptions(within(dialog).getByLabelText('Permission pour Lina Martin'), 'reservation');
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le partage' }));
 
-    // Le partage porte sur la liste : les deux idées passent en « Gérer ».
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gérer' })).toHaveLength(2));
-    expect(screen.queryByRole('button', { name: 'Partager' })).not.toBeInTheDocument();
+    // Le partage porte sur la liste : le bouton unique passe en « Gérer ».
+    await waitFor(() => expect(screen.getByRole('button', { name: /Gérer/ })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Partager/ })).not.toBeInTheDocument();
   });
 
   it('cache les réservations des autres pour le propriétaire de la liste', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
-    await user.click(await screen.findByRole('button', { name: 'Anniversaire de Noé' }));
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Anniversaire de Noé',
+    );
 
     // « Casque pour le vélo » est réservé par Thomas : le propriétaire ne le voit pas.
     expect(screen.getByText('Casque pour le vélo')).toBeInTheDocument();
@@ -136,7 +150,10 @@ describe('CadeauxPage', () => {
 
     // L’article apparaît dans sa liste, l’idée reste dans son onglet.
     await user.click(screen.getByRole('tab', { name: /Listes/ }));
-    await user.click(await screen.findByRole('button', { name: 'Anniversaire de Noé' }));
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Anniversaire de Noé',
+    );
     expect(await screen.findByText('Stage de poterie')).toBeInTheDocument();
   });
 
@@ -159,7 +176,7 @@ describe('CadeauxPage', () => {
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
     expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Partager' })[0]);
+    await user.click(screen.getByRole('button', { name: /Partager/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Aucun code actif. Générez-en un pour inviter.')).toBeInTheDocument();
 
@@ -172,7 +189,7 @@ describe('CadeauxPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    await user.click(screen.getAllByRole('button', { name: 'Partager' })[0]);
+    await user.click(screen.getByRole('button', { name: /Partager/ }));
     const reopened = await screen.findByRole('dialog');
     expect(within(reopened).queryByText(TEST_CODE)).not.toBeInTheDocument();
     expect(

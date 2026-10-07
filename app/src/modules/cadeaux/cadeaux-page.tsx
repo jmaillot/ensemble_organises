@@ -487,18 +487,26 @@ export default function CadeauxPage() {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-            {shownLists.map((list) => (
-              <div key={list.id} className="flex items-center gap-2">
-                <Button
-                  variant={list.id === activeList?.id ? 'primary' : 'secondary'}
-                  size="sm"
-                  aria-pressed={list.id === activeList?.id}
-                  onClick={() => setRequestedListId(list.id)}
-                >
-                  {list.name}
-                </Button>
-              </div>
-            ))}
+              {shownLists.length > 0 ? (
+                <label className="grid gap-1.5 text-[11px] font-extrabold text-muted">
+                  Sélection de la liste de cadeaux
+                  {shownLists.length > 1 ? (
+                    <Select
+                      value={activeList?.id ?? ''}
+                      onChange={(event) => setRequestedListId(event.target.value)}
+                      className="w-[220px]"
+                    >
+                      {shownLists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.name}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <span className="text-[13px] font-bold text-fg">{shownLists[0].name}</span>
+                  )}
+                </label>
+              ) : null}
             </div>
             {shownLists.length === 0 ? (
               <p className="text-sm text-muted">
@@ -539,6 +547,17 @@ export default function CadeauxPage() {
               </Button>
             )}
 
+            {activeList ? (
+              <button
+                type="button"
+                className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
+                aria-label={isShared ? `Gérer le partage de ${activeList.name}` : `Partager ${activeList.name}`}
+                onClick={() => setShareOpen(true)}
+              >
+                <Icon name="share" size="sm" />
+                {isShared ? 'Gérer' : 'Partager'}
+              </button>
+            ) : null}
             {activeList?.isOwned ? (
               <button
                 type="button"
@@ -691,14 +710,6 @@ export default function CadeauxPage() {
                         <strong className="font-display text-[18px] tracking-[-0.04em]">
                           {item.price === null ? '—' : formatEuro(item.price)}
                         </strong>
-                        <button
-                          type="button"
-                          className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
-                          onClick={() => setShareOpen(true)}
-                        >
-                          <Icon name="share" size="sm" />
-                          {isShared ? 'Gérer' : 'Partager'}
-                        </button>
                       </div>
                     </div>
                   </li>
