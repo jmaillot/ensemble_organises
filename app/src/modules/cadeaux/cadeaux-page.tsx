@@ -391,8 +391,9 @@ export default function CadeauxPage() {
   };
 
   /**
-   * Garantit la part `lecture` d'un destinataire e-mail SANS fermer le
-   * dialogue (D-04, partage d'abord) : le panneau d'envoi l'appelle avant
+   * Garantit la part `reservation` d'un destinataire e-mail SANS fermer le
+   * dialogue (D-04 amendée 2026-10-07, G-06-21 : la réservation est la seule
+   * issue du partage — partage d'abord) : le panneau d'envoi l'appelle avant
    * l'action serveur `send-email`, qui recrée la part côté serveur avant
    * l'envoi (jamais d'envoi sans part, jamais de dégradation d'une part
    * `reservation` existante).
@@ -414,7 +415,7 @@ export default function CadeauxPage() {
     const next: GiftShareInput[] = shares
       .filter((share) => share.listId === listId)
       .map((share) => ({ memberId: share.memberId, email: share.email, permission: share.permission }));
-    if (!already) next.push({ memberId: null, email: email.trim(), permission: 'lecture' });
+    if (!already) next.push({ memberId: null, email: email.trim(), permission: 'reservation' });
     await syncShares.mutateAsync({ listId, existing, next });
   };
 
@@ -547,20 +548,76 @@ export default function CadeauxPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {shownLists.length > 1 ? (
-                <div role="group" aria-label="Listes de cadeaux" className="flex flex-wrap items-center gap-2">
-                  {shownLists.map((list) => (
-                    <Button
-                      key={list.id}
-                      variant={list.id === activeList?.id ? 'primary' : 'secondary'}
-                      aria-pressed={list.id === activeList?.id}
-                      onClick={() => setRequestedListId(list.id)}
-                    >
-                      {list.name}
-                    </Button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span id="cadeaux-list-selector-label" className="text-[11px] font-extrabold text-muted">
+                    Sélection de la liste de cadeaux :{' '}
+                  </span>
+                  <div
+                    role="group"
+                    aria-label="Listes de cadeaux"
+                    aria-labelledby="cadeaux-list-selector-label"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    {shownLists.map((list) => (
+                      <Button
+                        key={list.id}
+                        variant={list.id === activeList?.id ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={list.id === activeList?.id}
+                        onClick={() => setRequestedListId(list.id)}
+                      >
+                        {list.name}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               ) : shownLists.length === 1 ? (
                 <span className="text-[13px] font-bold text-fg">{shownLists[0].name}</span>
+              ) : null}
+            </div>
+            {/* Barre d'actions de liste (G-06-21) : tous les contrôles de la
+                liste active en une seule rangée — conditions inchangées,
+                placement seul. */}
+            <div aria-label="Actions de la liste" className="flex flex-wrap items-center gap-2">
+              {activeList && !isForeignList ? (
+                <button
+                  type="button"
+                  className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
+                  aria-label={isShared ? `Gérer le partage de ${activeList.name}` : `Partager ${activeList.name}`}
+                  onClick={() => setShareOpen(true)}
+                >
+                  <Icon name="share" size="sm" />
+                  {isShared ? 'Gérer' : 'Partager'}
+                </button>
+              ) : null}
+              {activeList?.isForeign ? (
+                <Badge tone="muted">
+                  {activeList.originLabel ? `Liste partagée · ${activeList.originLabel}` : 'Liste partagée'}
+                </Badge>
+              ) : null}
+              {isForeignList ? (
+                // Départ volontaire (G-06-1c) : même condition d'étrangeté que
+                // le badge — jamais sur les listes du foyer, jamais pour un
+                // gestionnaire (toujours faux sur liste étrangère : isManager
+                // exige !isForeignList). Modale obligatoire (AGENTS.md §6).
+                <button
+                  type="button"
+                  className={shareButtonBase}
+                  aria-label={`Quitter la liste ${activeList?.name ?? ''}`}
+                  onClick={() => activeList && setPendingLeave(activeList)}
+                >
+                  Quitter cette liste
+                </button>
+              ) : null}
+              {activeList?.isOwned ? (
+                <button
+                  type="button"
+                  className={`${cardAction} hover:bg-coral-soft hover:text-coral`}
+                  aria-label={`Supprimer la liste ${activeList.name}`}
+                  onClick={() => setPendingListDeletion(activeList)}
+                >
+                  <Icon name="trash" size="sm" />
+                </button>
               ) : null}
             </div>
             {shownLists.length === 0 ? (
@@ -600,46 +657,6 @@ export default function CadeauxPage() {
               </form>
             ) : null}
 
-            {activeList && !isForeignList ? (
-              <button
-                type="button"
-                className={`${shareButtonBase} ${isShared ? 'bg-accent-soft text-accent-strong' : ''}`}
-                aria-label={isShared ? `Gérer le partage de ${activeList.name}` : `Partager ${activeList.name}`}
-                onClick={() => setShareOpen(true)}
-              >
-                <Icon name="share" size="sm" />
-                {isShared ? 'Gérer' : 'Partager'}
-              </button>
-            ) : null}
-            {activeList?.isForeign ? (
-              <Badge tone="muted">
-                {activeList.originLabel ? `Liste partagée · ${activeList.originLabel}` : 'Liste partagée'}
-              </Badge>
-            ) : null}
-            {isForeignList ? (
-              // Départ volontaire (G-06-1c) : même condition d'étrangeté que
-              // le badge — jamais sur les listes du foyer, jamais pour un
-              // gestionnaire (toujours faux sur liste étrangère : isManager
-              // exige !isForeignList). Modale obligatoire (AGENTS.md §6).
-              <button
-                type="button"
-                className={shareButtonBase}
-                aria-label={`Quitter la liste ${activeList?.name ?? ''}`}
-                onClick={() => activeList && setPendingLeave(activeList)}
-              >
-                Quitter cette liste
-              </button>
-            ) : null}
-            {activeList?.isOwned ? (
-              <button
-                type="button"
-                className={`${cardAction} hover:bg-coral-soft hover:text-coral`}
-                aria-label={`Supprimer la liste ${activeList.name}`}
-                onClick={() => setPendingListDeletion(activeList)}
-              >
-                <Icon name="trash" size="sm" />
-              </button>
-            ) : null}
           </div>
 
           {activeList?.isPrivate ? (
