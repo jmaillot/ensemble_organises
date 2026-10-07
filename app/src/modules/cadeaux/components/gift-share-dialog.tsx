@@ -26,7 +26,6 @@ const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const schema = z.object({
   members: z.array(z.string()),
   permissions: z.record(z.string(), z.enum(['lecture', 'reservation'])),
-  email: z.string().trim().refine((value) => value === '' || emailPattern.test(value), 'Indiquez un email valide.'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -330,7 +329,7 @@ export function GiftShareDialog({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { members: [], permissions: {}, email: '' },
+    defaultValues: { members: [], permissions: {} },
   });
   const toast = useToast();
   /**
@@ -346,7 +345,6 @@ export function GiftShareDialog({
 
   const shareable = members.filter((member) => member.id !== list?.ownerMemberId);
   const selected = watch('members') ?? [];
-  const emailValue = watch('email') ?? '';
   const listId = list?.id;
 
   useEffect(() => {
@@ -356,7 +354,6 @@ export function GiftShareDialog({
       permissions: Object.fromEntries(
         existingShares.filter((share) => share.memberId).map((share) => [share.memberId as string, share.permission]),
       ),
-      email: existingShares.find((share) => share.email)?.email ?? '',
     });
     setLinkReminder(false);
   }, [existingShares, list, open, reset]);
@@ -390,7 +387,7 @@ export function GiftShareDialog({
   };
 
   const linkLive = summary?.hasCode === true && summary?.isActive === true;
-  const zeroShare = selected.length === 0 && emailValue.trim() === '';
+  const zeroShare = selected.length === 0;
   const showLinkReminder = linkReminder && zeroShare && linkLive;
 
   const submit = (values: FormValues) => {
@@ -400,9 +397,6 @@ export function GiftShareDialog({
       email: null,
       permission: values.permissions[memberId] === 'reservation' ? 'reservation' : 'lecture',
     }));
-    if (values.email !== '') {
-      shares.push({ memberId: null, email: values.email, permission: 'lecture' });
-    }
     if (shares.length === 0 && linkLive) {
       // G-06-1d : retirer les partages ne révoque pas le lien — l'invitée
       // garde l'accès via le code. Pas de coupe silencieuse : l'enregistrement
@@ -482,10 +476,6 @@ export function GiftShareDialog({
               <p className="m-0 text-[10px] text-muted">{`${selected.length} personne(s) sélectionnée(s).`}</p>
             ) : null}
           </fieldset>
-
-          <Field label="Inviter un proche (optionnel)" error={errors.email?.message} hint="Un accès lecture seule">
-            {(props) => <Input {...props} type="email" placeholder="prenom@exemple.fr" {...register('email')} />}
-          </Field>
 
           {showLinkReminder ? (
             <div className="grid gap-2 rounded-[11px] border border-border bg-bg px-3 py-2.5" role="alert">
