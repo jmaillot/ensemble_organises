@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { data } from '@/lib/data';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { nextBirthdayDate } from '@/modules/anniversaires/types';
 import { renderWithProviders } from '@/test/render';
 import type { GiftItemRow, HouseholdMemberRow } from '@/types';
@@ -475,5 +476,115 @@ describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
     expect(mockLeaveList).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(/Ce lien ne passe plus/)).toBeInTheDocument();
     expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
+  });
+});
+
+describe('CadeauxPage — décocher Reçu (G-06-20)', () => {
+  it('décocher Reçu sur un article affiché réservé ouvre la confirmation, jamais un effacement silencieux', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Anniversaire de Noé',
+      }),
+    );
+
+    // « Casque pour le vélo » porte une tenue membre (Thomas) sans drapeau :
+    // aucun badge, interrupteur éteint, aucune libération proposée.
+    const card = screen.getByText('Casque pour le vélo').closest('li');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
+    expect(scope.queryByText('Réservé')).not.toBeInTheDocument();
+    expect(scope.getByRole('switch', { name: 'Reçu' })).not.toBeChecked();
+    expect(scope.queryByRole('button', { name: /Libérer/ })).not.toBeInTheDocument();
+
+    // Cocher : simple suivi, aucune modale, la tenue de Thomas est conservée.
+    await user.click(scope.getByRole('switch', { name: 'Reçu' }));
+    await waitFor(() => expect(scope.getByText('Réservé')).toBeInTheDocument());
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    let rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-2' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].purchased).toBe(true);
+    expect(rows[0].reserved_by).toBe(DEMO_MEMBERS.thomas);
+
+    // Le contrôle de modération porte son libellé explicite, et l'ancien
+    // libellé court n'existe plus nulle part.
+    expect(
+      scope.getByRole('button', { name: 'Libérer la réserve de Casque pour le vélo' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Libérer$/ })).not.toBeInTheDocument();
+
+    // Décocher : la confirmation existante s'ouvre ; le drapeau reste posé
+    // (la modale masque le fond aux lecteurs d'écran, donc preuve par la
+    // base : `purchased` intact → l'interrupteur reste visuellement coché).
+    await user.click(scope.getByRole('switch', { name: 'Reçu' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Libérer « Casque pour le vélo »')).toBeInTheDocument();
+    rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-2' });
+    expect(rows[0].purchased).toBe(true);
+
+    // Annuler : rien ne bouge — drapeau, badge et tenue intacts.
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(scope.getByRole('switch', { name: 'Reçu' })).toBeChecked();
+    rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-2' });
+    expect(rows[0].purchased).toBe(true);
+    expect(rows[0].reserved_by).toBe(DEMO_MEMBERS.thomas);
+    expect(scope.getByText('Réservé')).toBeInTheDocument();
+
+    // Décocher puis confirmer : l'unique charge de libération efface les
+    // deux formes d'auteur ET le drapeau — une seule voie de sortie.
+    await user.click(scope.getByRole('switch', { name: 'Reçu' }));
+    const confirm = await screen.findByRole('alertdialog');
+    await user.click(within(confirm).getByRole('button', { name: 'Libérer la réserve' }));
+    expect(await screen.findByText('Réservation libérée.')).toBeInTheDocument();
+    await waitFor(() => expect(scope.queryByText('Réservé')).not.toBeInTheDocument());
+    expect(scope.getByRole('switch', { name: 'Reçu' })).not.toBeChecked();
+    rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-2' });
+    expect(rows[0].purchased).toBe(false);
+    expect(rows[0].reserved_by).toBeNull();
+    expect(rows[0].reserved_by_name).toBeNull();
+  });
+
+  it('cocher Reçu sur un article libre : simple suivi sans modale, aucun auteur inventé', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    // Liste privée de Camille : « Atelier céramique » est libre.
+    const card = (await screen.findByText('Atelier céramique')).closest('li');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
+    expect(scope.getByRole('switch', { name: 'Reçu' })).not.toBeChecked();
+
+    await user.click(scope.getByRole('switch', { name: 'Reçu' }));
+
+    // Aucune modale : le drapeau se pose, le badge suit, aucun auteur touché.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(scope.getByText('Réservé')).toBeInTheDocument());
+    const rows = await data.list<GiftItemRow>('gift_items', { id: 'gift-1' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].purchased).toBe(true);
+    expect(rows[0].reserved_by).toBeNull();
+    expect(rows[0].reserved_by_name).toBeNull();
+  });
+
+  it('« Libérer la réserve » ne paraît que pour les gestionnaires, jamais sur liste étrangère', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(
+      within(await screen.findByRole('group', { name: 'Listes de cadeaux' })).getByRole('button', {
+        name: 'Noël des Voisins',
+      }),
+    );
+
+    // « Plante verte » est tenue (badge affiché) mais la liste est étrangère :
+    // état visible, aucune libération proposée.
+    const card = (await screen.findByText('Plante verte')).closest('li');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
+    expect(scope.getByText('Réservé')).toBeInTheDocument();
+    expect(scope.queryByRole('button', { name: /Libérer/ })).not.toBeInTheDocument();
   });
 });
