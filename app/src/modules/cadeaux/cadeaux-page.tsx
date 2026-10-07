@@ -302,6 +302,10 @@ export default function CadeauxPage() {
 
   // Propriétaire : marquer « reçu » ne touche jamais à `reserved_by` (la
   // réservation reste l'affaire des invités, et la surprise intacte).
+  // G-06-20 : DÉCOCHER sur un article qui s'affiche réservé (même condition
+  // que le badge : `purchased || heldAnonymously`), c'est libérer la réserve
+  // — l'appelant ouvre donc la confirmation existante au lieu d'effacer le
+  // drapeau en silence (voir le `onCheckedChange` propriétaire).
   const handleToggleReceived = async (item: GiftItem, purchased: boolean) => {
     try {
       await updateItem.mutateAsync({ id: item.id, values: { purchased } });
@@ -727,7 +731,22 @@ export default function CadeauxPage() {
                             <Switch
                               id={`gift-received-${item.id}`}
                               checked={item.purchased}
-                              onCheckedChange={(checked) => void handleToggleReceived(item, checked)}
+                              onCheckedChange={(checked) => {
+                                // G-06-20 : décocher « Reçu » sur un article
+                                // qui s'affiche réservé (même condition que le
+                                // badge), c'est libérer la réserve — la
+                                // confirmation existante tranche (D-08),
+                                // jamais un effacement silencieux.
+                                // L'interrupteur reste coché tant que la
+                                // modale n'est pas confirmée ; annuler ne
+                                // touche à rien. Hors réserve affichée,
+                                // simple suivi sans toucher aux auteurs.
+                                if (!checked && (item.purchased || item.heldAnonymously)) {
+                                  setPendingRelease(item);
+                                  return;
+                                }
+                                void handleToggleReceived(item, checked);
+                              }}
                             />
                             Reçu
                           </label>
@@ -735,10 +754,10 @@ export default function CadeauxPage() {
                             <button
                               type="button"
                               className={shareButtonBase}
-                              aria-label={`Libérer la réservation de ${item.name}`}
+                              aria-label={`Libérer la réserve de ${item.name}`}
                               onClick={() => setPendingRelease(item)}
                             >
-                              Libérer
+                              Libérer la réserve
                             </button>
                           ) : null}
                         </div>
@@ -806,10 +825,10 @@ export default function CadeauxPage() {
                             <button
                               type="button"
                               className={shareButtonBase}
-                              aria-label={`Libérer la réservation de ${item.name}`}
+                              aria-label={`Libérer la réserve de ${item.name}`}
                               onClick={() => setPendingRelease(item)}
                             >
-                              Libérer
+                              Libérer la réserve
                             </button>
                           ) : null}
                         </div>
@@ -1026,7 +1045,7 @@ export default function CadeauxPage() {
         }}
         title={pendingRelease ? `Libérer « ${pendingRelease.name} »` : 'Libérer la réservation'}
         description="La réservation sera effacée et l’article redeviendra libre. Cette action est visible par tous."
-        confirmLabel="Libérer"
+        confirmLabel="Libérer la réserve"
         onConfirm={() => void handleRelease()}
       />
 
