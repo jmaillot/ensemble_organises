@@ -20,6 +20,7 @@ import {
   useDeleteGiftIdea,
   useDeleteGiftItem,
   useDeleteGiftList,
+  useLeaveGiftList,
   usePromoteGiftIdea,
   useReserveMemberGiftItem,
   useSyncGiftListShares,
@@ -74,6 +75,7 @@ export default function CadeauxPage() {
   const deleteItem = useDeleteGiftItem();
   const addList = useAddGiftList();
   const deleteList = useDeleteGiftList();
+  const leaveList = useLeaveGiftList();
   const syncShares = useSyncGiftListShares();
   const addIdea = useAddGiftIdea();
   const updateIdea = useUpdateGiftIdea();
@@ -95,6 +97,7 @@ export default function CadeauxPage() {
   const [newListVisibility, setNewListVisibility] = useState<GiftVisibility>('privee');
   const [pendingItemDeletion, setPendingItemDeletion] = useState<GiftItem | null>(null);
   const [pendingListDeletion, setPendingListDeletion] = useState<GiftList | null>(null);
+  const [pendingLeave, setPendingLeave] = useState<GiftList | null>(null);
   const [pendingIdeaDeletion, setPendingIdeaDeletion] = useState<GiftIdea | null>(null);
   const [pendingRelease, setPendingRelease] = useState<GiftItem | null>(null);
   const [promotedIdea, setPromotedIdea] = useState<GiftIdea | null>(null);
@@ -323,6 +326,25 @@ export default function CadeauxPage() {
       toast('Liste supprimée.');
     } catch {
       toast('Suppression impossible.', 'error');
+    }
+  };
+
+  /**
+   * Départ volontaire d'une liste rejointe (G-06-1c) : le serveur supprime
+   * exactement les parts de l'appelant — la liste quitte la vue au refetch,
+   * ses tenues attribuées restent, le lien rejoint normalement. Le refus
+   * uniforme (404 « lien ne passe plus ») est dit tel quel, comme l'oracle
+   * invité. Action confirmée par modale (AGENTS.md §6), jamais en un tap.
+   */
+  const handleLeave = async () => {
+    if (!pendingLeave) return;
+    setPendingLeave(null);
+    try {
+      await leaveList.mutateAsync(pendingLeave.id);
+      setRequestedListId(null);
+      toast('Liste quittée. Vos réservations à votre nom sont conservées.');
+    } catch (leaveError) {
+      toast(leaveError instanceof Error ? leaveError.message : 'Départ impossible.', 'error');
     }
   };
 
@@ -583,6 +605,20 @@ export default function CadeauxPage() {
               <Badge tone="muted">
                 {activeList.originLabel ? `Liste partagée · ${activeList.originLabel}` : 'Liste partagée'}
               </Badge>
+            ) : null}
+            {isForeignList ? (
+              // Départ volontaire (G-06-1c) : même condition d'étrangeté que
+              // le badge — jamais sur les listes du foyer, jamais pour un
+              // gestionnaire (toujours faux sur liste étrangère : isManager
+              // exige !isForeignList). Modale obligatoire (AGENTS.md §6).
+              <button
+                type="button"
+                className={shareButtonBase}
+                aria-label={`Quitter la liste ${activeList?.name ?? ''}`}
+                onClick={() => activeList && setPendingLeave(activeList)}
+              >
+                Quitter cette liste
+              </button>
             ) : null}
             {activeList?.isOwned ? (
               <button
@@ -1019,6 +1055,18 @@ export default function CadeauxPage() {
         description="Les idées et les partages de cette liste seront également supprimés."
         confirmLabel="Supprimer"
         onConfirm={() => void handleDeleteList()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingLeave)}
+        onOpenChange={(open) => {
+          if (!open) setPendingLeave(null);
+        }}
+        title={pendingLeave ? `Quitter « ${pendingLeave.name} »` : 'Quitter cette liste'}
+        description="La liste quittera vos Cadeaux. Vos réservations à votre nom sont conservées, et le lien d’invitation vous permettra de rejoindre à nouveau."
+        confirmLabel="Quitter"
+        destructive={false}
+        onConfirm={() => void handleLeave()}
       />
     </ModuleShell>
   );

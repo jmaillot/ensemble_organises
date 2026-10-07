@@ -398,6 +398,35 @@ export async function reserveMemberGiftItem(itemId: string): Promise<MemberReser
 }
 
 /* ------------------------------------------------------------------ */
+/* Départ volontaire d'une liste rejointe (phase 06, G-06-1c)           */
+/*                                                                     */
+/* Chemin session attachée (user-only) vers l'action Edge              */
+/* `member-leave` : le client n'envoie QUE la liste — ni membre, ni    */
+/* part, ni e-mail. L'identité (lignes membre de tous les foyers +      */
+/* e-mail du compte) est résolue EN BASE depuis la session. Seules ses */
+/* propres parts sont supprimées : ses tenues attribuées sous nom      */
+/* vérifié restent intactes, les parts d'autrui aussi, et le lien      */
+/* d'invitation rejoint normalement (redeem 0082 inchangé).            */
+/* ------------------------------------------------------------------ */
+
+/** Départ volontaire : la liste quitte la vue Cadeaux, les tenues restent. */
+export interface LeaveGiftListResult {
+  list_id: string;
+  left: boolean;
+}
+
+/**
+ * Quitte une liste rejointe inter-foyers. Le refus uniforme (404 « lien ne
+ * passe plus », T-06-15) est propagé tel quel — la page l'affiche sans le
+ * reformuler, comme l'oracle invité.
+ */
+export async function leaveGiftList(listId: string): Promise<LeaveGiftListResult> {
+  const trimmed = listId.trim();
+  if (!trimmed) throw new Error('Liste introuvable.');
+  return callGiftInvite<LeaveGiftListResult>('member-leave', { listId: trimmed });
+}
+
+/* ------------------------------------------------------------------ */
 /* Invité sans compte (phase 06, D-05/D-06/D-09)                        */
 /*                                                                     */
 /* Même Edge Function, forme d'appel publishable : la clé publiable    */

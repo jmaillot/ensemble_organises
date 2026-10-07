@@ -4,6 +4,7 @@ import {
   deleteGiftList,
   fetchCadeauxSnapshot,
   fetchGuestGiftView,
+  leaveGiftList,
   markGuestReservedItem,
   readGuestName,
   readGuestReservedIds,
@@ -426,5 +427,51 @@ describe('reserveMemberGiftItem (G-06-1b-bis)', () => {
 
     stubGuestFetch(() => new Error('Vous ne pouvez pas réserver cet article.'));
     await expect(reserveMemberGiftItem('gift-foreign-1')).rejects.toThrow('ne pouvez pas réserver');
+  });
+});
+
+describe('leaveGiftList (G-06-1c)', () => {
+  it('n’envoie que la liste — aucun membre, part ou e-mail dans la charge', async () => {
+    const seen = stubGuestFetch(() => ({ list_id: 'list-voisins', left: true }));
+
+    const outcome = await leaveGiftList('list-voisins');
+
+    expect(outcome).toEqual({ list_id: 'list-voisins', left: true });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.url).toContain('/gift-list-invite');
+    const body = JSON.parse(String(seen[0]?.init.body ?? '{}')) as Record<string, unknown>;
+    // L'identité vient de la session : la charge ne porte que la liste.
+    expect(body).toEqual({ action: 'member-leave', listId: 'list-voisins' });
+    expect('memberId' in body).toBe(false);
+    expect('shared_with_member_id' in body).toBe(false);
+    expect('shareId' in body).toBe(false);
+    expect('email' in body).toBe(false);
+    expect('userId' in body).toBe(false);
+  });
+
+  it('chemin session attachée : clé publiable + porteur', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: { access_token: 'jwt-test' } } });
+    const seen = stubGuestFetch(() => ({ list_id: 'list-voisins', left: true }));
+
+    await leaveGiftList('list-voisins');
+
+    const headers = (seen[0]?.init.headers ?? {}) as Record<string, string>;
+    expect(headers.apikey).toBe('pk_test');
+    expect(headers.authorization).toBe('Bearer jwt-test');
+  });
+
+  it('liste vide : aucun appel réseau (garde cliente)', async () => {
+    const seen = stubGuestFetch(() => ({}));
+
+    await expect(leaveGiftList('   ')).rejects.toThrow('Liste introuvable');
+    expect(seen).toHaveLength(0);
+  });
+
+  it('l’oracle uniforme 404 est propagé tel quel (copie « lien ne passe plus »)', async () => {
+    stubGuestFetch(
+      () => new Error('Ce lien ne passe plus. Demandez un nouveau lien à l’organisateur pour rejoindre à nouveau.'),
+    );
+
+    await expect(leaveGiftList('list-voisins')).rejects.toThrow('ne passe plus');
   });
 });

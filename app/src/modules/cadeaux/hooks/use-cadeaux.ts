@@ -12,6 +12,7 @@ import {
   deleteGiftItem,
   deleteGiftList,
   fetchCadeauxSnapshot,
+  leaveGiftList,
   promoteIdeaToItem,
   reserveMemberGiftItem,
   syncGiftListShares,
@@ -217,6 +218,16 @@ export function useAddGiftList() {
 
 export function useDeleteGiftList() {
   return useCadeauxMutation((listId: string) => deleteGiftList(listId));
+}
+
+/**
+ * Départ volontaire d'une liste rejointe inter-foyers (G-06-1c) : ne sert
+ * QUE les listes étrangères (le bouton ne s'y affiche jamais ailleurs). Le
+ * serveur supprime exactement les parts de l'appelant ; la mutation ne fait
+ * que relire après (la liste quitte la vue quand sa part disparaît).
+ */
+export function useLeaveGiftList() {
+  return useCadeauxMutation((listId: string) => leaveGiftList(listId));
 }
 
 export function useSyncGiftListShares() {

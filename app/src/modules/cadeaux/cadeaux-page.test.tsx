@@ -27,6 +27,13 @@ const mockRevoke = vi.fn(async (_listId: string) => {
   codeActive = false;
 });
 const mockReserveMember = vi.fn(async (itemId: string) => ({ itemId, alreadyReserved: false }));
+// Départ fidèle (G-06-1c) : comme le RPC serveur, quitter supprime la part
+// qui faisait fusionner la liste — le refetch la fait sortir de la vue. La
+// base de démo est ré-amorcée après chaque test (setup.ts), sans pollution.
+const mockLeaveList = vi.fn(async (listId: string) => {
+  await data.remove('gift_list_shares', 'gift-share-2');
+  return { list_id: listId, left: true };
+});
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>();
@@ -36,6 +43,7 @@ vi.mock('./api', async (importOriginal) => {
     createGiftListInviteCode: (...args: [string]) => mockCreate(...args),
     revokeGiftListInviteCode: (...args: [string]) => mockRevoke(...args),
     reserveMemberGiftItem: (...args: [string]) => mockReserveMember(...args),
+    leaveGiftList: (...args: [string]) => mockLeaveList(...args),
   };
 });
 
@@ -317,5 +325,113 @@ describe('CadeauxPage — liste étrangère (G-06-1b-bis)', () => {
     expect(mockReserveMember).toHaveBeenCalledTimes(1);
     expect(mockReserveMember).toHaveBeenCalledWith('gift-4');
     expect(await screen.findByText('Article réservé.')).toBeInTheDocument();
+  });
+});
+
+describe('CadeauxPage — quitter une liste étrangère (G-06-1c)', () => {
+  it('le bouton ne paraît que sur les listes étrangères, jamais sur celles du foyer', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    // Liste privée du foyer : aucun départ proposé.
+    expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
+
+    // Liste non privée du foyer (gestionnaire) : toujours aucun départ.
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Anniversaire de Noé',
+    );
+    expect(await screen.findByText('Casque pour le vélo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
+
+    // Liste étrangère : le bouton paraît avec le badge d'origine.
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+    expect(await screen.findByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Quitter la liste/ })).toBeInTheDocument();
+  });
+
+  it('la modale annonce le sort exact : liste partie, noms gardés, lien rejouable', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+    await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Quitter « Noël des Voisins »')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Vos réservations à votre nom sont conservées/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/rejoindre à nouveau/)).toBeInTheDocument();
+    expect(mockLeaveList).not.toHaveBeenCalled();
+  });
+
+  it('annuler ne fait rien : aucun appel, liste toujours là', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+    await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(mockLeaveList).not.toHaveBeenCalled();
+    expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
+    expect(screen.getByText('Liste partagée · Les Voisins')).toBeInTheDocument();
+  });
+
+  it('confirmer appelle une fois le serveur puis la liste disparaît', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+    await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Quitter' }));
+
+    expect(mockLeaveList).toHaveBeenCalledTimes(1);
+    expect(mockLeaveList).toHaveBeenCalledWith('gift-list-voisins');
+    expect(await screen.findByText('Liste quittée. Vos réservations à votre nom sont conservées.')).toBeInTheDocument();
+    // La part supprimée, le refetch sort la liste de la vue : ni badge…
+    await waitFor(() => expect(screen.queryByText('Liste partagée · Les Voisins')).not.toBeInTheDocument());
+    // …ni option au sélecteur (repli sur la première liste du foyer).
+    const selector = screen.getByLabelText('Sélection de la liste de cadeaux');
+    expect(within(selector).queryByRole('option', { name: 'Noël des Voisins' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Quitter/ })).not.toBeInTheDocument();
+  });
+
+  it('oracle 404 : la copie « lien ne passe plus » est dite, la liste reste', async () => {
+    const user = userEvent.setup();
+    mockLeaveList.mockRejectedValueOnce(
+      new Error('Ce lien ne passe plus. Demandez un nouveau lien à l’organisateur pour rejoindre à nouveau.'),
+    );
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.selectOptions(
+      await screen.findByLabelText('Sélection de la liste de cadeaux'),
+      'Noël des Voisins',
+    );
+    await user.click(await screen.findByRole('button', { name: /Quitter la liste/ }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Quitter' }));
+
+    expect(mockLeaveList).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Ce lien ne passe plus/)).toBeInTheDocument();
+    expect(screen.getByText('Bougie parfumée')).toBeInTheDocument();
   });
 });
