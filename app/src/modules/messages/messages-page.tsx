@@ -19,6 +19,7 @@ export default function MessagesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
   const [listVisible, setListVisible] = useState(true);
   const { markRead } = feed;
   const isAdmin = useIsAdmin();
@@ -35,6 +36,18 @@ export default function MessagesPage() {
   }, [activeId, markRead]);
 
   const thread = activeId ? (feed.messagesByConversation.get(activeId) ?? []) : [];
+
+  // Départ volontaire : le registre déclaré arbitre (jamais le repli
+  // expéditrices), et le dernier membre restant ne peut pas quitter — bouton
+  // désactivé avec copie explicative plutôt qu'un refus serveur.
+  const declaredIds = activeId ? (feed.memberIdsByConversation.get(activeId) ?? []) : [];
+  const iAmDeclaredMember = declaredIds.includes(feed.currentMemberId);
+  const leaveDisabledReason = !iAmDeclaredMember
+    ? null
+    : declaredIds.length > 1
+      ? null
+      : 'Vous êtes le dernier membre de cette conversation : supprimez-la (admin) pour la fermer.';
+  const leavingTitle = active?.title ?? 'cette conversation';
 
   if (feed.isError) {
     return (
@@ -137,6 +150,33 @@ export default function MessagesPage() {
           }
           onAddMember={active ? () => setAddOpen(true) : undefined}
           onDeleteConversation={active && isAdmin ? () => setPendingDeletion(active.id) : undefined}
+          isAdmin={isAdmin}
+          onEditMessage={
+            active
+              ? (messageId, content) => {
+                  void feed
+                    .editMessage(messageId, content)
+                    .then(() => toast('Message modifié.'))
+                    .catch((error: unknown) => {
+                      toast(error instanceof Error ? error.message : 'Le message n’a pas pu être modifié.', 'error');
+                    });
+                }
+              : undefined
+          }
+          onDeleteMessage={
+            active
+              ? (messageId) => {
+                  void feed
+                    .deleteMessage(messageId)
+                    .then(() => toast('Message supprimé.'))
+                    .catch((error: unknown) => {
+                      toast(error instanceof Error ? error.message : 'Le message n’a pas pu être supprimé.', 'error');
+                    });
+                }
+              : undefined
+          }
+          onLeaveConversation={active && iAmDeclaredMember ? () => setPendingLeave(active.id) : undefined}
+          leaveDisabledReason={leaveDisabledReason}
           onBackToList={() => setListVisible(true)}
           className={cn(
             'flex min-h-[460px] flex-col overflow-hidden rounded-[16px] border border-border bg-surface',
@@ -199,6 +239,33 @@ export default function MessagesPage() {
             .then(() => toast('Conversation supprimée.'))
             .catch((error: unknown) =>
               toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être supprimée.', 'error'),
+            );
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingLeave !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingLeave(null);
+        }}
+        title={`Quitter « ${leavingTitle} » ?`}
+        description="Vous ne verrez plus cette conversation. Vos messages restent visibles pour les autres membres."
+        confirmLabel="Quitter la conversation"
+        onConfirm={() => {
+          const target = pendingLeave;
+          setPendingLeave(null);
+          if (!target) return;
+          // Bascule immédiate : en mode serveur la RLS masque le fil quitté,
+          // en local il reste listé mais sans mon appartenance.
+          if (selectedId === target) {
+            const fallback = conversations.find((conversation) => conversation.id !== target) ?? null;
+            setSelectedId(fallback?.id ?? null);
+          }
+          void feed
+            .leaveConversation(target)
+            .then(() => toast('Conversation quittée.'))
+            .catch((error: unknown) =>
+              toast(error instanceof Error ? error.message : 'Le départ n’a pas pu être enregistré.', 'error'),
             );
         }}
       />

@@ -43,6 +43,39 @@ export async function fetchMessages(householdId: string | null): Promise<Message
   return data.list<MessageRow>('messages', { household_id: householdId });
 }
 
+/**
+ * Renommage du contenu d'un message. La RLS (`messages_update`, prouvée en
+ * 0038) réserve l'opération à l'expéditrice ; les appels forgés sont refusés
+ * côté serveur, l'UI ne fait que refléter la porte (D-02).
+ */
+export async function updateMessageContent(messageId: string, content: string): Promise<MessageRow> {
+  const trimmed = content.trim();
+  if (trimmed.length === 0) throw new Error('Un message ne peut pas être vide.');
+  if (trimmed.length > MAX_MESSAGE_LENGTH) {
+    throw new Error(`Un message fait ${MAX_MESSAGE_LENGTH} caractères au maximum.`);
+  }
+  return data.update<MessageRow>('messages', messageId, { content: trimmed });
+}
+
+/**
+ * Suppression d'un seul message, historique du fil conservé pour le reste.
+ * La RLS (`messages_delete`, prouvée en 0038) réserve l'opération à
+ * l'expéditrice ou à un admin du foyer (D-03).
+ */
+export async function deleteMessage(messageId: string): Promise<void> {
+  await data.remove('messages', messageId);
+}
+
+/**
+ * Départ volontaire d'une conversation : seule la ligne d'appartenance est
+ * retirée, les messages restent visibles pour les autres membres. La RLS
+ * (`conversation_members_delete`, prouvée en 0038) réserve l'opération au
+ * membre lui-même (D-04).
+ */
+export async function leaveConversation(conversationId: string, memberId: string): Promise<void> {
+  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
+}
+
 export async function createMessage(draft: MessageDraft): Promise<MessageRow> {
   const content = draft.content.trim();
   if (content.length === 0 && !draft.mediaUrl) throw new Error('Écrivez un message ou joignez une image.');

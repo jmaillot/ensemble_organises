@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/shared/icon';
@@ -17,17 +18,125 @@ export interface ChatPanelProps {
   onAddMember?: () => void;
   /** Demande la suppression de la conversation (admin) ; absent, le bouton est masqué. */
   onDeleteConversation?: () => void;
+  /** Enregistre le contenu réécrit d'un message ; absent, l'édition est masquée. */
+  onEditMessage?: (messageId: string, content: string) => void;
+  /** Demande la suppression d'un seul message ; absent, le bouton est masqué. */
+  onDeleteMessage?: (messageId: string) => void;
+  /** Demande le départ volontaire du fil ; absent, le bouton est masqué. */
+  onLeaveConversation?: () => void;
+  /** Quand renseigné, « Quitter » est désactivé et la raison est expliquée. */
+  leaveDisabledReason?: string | null;
+  /** Vrai quand le membre courant administre le foyer : voit aussi la suppression des bulles d'autrui. */
+  isAdmin?: boolean;
   /** Sur petit écran : revient à la liste pour ne pas écraser la discussion. */
   onBackToList?: () => void;
   composerRef?: RefObject<HTMLInputElement | null>;
   className?: string;
 }
 
+/** Une bulle : contenu, édition inline de l'expéditrice, suppression confirmée. */
+function MessageBubble({
+  message,
+  showEdit,
+  showDelete,
+  editing,
+  editDraft,
+  onStartEdit,
+  onEditDraftChange,
+  onCancelEdit,
+  onSaveEdit,
+  onRequestDelete,
+}: {
+  message: Message;
+  showEdit: boolean;
+  showDelete: boolean;
+  editing: boolean;
+  editDraft: string;
+  onStartEdit: () => void;
+  onEditDraftChange: (value: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onRequestDelete: () => void;
+}) {
+  const canSave = editDraft.trim() !== '';
+  return (
+    <div
+      className={`max-w-[72%] rounded-[14px_14px_14px_4px] border border-border bg-surface px-3 py-2.5 text-xs ${
+        message.isMine ? 'self-end rounded-[14px_14px_4px_14px]' : 'self-start'
+      }`}
+    >
+      <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>
+      {message.mediaUrl ? (
+        <a href={message.mediaUrl} target="_blank" rel="noreferrer" aria-label={`Ouvrir l’image de ${message.senderName}`}>
+          <img src={message.mediaUrl} alt="" loading="lazy" className="mb-1.5 max-h-48 w-auto rounded-[10px]" />
+        </a>
+      ) : null}
+      {editing ? (
+        <form
+          className="grid gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!canSave) return;
+            onSaveEdit();
+          }}
+        >
+          <Input
+            value={editDraft}
+            onChange={(event) => onEditDraftChange(event.target.value)}
+            aria-label="Modifier votre message"
+            autoComplete="off"
+            maxLength={4000}
+            autoFocus
+          />
+          <div className="flex justify-end gap-1.5">
+            <Button type="button" variant="quiet" size="sm" onClick={onCancelEdit}>
+              Annuler
+            </Button>
+            <Button type="submit" variant="secondary" size="sm" disabled={!canSave}>
+              Enregistrer
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <span className="whitespace-pre-wrap break-words">{message.content}</span>
+      )}
+      <time dateTime={message.createdAt} className="mt-1 block text-[10px] text-muted">
+        {formatClock(message.createdAt)}
+        {message.pending ? ' · envoi…' : ''}
+      </time>
+      {showEdit || showDelete ? (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {showEdit && !editing ? (
+            <Button type="button" variant="quiet" size="sm" onClick={onStartEdit} aria-label="Modifier ce message">
+              Modifier
+            </Button>
+          ) : null}
+          {showDelete && !editing ? (
+            <Button
+              type="button"
+              variant="quiet"
+              size="sm"
+              onClick={onRequestDelete}
+              aria-label="Supprimer ce message"
+              className="text-coral"
+            >
+              Supprimer
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, isAdmin = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [pendingDeletion, setPendingDeletion] = useState<Message | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const conversationId = conversation?.id ?? null;
@@ -39,6 +148,9 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
       return null;
     });
     setAttachError(null);
+    setEditingId(null);
+    setEditDraft('');
+    setPendingDeletion(null);
   }, [conversationId]);
 
   // Le fil suit toujours le dernier message (envoi optimiste compris).
@@ -72,6 +184,13 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
       return null;
     });
   };
+  const saveEditFor = (target: Message) => () => {
+    if (editDraft.trim() === '' || !onEditMessage) return;
+    onEditMessage(target.id, editDraft);
+    setEditingId(null);
+    setEditDraft('');
+  };
+  const requestDeleteFor = (target: Message) => () => setPendingDeletion(target);
 
   const attach = async (file: File | undefined) => {
     if (!file) return;
@@ -131,6 +250,20 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
           />
         ) : null}
+        {onLeaveConversation ? (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon="logout"
+            onClick={onLeaveConversation}
+            disabled={leaveDisabledReason !== null}
+            title={leaveDisabledReason ?? 'Quitter cette conversation'}
+            aria-label={`Quitter la conversation ${conversation.title}`}
+            className="shrink-0"
+          >
+            Quitter
+          </Button>
+        ) : null}
       </div>
 
       <div
@@ -148,29 +281,28 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           </p>
         ) : (
           messages.map((message) => (
-            <div
+            <MessageBubble
               key={message.id}
-              // Un seul fond pour les deux camps (écriture sombre sur fond
-              // clair) : seul l'alignement distingue envoyés et reçus.
-              className={`max-w-[72%] rounded-[14px_14px_14px_4px] border border-border bg-surface px-3 py-2.5 text-xs ${
-                message.isMine ? 'self-end rounded-[14px_14px_4px_14px]' : 'self-start'
-              }`}
-            >
-              <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>
-              {message.mediaUrl ? (
-                <a href={message.mediaUrl} target="_blank" rel="noreferrer" aria-label={`Ouvrir l’image de ${message.senderName}`}>
-                  <img src={message.mediaUrl} alt="" loading="lazy" className="mb-1.5 max-h-48 w-auto rounded-[10px]" />
-                </a>
-              ) : null}
-              <span className="whitespace-pre-wrap break-words">{message.content}</span>
-              <time
-                dateTime={message.createdAt}
-                className="mt-1 block text-[10px] text-muted"
-              >
-                {formatClock(message.createdAt)}
-                {message.pending ? ' · envoi…' : ''}
-              </time>
-            </div>
+              message={message}
+              showEdit={Boolean(onEditMessage) && message.isMine && !message.pending}
+              showDelete={Boolean(onDeleteMessage) && !message.pending && (message.isMine || isAdmin)}
+              editing={editingId === message.id}
+              editDraft={editingId === message.id ? editDraft : message.content}
+              onStartEdit={() => {
+                setEditingId(message.id);
+                setEditDraft(message.content);
+              }}
+              onEditDraftChange={(value) => {
+                setEditingId(message.id);
+                setEditDraft(value);
+              }}
+              onCancelEdit={() => {
+                setEditingId(null);
+                setEditDraft('');
+              }}
+              onSaveEdit={saveEditFor(message)}
+              onRequestDelete={requestDeleteFor(message)}
+            />
           ))
         )}
       </div>
@@ -243,6 +375,21 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         <Icon name="wifi" size="sm" />
         Les messages arrivent en temps réel pour les membres du foyer.
       </p>
+      <ConfirmDialog
+        open={pendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeletion(null);
+        }}
+        title="Supprimer ce message ?"
+        description="Ce message disparaîtra pour tous les membres. Cette action est définitive."
+        confirmLabel="Supprimer le message"
+        onConfirm={() => {
+          const target = pendingDeletion;
+          setPendingDeletion(null);
+          if (!target || !onDeleteMessage) return;
+          onDeleteMessage(target.id);
+        }}
+      />
     </section>
   );
 }

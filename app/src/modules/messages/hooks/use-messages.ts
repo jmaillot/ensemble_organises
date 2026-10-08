@@ -5,10 +5,10 @@ import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, removeConversationCascade, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
+import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, leaveConversation as leaveConversationRow, removeConversationCascade, updateMessageContent, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
-import type { MessageRow } from '@/types';
+import type { ConversationMemberRow, MessageRow } from '@/types';
 
 export const messageKeys = {
   all: ['messages'] as const,
@@ -32,6 +32,8 @@ export function useReadConversations() {
 export interface MessagesFeed {
   conversations: ConversationSummary[];
   messagesByConversation: Map<string, Message[]>;
+  /** Appartenances déclarées par fil (registre brut, sans le repli expéditrices). */
+  memberIdsByConversation: Map<string, string[]>;
   totalMessages: number;
   unreadTotal: number;
   householdId: string | null;
@@ -48,8 +50,12 @@ export interface MessagesFeed {
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
+  editMessage: (messageId: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  leaveConversation: (conversationId: string) => Promise<void>;
   isCreating: boolean;
   isDeleting: boolean;
+  isLeaving: boolean;
 }
 
 /** Conversations, participants et messages du foyer, assemblés pour l'écran. */
@@ -220,6 +226,74 @@ export function useMessagesFeed(): MessagesFeed {
     },
   });
 
+  /** Édition optimiste : le contenu est remplacé aussitôt, restauré en cas de refus serveur. */
+  const editMessageMutation = useMutation({
+    mutationFn: (input: { messageId: string; content: string }) => updateMessageContent(input.messageId, input.content),
+    onMutate: async (input) => {
+      if (!householdId) return { previous: undefined };
+      await queryClient.cancelQueries({ queryKey: messageKeys.rows(householdId) });
+      const key = messageKeys.rows(householdId);
+      const previous = queryClient.getQueryData<MessageRow[]>(key);
+      queryClient.setQueryData<MessageRow[]>(key, (current = []) =>
+        current.map((row) => (row.id === input.messageId ? { ...row, content: input.content.trim() } : row)),
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!householdId || !context?.previous) return;
+      queryClient.setQueryData(messageKeys.rows(householdId), context.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  /** Suppression optimiste d'un seul message : retiré aussitôt, restauré en cas de refus serveur. */
+  const deleteMessageMutation = useMutation({
+    mutationFn: (messageId: string) => removeMessageRow(messageId),
+    onMutate: async (messageId) => {
+      if (!householdId) return { previous: undefined };
+      await queryClient.cancelQueries({ queryKey: messageKeys.rows(householdId) });
+      const key = messageKeys.rows(householdId);
+      const previous = queryClient.getQueryData<MessageRow[]>(key);
+      queryClient.setQueryData<MessageRow[]>(key, (current = []) => current.filter((row) => row.id !== messageId));
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!householdId || !context?.previous) return;
+      queryClient.setQueryData(messageKeys.rows(householdId), context.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  /**
+   * Départ volontaire : seule l'appartenance est retirée (l'historique reste).
+   * Retrait optimiste du registre, restauré en cas de refus serveur.
+   */
+  const leaveMutation = useMutation({
+    mutationFn: (conversationId: string) => {
+      if (!currentMemberId) throw new Error('Aucun membre courant pour quitter la conversation.');
+      return leaveConversationRow(conversationId, currentMemberId);
+    },
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: messageKeys.participants });
+      const previous = queryClient.getQueryData<ConversationMemberRow[]>(messageKeys.participants);
+      queryClient.setQueryData<ConversationMemberRow[]>(messageKeys.participants, (current = []) =>
+        current.filter((row) => !(row.conversation_id === conversationId && row.member_id === currentMemberId)),
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!context?.previous) return;
+      queryClient.setQueryData(messageKeys.participants, context.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
   const createConversationAndSelect = useCallback(
     async (draft: Omit<ConversationDraft, 'householdId'>) => createMutation.mutateAsync(draft),
     [createMutation],
@@ -232,6 +306,16 @@ export function useMessagesFeed(): MessagesFeed {
     async (conversationId: string) => deleteMutation.mutateAsync(conversationId),
     [deleteMutation],
   );
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    await editMessageMutation.mutateAsync({ messageId, content });
+  }, [editMessageMutation]);
+  const deleteMessage = useCallback(async (messageId: string) => {
+    await deleteMessageMutation.mutateAsync(messageId);
+  }, [deleteMessageMutation]);
+  const leaveConversation = useCallback(
+    async (conversationId: string) => leaveMutation.mutateAsync(conversationId),
+    [leaveMutation],
+  );
 
   const refetch = useCallback(() => {
     void conversationsQuery.refetch();
@@ -241,6 +325,15 @@ export function useMessagesFeed(): MessagesFeed {
   return {
     conversations,
     messagesByConversation,
+    memberIdsByConversation: useMemo(() => {
+      const grouped = new Map<string, string[]>();
+      for (const row of participantRows) {
+        const existing = grouped.get(row.conversation_id);
+        if (existing) existing.push(row.member_id);
+        else grouped.set(row.conversation_id, [row.member_id]);
+      }
+      return grouped;
+    }, [participantRows]),
     totalMessages: rows.length,
     unreadTotal: conversations.reduce((total, conversation) => total + conversation.unread, 0),
     householdId,
@@ -257,8 +350,12 @@ export function useMessagesFeed(): MessagesFeed {
     createConversation: createConversationAndSelect,
     addMembers,
     deleteConversation,
+    editMessage,
+    deleteMessage,
+    leaveConversation,
     isCreating: createMutation.isPending || addMembersMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isLeaving: leaveMutation.isPending,
   };
 }
 
