@@ -55,6 +55,42 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await expect(birthdays.getByText('E2E Aline')).toBeVisible();
   });
 
+  test('déplacer un contact personnel vers Famille le rend partagé', async ({ page }) => {
+    // Déplacement personnel→Famille (phase 07, D-04) en démonstration : sans
+    // backend, seuls le bouton réservé aux listes personnelles, la copie de
+    // la modale et le rattachement à Famille sont déterministes. Le miroir
+    // anniversaire et les refus RLS sont prouvés par la suite SQL 0036 — pas
+    // rejouables sans relais.
+    await openDemoSession(page);
+    await page.goto('/contacts');
+    await expect(page.getByRole('group', { name: 'Choisir une liste de contacts' })).toBeVisible();
+
+    // Fiche créée dans la liste personnelle…
+    await page.getByRole('button', { name: 'Ajouter un contact' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/^Nom/).fill('E2E Palma');
+    await dialog.getByLabel(/Date de naissance/).fill('03/03/2003');
+    await dialog.getByLabel(/Liste/).selectOption({ label: 'Camille' });
+    await dialog.getByRole('button', { name: 'Ajouter le contact' }).click();
+
+    const chips = page.getByRole('group', { name: 'Choisir une liste de contacts' });
+    await chips.getByRole('button', { name: /Camille/ }).click();
+    const rows = page.getByRole('list', { name: 'Liste des contacts' });
+    await expect(rows.getByText('E2E Palma')).toBeVisible();
+
+    // …déplacée vers Famille via la modale de confirmation.
+    await page.getByRole('button', { name: 'Déplacer la fiche de E2E Palma vers Famille' }).click();
+    const confirm = page.getByRole('alertdialog');
+    await expect(confirm.getByText(/visible par tout le foyer/)).toBeVisible();
+    await expect(confirm.getByText(/anniversaire sera partagé/)).toBeVisible();
+    await confirm.getByRole('button', { name: 'Déplacer vers Famille' }).click();
+
+    // La fiche rejoint la liste partagée, sans bouton de déplacement.
+    await chips.getByRole('button', { name: /Famille/ }).click();
+    await expect(page.getByRole('list', { name: 'Liste des contacts' }).getByText('E2E Palma')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Déplacer la fiche/ })).toHaveCount(0);
+  });
+
   test('un anniversaire homonyme affiche le badge deux-sources', async ({ page }) => {
     await openDemoSession(page);
 
