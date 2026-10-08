@@ -72,7 +72,7 @@ begin
           ('post_reactions', ARRAY['id', 'post_id', 'household_id', 'author_id', 'reaction_type', 'created_at']::text[]),
           ('trips', ARRAY['id', 'household_id', 'name', 'destination', 'start_date', 'end_date', 'cover_photo', 'notes', 'created_at']::text[]),
           ('conversations', ARRAY['id', 'household_id', 'type', 'title', 'created_at']::text[]),
-          ('conversation_members', ARRAY['conversation_id', 'member_id']::text[]),
+          ('conversation_members', ARRAY['conversation_id', 'member_id', 'left_at']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
           ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[]),

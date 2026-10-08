@@ -257,20 +257,21 @@ select testkit.eq(testkit.affected(format(
 
 reset role;
 
--- Admin (Alice, message restant de Bob) : 1 ligne (D-03 RLS-prête).
+-- Admin (Alice, message restant de Bob) : 0 ligne depuis 0100 (D-07 : la
+-- branche admin de `messages_delete` est retirée ; preuves en 0039).
 select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
   'delete from public.messages where id = %L',
-  (select row_id from testkit.fx where key = 'msg_bob'))), 1::bigint,
-  'l''admin supprime un message du fil');
+  (select row_id from testkit.fx where key = 'msg_bob'))), 0::bigint,
+  'l''admin ne supprime plus un message seul d''autrui (D-07, voir 0039)');
 
--- Le fil ne contient plus que le message d'Alice (borné au fil).
+-- Le fil contient les deux messages restants (borné au fil).
 select testkit.eq(testkit.count(format(
   'select 1 from public.messages where conversation_id = %L',
-  (select row_id from testkit.fx where key = 'conv'))), 1::bigint,
-  'apres suppressions legitimes, seul le message de l''auteur reste');
+  (select row_id from testkit.fx where key = 'conv'))), 2::bigint,
+  'apres suppressions auteur seul, les deux messages restants demeurent');
 
 reset role;
 
@@ -310,16 +311,21 @@ select testkit.eq(testkit.affected(format(
 
 reset role;
 
--- Self-leave (Noé quitte son fil, D-04 RLS-prête) : 1 ligne. En dernier :
--- Noé n'est plus membre après, aucun test ultérieur n'en dépend.
+-- Self-leave (Noé quitte son fil, D-08 depuis 0100 : pierre tombale par RPC,
+-- preuves en 0039) : 1 ligne. En dernier : aucun test ultérieur n'en dépend.
 select testkit.as_user(user_id, 'mconv-kid@example.fr') from testkit.fx where key = 'kid';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
-  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
-  (select row_id from testkit.fx where key = 'conv'),
-  (select row_id from testkit.fx where key = 'kid_m'))), 1::bigint,
-  'un membre quitte lui-meme son fil');
+  'select public.leave_conversation(%L)',
+  (select row_id from testkit.fx where key = 'conv'))), 1::bigint,
+  'un membre quitte lui-meme son fil (pierre tombale, D-08)');
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.conversations where household_id = %L and id = %L',
+  (select household_id from testkit.fx where key = 'home'),
+  (select row_id from testkit.fx where key = 'conv'))), 1::bigint,
+  'le partant voit encore son fil quitte (lecture seule, voir 0039)');
 
 reset role;
 
