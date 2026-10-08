@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { data } from '@/lib/data';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import type { ConversationMemberRow, MessageRow } from '@/types';
 import { useHouseholdStore } from '@/stores/household-store';
 import MessagesPage from './messages-page';
 
@@ -175,7 +177,201 @@ describe('Messages', () => {
     expect(within(log).getByRole('link', { name: /Ouvrir l’image/ })).toBeInTheDocument();
   });
 
+  it('modifie son propre message et l’enregistre', async () => {
+    // D-02 : l'expéditrice seule voit « Modifier » ; l'enregistrement est
+    // optimiste (rollback serveur en cas de refus, prouvé par la RLS 0038).
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const bubble = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    expect(bubble).not.toBeNull();
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Modifier ce message' }));
+
+    const editor = within(bubble as HTMLElement).getByLabelText('Modifier votre message');
+    expect(editor).toHaveValue('Pas encore, tu me donneras l’adresse ?');
+    await user.clear(editor);
+    await user.type(editor, 'Adresse reçue, merci !');
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => expect(within(log).getByText('Adresse reçue, merci !')).toBeInTheDocument());
+    expect(within(log).queryByText('Pas encore, tu me donneras l’adresse ?')).not.toBeInTheDocument();
+    // Le toast suit la confirmation serveur, après l'optimiste : il s'attend.
+    await waitFor(() => expect(screen.getByText('Message modifié.')).toBeInTheDocument());
+  });
+
+  it('annule l’édition sans toucher au message', async () => {
+    // Chaque test repart d'une base regarnie (setup afterEach) : `message-2`
+    // est la bulle de Camille, intacte ici.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const bubble = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    expect(bubble).not.toBeNull();
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Modifier ce message' }));
+
+    const editor = within(bubble as HTMLElement).getByLabelText('Modifier votre message');
+    await user.clear(editor);
+    await user.type(editor, 'Brouillon abandonné');
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Annuler' }));
+
+    expect(within(log).getByText('Pas encore, tu me donneras l’adresse ?')).toBeInTheDocument();
+    expect(within(log).queryByLabelText('Modifier votre message')).not.toBeInTheDocument();
+  });
+
+  it('supprime son propre message après confirmation, le reste du fil demeure', async () => {
+    // D-03 : suppression d'un seul message (`message-2`, Camille),
+    // historique conservé autour.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const bubble = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    expect(bubble).not.toBeNull();
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Supprimer ce message' }));
+
+    const alert = await screen.findByRole('alertdialog');
+    expect(alert).toHaveTextContent('disparaîtra pour tous les membres');
+    await user.click(within(alert).getByRole('button', { name: 'Supprimer le message' }));
+
+    await waitFor(() => expect(within(log).queryByText('Pas encore, tu me donneras l’adresse ?')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Message supprimé.')).toBeInTheDocument());
+    // Les bulles voisines survivent à la suppression ciblée.
+    expect(within(log).getByText('Tu as vu le nouveau parc ?')).toBeInTheDocument();
+    expect(within(log).getByText(/je te l’envoie/)).toBeInTheDocument();
+  });
+
+  it('laisse l’admin supprimer le message d’autrui, sans l’éditer', async () => {
+    // D-03, miroir RLS : Camille administre, donc « Supprimer » sur la bulle
+    // de Lina, mais aucune « Modifier » (édition strictement expéditrice).
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const bubble = within(log).getByText('Tu as vu le nouveau parc ?').closest('div');
+    expect(bubble).not.toBeNull();
+    expect(within(bubble as HTMLElement).queryByRole('button', { name: 'Modifier ce message' })).not.toBeInTheDocument();
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Supprimer ce message' }));
+
+    const alert = await screen.findByRole('alertdialog');
+    await user.click(within(alert).getByRole('button', { name: 'Supprimer le message' }));
+
+    await waitFor(() => expect(within(log).queryByText('Tu as vu le nouveau parc ?')).not.toBeInTheDocument());
+    expect(within(log).getByText(/je te l’envoie/)).toBeInTheDocument();
+  });
+
+  it('page le fil par conversation avec un « Charger plus » explicite', async () => {
+    // D-05 : ~35 messages ajoutés au fil de Lina ; la première fenêtre (30)
+    // cache les plus anciens, « Charger plus » les annexe. Les effectifs
+    // sont lus en base (le début de suite y écrit déjà) plutôt que codés en
+    // dur. `conversation-1` est l'identifiant graine du direct avec Lina.
+    const seedCount = (await data.list<MessageRow>('messages', { conversation_id: 'conversation-1' })).length;
+    for (let index = 0; index < 35; index += 1) {
+      await data.create<MessageRow>('messages', {
+        conversation_id: 'conversation-1',
+        household_id: DEMO_HOUSEHOLD_ID,
+        sender_id: index % 2 === 0 ? DEMO_MEMBERS.camille : DEMO_MEMBERS.lina,
+        content: `Message paginé ${index}`,
+        media_url: null,
+      });
+    }
+    const total = (await data.list<MessageRow>('messages', { conversation_id: 'conversation-1' })).length;
+    expect(total).toBeGreaterThan(30);
+    expect(total).toBe(seedCount + 35);
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+
+    expect(await within(log).findByText('Message paginé 34')).toBeInTheDocument();
+    // `message-3` (10 h 45, jamais touché par les tests) est le plus ancien
+    // survivant : il reste déchargé tant que la fenêtre ne s'élargit pas.
+    expect(within(log).queryByText(/je te l’envoie/)).not.toBeInTheDocument();
+    expect(within(log).getByText(`30 sur ${total} messages chargés`)).toBeInTheDocument();
+
+    await user.click(within(log).getByRole('button', { name: 'Charger les messages précédents' }));
+    await waitFor(() => expect(within(log).getByText(/je te l’envoie/)).toBeInTheDocument());
+    expect(within(log).getByText(`${total} sur ${total} messages chargés`)).toBeInTheDocument();
+    expect(within(log).queryByRole('button', { name: 'Charger les messages précédents' })).not.toBeInTheDocument();
+  });
+
+  it('fusionne l’insert temps réel sans dupliquer la bulle', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: DEMO_MEMBERS.lina,
+      content: 'Temps réel sans doublon',
+      media_url: null,
+    });
+
+    await waitFor(() => expect(within(log).getByText('Temps réel sans doublon')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(within(log).getAllByText('Temps réel sans doublon')).toHaveLength(1);
+    });
+  });
+
+  it('quitte une conversation : registre retiré, historique conservé', async () => {
+    // D-04 : le départ ne retire que l'appartenance (vérifié au registre),
+    // les messages restent ; la vue bascule sur un autre fil.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
+
+    const membershipsOf = async (memberId: string) =>
+      (await data.list<ConversationMemberRow>('conversation_members'))
+        .filter((row) => row.member_id === memberId)
+        .map((row) => row.conversation_id);
+    const before = await membershipsOf(DEMO_MEMBERS.camille);
+    expect(before.length).toBeGreaterThan(1);
+
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(alert).toHaveTextContent('restent visibles pour les autres membres');
+    await user.click(within(alert).getByRole('button', { name: 'Quitter la conversation' }));
+
+    await waitFor(() => expect(screen.queryByRole('log', { name: /Messages de Lina/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Conversation quittée.')).toBeInTheDocument());
+
+    const after = await membershipsOf(DEMO_MEMBERS.camille);
+    const left = before.filter((id) => !after.includes(id));
+    expect(left).toHaveLength(1);
+    const kept = await data.list<MessageRow>('messages', { conversation_id: left[0] });
+    expect(kept.length).toBeGreaterThan(0);
+  });
+
+  it('désactive le départ pour le dernier membre restant', async () => {
+    // `conversation-3` ne déclare que Camille : quitter est désactivé avec
+    // copie explicative plutôt qu'un refus serveur.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Maya/ }));
+    expect(await screen.findByRole('log', { name: 'Messages de Maya' })).toBeInTheDocument();
+
+    const quit = screen.getByRole('button', { name: 'Quitter la conversation Maya' });
+    expect(quit).toBeDisabled();
+    expect(quit).toHaveAttribute('title', expect.stringContaining('dernier membre'));
+    await user.click(quit);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('supprime une conversation et son fil après confirmation', async () => {
+    // Dernier : la cascade retire le fil de Lina, déjà quitté plus haut —
+    // l'opération admin ne dépend d'aucune appartenance.
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);
 
