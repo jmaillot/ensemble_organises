@@ -137,6 +137,232 @@ select testkit.expect_denied(format(
   (select user_id from testkit.fx where key = 'outsider')),
   'un exterieur ne depose aucune image messages');
 
+-- ===========================================================================
+-- D-06 : matrice RLS des conversations (preuves avec négatifs).
+-- ===========================================================================
+
+-- Extérieur : aucun SELECT sur le fil existant — ni la conversation, ni ses
+-- membres, ni ses messages.
+select testkit.as_user(user_id, 'mconv-outsider@example.fr') from testkit.fx where key = 'outsider';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.conversations where household_id = %L and id = %L',
+  (select household_id from testkit.fx where key = 'home'),
+  (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
+  'un exterieur ne lit pas la conversation');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.conversation_members where conversation_id = %L',
+  (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
+  'un exterieur ne lit pas les membres du fil');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.messages where household_id = %L and conversation_id = %L',
+  (select household_id from testkit.fx where key = 'home'),
+  (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
+  'un exterieur ne lit pas les messages du fil');
+
 reset role;
+
+-- Membre du foyer mais hors fil (Léa, enfant) : le fil reste invisible —
+-- l'isolation est au fil, pas au foyer.
+select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.messages where household_id = %L and conversation_id = %L',
+  (select household_id from testkit.fx where key = 'home'),
+  (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
+  'un membre hors fil ne lit pas les messages du fil');
+
+reset role;
+
+-- messages_update : l'auteur modifie son contenu (D-02 RLS-prête).
+select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'update public.messages set content = %L where id = %L',
+  'Bonsoir (precise)',
+  (select row_id from testkit.fx where key = 'msg_alice'))), 1::bigint,
+  'l''auteur modifie son propre message');
+
+reset role;
+
+-- Autrui (membre du fil, non auteur) : 0 ligne, sans erreur.
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'update public.messages set content = %L where id = %L',
+  'Reecrit par Bob',
+  (select row_id from testkit.fx where key = 'msg_alice'))), 0::bigint,
+  'un autre membre ne modifie pas le message d''autrui');
+
+reset role;
+
+-- Extérieur : 0 ligne, sans erreur.
+select testkit.as_user(user_id, 'mconv-outsider@example.fr') from testkit.fx where key = 'outsider';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'update public.messages set content = %L where id = %L',
+  'Reecrit par l''exterieur',
+  (select row_id from testkit.fx where key = 'msg_alice'))), 0::bigint,
+  'un exterieur ne modifie aucun message');
+
+reset role;
+
+-- Le message d'Alice est intact après les deux tentatives.
+select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.messages where conversation_id = %L and id = %L and content = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'msg_alice'), 'Bonsoir (precise)')), 1::bigint,
+  'le message de l''auteur est intact apres les tentatives d''autrui');
+
+reset role;
+
+-- messages_delete : non-auteur non-admin (Bob sur le message d'Alice) : 0.
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.messages where id = %L',
+  (select row_id from testkit.fx where key = 'msg_alice'))), 0::bigint,
+  'un membre non auteur et non admin ne supprime pas le message d''autrui');
+
+reset role;
+
+-- Extérieur : 0 ligne, sans erreur.
+select testkit.as_user(user_id, 'mconv-outsider@example.fr') from testkit.fx where key = 'outsider';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.messages where id = %L',
+  (select row_id from testkit.fx where key = 'msg_alice'))), 0::bigint,
+  'un exterieur ne supprime aucun message');
+
+reset role;
+
+-- Auteur (Bob, son deuxième message) : 1 ligne (D-03 RLS-prête).
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.messages where id = %L',
+  (select row_id from testkit.fx where key = 'msg_bob2'))), 1::bigint,
+  'l''auteur supprime son propre message');
+
+reset role;
+
+-- Admin (Alice, message restant de Bob) : 1 ligne (D-03 RLS-prête).
+select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.messages where id = %L',
+  (select row_id from testkit.fx where key = 'msg_bob'))), 1::bigint,
+  'l''admin supprime un message du fil');
+
+-- Le fil ne contient plus que le message d'Alice (borné au fil).
+select testkit.eq(testkit.count(format(
+  'select 1 from public.messages where conversation_id = %L',
+  (select row_id from testkit.fx where key = 'conv'))), 1::bigint,
+  'apres suppressions legitimes, seul le message de l''auteur reste');
+
+reset role;
+
+-- conversation_members_delete : non-admin (Bob) retirant autrui (Alice) : 0.
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'alice_m'))), 0::bigint,
+  'un membre non admin ne retire pas autrui du fil');
+
+reset role;
+
+-- Non-membre du fil (Léa) : 0 ligne, sans erreur.
+select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'bob_m'))), 0::bigint,
+  'un non-membre du fil n''en retire personne');
+
+reset role;
+
+-- Extérieur : 0 ligne, sans erreur.
+select testkit.as_user(user_id, 'mconv-outsider@example.fr') from testkit.fx where key = 'outsider';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'bob_m'))), 0::bigint,
+  'un exterieur n''en retire personne');
+
+reset role;
+
+-- Self-leave (Noé quitte son fil, D-04 RLS-prête) : 1 ligne. En dernier :
+-- Noé n'est plus membre après, aucun test ultérieur n'en dépend.
+select testkit.as_user(user_id, 'mconv-kid@example.fr') from testkit.fx where key = 'kid';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'kid_m'))), 1::bigint,
+  'un membre quitte lui-meme son fil');
+
+reset role;
+
+-- ===========================================================================
+-- D-06 (fin) : isolation notification_reads sur portée conversation réelle —
+-- Alice marque le fil lu ; Bob ne voit rien de sa ligne et ne peut l'écrire
+-- à sa place (0015 prouve le mécanisme ; ici la portée est le fil du foyer).
+-- ===========================================================================
+select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'insert into public.notification_reads (id, user_id, scope, scope_id) values (%L, %L, %L, %L)',
+  'mconv-nr-alice', (select user_id from testkit.fx where key = 'alice'),
+  'conversation', (select row_id from testkit.fx where key = 'conv'))), 1::bigint,
+  'Alice marque le fil lu dans son propre registre');
+
+reset role;
+
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.notification_reads where scope = %L and scope_id = %L',
+  'conversation', (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
+  'Bob ne lit pas la ligne de lecture d''Alice sur le fil');
+select testkit.expect_denied(format(
+  'insert into public.notification_reads (id, user_id, scope, scope_id) values (%L, %L, %L, %L)',
+  'mconv-nr-intrus', (select user_id from testkit.fx where key = 'alice'),
+  'conversation', (select row_id from testkit.fx where key = 'conv')),
+  'Bob ne peut pas ecrire une ligne de lecture au nom d''Alice');
+select testkit.eq(testkit.affected(
+  'update public.notification_reads set read_at = now() where id = ''mconv-nr-alice'''), 0::bigint,
+  'Bob ne touche pas l''horodatage de lecture d''Alice');
+select testkit.eq(testkit.affected(
+  'delete from public.notification_reads where id = ''mconv-nr-alice'''), 0::bigint,
+  'Bob ne supprime pas la ligne de lecture d''Alice');
+
+reset role;
+
+-- La ligne d'Alice a survécu aux tentatives de Bob (bornée à l'objet).
+select testkit.eq(testkit.count(
+  'select 1 from public.notification_reads where id = ''mconv-nr-alice'''), 1::bigint,
+  'la ligne de lecture d''Alice est intacte');
 
 rollback;
