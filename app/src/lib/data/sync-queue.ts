@@ -1,5 +1,6 @@
 import { getDatabase, type PendingMutation } from './dexie';
 import type { Row, RowFilter } from '@/types';
+import { requestQueueSync } from '@/hooks/use-pwa';
 
 /**
  * File de synchronisation : lorsqu'une écriture échoue faute de réseau, elle
@@ -17,6 +18,10 @@ import type { Row, RowFilter } from '@/types';
 export async function enqueueMutation(mutation: Omit<PendingMutation, 'id' | 'attempts' | 'createdAt'>) {
   const db = getDatabase();
   await db.mutations.add({ ...mutation, attempts: 0, createdAt: Date.now() });
+  // Réveille le worker pour un rejeu même onglet fermé là où le navigateur
+  // le permet (D-05). Sans support : sans effet, le rejeu foreground reste.
+  // Import depuis le hook : utilitaire pur navigateur, sans dépendance React.
+  requestQueueSync();
 }
 
 export async function pendingCount() {

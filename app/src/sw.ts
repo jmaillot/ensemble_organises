@@ -49,7 +49,7 @@ const FALLBACK: PushPayload = {
  * conservées à la réinstallation…), cas où les push arrivent mais où rien ne
  * s'affiche, nulle part, sans aucune erreur.
  */
-const SW_VERSION = 'push-popup-v1';
+const SW_VERSION = 'bg-sync-v1';
 
 /** Clé du reçu du dernier push, lisible par la page via l'API Cache. */
 const PUSH_RECEIPT_URL = '/__push_last__';
@@ -140,8 +140,8 @@ self.addEventListener('push', (event: PushEvent) => {
     // successifs) remplace le précédent en silence : ni bannière, ni son.
     // Le tag continue de regrouper, mais chaque envoi ré-alerte.
     renotify: true,
-    icon: 'icon.svg',
-    badge: 'icon.svg',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
     lang: 'fr',
     data: { url: payload.url },
   };
@@ -201,6 +201,128 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
  * traité ici, et `clients.openWindow` est la seule action possible — un
  * `postMessage` à la page n'aurait personne pour le recevoir.
  */
+
+// --- Background Sync : rejeu de la file onglet fermé ------------------------
+//
+// D-05. Le worker ne rejoue JAMAIS lui-même : il n'a pas de session
+// utilisateur (localStorage inaccessible), donc un rejeu direct partirait
+// sans JWT, serait rejeté par la RLS et gonflerait `attempts` pour rien.
+// Le worker est un DÉCLENCHEUR : il compte la file en attente (lecture
+// brute d'IndexedDB, sans Dexie pour ne pas alourdir le bundle) et demande
+// aux onglets ouverts de rejouer via le chemin existant `flushWithAdapter`
+// — même ordre, même comptabilité, nouveau déclencheur uniquement (T-09-03).
+// Sans onglet, il ré-enregistre le tag pour retenter plus tard : le rejeu
+// se termine alors à la prochaine ouverture (dégradation propre, pas
+// d'erreur, la bannière et le bouton du panneau restent le repli manuel).
+
+const EO_QUEUE_SYNC_TAG = 'eo-mutations';
+const EO_PERIODIC_SYNC_TAG = 'eo-periodic';
+const EO_SYNC_MESSAGE = 'EO_SYNC_NOW';
+const EO_SYNC_DONE = 'EO_SYNC_DONE';
+const SYNC_WAIT_MS = 30_000;
+const DB_NAME = 'ensemble-organises';
+const MUTATIONS_STORE = 'mutations';
+
+/** Nombre de mutations en attente, lu en IDB brut. Jamais de rejet : 0 en cas de doute. */
+function pendingMutationCount(): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(DB_NAME);
+      request.onerror = () => resolve(0);
+      request.onsuccess = () => {
+        try {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(MUTATIONS_STORE)) {
+            db.close();
+            resolve(0);
+            return;
+          }
+          const tx = db.transaction(MUTATIONS_STORE, 'readonly');
+          const count = tx.objectStore(MUTATIONS_STORE).count();
+          count.onsuccess = () => {
+            db.close();
+            resolve(typeof count.result === 'number' ? count.result : 0);
+          };
+          count.onerror = () => {
+            db.close();
+            resolve(0);
+          };
+        } catch {
+          resolve(0);
+        }
+      };
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+interface SyncManagerLike {
+  register(tag: string): Promise<void>;
+}
+
+function syncManager(): SyncManagerLike | null {
+  const candidate = (self.registration as unknown as { sync?: SyncManagerLike }).sync;
+  return candidate && typeof candidate.register === 'function' ? candidate : null;
+}
+
+/**
+ * Demande aux onglets de rejouer et attend leur accusé (canal dédié par
+ * onglet, timeout de sécurité pour ne jamais bloquer le worker).
+ */
+async function replayViaClients(): Promise<void> {
+  const pending = await pendingMutationCount();
+  if (pending === 0) return;
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (windows.length === 0) {
+    // Aucun onglet : pas de session, donc pas de rejeu direct. On
+    // ré-enregistre pour que le navigateur réveille le worker plus tard ;
+    // le rejeu se conclura à la prochaine ouverture de l'application.
+    try {
+      await syncManager()?.register(EO_QUEUE_SYNC_TAG);
+    } catch {
+      // SyncManager indisponible : la file attendra la prochaine visite.
+    }
+    return;
+  }
+  await Promise.all(
+    windows.map(
+      (client) =>
+        new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, SYNC_WAIT_MS);
+          try {
+            const channel = new MessageChannel();
+            channel.port1.onmessage = (reply) => {
+              const payload = reply.data as { type?: unknown } | null;
+              if (!payload || payload.type !== EO_SYNC_DONE) return;
+              clearTimeout(timer);
+              resolve();
+            };
+            client.postMessage({ type: EO_SYNC_MESSAGE }, [channel.port2]);
+          } catch {
+            clearTimeout(timer);
+            resolve();
+          }
+        }),
+    ),
+  );
+}
+
+self.addEventListener('sync', (event) => {
+  // `sync` n'est pas dans la lib DOM de TypeScript : cast local plutôt que
+  // contournement global (même motif que `renotify` côté push).
+  const syncEvent = event as ExtendableEvent & { tag?: unknown };
+  if (syncEvent.tag !== EO_QUEUE_SYNC_TAG) return;
+  syncEvent.waitUntil(replayViaClients());
+});
+
+// Periodic Sync (Chrome/Edge desktop et Android uniquement) : même chemin,
+// déclenchement périodique en plus du déclenchement à la mise en file.
+(self as unknown as EventTarget).addEventListener('periodicsync', (raw) => {
+  const event = raw as ExtendableEvent & { tag?: unknown };
+  if (event.tag !== EO_PERIODIC_SYNC_TAG) return;
+  event.waitUntil(replayViaClients());
+});
 
 // --- Diagnostic : la page ping pour savoir QUEL worker est actif ------------
 

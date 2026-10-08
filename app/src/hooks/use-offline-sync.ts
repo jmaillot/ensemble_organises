@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { isLocalMode } from '@/lib/data';
 import { data } from '@/lib/data';
 import { flushWithAdapter, pendingCount } from '@/lib/data/sync-queue';
+import { EO_SYNC_DONE, EO_SYNC_MESSAGE, requestPeriodicSync } from '@/hooks/use-pwa';
 import { queryKeys } from '@/lib/data/useResource';
 import { useToast } from '@/components/ui/toast';
 
@@ -82,9 +83,39 @@ export function useOfflineSync(): OfflineSyncState {
     const onOffline = () => setOnline(false);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
+
+    // Déclenchement Background Sync (D-05) : le worker réveillé par le
+    // navigateur demande aux onglets de rejouer — même `syncNow`, donc même
+    // chemin `flushWithAdapter`, sans changement de protocole. L'accusé
+    // passé par le port dédié libère le `waitUntil` du worker.
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      const payload = event.data as { type?: unknown } | null;
+      if (!payload || payload.type !== EO_SYNC_MESSAGE) return;
+      const replyPort = event.ports?.[0];
+      void (async () => {
+        try {
+          await syncNow();
+        } finally {
+          try {
+            replyPort?.postMessage({ type: EO_SYNC_DONE });
+          } catch {
+            // Port fermé (onglet en cours de fermeture) : le worker a son timeout.
+          }
+        }
+      })();
+    };
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+    }
+    // Periodic Sync best-effort (Chrome/Edge) : sans support, sans effet.
+    requestPeriodicSync();
+
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
+      }
     };
   }, [refreshPending, syncNow]);
 
