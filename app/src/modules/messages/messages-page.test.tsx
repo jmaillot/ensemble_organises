@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { useHouseholdStore } from '@/stores/household-store';
 import MessagesPage from './messages-page';
 
 describe('Messages', () => {
@@ -140,6 +142,36 @@ describe('Messages', () => {
 
     const log = await screen.findByRole('log', { name: /Messages de Lina/ });
     await waitFor(() => expect(within(log).getByText('La photo du parc')).toBeInTheDocument(), { timeout: 5000 });
+    expect(within(log).getByRole('link', { name: /Ouvrir l’image/ })).toBeInTheDocument();
+  });
+
+  it('laisse Noé, enfant, joindre une image et l’envoyer', async () => {
+    // D-01, verrou UI : le dépôt client ne regarde pas le rôle, seule la
+    // porte serveur (0099, prouvée par 0038) arbitre. Le fil est ouvert sous
+    // l'identité admin puis l'envoi part de Noé, via le chemin dégradé
+    // (aperçu local, Supabase non configuré sous Vitest).
+    const user = userEvent.setup();
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: () => 'blob:apercu-noe',
+      revokeObjectURL: () => undefined,
+    });
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+
+    const file = new File(['pixels'], 'cabane.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Joindre une image', { selector: 'input' }), file);
+    expect(await screen.findByText(/cabane\.png/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Écrire un message'), 'La photo de la cabane');
+    await user.click(screen.getByRole('button', { name: 'Envoyer' }));
+
+    // Vu par Noé, le direct à deux autres s'intitule « Camille, Lina ».
+    const log = await screen.findByRole('log', { name: 'Messages de Camille, Lina' });
+    await waitFor(() => expect(within(log).getByText('La photo de la cabane')).toBeInTheDocument(), { timeout: 5000 });
+    expect(within(log).getByText('Noé Martin :')).toBeInTheDocument();
     expect(within(log).getByRole('link', { name: /Ouvrir l’image/ })).toBeInTheDocument();
   });
 
