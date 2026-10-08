@@ -2,11 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
 import ContactsPage from './contacts-page';
 
 const list = () => screen.findByRole('list', { name: 'Liste des contacts' });
 
 describe('ContactsPage', () => {
+  it('en tant qu’admin, seules Famille + sa perso sont visibles (OQ-2 amendée)', async () => {
+    // Camille, la connectée du jeu de démo, est admin : depuis 0098, même un
+    // admin ne reçoit du serveur que Famille + sa liste personnelle. La page
+    // rend ce snapshot filtré sans l'élargir (aucune branche rôle côté
+    // client) — ce test verrouille la forme : 2 pastilles, compteurs sur le
+    // seul visible.
+    renderWithProviders(<ContactsPage />, { route: '/contacts' });
+
+    const state = useHouseholdStore.getState();
+    expect(state.members.find((member) => member.id === state.currentMemberId)?.role).toBe('admin');
+
+    await within(await list()).findByText('Maya Martin');
+
+    const chips = screen.getByRole('group', { name: 'Choisir une liste de contacts' });
+    expect(within(chips).getAllByRole('button')).toHaveLength(2);
+    expect(within(chips).getByRole('button', { name: /Famille/ })).toBeInTheDocument();
+    expect(within(chips).getByRole('button', { name: /Camille/ })).toBeInTheDocument();
+
+    // Compteurs sur le seul visible (jeu de démo : 2 listes, 5 fiches).
+    expect(screen.getByText('Listes').closest('div')).toHaveTextContent('2');
+    expect(screen.getByText('Fiches').closest('div')).toHaveTextContent('5');
+  });
+
   it('affiche les chips de listes et les fiches avec date au format JJ/MM/AAAA', async () => {
     renderWithProviders(<ContactsPage />, { route: '/contacts' });
 
