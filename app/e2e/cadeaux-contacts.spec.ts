@@ -91,6 +91,20 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await expect(page.getByRole('button', { name: /Déplacer la fiche/ })).toHaveCount(0);
   });
 
+  test('vue admin : seules Famille + sa liste personnelle', async ({ page }) => {
+    // OQ-2 amendée (phase 07, 0098) en démonstration : Camille, la connectée
+    // de démo, est admin, et pourtant seules Famille + sa liste personnelle
+    // existent dans le jeu de démo — ce test verrouille les 2 pastilles. Le
+    // refus effectif à un admin d'une liste d'AUTRUI est prouvé par la suite
+    // SQL 0037, pas rejouable sans relais.
+    await openDemoSession(page);
+    await page.goto('/contacts');
+    const chips = page.getByRole('group', { name: 'Choisir une liste de contacts' });
+    await expect(chips.getByRole('button')).toHaveCount(2);
+    await expect(chips.getByRole('button', { name: /Famille/ })).toBeVisible();
+    await expect(chips.getByRole('button', { name: /Camille/ })).toBeVisible();
+  });
+
   test('un anniversaire homonyme affiche le badge deux-sources', async ({ page }) => {
     await openDemoSession(page);
 
