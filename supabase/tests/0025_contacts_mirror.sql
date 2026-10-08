@@ -4,9 +4,10 @@
 --
 -- Défauts D-01 (Famille partagée + une perso par adulte), pré-remplissage
 -- D-02 (un contact lié par adulte, zéro pour l'enfant), RLS perso
--- propriétaire + admins (OQ-2), enfant bloqué en écriture, isolation
--- inter-foyer, suppression non-défaut OK, suppression dernière-défaut
--- refusée.
+-- propriétaire-only (OQ-2 AMENDÉE 0098 : les admins ne voient plus les
+-- personnelles d'autrui — les assertions ci-dessous en tiennent compte),
+-- enfant bloqué en écriture, isolation inter-foyer, suppression non-défaut
+-- OK (par le propriétaire), suppression dernière-défaut refusée.
 --
 -- Le seed est déclenché par les insertions de membres ci-dessous (trigger
 -- ensure_default_contact_list de 0077) : les fixtures n'insèrent aucune
@@ -63,8 +64,8 @@ $$;
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.contact_lists'), 3::bigint,
-  'Alice (admin) voit Famille + 2 persos adultes');
+select testkit.eq(testkit.count('select 1 from public.contact_lists'), 2::bigint,
+  'Alice (admin) voit Famille + sa perso, plus celle de Bob (OQ-2 amende 0098)');
 select testkit.eq(testkit.count(
   'select 1 from public.contact_lists where owner_member_id is null and is_default and name = ''Famille'''), 1::bigint,
   'la liste Famille partagee existe');
@@ -74,8 +75,8 @@ select testkit.eq(testkit.count(format(
   'Alice a sa liste personnelle par defaut');
 select testkit.eq(testkit.count(format(
   'select 1 from public.contact_lists where owner_member_id = %L and is_default',
-  (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
-  'Bob a sa liste personnelle par defaut');
+  (select row_id from testkit.fx where key = 'bob'))), 0::bigint,
+  'la liste personnelle de Bob est invisible a Alice, meme admin (OQ-2 amende 0098)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.contact_lists where owner_member_id = %L',
   (select row_id from testkit.fx where key = 'enfant'))), 0::bigint,
@@ -86,8 +87,8 @@ select testkit.eq(testkit.count(format(
   'un contact pre-rempli lie Alice');
 select testkit.eq(testkit.count(format(
   'select 1 from public.contacts where linked_member_id = %L',
-  (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
-  'un contact pre-rempli lie Bob');
+  (select row_id from testkit.fx where key = 'bob'))), 0::bigint,
+  'le contact pre-rempli de Bob vit dans sa perso, invisible a Alice (OQ-2 amende 0098)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.contacts where linked_member_id = %L',
   (select row_id from testkit.fx where key = 'enfant'))), 0::bigint,
@@ -146,8 +147,8 @@ reset role;
 select testkit.as_user(user_id, 'carol@example.fr') from testkit.fx where key = 'carol';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.contact_lists'), 3::bigint,
-  'Carol voit les 3 listes de son foyer');
+select testkit.eq(testkit.count('select 1 from public.contact_lists'), 2::bigint,
+  'Carol voit Famille + sa perso, plus celle de Dave (OQ-2 amende 0098)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.contact_lists where household_id = %L',
   (select household_id from testkit.fx where key = 'alice'))), 0::bigint,
@@ -339,23 +340,42 @@ select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 
 set local role authenticated;
 
 select testkit.eq(testkit.affected(
-  'delete from public.contact_lists where id = ''list_bob_extra'''), 1::bigint,
-  'une liste non-defaut se supprime');
+  'delete from public.contact_lists where id = ''list_bob_extra'''), 0::bigint,
+  'l''admin ne supprime plus la liste non-defaut d''autrui (illisible, OQ-2 amende 0098)');
+select testkit.eq(testkit.affected(format(
+  'insert into public.contact_lists (id, household_id, name, owner_member_id) values (%L, %L, %L, %L)',
+  'list_alice_extra', (select household_id from testkit.fx where key = 'alice'),
+  'Alice Extra', (select row_id from testkit.fx where key = 'alice'))), 1::bigint,
+  'Alice cree une liste non-defaut a son nom');
+select testkit.eq(testkit.affected(
+  'delete from public.contact_lists where id = ''list_alice_extra'''), 1::bigint,
+  'une liste non-defaut se supprime (par sa proprietaire)');
 select testkit.eq(testkit.affected(format(
   'delete from public.contact_lists where owner_member_id = %L',
-  (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
-  'une liste perso non-derniere se supprime (admin)');
+  (select row_id from testkit.fx where key = 'bob'))), 0::bigint,
+  'l''admin ne supprime plus la perso d''autrui, meme non-derniere (OQ-2 amende 0098)');
 select testkit.eq(testkit.affected(format(
   'delete from public.contact_lists where owner_member_id = %L',
   (select row_id from testkit.fx where key = 'alice'))), 1::bigint,
   'la deuxieme perso se supprime tant que Famille reste');
-select testkit.expect_denied(
-  'delete from public.contact_lists where owner_member_id is null and is_default',
-  'la derniere liste par defaut (Famille) ne se supprime pas');
 select testkit.eq(testkit.count(
   'select 1 from public.contact_lists where owner_member_id is null and is_default and name = ''Famille'''), 1::bigint,
   'Famille est toujours la apres le refus');
 
 reset role;
+
+-- ===========================================================================
+-- Garde dernière-défaut (rôle propriétaire : la RLS est contournée, le
+-- trigger de garde, lui, s'applique) : depuis 0098, aucun membre ne voit
+-- TOUS les défauts du foyer (sa perso + Famille chacun), donc la preuve
+-- « Famille dernière » passe par le propriétaire — mécanisme identique.
+-- ===========================================================================
+select testkit.eq(testkit.affected(format(
+  'delete from public.contact_lists where owner_member_id = %L',
+  (select row_id from testkit.fx where key = 'bob'))), 2::bigint,
+  'les listes de Bob (perso + extra) se suppriment (autres defauts existants)');
+select testkit.expect_denied(
+  'delete from public.contact_lists where owner_member_id is null and is_default',
+  'la derniere liste par defaut (Famille) ne se supprime pas');
 
 rollback;
