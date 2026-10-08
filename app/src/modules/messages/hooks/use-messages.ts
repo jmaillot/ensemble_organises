@@ -95,7 +95,24 @@ export function useMessagesFeed(): MessagesFeed {
 
   const conversationRows = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
   const participantRows = useMemo(() => participantsQuery.data ?? [], [participantsQuery.data]);
-  const conversationIds = useMemo(() => conversationRows.map((row) => row.id).sort(), [conversationRows]);
+
+  // Visibilité locale du gate de lecture serveur : un fil sans aucune ligne
+  // d'appartenance (ni active, ni tombée) est invisible — en ligne la RLS
+  // (`conversations_select`) le masque, en local ce filtre l'imite. Sans
+  // lui, un fil retiré de ses archives resurgirait actif en démo.
+  const visibleIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of participantRows) {
+      if (row.member_id === currentMemberId) ids.add(row.conversation_id);
+    }
+    return ids;
+  }, [currentMemberId, participantRows]);
+
+  const visibleRows = useMemo(
+    () => conversationRows.filter((row) => visibleIds.has(row.id)),
+    [conversationRows, visibleIds],
+  );
+  const conversationIds = useMemo(() => visibleRows.map((row) => row.id).sort(), [visibleRows]);
 
   const previewsQuery = useQuery({
     queryKey: messageKeys.previews(householdId),
@@ -179,12 +196,12 @@ export function useMessagesFeed(): MessagesFeed {
   );
 
   const conversations = useMemo(
-    () => buildSummaries(conversationRows.filter((row) => !archivedIds.has(row.id))),
-    [archivedIds, buildSummaries, conversationRows],
+    () => buildSummaries(visibleRows.filter((row) => !archivedIds.has(row.id))),
+    [archivedIds, buildSummaries, visibleRows],
   );
   const archivedConversations = useMemo(
-    () => buildSummaries(conversationRows.filter((row) => archivedIds.has(row.id))),
-    [archivedIds, buildSummaries, conversationRows],
+    () => buildSummaries(visibleRows.filter((row) => archivedIds.has(row.id))),
+    [archivedIds, buildSummaries, visibleRows],
   );
 
   /**

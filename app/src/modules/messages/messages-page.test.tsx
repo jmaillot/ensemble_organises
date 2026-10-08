@@ -158,9 +158,19 @@ describe('Messages', () => {
       createObjectURL: () => 'blob:apercu-noe',
       revokeObjectURL: () => undefined,
     });
+    // Noé rejoint le fil (membre actif) AVANT le montage : le dépôt prouvé
+    // par 0038 exige l'appartenance au fil, et la liste ne montre que les
+    // fils rejoints — une écriture en cours de test ferait clignoter la vue.
+    await data.create<ConversationMemberRow>('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.noe,
+      left_at: null,
+    });
     renderWithProviders(<MessagesPage />);
 
-    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    // Noé membre, le direct à trois s'intitule dans un ordre de registre
+    // (ici « Noé, Lina ») : on matche sans ancre, Lina n'apparaît qu'ici.
+    await user.click(await screen.findByRole('button', { name: /Lina/ }));
     useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
 
     const file = new File(['pixels'], 'cabane.png', { type: 'image/png' });
@@ -263,6 +273,9 @@ describe('Messages', () => {
     const mine = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
     expect(mine).not.toBeNull();
     expect(within(mine as HTMLElement).getByRole('button', { name: 'Supprimer ce message' })).toBeInTheDocument();
+
+    // Le levier de modération demeure : la suppression du fil entier.
+    expect(screen.getByRole('button', { name: 'Supprimer la conversation Lina' })).toBeInTheDocument();
   });
 
   it('page le fil par conversation avec un « Charger plus » explicite', async () => {
@@ -353,6 +366,68 @@ describe('Messages', () => {
     expect(screen.getByText(/lecture seule/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retirer .* de mes archives/ })).toBeInTheDocument();
+  });
+
+  it('retire un fil quitté de ses archives, il disparaît sans toucher aux autres', async () => {
+    // D-08 : le retrait des archives supprime sa propre pierre (modale de
+    // confirmation, nettoyage personnel) ; le fil disparaît, les autres fils
+    // et l'historique des restants demeurent.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Retirer .* de mes archives/ }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(alert).toHaveTextContent('ne supprime la conversation pour personne d’autre');
+    await user.click(within(alert).getByRole('button', { name: 'Retirer de mes archives' }));
+
+    await waitFor(() => expect(screen.getByText('Fil retiré de vos archives.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Lina/ })).not.toBeInTheDocument());
+    expect(screen.queryByText('Anciennes conversations')).not.toBeInTheDocument();
+
+    // La pierre est partie, sans emporter le reste du registre.
+    const rows = await data.list<ConversationMemberRow>('conversation_members');
+    expect(rows.some((row) => row.member_id === DEMO_MEMBERS.camille && row.conversation_id === 'conversation-1')).toBe(false);
+    expect(rows.filter((row) => row.conversation_id === 'conversation-1').map((row) => row.member_id)).toEqual([
+      DEMO_MEMBERS.lina,
+    ]);
+
+    // Les autres fils restent ouverts et sélectionnables.
+    expect(screen.getByRole('button', { name: /^Thomas/ })).toBeInTheDocument();
+  });
+
+  it('exclut le partant du registre actif, sans toucher aux archives des autres', async () => {
+    // D-08, miroir registre : après le départ de Camille, le registre actif
+    // du fil ne la compte plus (Lina reste) tandis que la tombe demeure
+    // lisible ; la liste active ne montre plus Lina, les archives si.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: 'conversation-1' });
+    expect(rows.filter((row) => !row.left_at).map((row) => row.member_id)).toEqual([DEMO_MEMBERS.lina]);
+    expect(rows.some((row) => row.member_id === DEMO_MEMBERS.camille && row.left_at)).toBe(true);
+
+    // Une seule « Lina » à l'écran : celle des archives.
+    expect(screen.getAllByRole('button', { name: /^Lina/ })).toHaveLength(1);
+    const archived = screen.getByRole('list', { name: 'Anciennes conversations' });
+    expect(within(archived).getByRole('button', { name: /^Lina/ })).toBeInTheDocument();
   });
 
   it('désactive le départ pour le dernier membre restant', async () => {
