@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'assets/*.jpg'],
+      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'assets/*.jpg'],
       // `injectManifest` et non `generateSW` : le second génère un service
       // worker auquel on ne peut ajouter aucun écouteur, et l'API Push en exige
       // deux (`push` et `notificationclick`). `src/sw.ts` reproduit à la main ce
@@ -21,6 +21,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
+      // Source UNIQUE du manifeste : le fichier statique
+      // `public/manifest.webmanifest` a été supprimé (09-02) car il
+      // divergeait de ce bloc (start_url `./index.html`, scope `./`,
+      // icône SVG seule) alors que c'est ce bloc qui gagne dans `dist/`.
+      // Le manifeste généré est servi à `/manifest.webmanifest`, couvert
+      // par la règle no-cache de `nginx.conf`, comme avant.
       manifest: {
         name: 'Ensemble & Organisés',
         short_name: 'Ensemble',
@@ -34,7 +40,11 @@ export default defineConfig({
         orientation: 'portrait-primary',
         theme_color: 'oklch(98% 0.004 240)',
         background_color: 'oklch(98% 0.004 240)',
-        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+        icons: [
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
       },
       injectManifest: {
         // Le service worker versionné est écrit dans `dist/`, donc très proche
