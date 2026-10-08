@@ -12,7 +12,12 @@ export interface StoredRow {
 export interface PendingMutation {
   id?: number;
   table: string;
-  operation: 'insert' | 'update' | 'delete';
+  /**
+   * `deleteWhere` = suppression de lignes de jointure par filtre (les valeurs
+   * portent alors le filtre, pas une ligne). Rejoué dans l'ordre comme les
+   * autres verbes (D-02).
+   */
+  operation: 'insert' | 'update' | 'delete' | 'deleteWhere';
   rowId: string;
   values: Record<string, unknown>;
   createdAt: number;

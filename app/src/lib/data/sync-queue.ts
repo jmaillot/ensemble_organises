@@ -1,9 +1,18 @@
 import { getDatabase, type PendingMutation } from './dexie';
-import type { Row } from '@/types';
+import type { Row, RowFilter } from '@/types';
 
 /**
  * File de synchronisation : lorsqu'une écriture échoue faute de réseau, elle
  * est conservée localement puis rejouée à la reconnexion, dans l'ordre.
+ *
+ * Conflits (D-06, dernier-écrivain documenté, aucune fusion tentée) : si le
+ * serveur a bougé entre la mise en file et le rejeu, l'écriture rejouée
+ * écrase silencieusement l'état serveur — le dernier écrivain gagne. Les
+ * insertions portent un identifiant client (`randomId`) donc un double rejeu
+ * ne duplique pas la ligne ; les `update`/`delete` rejoués deux fois sont
+ * idempotents par construction (même valeurs, même cible). Au-delà de ce
+ * périmètre, aucune idempotence n'est garantie : c'est documenté dans le
+ * panneau hors ligne plutôt que silencieusement accepté.
  */
 export async function enqueueMutation(mutation: Omit<PendingMutation, 'id' | 'attempts' | 'createdAt'>) {
   const db = getDatabase();
@@ -50,4 +59,51 @@ export async function readCached<T extends Row>(table: string, householdId?: str
       ? await db.rows.where('table').equals(table).toArray()
       : await db.rows.where('[table+householdId]').equals([table, householdId]).toArray();
   return entries.map((entry) => entry.data) as T[];
+}
+
+/**
+ * Adaptateur minimal capable de rejouer une mutation. `DataAdapter` complet
+ * non requis : les tests y branchent un double, le client y passe `data`.
+ */
+export interface ReplayTarget {
+  create(table: string, values: Record<string, unknown>): Promise<unknown>;
+  update(table: string, id: string, values: Record<string, unknown>): Promise<unknown>;
+  remove(table: string, id: string): Promise<void>;
+  removeWhere(table: string, filter: RowFilter): Promise<void>;
+}
+
+/**
+ * Rejoue une mutation vers sa cible. Toute exception remonte : c'est
+ * `flushMutations` qui comptabilise l'essai, jamais l'expéditeur.
+ */
+export async function replayOne(target: ReplayTarget, mutation: PendingMutation): Promise<void> {
+  switch (mutation.operation) {
+    case 'insert':
+      await target.create(mutation.table, mutation.values);
+      return;
+    case 'update':
+      await target.update(mutation.table, mutation.rowId, mutation.values);
+      return;
+    case 'delete':
+      await target.remove(mutation.table, mutation.rowId);
+      return;
+    case 'deleteWhere':
+      await target.removeWhere(mutation.table, mutation.values as RowFilter);
+      return;
+  }
+}
+
+/**
+ * Rejeu par défaut : chaque entrée est rejouée dans l'ordre d'arrivée vers la
+ * cible, les échecs restant en file avec `attempts` incrémenté.
+ */
+export async function flushWithAdapter(target: ReplayTarget): Promise<FlushResult> {
+  return flushMutations(async (mutation) => {
+    try {
+      await replayOne(target, mutation);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
 }

@@ -5,6 +5,16 @@ export interface Entity {
   id: string;
 }
 
+export interface ListResult<T = Row> {
+  rows: T[];
+  /**
+   * Vrai quand les lignes viennent du cache local après un échec réseau
+   * (repli hors ligne, D-01). L'UI doit les marquer comme périmées, jamais
+   * les présenter comme des données en direct.
+   */
+  fromCache: boolean;
+}
+
 /**
  * Contrat d'accès aux données. Deux implémentations : PostgREST (Supabase
  * auto-hébergé) et IndexedDB (mode local / hors ligne). Les modules ne
@@ -13,6 +23,12 @@ export interface Entity {
 export interface DataAdapter {
   readonly kind: 'supabase' | 'local';
   list<T = Row>(table: string, filter?: RowFilter): Promise<T[]>;
+  /**
+   * Variante de `list` qui signale l'origine des lignes. Les adaptateurs
+   * sans repli hors ligne peuvent l'omettre : l'appelant retombe sur `list`
+   * avec `fromCache: false`.
+   */
+  listWithMeta?<T = Row>(table: string, filter?: RowFilter): Promise<ListResult<T>>;
   create<T = Row>(table: string, values: Partial<T>): Promise<T>;
   update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T>;
   remove(table: string, id: string): Promise<void>;
@@ -45,11 +61,19 @@ export interface DataAdapter {
 }
 
 export class DataError extends Error {
+  /**
+   * Vrai quand l'écriture a été mise en file pour rejeu ultérieur : l'appelant
+   * peut garder son état optimiste au lieu de le retourner en arrière.
+   */
+  readonly queuedForSync: boolean;
+
   constructor(
     message: string,
     override readonly cause?: unknown,
+    queuedForSync = false,
   ) {
     super(message);
     this.name = 'DataError';
+    this.queuedForSync = queuedForSync;
   }
 }

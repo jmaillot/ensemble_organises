@@ -1,6 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from './index';
+import { DataError, type ListResult } from './adapter';
 import { useHouseholdStore } from '@/stores/household-store';
 import type { Row, RowFilter } from '@/types';
 
@@ -15,6 +16,13 @@ export interface ResourceResult<T> {
   isFetching: boolean;
   isError: boolean;
   error: Error | null;
+  /**
+   * Vrai quand `rows` vient du cache local après un échec réseau (D-01) :
+   * à afficher comme données périmées, jamais comme du direct.
+   */
+  isStale: boolean;
+  /** Alias de `isStale`, conservé pour l'honnêteté d'affichage. */
+  dataFromCache: boolean;
   refetch: () => void;
   create: (values: Partial<T>) => Promise<T>;
   update: (id: string, values: Partial<T>) => Promise<T>;
@@ -52,6 +60,10 @@ export function useResource<T = Row>(
     [filter, householdId, scoped],
   );
   const key = queryKeys.table(table, householdId, effectiveFilter);
+  // Positionné par `queryFn` ci-dessous : vrai quand la dernière lecture a
+  // servi le cache local (repli D-01). État local au hook, pas de course
+  // entre tables : chaque instance ne suit que sa propre requête.
+  const [dataFromCache, setDataFromCache] = useState(false);
 
   const query = useQuery({
     queryKey: key,
@@ -59,6 +71,15 @@ export function useResource<T = Row>(
     placeholderData: keepPreviousData,
     refetchInterval,
     queryFn: async () => {
+      const withMeta = data as typeof data & {
+        listWithMeta?: <T>(table: string, filter?: RowFilter) => Promise<ListResult<T>>;
+      };
+      if (typeof withMeta.listWithMeta === 'function') {
+        const result = await withMeta.listWithMeta<T>(table, effectiveFilter);
+        setDataFromCache(result.fromCache);
+        return (select ? select(result.rows as unknown as Row[]) : (result.rows as unknown as Row[])) as T[];
+      }
+      setDataFromCache(false);
       const rows = await data.list<T>(table, effectiveFilter);
       return (select ? select(rows as unknown as Row[]) : (rows as unknown as Row[])) as T[];
     },
@@ -93,7 +114,11 @@ export function useResource<T = Row>(
         await invalidate();
         return result;
       } catch (error) {
-        queryClient.setQueryData<T[]>(key, snapshot);
+        // Écriture mise en file (D-02) : l'état optimiste est conservé, il
+        // sera confirmé au rejeu. Seule une vraie erreur retourne en arrière.
+        if (!(error instanceof DataError) || !error.queuedForSync) {
+          queryClient.setQueryData<T[]>(key, snapshot);
+        }
         throw error;
       }
     },
@@ -125,6 +150,8 @@ export function useResource<T = Row>(
     isFetching: query.isFetching,
     isError: query.isError,
     error: (query.error as Error | null) ?? null,
+    isStale: dataFromCache,
+    dataFromCache,
     refetch: () => void query.refetch(),
     create,
     update,
@@ -137,6 +164,10 @@ export function useResource<T = Row>(
 export interface LinkedResult<T> {
   rows: T[];
   isLoading: boolean;
+  /** Vrai quand `rows` vient du cache local après un échec réseau (D-01). */
+  isStale: boolean;
+  /** Alias de `isStale`. */
+  dataFromCache: boolean;
   add: (values: Partial<T>) => Promise<T>;
   remove: (filter: RowFilter) => Promise<void>;
   isMutating: boolean;
@@ -146,10 +177,22 @@ export interface LinkedResult<T> {
 export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): LinkedResult<T> {
   const queryClient = useQueryClient();
   const key = queryKeys.table(table, null, filter);
+  const [dataFromCache, setDataFromCache] = useState(false);
 
   const query = useQuery({
     queryKey: key,
-    queryFn: async () => data.list<T>(table, filter),
+    queryFn: async () => {
+      const withMeta = data as typeof data & {
+        listWithMeta?: <T>(table: string, filter?: RowFilter) => Promise<ListResult<T>>;
+      };
+      if (typeof withMeta.listWithMeta === 'function') {
+        const result = await withMeta.listWithMeta<T>(table, filter);
+        setDataFromCache(result.fromCache);
+        return result.rows;
+      }
+      setDataFromCache(false);
+      return data.list<T>(table, filter);
+    },
   });
 
   const addMutation = useMutation({ mutationFn: (values: Partial<T>) => data.create<T>(table, values) });
@@ -179,6 +222,8 @@ export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): L
   return {
     rows: query.data ?? [],
     isLoading: query.isLoading,
+    isStale: dataFromCache,
+    dataFromCache,
     add,
     remove,
     isMutating: addMutation.isPending || removeMutation.isPending,
