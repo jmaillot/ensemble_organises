@@ -28,6 +28,12 @@ export interface ChatPanelProps {
   leaveDisabledReason?: string | null;
   /** Vrai quand le membre courant administre le foyer : voit aussi la suppression des bulles d'autrui. */
   isAdmin?: boolean;
+  /** Fenêtre chargée du fil : affiche « Charger plus » quand des anciens restent déchargés. */
+  pageInfo?: { hasMoreBefore: boolean; remainingBefore: number; loaded: number; total: number };
+  /** Élargit la fenêtre vers les messages plus anciens. */
+  onLoadMore?: () => void;
+  /** Chargement de la page précédente en cours (données précédentes conservées). */
+  isLoadingMore?: boolean;
   /** Sur petit écran : revient à la liste pour ne pas écraser la discussion. */
   onBackToList?: () => void;
   composerRef?: RefObject<HTMLInputElement | null>;
@@ -130,7 +136,7 @@ function MessageBubble({
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, isAdmin = false, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, isAdmin = false, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -153,11 +159,13 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
     setPendingDeletion(null);
   }, [conversationId]);
 
-  // Le fil suit toujours le dernier message (envoi optimiste compris).
+  // Le fil suit le dernier message (envoi optimiste compris), jamais le haut :
+  // charger des anciens ne doit pas renvoyer en bas.
+  const newestId = messages.at(-1)?.id ?? null;
   useEffect(() => {
     const body = bodyRef.current;
     if (body) body.scrollTop = body.scrollHeight;
-  }, [conversationId, messages.length]);
+  }, [conversationId, newestId]);
 
   if (!conversation) {
     return (
@@ -273,6 +281,25 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         aria-label={`Messages de ${conversation.title}`}
         className="scrollbar-slim flex flex-1 flex-col gap-2.5 overflow-auto bg-bg px-[18px] py-[18px]"
       >
+        {pageInfo && messages.length > 0 ? (
+          <div className="flex flex-col items-center gap-1.5 pb-1">
+            <p role="status" className="m-0 text-[10px] text-muted">
+              {pageInfo.loaded} sur {pageInfo.total} messages chargés
+            </p>
+            {pageInfo.hasMoreBefore && onLoadMore ? (
+              <Button
+                type="button"
+                variant="quiet"
+                size="sm"
+                onClick={onLoadMore}
+                disabled={isLoadingMore}
+                aria-label="Charger les messages précédents"
+              >
+                {isLoadingMore ? 'Chargement…' : `Charger plus (${pageInfo.remainingBefore} restants)`}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {messages.length === 0 ? (
           <p className="m-auto max-w-[320px] text-center text-xs text-muted">
             {conversation.type === 'direct'

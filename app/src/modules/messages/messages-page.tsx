@@ -9,7 +9,7 @@ import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
 import { ConversationList } from './components/conversation-list';
 import { AddMembersDialog, ConversationFormDialog } from './components/conversation-form-dialog';
-import { useMessagesFeed, useMessagesRealtime } from './hooks/use-messages';
+import { useMessagesFeed, useMessagesRealtime, useThreadPage } from './hooks/use-messages';
 
 export default function MessagesPage() {
   const feed = useMessagesFeed();
@@ -35,7 +35,10 @@ export default function MessagesPage() {
     if (activeId) markRead(activeId);
   }, [activeId, markRead]);
 
-  const thread = activeId ? (feed.messagesByConversation.get(activeId) ?? []) : [];
+  // Le fil ouvert est paginé par conversation (D-05) ; son compte de
+  // non-lus exact remplace le signal d'aperçu dans le total affiché.
+  const thread = useThreadPage(activeId);
+  const unreadTotal = feed.unreadTotal - (active?.unread ?? 0) + thread.unread;
 
   // Départ volontaire : le registre déclaré arbitre (jamais le repli
   // expéditrices), et le dernier membre restant ne peut pas quitter — bouton
@@ -108,8 +111,8 @@ export default function MessagesPage() {
     >
       <MetricRow
         items={[
-          { label: 'Messages', value: feed.totalMessages, caption: 'échanges récents' },
-          { label: 'Non lus', value: feed.unreadTotal, caption: 'dans vos conversations' },
+          { label: 'Messages', value: thread.total, caption: 'dans ce fil' },
+          { label: 'Non lus', value: unreadTotal, caption: 'dans vos conversations' },
           { label: 'Membres', value: members.length, caption: 'dans le foyer' },
           { label: 'Synchronisation', value: 'Direct', caption: 'temps réel' },
         ]}
@@ -131,8 +134,20 @@ export default function MessagesPage() {
         />
         <ChatPanel
           conversation={active}
-          messages={thread}
+          messages={thread.messages}
           isSending={feed.isSending}
+          pageInfo={
+            active
+              ? {
+                  hasMoreBefore: thread.hasMoreBefore,
+                  remainingBefore: thread.remainingBefore,
+                  loaded: thread.loaded,
+                  total: thread.total,
+                }
+              : undefined
+          }
+          isLoadingMore={thread.isLoadingMore}
+          onLoadMore={thread.loadMore}
           onSend={(content) => {
             if (!active) return;
             void feed.send(active.id, content).catch((error: unknown) => {
@@ -155,7 +170,7 @@ export default function MessagesPage() {
             active
               ? (messageId, content) => {
                   void feed
-                    .editMessage(messageId, content)
+                    .editMessage(active.id, messageId, content)
                     .then(() => toast('Message modifié.'))
                     .catch((error: unknown) => {
                       toast(error instanceof Error ? error.message : 'Le message n’a pas pu être modifié.', 'error');
@@ -167,7 +182,7 @@ export default function MessagesPage() {
             active
               ? (messageId) => {
                   void feed
-                    .deleteMessage(messageId)
+                    .deleteMessage(active.id, messageId)
                     .then(() => toast('Message supprimé.'))
                     .catch((error: unknown) => {
                       toast(error instanceof Error ? error.message : 'Le message n’a pas pu être supprimé.', 'error');

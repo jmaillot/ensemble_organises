@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchMessages, leaveConversation as leaveConversationRow, removeConversationCascade, updateMessageContent, MAX_MESSAGE_LENGTH, type ConversationDraft } from '../api';
+import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, removeConversationCascade, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { ConversationMemberRow, MessageRow } from '@/types';
@@ -14,7 +14,14 @@ export const messageKeys = {
   all: ['messages'] as const,
   conversations: (householdId: string | null) => ['messages', 'conversations', householdId] as const,
   participants: ['messages', 'participants'] as const,
-  rows: (householdId: string | null) => ['messages', 'rows', householdId] as const,
+  /** Dernier message connu de chaque fil : aperçus, tri et signal de non-lus. */
+  previews: (householdId: string | null) => ['messages', 'previews', householdId] as const,
+  /** Page chargée d'un fil : une entrée par (fil, taille de fenêtre). */
+  thread: (householdId: string | null, conversationId: string | null, limit: number) =>
+    ['messages', 'thread', householdId, conversationId, limit] as const,
+  /** Préfixe pour toucher toutes les fenêtres mises en cache d'un même fil. */
+  threadPrefix: (householdId: string | null, conversationId: string) =>
+    ['messages', 'thread', householdId, conversationId] as const,
 };
 
 const READ_STORAGE_KEY = 'ensemble-organises-messages-read';
@@ -31,10 +38,13 @@ export function useReadConversations() {
 
 export interface MessagesFeed {
   conversations: ConversationSummary[];
-  messagesByConversation: Map<string, Message[]>;
   /** Appartenances déclarées par fil (registre brut, sans le repli expéditrices). */
   memberIdsByConversation: Map<string, string[]>;
-  totalMessages: number;
+  /**
+   * Non-lus par fil : signal 1/0 depuis l'aperçu pour les fils fermés (borne
+   * inférieure honnête — le compte exact exigerait le fil entier), la page
+   * appelle `useThreadPage` pour le compte exact du fil ouvert.
+   */
   unreadTotal: number;
   householdId: string | null;
   currentMemberId: string;
@@ -50,15 +60,15 @@ export interface MessagesFeed {
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
-  editMessage: (messageId: string, content: string) => Promise<void>;
-  deleteMessage: (messageId: string) => Promise<void>;
+  editMessage: (conversationId: string, messageId: string, content: string) => Promise<void>;
+  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   leaveConversation: (conversationId: string) => Promise<void>;
   isCreating: boolean;
   isDeleting: boolean;
   isLeaving: boolean;
 }
 
-/** Conversations, participants et messages du foyer, assemblés pour l'écran. */
+/** Conversations, registre et aperçus du foyer : jamais un fil en entier. */
 export function useMessagesFeed(): MessagesFeed {
   const queryClient = useQueryClient();
   const householdId = useHouseholdStore((state) => state.householdId);
@@ -75,46 +85,54 @@ export function useMessagesFeed(): MessagesFeed {
     queryKey: messageKeys.participants,
     queryFn: fetchConversationParticipants,
   });
-  const messagesQuery = useQuery({
-    queryKey: messageKeys.rows(householdId),
-    enabled: Boolean(householdId),
-    queryFn: () => fetchMessages(householdId),
-  });
 
-  const rows = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
   const conversationRows = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
   const participantRows = useMemo(() => participantsQuery.data ?? [], [participantsQuery.data]);
+  const conversationIds = useMemo(() => conversationRows.map((row) => row.id).sort(), [conversationRows]);
 
-  const messagesByConversation = useMemo(() => {
-    const grouped = new Map<string, Message[]>();
-    for (const row of rows) {
-      const message = toMessage(row, { currentMemberId, members });
-      const existing = grouped.get(message.conversationId);
-      if (existing) existing.push(message);
-      else grouped.set(message.conversationId, [message]);
-    }
-    for (const [conversationId, list] of grouped) grouped.set(conversationId, sortMessages(list));
+  const previewsQuery = useQuery({
+    queryKey: messageKeys.previews(householdId),
+    enabled: Boolean(householdId) && conversationIds.length > 0,
+    queryFn: () => fetchLatestMessages(householdId, conversationIds),
+  });
+  const previewRows = useMemo(() => previewsQuery.data ?? [], [previewsQuery.data]);
+  const previewByConversation = useMemo(() => {
+    const grouped = new Map<string, MessageRow>();
+    for (const row of previewRows) grouped.set(row.conversation_id, row);
     return grouped;
-  }, [currentMemberId, members, rows]);
+  }, [previewRows]);
+
+  const memberIdsByConversation = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+    for (const row of participantRows) {
+      const existing = grouped.get(row.conversation_id);
+      if (existing) existing.push(row.member_id);
+      else grouped.set(row.conversation_id, [row.member_id]);
+    }
+    return grouped;
+  }, [participantRows]);
 
   const conversations = useMemo<ConversationSummary[]>(() => {
     const memberById = new Map(members.map((member) => [member.id, member]));
     const createdAt = new Map(conversationRows.map((row) => [row.id, row.created_at]));
     const summaries = conversationRows.map((row) => {
-      // Membres déclarés dans la conversation, complétés par celles et ceux qui
-      // y ont écrit : une table `conversation_members` incomplète ne doit pas
-      // afficher « Foyer » à la place d'un prénom.
+      // Membres déclarés, complétés par l'expéditrice du dernier message :
+      // une table `conversation_members` incomplète ne doit pas afficher
+      // « Foyer » à la place d'un prénom. Seul l'aperçu alimente le repli
+      // (pas le fil entier) : les expéditrices anciennes d'un fil non ouvert
+      // restent invisibles tant qu'il n'est pas chargé.
+      const preview = previewByConversation.get(row.id);
       const memberIds = [
-        ...participantRows.filter((participant) => participant.conversation_id === row.id).map((participant) => participant.member_id),
-        ...rows.filter((message) => message.conversation_id === row.id).map((message) => message.sender_id),
+        ...(memberIdsByConversation.get(row.id) ?? []),
+        ...(preview ? [preview.sender_id] : []),
       ];
       const participants = [...new Set(memberIds)]
         .map((memberId) => memberById.get(memberId))
         .filter((member): member is NonNullable<typeof member> => Boolean(member))
         .map(toParticipant);
-      const thread = messagesByConversation.get(row.id) ?? [];
-      const last = thread.at(-1) ?? null;
+      const last = preview ? toMessage(preview, { currentMemberId, members }) : null;
       const readAt = readMap[row.id] ?? '';
+      const unseenLatest = last !== null && !last.isMine && isUnseen(last.createdAt, readAt);
       return {
         id: row.id,
         type: row.type,
@@ -124,7 +142,7 @@ export function useMessagesFeed(): MessagesFeed {
         lastMessage: last?.content ?? null,
         lastMessageAt: last?.createdAt ?? null,
         lastMessageMine: last?.isMine ?? false,
-        unread: thread.filter((message) => !message.isMine && isUnseen(message.createdAt, readAt)).length,
+        unread: unseenLatest ? 1 : 0,
       } satisfies ConversationSummary;
     });
     // Les conversations les plus récentes d'abord ; celles sans message restent en fin de liste.
@@ -133,7 +151,58 @@ export function useMessagesFeed(): MessagesFeed {
       if (Boolean(left.lastMessageAt) !== Boolean(right.lastMessageAt)) return left.lastMessageAt ? -1 : 1;
       return activity(right).localeCompare(activity(left));
     });
-  }, [conversationRows, currentMemberId, members, messagesByConversation, participantRows, readMap, rows]);
+  }, [conversationRows, currentMemberId, members, memberIdsByConversation, previewByConversation, readMap]);
+
+  /**
+   * Applique une réécriture aux fenêtres du fil mises en cache (toutes les
+   * tailles) et à l'aperçu, en rendant l'instantané pour restauration.
+   */
+  const rewriteThreadCaches = useCallback(
+    (conversationId: string, rewrite: (row: MessageRow) => MessageRow | null) => {
+      if (!householdId) return { threadEntries: [], previousPreview: undefined as MessageRow[] | undefined };
+      const threadEntries = queryClient.getQueriesData<MessagePage>({
+        queryKey: messageKeys.threadPrefix(householdId, conversationId),
+      });
+      for (const [key, page] of threadEntries) {
+        if (!page) continue;
+        queryClient.setQueryData<MessagePage>(key, {
+          ...page,
+          rows: page.rows.flatMap((row) => {
+            const rewritten = rewrite(row);
+            return rewritten === null ? [] : [rewritten];
+          }),
+        });
+      }
+      const previewKey = messageKeys.previews(householdId);
+      const previousPreview = queryClient.getQueryData<MessageRow[]>(previewKey);
+      queryClient.setQueryData<MessageRow[]>(previewKey, (current = []) => {
+        const next: MessageRow[] = [];
+        for (const row of current) {
+          if (row.conversation_id !== conversationId) {
+            next.push(row);
+            continue;
+          }
+          const rewritten = rewrite(row);
+          if (rewritten) next.push(rewritten);
+        }
+        return next;
+      });
+      return { threadEntries, previousPreview };
+    },
+    [householdId, queryClient],
+  );
+
+  const restoreThreadCaches = useCallback(
+    (
+      snapshot: { threadEntries: ReturnType<typeof queryClient.getQueriesData<MessagePage>>; previousPreview: MessageRow[] | undefined },
+    ) => {
+      for (const [key, page] of snapshot.threadEntries) queryClient.setQueryData(key, page);
+      if (snapshot.previousPreview && householdId) {
+        queryClient.setQueryData(messageKeys.previews(householdId), snapshot.previousPreview);
+      }
+    },
+    [householdId, queryClient],
+  );
 
   const sendMutation = useMutation({
     mutationFn: (input: { conversationId: string; content: string; mediaUrl?: string | null }) => {
@@ -148,9 +217,7 @@ export function useMessagesFeed(): MessagesFeed {
     },
     onMutate: async (input) => {
       if (!householdId) return { previous: undefined };
-      await queryClient.cancelQueries({ queryKey: messageKeys.rows(householdId) });
-      const key = messageKeys.rows(householdId);
-      const previous = queryClient.getQueryData<Awaited<ReturnType<typeof fetchMessages>>>(key);
+      await queryClient.cancelQueries({ queryKey: messageKeys.all });
       const optimistic: MessageRow = {
         id: `pending-${randomId('message')}`,
         conversation_id: input.conversationId,
@@ -160,12 +227,24 @@ export function useMessagesFeed(): MessagesFeed {
         media_url: input.mediaUrl ?? null,
         created_at: new Date().toISOString(),
       };
-      queryClient.setQueryData<MessageRow[]>(key, (current = []) => [...current, optimistic]);
-      return { previous };
+      const threadEntries = queryClient.getQueriesData<MessagePage>({
+        queryKey: messageKeys.threadPrefix(householdId, input.conversationId),
+      });
+      for (const [key, page] of threadEntries) {
+        if (!page) continue;
+        queryClient.setQueryData<MessagePage>(key, { ...page, rows: [optimistic, ...page.rows], total: page.total + 1 });
+      }
+      const previewKey = messageKeys.previews(householdId);
+      const previousPreview = queryClient.getQueryData<MessageRow[]>(previewKey);
+      queryClient.setQueryData<MessageRow[]>(previewKey, (current = []) => {
+        const rest = current.filter((row) => row.conversation_id !== input.conversationId);
+        return [...rest, optimistic];
+      });
+      return { previous: { threadEntries, previousPreview } };
     },
     onError: (_error, _input, context) => {
-      if (!householdId || !context?.previous) return;
-      queryClient.setQueryData(messageKeys.rows(householdId), context.previous);
+      if (!context?.previous) return;
+      restoreThreadCaches(context.previous);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: messageKeys.all });
@@ -228,20 +307,20 @@ export function useMessagesFeed(): MessagesFeed {
 
   /** Édition optimiste : le contenu est remplacé aussitôt, restauré en cas de refus serveur. */
   const editMessageMutation = useMutation({
-    mutationFn: (input: { messageId: string; content: string }) => updateMessageContent(input.messageId, input.content),
+    mutationFn: (input: { conversationId: string; messageId: string; content: string }) =>
+      updateMessageContent(input.messageId, input.content),
     onMutate: async (input) => {
       if (!householdId) return { previous: undefined };
-      await queryClient.cancelQueries({ queryKey: messageKeys.rows(householdId) });
-      const key = messageKeys.rows(householdId);
-      const previous = queryClient.getQueryData<MessageRow[]>(key);
-      queryClient.setQueryData<MessageRow[]>(key, (current = []) =>
-        current.map((row) => (row.id === input.messageId ? { ...row, content: input.content.trim() } : row)),
+      await queryClient.cancelQueries({ queryKey: messageKeys.all });
+      const trimmed = input.content.trim();
+      const previous = rewriteThreadCaches(input.conversationId, (row) =>
+        row.id === input.messageId ? { ...row, content: trimmed } : row,
       );
       return { previous };
     },
     onError: (_error, _input, context) => {
-      if (!householdId || !context?.previous) return;
-      queryClient.setQueryData(messageKeys.rows(householdId), context.previous);
+      if (!context?.previous) return;
+      restoreThreadCaches(context.previous);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: messageKeys.all });
@@ -250,18 +329,16 @@ export function useMessagesFeed(): MessagesFeed {
 
   /** Suppression optimiste d'un seul message : retiré aussitôt, restauré en cas de refus serveur. */
   const deleteMessageMutation = useMutation({
-    mutationFn: (messageId: string) => removeMessageRow(messageId),
-    onMutate: async (messageId) => {
+    mutationFn: (input: { conversationId: string; messageId: string }) => removeMessageRow(input.messageId),
+    onMutate: async (input) => {
       if (!householdId) return { previous: undefined };
-      await queryClient.cancelQueries({ queryKey: messageKeys.rows(householdId) });
-      const key = messageKeys.rows(householdId);
-      const previous = queryClient.getQueryData<MessageRow[]>(key);
-      queryClient.setQueryData<MessageRow[]>(key, (current = []) => current.filter((row) => row.id !== messageId));
+      await queryClient.cancelQueries({ queryKey: messageKeys.all });
+      const previous = rewriteThreadCaches(input.conversationId, (row) => (row.id === input.messageId ? null : row));
       return { previous };
     },
     onError: (_error, _input, context) => {
-      if (!householdId || !context?.previous) return;
-      queryClient.setQueryData(messageKeys.rows(householdId), context.previous);
+      if (!context?.previous) return;
+      restoreThreadCaches(context.previous);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: messageKeys.all });
@@ -306,12 +383,18 @@ export function useMessagesFeed(): MessagesFeed {
     async (conversationId: string) => deleteMutation.mutateAsync(conversationId),
     [deleteMutation],
   );
-  const editMessage = useCallback(async (messageId: string, content: string) => {
-    await editMessageMutation.mutateAsync({ messageId, content });
-  }, [editMessageMutation]);
-  const deleteMessage = useCallback(async (messageId: string) => {
-    await deleteMessageMutation.mutateAsync(messageId);
-  }, [deleteMessageMutation]);
+  const editMessage = useCallback(
+    async (conversationId: string, messageId: string, content: string) => {
+      await editMessageMutation.mutateAsync({ conversationId, messageId, content });
+    },
+    [editMessageMutation],
+  );
+  const deleteMessage = useCallback(
+    async (conversationId: string, messageId: string) => {
+      await deleteMessageMutation.mutateAsync({ conversationId, messageId });
+    },
+    [deleteMessageMutation],
+  );
   const leaveConversation = useCallback(
     async (conversationId: string) => leaveMutation.mutateAsync(conversationId),
     [leaveMutation],
@@ -319,28 +402,19 @@ export function useMessagesFeed(): MessagesFeed {
 
   const refetch = useCallback(() => {
     void conversationsQuery.refetch();
-    void messagesQuery.refetch();
-  }, [conversationsQuery, messagesQuery]);
+    void participantsQuery.refetch();
+    void previewsQuery.refetch();
+  }, [conversationsQuery, participantsQuery, previewsQuery]);
 
   return {
     conversations,
-    messagesByConversation,
-    memberIdsByConversation: useMemo(() => {
-      const grouped = new Map<string, string[]>();
-      for (const row of participantRows) {
-        const existing = grouped.get(row.conversation_id);
-        if (existing) existing.push(row.member_id);
-        else grouped.set(row.conversation_id, [row.member_id]);
-      }
-      return grouped;
-    }, [participantRows]),
-    totalMessages: rows.length,
+    memberIdsByConversation,
     unreadTotal: conversations.reduce((total, conversation) => total + conversation.unread, 0),
     householdId,
     currentMemberId,
-    isLoading: conversationsQuery.isLoading || messagesQuery.isLoading,
-    isError: conversationsQuery.isError || messagesQuery.isError,
-    error: (conversationsQuery.error ?? messagesQuery.error ?? null) as Error | null,
+    isLoading: conversationsQuery.isLoading || participantsQuery.isLoading || previewsQuery.isLoading,
+    isError: conversationsQuery.isError || participantsQuery.isError || previewsQuery.isError,
+    error: (conversationsQuery.error ?? participantsQuery.error ?? previewsQuery.error ?? null) as Error | null,
     refetch,
     readMap,
     markRead,
@@ -356,6 +430,83 @@ export function useMessagesFeed(): MessagesFeed {
     isCreating: createMutation.isPending || addMembersMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isLeaving: leaveMutation.isPending,
+  };
+}
+
+export interface ThreadPage {
+  /** Fil chargé, du plus ancien au plus récent. */
+  messages: Message[];
+  /** Taille connue du fil (portée conversation). */
+  total: number;
+  /** Messages effectivement chargés. */
+  loaded: number;
+  /** Vrai quand des messages plus anciens restent déchargés. */
+  hasMoreBefore: boolean;
+  /** Anciens restants, pour une copie honnête du « Charger plus ». */
+  remainingBefore: number;
+  /** Non-lus exacts sur la page chargée (les plus anciens sont antérieurs au marquage). */
+  unread: number;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  loadMore: () => void;
+  refetch: () => void;
+}
+
+/**
+ * Page d'un seul fil (D-05) : la fenêtre la plus récente d'abord, élargie par
+ * « Charger plus » explicite — jamais de défilement infini. Les tailles de
+ * fenêtre sont conservées par fil le temps de la session.
+ */
+export function useThreadPage(conversationId: string | null): ThreadPage {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
+  const members = useMembers();
+  const { readMap } = useReadConversations();
+  const [limits, setLimits] = useState<Record<string, number>>({});
+  const limit = conversationId ? (limits[conversationId] ?? MESSAGE_PAGE_SIZE) : MESSAGE_PAGE_SIZE;
+
+  const threadQuery = useQuery({
+    queryKey: messageKeys.thread(householdId, conversationId, limit),
+    enabled: Boolean(householdId && conversationId),
+    queryFn: () => fetchMessagePage(householdId, conversationId, { limit }),
+    placeholderData: keepPreviousData,
+  });
+
+  const loadMore = useCallback(() => {
+    if (!conversationId) return;
+    setLimits((previous) => ({
+      ...previous,
+      [conversationId]: (previous[conversationId] ?? MESSAGE_PAGE_SIZE) + MESSAGE_PAGE_SIZE,
+    }));
+  }, [conversationId]);
+
+  const messages = useMemo(() => {
+    const rows = threadQuery.data?.rows ?? [];
+    return sortMessages(rows.map((row) => toMessage(row, { currentMemberId, members })));
+  }, [currentMemberId, members, threadQuery.data]);
+
+  const readAt = (conversationId && readMap[conversationId]) ?? '';
+  const unread = messages.filter((message) => !message.isMine && isUnseen(message.createdAt, readAt)).length;
+
+  const total = threadQuery.data?.total ?? 0;
+  const loaded = threadQuery.data?.rows.length ?? 0;
+  const hasMoreBefore = threadQuery.data?.hasMore ?? false;
+
+  const refetch = useCallback(() => {
+    void threadQuery.refetch();
+  }, [threadQuery]);
+
+  return {
+    messages,
+    total,
+    loaded,
+    hasMoreBefore,
+    remainingBefore: Math.max(0, total - loaded),
+    unread,
+    isLoading: threadQuery.isLoading,
+    isLoadingMore: threadQuery.isFetching && !threadQuery.isLoading,
+    loadMore,
+    refetch,
   };
 }
 

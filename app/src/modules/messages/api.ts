@@ -43,6 +43,58 @@ export async function fetchMessages(householdId: string | null): Promise<Message
   return data.list<MessageRow>('messages', { household_id: householdId });
 }
 
+/** Taille d'une page de fil : 30 messages, compromis foyer (D-05). */
+export const MESSAGE_PAGE_SIZE = 30;
+
+export interface MessagePage {
+  /** Page demandée, du plus récent au plus ancien. */
+  rows: MessageRow[];
+  /** Vrai quand des messages plus anciens restent déchargés. */
+  hasMore: boolean;
+  /** Taille connue du fil (portée conversation, jamais foyer entier). */
+  total: number;
+}
+
+/**
+ * Chargement paginé d'UN fil (D-05) : la portée est la conversation, la page
+ * la plus récente d'abord via l'index existant
+ * (`messages_conversation_idx` sur `conversation_id, created_at desc`).
+ * L'adaptateur ne poussant pas encore `limit`/`order` côté PostgREST, la
+ * fenêtre est découpée côté client sur le fil seul — le dump foyer entier a
+ * disparu, le rendu ne reçoit que la page demandée.
+ */
+export async function fetchMessagePage(
+  householdId: string | null,
+  conversationId: string | null,
+  options?: { limit?: number; before?: { createdAt: string; id: string } },
+): Promise<MessagePage> {
+  if (!householdId || !conversationId) return { rows: [], hasMore: false, total: 0 };
+  const scoped = await data.list<MessageRow>('messages', { household_id: householdId, conversation_id: conversationId });
+  const sorted = [...scoped].sort(
+    (left, right) => right.created_at.localeCompare(left.created_at) || right.id.localeCompare(left.id),
+  );
+  const before = options?.before;
+  const windowed = before
+    ? sorted.filter(
+        (row) => row.created_at < before.createdAt || (row.created_at === before.createdAt && row.id < before.id),
+      )
+    : sorted;
+  const limit = options?.limit ?? MESSAGE_PAGE_SIZE;
+  return { rows: windowed.slice(0, limit), hasMore: windowed.length > limit, total: sorted.length };
+}
+
+/**
+ * Dernier message de chaque fil : alimente les aperçus, le tri d'activité et
+ * le signal de non-lus de la liste sans charger aucun fil en entier.
+ */
+export async function fetchLatestMessages(householdId: string | null, conversationIds: string[]): Promise<MessageRow[]> {
+  if (!householdId || conversationIds.length === 0) return [];
+  const pages = await Promise.all(
+    conversationIds.map((conversationId) => fetchMessagePage(householdId, conversationId, { limit: 1 })),
+  );
+  return pages.flatMap((page) => page.rows);
+}
+
 /**
  * Renommage du contenu d'un message. La RLS (`messages_update`, prouvée en
  * 0038) réserve l'opération à l'expéditrice ; les appels forgés sont refusés
