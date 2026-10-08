@@ -7,15 +7,26 @@ import { useToast } from '@/components/ui/toast';
 import { clearDatabase } from '@/lib/data/dexie';
 import { isLocalMode } from '@/lib/data';
 import { useInstallPrompt } from '@/hooks/use-pwa';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { dataModeLabel } from '../types';
 
 const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '0.1.0';
+
+function formatLastSync(value: number | null): string {
+  if (value === null) return 'Jamais';
+  try {
+    return new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return 'Inconnue';
+  }
+}
 
 export function OfflinePanel() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { canInstall, install } = useInstallPrompt();
-  const [pending, setPending] = useState(false);
+  const { online, pending, syncing, lastSyncedAt, syncNow } = useOfflineSync();
+  const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
   return (
@@ -34,16 +45,50 @@ export function OfflinePanel() {
             <span className="text-muted">Version</span>
             <strong>{appVersion}</strong>
           </div>
+          {!isLocalMode ? (
+            <>
+              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+                <span className="text-muted">État du réseau</span>
+                <strong>{online ? 'En ligne' : 'Hors ligne'}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+                <span className="text-muted">Modifications en attente</span>
+                <strong>{pending === 0 ? 'Aucune' : `${pending} en attente`}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+                <span className="text-muted">Dernière synchronisation</span>
+                <strong>{formatLastSync(lastSyncedAt)}</strong>
+              </div>
+            </>
+          ) : null}
         </div>
-        <p className="mt-4 mb-4 text-[11px] text-muted">
-          En mode local, les données vivent uniquement dans ce navigateur : rien n’est envoyé sur un serveur. Videz le
-          cache pour revenir au jeu de démonstration d’origine.
-        </p>
+        {!isLocalMode ? (
+          <>
+            <p className="mt-4 mb-4 text-[11px] text-muted">
+              En cas de panne réseau, les données déjà consultées sont servies depuis le cache local et marquées
+              comme périmées. Toute écriture qui échoue (hors ligne, timeout, erreur serveur) est mise en file et
+              rejouée dans l’ordre à la reconnexion — y compris les retraits de lignes liées. En cas de conflit, le
+              dernier écrivain gagne, sans fusion. Les créations et mises à jour en attente n’apparaissent qu’après
+              synchronisation. Les invitations et la création de foyer exigent une connexion : ils ne sont jamais
+              mis en file.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" icon="refresh" disabled={syncing || pending === 0} onClick={() => void syncNow()}>
+                {syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <p className="mt-4 mb-4 text-[11px] text-muted">
+            En mode local, les données vivent uniquement dans ce navigateur : rien n’est envoyé sur un serveur. Videz le
+            cache pour revenir au jeu de démonstration d’origine.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             icon="trash"
-            disabled={pending}
+            disabled={clearing}
             onClick={() => setConfirmClear(true)}
           >
             Vider le cache local
@@ -59,8 +104,22 @@ export function OfflinePanel() {
       <Panel title="Application web" description="Installable, utilisable hors ligne, sans magasin d’applications.">
         <ul className="m-0 grid list-none gap-2.5 p-0 text-[11px] text-muted">
           <li>Application web installable (manifeste + service worker).</li>
-          <li>Utilisable hors ligne : les pages et les données déjà consultées restent accessibles.</li>
-          <li>Les écritures hors ligne sont mises en file et rejouées à la reconnexion.</li>
+          {isLocalMode ? (
+            <>
+              <li>Utilisable hors ligne : les pages et les données déjà consultées restent accessibles.</li>
+              <li>Les écritures hors ligne sont mises en file et rejouées à la reconnexion.</li>
+            </>
+          ) : (
+            <>
+              <li>Hors ligne : les données déjà consultées restent accessibles, marquées comme périmées.</li>
+              <li>
+                {pending === 0
+                  ? 'Aucune modification en attente de synchronisation.'
+                  : `${pending} modification(s) en attente de synchronisation, rejouées dans l’ordre.`}
+              </li>
+              <li>Les invitations et la création de foyer exigent une connexion.</li>
+            </>
+          )}
         </ul>
         <p className="mt-4 mb-0 text-[11px] text-muted">
           Version {appVersion} · service worker mis à jour automatiquement à chaque déploiement.
@@ -74,7 +133,7 @@ export function OfflinePanel() {
         description="Les données enregistrées sur cet appareil seront supprimées. Le jeu de démonstration sera rechargé à la prochaine lecture."
         confirmLabel="Vider le cache"
         onConfirm={async () => {
-          setPending(true);
+          setClearing(true);
           try {
             await clearDatabase();
             await queryClient.invalidateQueries();
@@ -82,7 +141,7 @@ export function OfflinePanel() {
           } catch (clearError) {
             toast(clearError instanceof Error ? clearError.message : 'Vidage impossible.', 'error');
           } finally {
-            setPending(false);
+            setClearing(false);
             setConfirmClear(false);
           }
         }}

@@ -2,14 +2,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { isLocalMode } from '@/lib/data';
 import { data } from '@/lib/data';
-import { flushMutations, pendingCount } from '@/lib/data/sync-queue';
+import { flushWithAdapter, pendingCount } from '@/lib/data/sync-queue';
 import { queryKeys } from '@/lib/data/useResource';
 import { useToast } from '@/components/ui/toast';
+
+const LAST_SYNC_KEY = 'eo:last-sync-at';
+
+function readLastSyncedAt(): number | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(LAST_SYNC_KEY);
+    if (!raw) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface OfflineSyncState {
   online: boolean;
   pending: number;
   syncing: boolean;
+  /** Horodatage (ms) de la dernière synchronisation réussie, `null` si jamais. */
+  lastSyncedAt: number | null;
   syncNow: () => Promise<void>;
 }
 
@@ -21,6 +37,7 @@ export function useOfflineSync(): OfflineSyncState {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => readLastSyncedAt());
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -33,25 +50,22 @@ export function useOfflineSync(): OfflineSyncState {
     if (isLocalMode) return;
     setSyncing(true);
     try {
-      const result = await flushMutations(async (mutation) => {
-        try {
-          if (mutation.operation === 'delete') {
-            await data.remove(mutation.table, mutation.rowId);
-            return { ok: true };
-          }
-          if (mutation.operation === 'update') {
-            await data.update(mutation.table, mutation.rowId, mutation.values);
-            return { ok: true };
-          }
-          await data.create(mutation.table, mutation.values as never);
-          return { ok: true };
-        } catch {
-          return { ok: false };
-        }
-      });
+      // Rejeu ordonné vers l'adaptateur actif, `deleteWhere` compris : chaque
+      // verbe est rejoué par `replayOne`, les échecs restant en file avec
+      // `attempts` incrémenté (dernier-écrivain, D-06 — voir sync-queue.ts).
+      const result = await flushWithAdapter(data);
       await queryClient.invalidateQueries();
       await refreshPending();
+      const stamped = Date.now();
+      setLastSyncedAt(stamped);
+      try {
+        localStorage.setItem(LAST_SYNC_KEY, String(stamped));
+      } catch {
+        // Stockage indisponible (navigation privée stricte) : l'horodatage
+        // reste en mémoire pour la session, sans casser la synchronisation.
+      }
       if (result.replayed > 0) toast(`${result.replayed} modification(s) synchronisée(s).`);
+      if (result.failed > 0) toast(`${result.failed} modification(s) restent en attente (conflit ou réseau).`, 'error');
     } finally {
       setSyncing(false);
     }
@@ -74,7 +88,7 @@ export function useOfflineSync(): OfflineSyncState {
     };
   }, [refreshPending, syncNow]);
 
-  return { online, pending, syncing, syncNow };
+  return { online, pending, syncing, lastSyncedAt, syncNow };
 }
 
 export { queryKeys };

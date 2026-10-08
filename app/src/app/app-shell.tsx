@@ -250,7 +250,7 @@ export function AppShell() {
             >
               <span className="flex items-center gap-2">
                 <Icon name="cloud" size="sm" />
-                Vous êtes hors ligne. Les données affichées viennent du cache local.
+                Vous êtes hors ligne. Les données affichées peuvent venir du cache local et être périmées.
                 {pending > 0 ? ` ${pending} modification(s) en attente de synchronisation.` : ''}
               </span>
               <span className="flex gap-2">
@@ -261,6 +261,20 @@ export function AppShell() {
                   Masquer
                 </Button>
               </span>
+            </div>
+          ) : null}
+          {online && pending > 0 ? (
+            <div
+              role="status"
+              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 py-3 text-xs"
+            >
+              <span className="flex items-center gap-2">
+                <Icon name="refresh" size="sm" />
+                {pending} modification(s) en attente de synchronisation, rejouées dans l’ordre à la reconnexion.
+              </span>
+              <Button size="sm" variant="secondary" disabled={syncing} onClick={() => void syncNow()}>
+                {syncing ? 'Synchronisation…' : 'Synchroniser'}
+              </Button>
             </div>
           ) : null}
           <Outlet />

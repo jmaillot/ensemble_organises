@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { DataError, type DataAdapter, type ListResult } from './adapter';
 import { getDatabase } from './dexie';
-import { enqueueMutation, readCached } from './sync-queue';
+import { enqueueMutation, isReplayingQueue, readCached } from './sync-queue';
 import { isKeylessTable, rowKey } from './keys';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
@@ -173,29 +173,51 @@ export class SupabaseAdapter implements DataAdapter {
   async remove(table: string, id: string) {
     const client = this.client();
     const { error } = await client.from(table).delete().eq('id', id);
-    if (error) throw this.queueOrFail(table, 'delete', id, {}, error);
+    if (error) {
+      const queued = this.queueOrFail(table, 'delete', id, {}, error);
+      // Éviction optimiste : une ligne supprimée ne doit pas ressurgir des
+      // lectures périmées avant son rejeu.
+      await getDatabase().rows.delete(rowKey(table, { id }));
+      throw queued;
+    }
     await getDatabase().rows.delete(rowKey(table, { id }));
   }
 
   /**
-   * Hors ligne, l'écriture est conservée dans la file de synchronisation et
-   * rejouée à la reconnexion ; sinon l'erreur remonte à l'UI.
+   * Mise en file sur échec constaté (D-02) : toute erreur d'écriture est
+   * mise en file pour rejeu, que le navigateur se dise hors ligne ou non —
+   * un timeout, une 5xx ou un portail captif ne font plus perdre une
+   * mutation. Politique volontairement « transitoire d'abord » : une erreur
+   * durable (droits, validation) restera en file avec `attempts` incrémenté
+   * au lieu d'être perdue, et remontera au rejeu. Le `DataError` porte
+   * `queuedForSync` pour que l'UI garde son état optimiste.
    */
   private queueOrFail(
     table: string,
-    operation: 'insert' | 'update' | 'delete',
+    operation: 'insert' | 'update' | 'delete' | 'deleteWhere',
     rowId: string,
     values: Record<string, unknown>,
     error: { message: string } | null,
   ) {
+    // Pendant un rejeu, l'écriture rejouée est déjà en file : l'y remettre
+    // dupliquerait la file à chaque échec. L'erreur remonte sans file et le
+    // compteur d'essais est incrémenté par `flushMutations`.
+    if (isReplayingQueue()) return new DataError(error?.message ?? 'Écriture refusée.', error);
+    void enqueueMutation({ table, operation, rowId, values });
     const offline = typeof navigator !== 'undefined' && !navigator.onLine;
-    if (offline) {
-      void enqueueMutation({ table, operation, rowId, values });
-      return new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', error);
-    }
-    return new DataError(error?.message ?? 'Écriture refusée.', error);
+    return new DataError(
+      offline
+        ? 'Hors ligne : la modification sera synchronisée au retour du réseau.'
+        : 'Écriture non confirmée (réseau ou serveur) : elle est conservée et sera rejouée automatiquement.',
+      error,
+      true,
+    );
   }
 
+  /**
+   * Jointures (lignes sans `id`) : l'échec est mis en file comme les autres
+   * verbes (D-02), avec le filtre dans `values` pour un rejeu à l'identique.
+   */
   async removeWhere(table: string, filter: RowFilter) {
     const client = this.client();
     let query = client.from(table).delete();
@@ -206,7 +228,19 @@ export class SupabaseAdapter implements DataAdapter {
       else query = query.eq(key, value);
     }
     const { error } = await query;
-    if (error) throw new DataError(error.message, error);
+    if (error) {
+      const queued = this.queueOrFail(table, 'deleteWhere', '*', filter as Record<string, unknown>, error);
+      await this.evictCachedWhere(table, filter);
+      throw queued;
+    }
+  }
+
+  /** Éviction optimiste des lignes du cache correspondant à un filtre. */
+  private async evictCachedWhere(table: string, filter: RowFilter) {
+    const db = getDatabase();
+    const entries = await db.rows.where('table').equals(table).toArray();
+    const targets = entries.filter((entry) => matchesRow(entry.data, filter));
+    if (targets.length > 0) await db.rows.bulkDelete(targets.map((entry) => entry.key));
   }
 
   subscribe(table: string, onChange: () => void) {

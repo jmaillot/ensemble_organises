@@ -25,6 +25,16 @@ export async function pendingCount() {
 
 export type FlushResult = { replayed: number; failed: number };
 
+/**
+ * Vrai pendant un rejeu : l'adaptateur ne doit pas remettre en file une
+ * écriture qui y est déjà (sinon chaque rejeu en échec dupliquerait la file).
+ */
+let replaying = false;
+
+export function isReplayingQueue() {
+  return replaying;
+}
+
 /** Rejoue la file ; les échecs sont conservés avec un compteur d'essais. */
 export async function flushMutations(
   send: (mutation: PendingMutation) => Promise<{ ok: boolean }>,
@@ -33,20 +43,25 @@ export async function flushMutations(
   const entries = await db.mutations.orderBy('createdAt').toArray();
   let replayed = 0;
   let failed = 0;
-  for (const entry of entries) {
-    try {
-      const outcome = await send(entry);
-      if (outcome.ok) {
-        await db.mutations.delete(entry.id as number);
-        replayed += 1;
-      } else {
+  replaying = true;
+  try {
+    for (const entry of entries) {
+      try {
+        const outcome = await send(entry);
+        if (outcome.ok) {
+          await db.mutations.delete(entry.id as number);
+          replayed += 1;
+        } else {
+          await db.mutations.update(entry.id as number, { attempts: entry.attempts + 1 });
+          failed += 1;
+        }
+      } catch {
         await db.mutations.update(entry.id as number, { attempts: entry.attempts + 1 });
         failed += 1;
       }
-    } catch {
-      await db.mutations.update(entry.id as number, { attempts: entry.attempts + 1 });
-      failed += 1;
     }
+  } finally {
+    replaying = false;
   }
   return { replayed, failed };
 }
