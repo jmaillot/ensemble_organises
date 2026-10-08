@@ -111,20 +111,42 @@ export async function updateMessageContent(messageId: string, content: string): 
 
 /**
  * Suppression d'un seul message, historique du fil conservé pour le reste.
- * La RLS (`messages_delete`, prouvée en 0038) réserve l'opération à
- * l'expéditrice ou à un admin du foyer (D-03).
+ * La RLS (`messages_delete`, D-07 prouvée en 0039) réserve l'opération à
+ * l'expéditrice, membre actif du fil — jamais à un admin sur autrui.
  */
 export async function deleteMessage(messageId: string): Promise<void> {
   await data.remove('messages', messageId);
 }
 
 /**
- * Départ volontaire d'une conversation : seule la ligne d'appartenance est
- * retirée, les messages restent visibles pour les autres membres. La RLS
- * (`conversation_members_delete`, prouvée en 0038) réserve l'opération au
- * membre lui-même (D-04).
+ * Départ volontaire en pierre tombale (D-08) : la ligne d'appartenance porte
+ * `left_at`, les messages restent lisibles en lecture seule. En ligne le RPC
+ * `leave_conversation` (0100, idempotent) ; en local la même tombe écrite en
+ * IndexedDB, atomique sur deux écritures (aucune RLS à traverser).
  */
 export async function leaveConversation(conversationId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('leave_conversation', { p_conversation_id: conversationId });
+    if (error) throw new DataError(error.message || 'Le départ n’a pas pu être enregistré.', error);
+    return;
+  }
+  const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
+  const mine = rows.find((row) => row.member_id === memberId && !row.left_at);
+  if (!mine) return;
+  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
+  await data.create<ConversationMemberRow>('conversation_members', {
+    conversation_id: conversationId,
+    member_id: memberId,
+    left_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Retrait d'un fil quitté de ses archives (D-08) : seule sa propre pierre
+ * est supprimée — nettoyage personnel, jamais suppression du fil. La RLS
+ * réserve l'opération au partant sur sa tombe (prouvée en 0039).
+ */
+export async function removeArchivedConversation(conversationId: string, memberId: string): Promise<void> {
   await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
 }
 
@@ -210,6 +232,7 @@ export async function createConversation(draft: ConversationDraft): Promise<Conv
         data.create<ConversationMemberRow>('conversation_members', {
           conversation_id: row.id,
           member_id: memberId,
+          left_at: null,
         }),
       ),
     );
@@ -222,34 +245,58 @@ export async function createConversation(draft: ConversationDraft): Promise<Conv
 
 /**
  * Ajout ultérieur de membres à une conversation existante. La RLS
- * (`can_join_conversation`) réserve l'opération aux participants et aux
- * admins ; les doublons sont ignorés avant tout appel réseau.
+ * (`can_join_conversation`) réserve l'opération aux participants actifs et
+ * aux admins ; les doublons actifs sont ignorés avant tout appel réseau.
+ * Une pierre tombale ne se ré-insère pas (conflit de clé) : elle se ranime
+ * (retrait + création, réservé aux admins côté serveur, D-08) — le partant
+ * seul ne se ré-ajoute pas.
  */
 export async function addConversationMembers(conversationId: string, memberIds: string[]): Promise<void> {
   const fresh = [...new Set(memberIds.filter((id) => id.trim() !== ''))];
   if (fresh.length === 0) throw new Error('Choisissez au moins un membre à ajouter.');
   const existing = await data.list<ConversationMemberRow>('conversation_members');
-  const missing = fresh.filter(
-    (memberId) => !existing.some((row) => row.conversation_id === conversationId && row.member_id === memberId),
-  );
+  const rows = existing.filter((row) => row.conversation_id === conversationId);
+  const missing = fresh.filter((memberId) => !rows.some((row) => row.member_id === memberId));
+  const left = fresh.filter((memberId) => rows.some((row) => row.member_id === memberId && row.left_at));
   await Promise.all(
     missing.map((memberId) =>
-      data.create<ConversationMemberRow>('conversation_members', { conversation_id: conversationId, member_id: memberId }),
+      data.create<ConversationMemberRow>('conversation_members', {
+        conversation_id: conversationId,
+        member_id: memberId,
+        left_at: null,
+      }),
     ),
   );
+  // Réadhésion (D-08) : la pierre est retirée puis la ligne ré-insérée —
+  // les deux opérations sont réservées aux admins côté serveur.
+  for (const memberId of left) {
+    await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
+    await data.create<ConversationMemberRow>('conversation_members', {
+      conversation_id: conversationId,
+      member_id: memberId,
+      left_at: null,
+    });
+  }
 }
 
 /**
  * Suppression d'une conversation et de tout son contenu (participants,
- * messages). En ligne la cascade SQL emporte les enfants ; en local
- * l'adaptateur n'a pas de cascade implicite, on retire explicitement.
- * La RLS (`conversations_delete`) réserve l'opération aux administrateurs.
+ * messages) — levier de modération admin, intact depuis D-07. En ligne la
+ * cascade SQL emporte les enfants (la suppression unitaire des messages est
+ * réservée à leurs auteurs, un admin ne peut plus les retirer un par un) ;
+ * en local l'adaptateur n'a pas de cascade implicite, on retire
+ * explicitement. La RLS (`conversations_delete`) réserve l'opération aux
+ * administrateurs.
  */
 export async function removeConversationCascade(input: {
   householdId: string;
   conversationId: string;
 }): Promise<void> {
   const { householdId, conversationId } = input;
+  if (isSupabaseConfigured && supabase) {
+    await data.remove('conversations', conversationId);
+    return;
+  }
   const [media, members] = await Promise.all([
     data.list<MessageRow>('messages', { household_id: householdId, conversation_id: conversationId }),
     data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId }),

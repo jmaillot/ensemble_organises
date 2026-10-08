@@ -685,6 +685,8 @@ export interface ConversationRow {
 export interface ConversationMemberRow {
   conversation_id: Uuid;
   member_id: Uuid;
+  /** Pierre tombale (D-08) : renseigné, le membre a quitté (lecture seule). */
+  left_at: IsoDateTime | null;
 }
 
 export interface MessageRow {

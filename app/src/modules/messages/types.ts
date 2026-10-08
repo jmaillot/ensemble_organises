@@ -21,6 +21,8 @@ export interface ConversationSummary {
   lastMessageAt: string | null;
   lastMessageMine: boolean;
   unread: number;
+  /** Fil quitté (pierre tombale) : section archives, lecture seule. */
+  isArchived: boolean;
 }
 
 /** Message affiché dans la zone de discussion. */

@@ -245,9 +245,10 @@ describe('Messages', () => {
     expect(within(log).getByText(/je te l’envoie/)).toBeInTheDocument();
   });
 
-  it('laisse l’admin supprimer le message d’autrui, sans l’éditer', async () => {
-    // D-03, miroir RLS : Camille administre, donc « Supprimer » sur la bulle
-    // de Lina, mais aucune « Modifier » (édition strictement expéditrice).
+  it('ne propose plus à l’admin de supprimer le message d’autrui, sans l’éditer', async () => {
+    // D-07, miroir RLS (0039) : Camille administre mais ne voit « Supprimer »
+    // que sur ses propres bulles — jamais sur celles d'autrui, jamais
+    // « Modifier » hors de ses messages. La modération passe par le fil.
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);
 
@@ -256,13 +257,12 @@ describe('Messages', () => {
     const bubble = within(log).getByText('Tu as vu le nouveau parc ?').closest('div');
     expect(bubble).not.toBeNull();
     expect(within(bubble as HTMLElement).queryByRole('button', { name: 'Modifier ce message' })).not.toBeInTheDocument();
-    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Supprimer ce message' }));
+    expect(within(bubble as HTMLElement).queryByRole('button', { name: 'Supprimer ce message' })).not.toBeInTheDocument();
 
-    const alert = await screen.findByRole('alertdialog');
-    await user.click(within(alert).getByRole('button', { name: 'Supprimer le message' }));
-
-    await waitFor(() => expect(within(log).queryByText('Tu as vu le nouveau parc ?')).not.toBeInTheDocument());
-    expect(within(log).getByText(/je te l’envoie/)).toBeInTheDocument();
+    // Sa propre bulle garde la suppression confirmée.
+    const mine = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    expect(mine).not.toBeNull();
+    expect(within(mine as HTMLElement).getByRole('button', { name: 'Supprimer ce message' })).toBeInTheDocument();
   });
 
   it('page le fil par conversation avec un « Charger plus » explicite', async () => {
@@ -322,35 +322,37 @@ describe('Messages', () => {
     });
   });
 
-  it('quitte une conversation : registre retiré, historique conservé', async () => {
-    // D-04 : le départ ne retire que l'appartenance (vérifié au registre),
-    // les messages restent ; la vue bascule sur un autre fil.
+  it('quitte une conversation : archives en lecture seule, historique conservé', async () => {
+    // D-08 : le départ tombe la ligne (`left_at`, vérifié au registre), le
+    // fil bascule dans « Anciennes conversations », lecture seule, historique
+    // conservé — la sélection reste sur place au lieu de disparaître.
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);
 
     await user.click(await screen.findByRole('button', { name: /^Lina/ }));
     expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
 
-    const membershipsOf = async (memberId: string) =>
-      (await data.list<ConversationMemberRow>('conversation_members'))
-        .filter((row) => row.member_id === memberId)
-        .map((row) => row.conversation_id);
-    const before = await membershipsOf(DEMO_MEMBERS.camille);
-    expect(before.length).toBeGreaterThan(1);
-
     await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
     const alert = await screen.findByRole('alertdialog');
-    expect(alert).toHaveTextContent('restent visibles pour les autres membres');
+    expect(alert).toHaveTextContent('anciennes conversations');
     await user.click(within(alert).getByRole('button', { name: 'Quitter la conversation' }));
 
-    await waitFor(() => expect(screen.queryByRole('log', { name: /Messages de Lina/ })).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText('Conversation quittée.')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
 
-    const after = await membershipsOf(DEMO_MEMBERS.camille);
-    const left = before.filter((id) => !after.includes(id));
-    expect(left).toHaveLength(1);
-    const kept = await data.list<MessageRow>('messages', { conversation_id: left[0] });
-    expect(kept.length).toBeGreaterThan(0);
+    // La tombe est écrite, la ligne n'est pas retirée.
+    const rows = await data.list<ConversationMemberRow>('conversation_members');
+    const tomb = rows.find((row) => row.member_id === DEMO_MEMBERS.camille && row.left_at);
+    expect(tomb).toBeDefined();
+
+    // Section archives + panneau lecture seule, historique conservé.
+    expect(screen.getByText('Anciennes conversations')).toBeInTheDocument();
+    const log = screen.getByRole('log', { name: /Messages de Lina/ });
+    expect(within(log).getByText('Tu as vu le nouveau parc ?')).toBeInTheDocument();
+    expect(screen.getByText(/lecture seule/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Retirer .* de mes archives/ })).toBeInTheDocument();
   });
 
   it('désactive le départ pour le dernier membre restant', async () => {

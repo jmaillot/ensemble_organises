@@ -6,6 +6,8 @@ import { formatListTime, type ConversationSummary } from '../types';
 
 export interface ConversationListProps {
   conversations: ConversationSummary[];
+  /** Fils quittés : section « Anciennes conversations », lecture seule. */
+  archivedConversations?: ConversationSummary[];
   activeId: string | null;
   onSelect: (conversationId: string) => void;
   isLoading?: boolean;
@@ -13,7 +15,39 @@ export interface ConversationListProps {
 }
 
 /** Liste des conversations : une vraie liste de boutons, `aria-current` compris. */
-export function ConversationList({ conversations, activeId, onSelect, isLoading = false, className }: ConversationListProps) {
+export function ConversationList({ conversations, archivedConversations = [], activeId, onSelect, isLoading = false, className }: ConversationListProps) {
+  const renderItem = (conversation: ConversationSummary) => {
+    const isActive = conversation.id === activeId;
+    const unreadLabel =
+      conversation.unread > 0 ? `, ${pluralize(conversation.unread, 'message')} non lu${conversation.unread > 1 ? 's' : ''}` : '';
+    return (
+      <li key={conversation.id}>
+        <button
+          type="button"
+          aria-current={isActive ? 'true' : undefined}
+          aria-label={`${conversation.title}${unreadLabel}`}
+          onClick={() => onSelect(conversation.id)}
+          className={`flex w-full items-center gap-2.5 rounded-[11px] px-2 py-[11px] text-left transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint ${
+            isActive ? 'bg-accent-faint' : ''
+          }`}
+        >
+          <MemberAvatar name={conversation.title} colorTag={conversation.colorTag} size="sm" />
+          <span className="min-w-0 flex-1">
+            <strong className="block text-xs">{conversation.title}</strong>
+            <span className="block truncate text-[10px] text-muted">
+              {conversation.lastMessageMine ? 'Vous : ' : ''}
+              {conversation.lastMessage ?? 'Aucun message'}
+            </span>
+          </span>
+          {conversation.unread > 0 ? (
+            <span className="size-[7px] shrink-0 rounded-full bg-coral" aria-hidden="true" />
+          ) : (
+            <small className="shrink-0 text-[10px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
+          )}
+        </button>
+      </li>
+    );
+  };
   return (
     <aside
       aria-label="Conversations"
@@ -28,39 +62,19 @@ export function ConversationList({ conversations, activeId, onSelect, isLoading 
         <p className="m-0 px-2 pb-2 text-xs text-muted">Aucune conversation pour le moment.</p>
       ) : null}
       <ul className="grid list-none gap-0.5 p-0">
-        {conversations.map((conversation) => {
-          const isActive = conversation.id === activeId;
-          const unreadLabel =
-            conversation.unread > 0 ? `, ${pluralize(conversation.unread, 'message')} non lu${conversation.unread > 1 ? 's' : ''}` : '';
-          return (
-            <li key={conversation.id}>
-              <button
-                type="button"
-                aria-current={isActive ? 'true' : undefined}
-                aria-label={`${conversation.title}${unreadLabel}`}
-                onClick={() => onSelect(conversation.id)}
-                className={`flex w-full items-center gap-2.5 rounded-[11px] px-2 py-[11px] text-left transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint ${
-                  isActive ? 'bg-accent-faint' : ''
-                }`}
-              >
-                <MemberAvatar name={conversation.title} colorTag={conversation.colorTag} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block text-xs">{conversation.title}</strong>
-                  <span className="block truncate text-[10px] text-muted">
-                    {conversation.lastMessageMine ? 'Vous : ' : ''}
-                    {conversation.lastMessage ?? 'Aucun message'}
-                  </span>
-                </span>
-                {conversation.unread > 0 ? (
-                  <span className="size-[7px] shrink-0 rounded-full bg-coral" aria-hidden="true" />
-                ) : (
-                  <small className="shrink-0 text-[10px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
-                )}
-              </button>
-            </li>
-          );
-        })}
+        {conversations.map(renderItem)}
       </ul>
+      {archivedConversations.length > 0 ? (
+        <>
+          <div className="flex items-center justify-between gap-2 px-2 pt-3 pb-2">
+            <h4 className="m-0 font-display text-sm tracking-[-0.035em]">Anciennes conversations</h4>
+            <CountBadge value={archivedConversations.length} label="archives" />
+          </div>
+          <ul className="grid list-none gap-0.5 p-0" aria-label="Anciennes conversations">
+            {archivedConversations.map(renderItem)}
+          </ul>
+        </>
+      ) : null}
     </aside>
   );
 }

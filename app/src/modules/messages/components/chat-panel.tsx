@@ -26,8 +26,10 @@ export interface ChatPanelProps {
   onLeaveConversation?: () => void;
   /** Quand renseigné, « Quitter » est désactivé et la raison est expliquée. */
   leaveDisabledReason?: string | null;
-  /** Vrai quand le membre courant administre le foyer : voit aussi la suppression des bulles d'autrui. */
-  isAdmin?: boolean;
+  /** Fil quitté (D-08) : historique en lecture seule, sans compositeur ni actions d'écriture. */
+  readOnly?: boolean;
+  /** Retire ce fil quitté de ses archives (sa propre pierre, D-08) ; absent, le bouton est masqué. */
+  onRemoveArchived?: () => void;
   /** Fenêtre chargée du fil : affiche « Charger plus » quand des anciens restent déchargés. */
   pageInfo?: { hasMoreBefore: boolean; remainingBefore: number; loaded: number; total: number };
   /** Élargit la fenêtre vers les messages plus anciens. */
@@ -136,7 +138,7 @@ function MessageBubble({
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, isAdmin = false, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -233,10 +235,17 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         <div className="min-w-0 flex-1">
           <strong className="block truncate text-[13px]">{conversation.title}</strong>
           <small className="block truncate text-[10px] text-muted">
-            {conversation.type === 'direct' ? 'Échange privé' : `${participants} participants`} · Foyer
+            {readOnly ? (
+              'Conversation quittée · lecture seule'
+            ) : conversation.type === 'direct' ? (
+              'Échange privé'
+            ) : (
+              `${participants} participants`
+            )}{' '}
+            · Foyer
           </small>
         </div>
-        {onAddMember ? (
+        {!readOnly && onAddMember ? (
           <Button
             variant="quiet"
             size="sm"
@@ -258,7 +267,19 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
           />
         ) : null}
-        {onLeaveConversation ? (
+        {readOnly && onRemoveArchived ? (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon="trash"
+            onClick={onRemoveArchived}
+            aria-label={`Retirer ${conversation.title} de mes archives`}
+            className="shrink-0"
+          >
+            Retirer de mes archives
+          </Button>
+        ) : null}
+        {!readOnly && onLeaveConversation ? (
           <Button
             variant="quiet"
             size="sm"
@@ -311,8 +332,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             <MessageBubble
               key={message.id}
               message={message}
-              showEdit={Boolean(onEditMessage) && message.isMine && !message.pending}
-              showDelete={Boolean(onDeleteMessage) && !message.pending && (message.isMine || isAdmin)}
+              showEdit={Boolean(onEditMessage) && !readOnly && message.isMine && !message.pending}
+              showDelete={Boolean(onDeleteMessage) && !readOnly && !message.pending && message.isMine}
               editing={editingId === message.id}
               editDraft={editingId === message.id ? editDraft : message.content}
               onStartEdit={() => {
@@ -334,6 +355,12 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         )}
       </div>
 
+      {readOnly ? (
+        <p className="m-0 border-t border-border px-3 py-2.5 text-center text-[11px] text-muted">
+          Vous avez quitté cette conversation : l’historique reste lisible, sans écriture possible.
+        </p>
+      ) : (
+        <>
       {attachment ? (
         <div className="flex items-center gap-2 border-t border-border px-3 pt-2.5">
           <img src={attachment.previewUrl} alt="" className="h-11 w-auto rounded-[8px]" />
@@ -398,6 +425,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         />
         <Button type="submit" icon="send" aria-label="Envoyer" disabled={!canSubmit || isSending} />
       </form>
+        </>
+      )}
       <p className="m-0 flex items-center gap-1.5 border-t border-border px-3 py-2 text-[10px] text-muted">
         <Icon name="wifi" size="sm" />
         Les messages arrivent en temps réel pour les membres du foyer.

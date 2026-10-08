@@ -20,6 +20,7 @@ export default function MessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
   const [pendingLeave, setPendingLeave] = useState<string | null>(null);
+  const [pendingArchiveRemoval, setPendingArchiveRemoval] = useState<string | null>(null);
   const [listVisible, setListVisible] = useState(true);
   const { markRead } = feed;
   const isAdmin = useIsAdmin();
@@ -27,8 +28,14 @@ export default function MessagesPage() {
   useMessagesRealtime();
 
   const conversations = feed.conversations;
-  const active = conversations.find((conversation) => conversation.id === selectedId) ?? conversations[0] ?? null;
+  const archivedConversations = feed.archivedConversations;
+  const active =
+    conversations.find((conversation) => conversation.id === selectedId) ??
+    archivedConversations.find((conversation) => conversation.id === selectedId) ??
+    conversations[0] ??
+    null;
   const activeId = active?.id ?? null;
+  const isArchived = active?.isArchived ?? false;
 
   // Ouvrir une conversation la marque comme lue (mise à jour optimiste).
   useEffect(() => {
@@ -63,7 +70,7 @@ export default function MessagesPage() {
     );
   }
 
-  if (conversations.length === 0) {
+  if (conversations.length === 0 && archivedConversations.length === 0) {
     return (
       <ModuleShell module="messages">
         {feed.isLoading ? <LoadingRows rows={4} /> : (
@@ -97,7 +104,7 @@ export default function MessagesPage() {
   }
 
   const eligible = members.filter(
-    (member) => active && !active.participants.some((participant) => participant.id === member.id),
+    (member) => active && !isArchived && !active.participants.some((participant) => participant.id === member.id),
   );
 
   return (
@@ -121,6 +128,7 @@ export default function MessagesPage() {
       <div className="grid min-h-[520px] grid-cols-[290px_minmax(0,1fr)] gap-3.5 max-[920px]:min-h-0 max-[920px]:grid-cols-1">
         <ConversationList
           conversations={conversations}
+          archivedConversations={archivedConversations}
           activeId={activeId}
           isLoading={feed.isLoading}
           onSelect={(conversationId) => {
@@ -136,6 +144,8 @@ export default function MessagesPage() {
           conversation={active}
           messages={thread.messages}
           isSending={feed.isSending}
+          readOnly={isArchived}
+          onRemoveArchived={isArchived && active ? () => setPendingArchiveRemoval(active.id) : undefined}
           pageInfo={
             active
               ? {
@@ -149,13 +159,13 @@ export default function MessagesPage() {
           isLoadingMore={thread.isLoadingMore}
           onLoadMore={thread.loadMore}
           onSend={(content) => {
-            if (!active) return;
+            if (!active || isArchived) return;
             void feed.send(active.id, content).catch((error: unknown) => {
               toast(error instanceof Error ? error.message : 'Message non envoyé.', 'error');
             });
           }}
           onSendMedia={
-            active
+            active && !isArchived
               ? (content, image) => {
                   void feed.sendMedia(active.id, content, image).catch((error: unknown) => {
                     toast(error instanceof Error ? error.message : 'Image non envoyée.', 'error');
@@ -163,11 +173,10 @@ export default function MessagesPage() {
                 }
               : undefined
           }
-          onAddMember={active ? () => setAddOpen(true) : undefined}
+          onAddMember={active && !isArchived ? () => setAddOpen(true) : undefined}
           onDeleteConversation={active && isAdmin ? () => setPendingDeletion(active.id) : undefined}
-          isAdmin={isAdmin}
           onEditMessage={
-            active
+            active && !isArchived
               ? (messageId, content) => {
                   void feed
                     .editMessage(active.id, messageId, content)
@@ -179,7 +188,7 @@ export default function MessagesPage() {
               : undefined
           }
           onDeleteMessage={
-            active
+            active && !isArchived
               ? (messageId) => {
                   void feed
                     .deleteMessage(active.id, messageId)
@@ -190,7 +199,7 @@ export default function MessagesPage() {
                 }
               : undefined
           }
-          onLeaveConversation={active && iAmDeclaredMember ? () => setPendingLeave(active.id) : undefined}
+          onLeaveConversation={active && !isArchived && iAmDeclaredMember ? () => setPendingLeave(active.id) : undefined}
           leaveDisabledReason={leaveDisabledReason}
           onBackToList={() => setListVisible(true)}
           className={cn(
@@ -264,23 +273,47 @@ export default function MessagesPage() {
           if (!open) setPendingLeave(null);
         }}
         title={`Quitter « ${leavingTitle} » ?`}
-        description="Vous ne verrez plus cette conversation. Vos messages restent visibles pour les autres membres."
+        description="La conversation restera dans vos anciennes conversations, en lecture seule. Vos messages restent visibles pour les autres membres."
         confirmLabel="Quitter la conversation"
         onConfirm={() => {
           const target = pendingLeave;
           setPendingLeave(null);
           if (!target) return;
-          // Bascule immédiate : en mode serveur la RLS masque le fil quitté,
-          // en local il reste listé mais sans mon appartenance.
+          // La sélection reste sur le fil : il bascule dans les archives,
+          // lecture seule, au lieu de disparaître.
+          void feed
+            .leaveConversation(target)
+            .then(() => toast('Conversation quittée : elle reste dans vos anciennes conversations.'))
+            .catch((error: unknown) =>
+              toast(error instanceof Error ? error.message : 'Le départ n’a pas pu être enregistré.', 'error'),
+            );
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingArchiveRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchiveRemoval(null);
+        }}
+        title="Retirer de vos archives ?"
+        description="Ce fil disparaîtra de vos anciennes conversations. Les autres membres le conservent ; cette action ne supprime la conversation pour personne d’autre."
+        confirmLabel="Retirer de mes archives"
+        onConfirm={() => {
+          const target = pendingArchiveRemoval;
+          setPendingArchiveRemoval(null);
+          if (!target) return;
           if (selectedId === target) {
-            const fallback = conversations.find((conversation) => conversation.id !== target) ?? null;
+            const fallback =
+              conversations.find((conversation) => conversation.id !== target) ??
+              archivedConversations.find((conversation) => conversation.id !== target) ??
+              null;
             setSelectedId(fallback?.id ?? null);
           }
           void feed
-            .leaveConversation(target)
-            .then(() => toast('Conversation quittée.'))
+            .removeArchivedConversation(target)
+            .then(() => toast('Fil retiré de vos archives.'))
             .catch((error: unknown) =>
-              toast(error instanceof Error ? error.message : 'Le départ n’a pas pu être enregistré.', 'error'),
+              toast(error instanceof Error ? error.message : 'Le retrait n’a pas pu être enregistré.', 'error'),
             );
         }}
       />
