@@ -9,22 +9,38 @@ import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { cn, pluralize } from '@/lib/utils';
 import { ContactFormDialog } from './components/contact-form-dialog';
+import { useHouseholdStore } from '@/stores/household-store';
 import { useContacts } from './hooks/use-contacts';
 import { formatFrDate } from './types';
 import type { Contact } from './types';
 
 export default function ContactsPage() {
   const toast = useToast();
-  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact } =
+  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact, moveToFamily } =
     useContacts();
+  const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<{ open: boolean; contact: Contact | null }>({ open: false, contact: null });
   const [pendingDelete, setPendingDelete] = useState<Contact | null>(null);
+  const [pendingMove, setPendingMove] = useState<Contact | null>(null);
 
   // La liste « Famille » partagée est proposée par défaut.
   const effectiveListId = activeListId ?? lists.find((list) => list.isShared)?.id ?? lists[0]?.id ?? null;
   const activeList = lists.find((list) => list.id === effectiveListId) ?? null;
+  const familyList = lists.find((list) => list.isShared) ?? null;
+  const listsById = useMemo(() => new Map(lists.map((list) => [list.id, list])), [lists]);
+
+  /**
+   * Déplacement vers Famille (D-04) : proposé sur les fiches des listes
+   * personnelles du membre connecté uniquement — jamais sur un contact
+   * Famille, jamais sur la liste d'un autre membre.
+   */
+  const canMoveToFamily = (contact: Contact) => {
+    if (!familyList) return false;
+    const list = listsById.get(contact.listId);
+    return list !== undefined && !list.isShared && list.ownerMemberId === currentMemberId;
+  };
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -152,6 +168,17 @@ export default function ContactsPage() {
                         </small>
                       </div>
                       <div className="flex items-center gap-1.5">
+                        {canMoveToFamily(contact) ? (
+                          <button
+                            type="button"
+                            onClick={() => setPendingMove(contact)}
+                            aria-label={`Déplacer la fiche de ${contact.name} vers Famille`}
+                            title="Déplacer vers Famille"
+                            className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                          >
+                            <Icon name="send" size="sm" />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => openEdit(contact)}
@@ -213,6 +240,27 @@ export default function ContactsPage() {
             .then(() => toast('Contact supprimé.'))
             .catch((error: unknown) =>
               toast(error instanceof Error ? error.message : 'Le contact n’a pas pu être supprimé.', 'error'),
+            );
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingMove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingMove(null);
+        }}
+        title={`Déplacer « ${pendingMove?.name ?? ''} » vers Famille ?`}
+        description="La fiche sera visible par tout le foyer, et son anniversaire sera partagé avec tous les membres."
+        confirmLabel="Déplacer vers Famille"
+        destructive={false}
+        onConfirm={() => {
+          const target = pendingMove;
+          setPendingMove(null);
+          if (!target) return;
+          void moveToFamily(target.id)
+            .then(() => toast('Contact visible par tout le foyer.'))
+            .catch((error: unknown) =>
+              toast(error instanceof Error ? error.message : 'Le contact n’a pas pu être déplacé.', 'error'),
             );
         }}
       />

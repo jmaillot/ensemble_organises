@@ -44,6 +44,19 @@ export async function deleteContact(id: string): Promise<void> {
 }
 
 /**
+ * Déplacement personnel→Famille (D-04, plan 07-01) : écriture client directe,
+ * charge minimale (`list_id` seul — `household_id` inchangé, même foyer).
+ * La RLS exige l'écriture sur l'ancienne ET la nouvelle liste (prouvé en
+ * 0036) ; le miroir anniversaire naît du trigger 0097.
+ */
+export async function moveContactToFamily(id: string, familyListId: string): Promise<ContactRow> {
+  if (id.trim() === '' || familyListId.trim() === '') {
+    throw new Error('Contact introuvable.');
+  }
+  return data.update<ContactRow>(CONTACTS, id, { list_id: familyListId });
+}
+
+/**
  * Flux « anniversaire d'abord » (D-10) : la case cochée du dialogue
  * anniversaire crée la fiche dans la liste partagée. Le trigger miroir
  * 0078 absorbe le double-miroir grâce à sa garde nom normalisé + date.

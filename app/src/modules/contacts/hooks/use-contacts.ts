@@ -5,7 +5,7 @@ import { data } from '@/lib/data';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { invalidateTables } from '@/modules/calendrier/hooks/use-calendrier';
 import { toContact, toContactList, type Contact, type ContactFormValues, type ContactList } from '../types';
-import { createContact, deleteContact, updateContact } from '../api';
+import { createContact, deleteContact, moveContactToFamily, updateContact } from '../api';
 import type { ContactListRow, ContactRow } from '@/types';
 
 const TABLES = ['contact_lists', 'contacts'];
@@ -22,6 +22,8 @@ export interface ContactsResource {
   isMutating: boolean;
   saveContact: (id: string | null, values: ContactFormValues) => Promise<string>;
   removeContact: (id: string) => Promise<void>;
+  /** Déplace une fiche personnelle vers la liste Famille (D-04). */
+  moveToFamily: (id: string) => Promise<void>;
 }
 
 /** Listes et fiches contacts du foyer, avec la liste « Famille » en tête. */
@@ -49,6 +51,16 @@ export function useContacts(): ContactsResource {
   });
 
   const removeMutation = useMutation({ mutationFn: (id: string) => deleteContact(id), onSuccess: refresh });
+
+  // La liste « Famille » partagée reçoit les fiches déplacées (D-04).
+  const moveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const target = listsResource.rows.find((row) => row.owner_member_id === null);
+      if (!target) throw new Error('La liste Famille est introuvable.');
+      await moveContactToFamily(id, target.id);
+    },
+    onSuccess: refresh,
+  });
 
   const lists = useMemo(
     () =>
@@ -85,10 +97,13 @@ export function useContacts(): ContactsResource {
       listsResource.refetch();
       contactsResource.refetch();
     },
-    isMutating: saveMutation.isPending || removeMutation.isPending,
+    isMutating: saveMutation.isPending || removeMutation.isPending || moveMutation.isPending,
     saveContact: (id, values) => saveMutation.mutateAsync({ id, values }),
     removeContact: async (id) => {
       await removeMutation.mutateAsync(id);
+    },
+    moveToFamily: async (id) => {
+      await moveMutation.mutateAsync(id);
     },
   };
 }
