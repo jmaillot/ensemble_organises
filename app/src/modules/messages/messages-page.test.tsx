@@ -284,6 +284,24 @@ describe('Messages', () => {
     // sont lus en base (le début de suite y écrit déjà) plutôt que codés en
     // dur. `conversation-1` est l'identifiant graine du direct avec Lina.
     const seedCount = (await data.list<MessageRow>('messages', { conversation_id: 'conversation-1' })).length;
+    // Ancrage déterministe : les paginés naissent après la graine la plus
+    // récente, à une seconde d'intervalle. Sans lui, `created_at` vaudrait
+    // l'heure d'exécution et le fenêtrage dépendrait de l'heure du lancement
+    // (avant 10 h 45, les graines fixes trient après les paginés).
+    const seedNewest = (await data.list<MessageRow>('messages', { conversation_id: 'conversation-1' })).reduce(
+      (latest, row) => (row.created_at > latest ? row.created_at : latest),
+      '',
+    );
+    // Même format que les graines (`AAAA-MM-JJTHH:mm:ss` local, sans fuseau) :
+    // le tri du fil compare les chaînes, et un ISO `Z` trierait avant elles
+    // quel que soit l'instant réel.
+    const pad = (value: number) => String(value).padStart(2, '0');
+    const stampAfterSeed = (seconds: number) => {
+      const date = new Date(new Date(seedNewest).getTime() + seconds * 1000);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
+    const seedBase = new Date(seedNewest).getTime();
+    expect(Number.isNaN(seedBase)).toBe(false);
     for (let index = 0; index < 35; index += 1) {
       await data.create<MessageRow>('messages', {
         conversation_id: 'conversation-1',
@@ -291,6 +309,7 @@ describe('Messages', () => {
         sender_id: index % 2 === 0 ? DEMO_MEMBERS.camille : DEMO_MEMBERS.lina,
         content: `Message paginé ${index}`,
         media_url: null,
+        created_at: stampAfterSeed(index + 1),
       });
     }
     const total = (await data.list<MessageRow>('messages', { conversation_id: 'conversation-1' })).length;

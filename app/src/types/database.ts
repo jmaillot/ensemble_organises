@@ -693,7 +693,8 @@ export interface MessageRow {
   id: Uuid;
   conversation_id: Uuid;
   household_id: Uuid;
-  sender_id: Uuid;
+  /** Auteur membre du foyer ; NULL = ligne système serveur (départ D-09), jamais écrite par un client. */
+  sender_id: Uuid | null;
   content: string;
   media_url: string | null;
   created_at: IsoDateTime;

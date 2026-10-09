@@ -113,23 +113,28 @@ function MessageBubble({
         {message.pending ? ' · envoi…' : ''}
       </time>
       {showEdit || showDelete ? (
-        <div className="mt-1 flex flex-wrap gap-1">
+        <div className="mt-1 flex justify-end gap-1">
           {showEdit && !editing ? (
-            <Button type="button" variant="quiet" size="sm" onClick={onStartEdit} aria-label="Modifier ce message">
-              Modifier
-            </Button>
+            <Button
+              type="button"
+              variant="quiet"
+              size="icon"
+              icon="edit"
+              onClick={onStartEdit}
+              aria-label="Modifier ce message"
+              className="size-8"
+            />
           ) : null}
           {showDelete && !editing ? (
             <Button
               type="button"
-              variant="quiet"
-              size="sm"
+              variant="ghost"
+              size="icon"
+              icon="trash"
               onClick={onRequestDelete}
               aria-label="Supprimer ce message"
-              className="text-coral"
-            >
-              Supprimer
-            </Button>
+              className="size-8 text-coral hover:bg-coral-soft hover:text-coral"
+            />
           ) : null}
         </div>
       ) : null}
@@ -328,7 +333,18 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
               : `Lancez la conversation « ${conversation.title} ».`}
           </p>
         ) : (
-          messages.map((message) => (
+          messages.map((message) =>
+            // Ligne système (départ D-09) : annonce centrée atténuée, sans
+            // avatar, sans nom, sans actions (ni édition, ni suppression, ni
+            // réponse) — le fil lui-même est le signal.
+            message.isSystem ? (
+              <p
+                key={message.id}
+                className="mx-auto max-w-[85%] rounded-full bg-surface px-3 py-1 text-center text-[11px] text-muted"
+              >
+                {message.content}
+              </p>
+            ) : (
             <MessageBubble
               key={message.id}
               message={message}
@@ -351,7 +367,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
               onSaveEdit={saveEditFor(message)}
               onRequestDelete={requestDeleteFor(message)}
             />
-          ))
+            ),
+          )
         )}
       </div>
 

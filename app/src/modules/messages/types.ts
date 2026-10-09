@@ -29,10 +29,13 @@ export interface ConversationSummary {
 export interface Message {
   id: string;
   conversationId: string;
-  senderId: string;
+  /** Auteur membre ; `null` pour une ligne système serveur (départ D-09). */
+  senderId: string | null;
   senderName: string;
   senderColorTag: MemberColorTag;
   content: string;
+  /** Vrai pour une ligne système : annonce centrée, sans actions, hors non-lus. */
+  isSystem: boolean;
   /** URL signée (Supabase) ou aperçu local (démo) de l'image jointe. */
   mediaUrl: string | null;
   createdAt: string;
@@ -89,7 +92,7 @@ export function toMessage(
   row: MessageRow,
   context: { currentMemberId: string | null; members: HouseholdMemberRow[]; pending?: boolean },
 ): Message {
-  const sender = context.members.find((member) => member.id === row.sender_id);
+  const sender = row.sender_id ? context.members.find((member) => member.id === row.sender_id) : undefined;
   return {
     id: row.id,
     conversationId: row.conversation_id,
@@ -97,9 +100,12 @@ export function toMessage(
     senderName: sender?.display_name ?? 'Membre du foyer',
     senderColorTag: sender?.color_tag ?? 'accent',
     content: row.content,
+    // Une ligne système n'a pas d'auteur : elle n'est jamais « à moi », donc
+    // jamais un signal de non-lu — le prédicat est prouvé côté SQL (0040).
+    isSystem: row.sender_id == null,
     mediaUrl: row.media_url ?? null,
     createdAt: row.created_at,
-    isMine: row.sender_id === context.currentMemberId,
+    isMine: row.sender_id != null && row.sender_id === context.currentMemberId,
     // Les lignes optimistes ne sont pas encore persistées : on le signale.
     pending: context.pending ?? row.id.startsWith('pending-'),
   };
