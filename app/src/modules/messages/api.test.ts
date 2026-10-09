@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addConversationMembers } from './api';
+import { addConversationMembers, archiveConversation } from './api';
 
 const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, mockUpdate, mockRemove } =
   vi.hoisted(() => {
@@ -7,6 +7,8 @@ const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, moc
       configured: false,
       updateError: null as null | { message: string },
       lastUpdate: null as null | { values: unknown; filters: Array<[string, string]> },
+      rpcError: null as null | { message: string },
+      lastRpc: null as null | { fn: string; args: unknown },
     };
     const eqInner = vi.fn(async (column: string, value: string) => {
       supabaseState.lastUpdate?.filters.push([column, value]);
@@ -21,10 +23,15 @@ const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, moc
       return { eq: eqOuter };
     });
     const from = vi.fn((_table: string) => ({ update }));
-    const supabaseMocks = { from, update, eqOuter, eqInner };
-    // Registre du fil `conv-1` : un actif, un tombé, le reste absent.
+    const rpc = vi.fn(async (fn: string, args: unknown) => {
+      supabaseState.lastRpc = { fn, args };
+      return { error: supabaseState.rpcError };
+    });
+    const supabaseMocks = { from, update, eqOuter, eqInner, rpc };
+    // Registre du fil `conv-1` : deux actifs, un tombé, le reste absent.
     const memberRows: Array<Record<string, unknown>> = [
       { conversation_id: 'conv-1', member_id: 'member-actif', left_at: null },
+      { conversation_id: 'conv-1', member_id: 'member-actif-2', left_at: null },
       { conversation_id: 'conv-1', member_id: 'member-parti', left_at: '2026-01-01T00:00:00Z' },
     ];
     const matches = (row: Record<string, unknown>, filter: Record<string, unknown>) =>
@@ -57,7 +64,7 @@ vi.mock('@/lib/supabase/client', () => ({
     return supabaseState.configured;
   },
   get supabase() {
-    return supabaseState.configured ? { from: supabaseMocks.from } : null;
+    return supabaseState.configured ? { from: supabaseMocks.from, rpc: supabaseMocks.rpc } : null;
   },
 }));
 
@@ -66,6 +73,8 @@ beforeEach(() => {
   supabaseState.configured = false;
   supabaseState.updateError = null;
   supabaseState.lastUpdate = null;
+  supabaseState.rpcError = null;
+  supabaseState.lastRpc = null;
 });
 
 describe('addConversationMembers — réadhésion (D-12)', () => {
@@ -134,5 +143,73 @@ describe('addConversationMembers — réadhésion (D-12)', () => {
     await expect(addConversationMembers('conv-1', ['   '])).rejects.toThrow('au moins un membre');
     expect(supabaseMocks.from).not.toHaveBeenCalled();
     expect(mockList).not.toHaveBeenCalled();
+  });
+});
+
+describe('archiveConversation — archivage-pour-tous (D-14)', () => {
+  it('en ligne : appelle le RPC avec le seul identifiant du fil, sans liste de membres', async () => {
+    // D-14 : la tombe collective est calculée côté serveur (tous les actifs
+    // au même instant) — le client ne fournit ni membres, ni bornes.
+    supabaseState.configured = true;
+
+    await archiveConversation('conv-1');
+
+    expect(supabaseMocks.rpc).toHaveBeenCalledTimes(1);
+    expect(supabaseState.lastRpc).toEqual({
+      fn: 'archive_conversation',
+      args: { p_conversation_id: 'conv-1' },
+    });
+    expect(mockList).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockRemoveWhere).not.toHaveBeenCalled();
+  });
+
+  it('en ligne : le refus serveur de l’archivage est propagé tel quel', async () => {
+    supabaseState.configured = true;
+    supabaseState.rpcError = { message: 'seul un administrateur archive la conversation' };
+
+    await expect(archiveConversation('conv-1')).rejects.toThrow(
+      'seul un administrateur archive la conversation',
+    );
+  });
+
+  it('en local : tombe tous les actifs au même instant, le déjà-parti est intouché', async () => {
+    // Même résultat observable que le RPC (fil en archives pour tous) sans
+    // RLS ni déclencheur à traverser ; l'annonce serveur n'a pas
+    // d'équivalent en démo (écart documenté, comme en 0104).
+    supabaseState.configured = false;
+
+    await archiveConversation('conv-1');
+
+    expect(supabaseMocks.rpc).not.toHaveBeenCalled();
+    expect(mockRemoveWhere).toHaveBeenCalledTimes(2);
+    expect(mockRemoveWhere).toHaveBeenCalledWith('conversation_members', {
+      conversation_id: 'conv-1',
+      member_id: 'member-actif',
+    });
+    expect(mockRemoveWhere).toHaveBeenCalledWith('conversation_members', {
+      conversation_id: 'conv-1',
+      member_id: 'member-actif-2',
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    const stamps = mockCreate.mock.calls.map(
+      (call) => (call[1] as Record<string, unknown>).left_at as string,
+    );
+    expect(stamps[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // Un seul instant commun, comme le RPC (0106).
+    expect(stamps[1]).toBe(stamps[0]);
+    // Le déjà-parti n'est jamais réécrit.
+    expect(mockCreate.mock.calls.some((call) =>
+      ((call[1] as Record<string, unknown>).member_id as string).includes('parti'),
+    )).toBe(false);
+  });
+
+  it('en local : fil sans actif, aucun appel au registre', async () => {
+    supabaseState.configured = false;
+
+    await archiveConversation('conv-vide');
+
+    expect(mockRemoveWhere).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 });

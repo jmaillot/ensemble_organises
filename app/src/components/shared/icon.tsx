@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const paths = {
   arrow: 'M5 12h13M13 6l6 6-6 6',
   arrowLeft: 'M19 12H6M11 6l-6 6 6 6',
+  archive: 'M4 4h16v4H4zM5 8v12h14V8M10 12h4',
   bell: 'M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4',
   calendar: 'M4 5h16v15H4zM8 3v4M16 3v4M4 9h16',
   check: 'm5 12 4 4L19 6',

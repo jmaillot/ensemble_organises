@@ -295,32 +295,31 @@ export async function addConversationMembers(conversationId: string, memberIds: 
 }
 
 /**
- * Suppression d'une conversation et de tout son contenu (participants,
- * messages) — levier de modération admin, intact depuis D-07. En ligne la
- * cascade SQL emporte les enfants (la suppression unitaire des messages est
- * réservée à leurs auteurs, un admin ne peut plus les retirer un par un) ;
- * en local l'adaptateur n'a pas de cascade implicite, on retire
- * explicitement. La RLS (`conversations_delete`) réserve l'opération aux
- * administrateurs.
+ * Archivage-pour-tous (D-14) : le fil est figé pour tous au lieu d'être
+ * détruit. En ligne le RPC atomique `archive_conversation` (0106, admin
+ * seul) tombe tous les actifs au même instant et émet une seule annonce ;
+ * en local la même tombe collective en IndexedDB, un instant commun pour
+ * tous les actifs (aucune RLS ni déclencheur à traverser — l'annonce
+ * serveur n'a pas d'équivalent en démo, écart documenté comme en 0104).
  */
-export async function removeConversationCascade(input: {
-  householdId: string;
-  conversationId: string;
-}): Promise<void> {
-  const { householdId, conversationId } = input;
+export async function archiveConversation(conversationId: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
-    await data.remove('conversations', conversationId);
+    const { error } = await supabase.rpc('archive_conversation', { p_conversation_id: conversationId });
+    if (error) throw new DataError(error.message || 'L’archivage n’a pas pu être enregistré.', error);
     return;
   }
-  const [media, members] = await Promise.all([
-    data.list<MessageRow>('messages', { household_id: householdId, conversation_id: conversationId }),
-    data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId }),
-  ]);
-  await Promise.all([
-    ...media.map((row) => data.remove('messages', row.id)),
-    ...members.map((row) =>
-      data.removeWhere('conversation_members', { conversation_id: row.conversation_id, member_id: row.member_id }),
-    ),
-    data.remove('conversations', conversationId),
-  ]);
+  const stampedAt = new Date().toISOString();
+  const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
+  const actives = rows.filter((row) => !row.left_at);
+  if (actives.length === 0) return;
+  await Promise.all(
+    actives.map(async (row) => {
+      await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: row.member_id });
+      await data.create<ConversationMemberRow>('conversation_members', {
+        conversation_id: conversationId,
+        member_id: row.member_id,
+        left_at: stampedAt,
+      });
+    }),
+  );
 }

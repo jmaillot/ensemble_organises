@@ -5,7 +5,7 @@ import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, removeArchivedConversation as removeArchivedConversationRow, removeConversationCascade, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
+import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, removeArchivedConversation as removeArchivedConversationRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { ConversationMemberRow, MessageRow } from '@/types';
@@ -63,14 +63,15 @@ export interface MessagesFeed {
   sendMedia: (conversationId: string, content: string, image: CompressedImage) => Promise<void>;
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
-  deleteConversation: (conversationId: string) => Promise<void>;
+  /** Fige le fil pour tous (D-14) : tombe collective, lecture seule. */
+  archiveConversation: (conversationId: string) => Promise<void>;
   editMessage: (conversationId: string, messageId: string, content: string) => Promise<void>;
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   leaveConversation: (conversationId: string) => Promise<void>;
   /** Retire un fil quitté de ses archives (sa propre pierre, D-08). */
   removeArchivedConversation: (conversationId: string) => Promise<void>;
   isCreating: boolean;
-  isDeleting: boolean;
+  isArchiving: boolean;
   isLeaving: boolean;
   isRemovingArchived: boolean;
 }
@@ -350,10 +351,27 @@ export function useMessagesFeed(): MessagesFeed {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (conversationId: string) => {
-      if (!householdId) throw new Error('Aucun foyer sélectionné.');
-      return removeConversationCascade({ householdId, conversationId });
+  /**
+   * Archivage-pour-tous (D-14) : la tombe collective retire le fil des
+   * actifs (il bascule dans les archives, lecture seule), sans rien
+   * détruire. Restauré en cas de refus.
+   */
+  const archiveMutation = useMutation({
+    mutationFn: (conversationId: string) => archiveConversationRow(conversationId),
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: messageKeys.participants });
+      const previous = queryClient.getQueryData<ConversationMemberRow[]>(messageKeys.participants);
+      const stampedAt = new Date().toISOString();
+      queryClient.setQueryData<ConversationMemberRow[]>(messageKeys.participants, (current = []) =>
+        current.map((row) =>
+          row.conversation_id === conversationId && !row.left_at ? { ...row, left_at: stampedAt } : row,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!context?.previous) return;
+      queryClient.setQueryData(messageKeys.participants, context.previous);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: messageKeys.all });
@@ -466,9 +484,9 @@ export function useMessagesFeed(): MessagesFeed {
     async (conversationId: string, memberIds: string[]) => addMembersMutation.mutateAsync({ conversationId, memberIds }),
     [addMembersMutation],
   );
-  const deleteConversation = useCallback(
-    async (conversationId: string) => deleteMutation.mutateAsync(conversationId),
-    [deleteMutation],
+  const archiveConversation = useCallback(
+    async (conversationId: string) => archiveMutation.mutateAsync(conversationId),
+    [archiveMutation],
   );
   const editMessage = useCallback(
     async (conversationId: string, messageId: string, content: string) => {
@@ -515,13 +533,13 @@ export function useMessagesFeed(): MessagesFeed {
     sendMedia,
     createConversation: createConversationAndSelect,
     addMembers,
-    deleteConversation,
+    archiveConversation,
     editMessage,
     deleteMessage,
     leaveConversation,
     removeArchivedConversation,
     isCreating: createMutation.isPending || addMembersMutation.isPending,
-    isDeleting: deleteMutation.isPending,
+    isArchiving: archiveMutation.isPending,
     isLeaving: leaveMutation.isPending,
     isRemovingArchived: removeArchivedMutation.isPending,
   };

@@ -275,8 +275,8 @@ describe('Messages', () => {
     expect(mine).not.toBeNull();
     expect(within(mine as HTMLElement).getByRole('button', { name: 'Supprimer ce message' })).toBeInTheDocument();
 
-    // Le levier de modération demeure : la suppression du fil entier.
-    expect(screen.getByRole('button', { name: 'Supprimer la conversation Lina' })).toBeInTheDocument();
+    // Le levier de modération demeure : l'archivage du fil pour tous.
+    expect(screen.getByRole('button', { name: 'Archiver la conversation Lina' })).toBeInTheDocument();
   });
 
   it('page le fil par conversation avec un « Charger plus » explicite', async () => {
@@ -926,21 +926,42 @@ describe('Messages', () => {
     }
   });
 
-  it('supprime une conversation et son fil après confirmation', async () => {
-    // Dernier : la cascade retire le fil de Lina, déjà quitté plus haut —
-    // l'opération admin ne dépend d'aucune appartenance.
+  it('ne propose l’archivage qu’aux admins, jamais aux autres membres', async () => {
+    // D-14 : le bouton n'existe que pour l'admin du foyer — Thomas (membre
+    // du direct graine avec Camille, `conversation-2`, stable quel que soit
+    // l'ordre d'exécution) ne voit aucun contrôle d'archive sur son fil.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+
+    await user.click(await screen.findByRole('button', { name: /^Camille/ }, { timeout: 8000 }));
+    expect(await screen.findByRole('log', { name: /Messages de Camille/ }, { timeout: 8000 })).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: /Archiver la conversation/ })).not.toBeInTheDocument();
+  });
+
+  it('archive une conversation pour tous après confirmation honnête', async () => {
+    // D-14 : la modale dit l'issue exacte (fil figé, archives lisibles par
+    // tous, plus personne n'écrit — admin compris), « Archiver » tombe tout
+    // le monde : le fil bascule dans les archives en lecture seule au lieu
+    // de disparaître, avec toast.
     const user = userEvent.setup();
     renderWithProviders(<MessagesPage />);
 
     await user.click(await screen.findByRole('button', { name: /^Lina/ }));
     expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Supprimer la conversation Lina' }));
+    await user.click(screen.getByRole('button', { name: 'Archiver la conversation Lina' }));
     const alert = await screen.findByRole('alertdialog');
-    await user.click(within(alert).getByRole('button', { name: 'Supprimer la conversation' }));
+    expect(alert).toHaveTextContent('Archiver cette conversation ?');
+    expect(alert).toHaveTextContent(/lecture seule/);
+    expect(alert).toHaveTextContent(/plus personne ne pourra y écrire/);
+    await user.click(within(alert).getByRole('button', { name: 'Archiver' }));
 
-    await waitFor(() => expect(screen.queryByRole('log', { name: /Messages de Lina/ })).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^Lina/ })).not.toBeInTheDocument());
-    expect(screen.getByText('Conversation supprimée.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Conversation archivée/)).toBeInTheDocument());
+    // Le fil survit, en archives et en lecture seule — rien n'est vaporisé.
+    const archived = screen.getByRole('list', { name: 'Anciennes conversations' });
+    expect(within(archived).getByRole('button', { name: /^Lina/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
   });
 });

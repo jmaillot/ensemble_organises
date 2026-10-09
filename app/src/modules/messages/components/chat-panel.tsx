@@ -16,8 +16,8 @@ export interface ChatPanelProps {
   onSendMedia?: (content: string, image: CompressedImage) => void;
   /** Ouvre le dialogue d'ajout de membre ; absent, le bouton est masqué. */
   onAddMember?: () => void;
-  /** Demande la suppression de la conversation (admin) ; absent, le bouton est masqué. */
-  onDeleteConversation?: () => void;
+  /** Demande l'archivage du fil pour tous (admin, D-14) ; absent, le bouton est masqué. */
+  onArchiveConversation?: () => void;
   /** Enregistre le contenu réécrit d'un message ; absent, l'édition est masquée. */
   onEditMessage?: (messageId: string, content: string) => void;
   /** Demande la suppression d'un seul message ; absent, le bouton est masqué. */
@@ -148,7 +148,7 @@ function MessageBubble({
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, showSoloNotice = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onArchiveConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, showSoloNotice = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -267,13 +267,13 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             Ajouter
           </Button>
         ) : null}
-        {onDeleteConversation ? (
+        {onArchiveConversation ? (
           <Button
             variant="ghost"
             size="icon"
-            icon="trash"
-            onClick={onDeleteConversation}
-            aria-label={`Supprimer la conversation ${conversation.title}`}
+            icon="archive"
+            onClick={onArchiveConversation}
+            aria-label={`Archiver la conversation ${conversation.title}`}
             className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
           />
         ) : null}

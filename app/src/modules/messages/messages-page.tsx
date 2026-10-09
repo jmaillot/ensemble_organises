@@ -18,7 +18,7 @@ export default function MessagesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
+  const [pendingArchive, setPendingArchive] = useState<string | null>(null);
   const [pendingLeave, setPendingLeave] = useState<string | null>(null);
   const [pendingArchiveRemoval, setPendingArchiveRemoval] = useState<string | null>(null);
   const [listVisible, setListVisible] = useState(true);
@@ -56,7 +56,7 @@ export default function MessagesPage() {
     ? null
     : declaredIds.length > 1
       ? null
-      : 'Vous êtes le dernier membre de cette conversation : supprimez-la (admin) pour la fermer.';
+      : 'Vous êtes le dernier membre de cette conversation : archivez-la (admin) pour la figer.';
   // Fil solo (D-11) : un seul membre actif dans le registre déclaré — signalé
   // au compositeur comme indication, jamais comme blocage d'envoi. Même
   // source que le bouton Quitter (pierres exclues), aucune requête ajoutée ;
@@ -180,7 +180,7 @@ export default function MessagesPage() {
               : undefined
           }
           onAddMember={active && !isArchived ? () => setAddOpen(true) : undefined}
-          onDeleteConversation={active && isAdmin ? () => setPendingDeletion(active.id) : undefined}
+          onArchiveConversation={active && isAdmin ? () => setPendingArchive(active.id) : undefined}
           onEditMessage={
             active && !isArchived
               ? (messageId, content) => {
@@ -252,23 +252,24 @@ export default function MessagesPage() {
       ) : null}
 
       <ConfirmDialog
-        open={pendingDeletion !== null}
+        open={pendingArchive !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingDeletion(null);
+          if (!open) setPendingArchive(null);
         }}
-        title="Supprimer cette conversation ?"
-        description="Les messages et les participants disparaîtront avec elle. Cette action est définitive."
-        confirmLabel="Supprimer la conversation"
+        title="Archiver cette conversation ?"
+        description="Le fil sera figé et restera visible dans les anciennes conversations de tous les membres, en lecture seule — plus personne ne pourra y écrire, vous compris."
+        confirmLabel="Archiver"
         onConfirm={() => {
-          const target = pendingDeletion;
-          setPendingDeletion(null);
+          const target = pendingArchive;
+          setPendingArchive(null);
           if (!target) return;
-          if (selectedId === target) setSelectedId(null);
+          // La sélection reste sur le fil : il bascule dans les archives,
+          // lecture seule, au lieu de disparaître.
           void feed
-            .deleteConversation(target)
-            .then(() => toast('Conversation supprimée.'))
+            .archiveConversation(target)
+            .then(() => toast('Conversation archivée : elle reste dans vos anciennes conversations.'))
             .catch((error: unknown) =>
-              toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être supprimée.', 'error'),
+              toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être archivée.', 'error'),
             );
         }}
       />
