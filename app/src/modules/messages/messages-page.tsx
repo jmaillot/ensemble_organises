@@ -273,7 +273,7 @@ export default function MessagesPage() {
           if (!open) setPendingLeave(null);
         }}
         title={`Quitter « ${leavingTitle} » ?`}
-        description="La conversation restera dans vos anciennes conversations, en lecture seule. Vos messages restent visibles pour les autres membres."
+        description="La conversation restera dans vos anciennes conversations, figée à votre départ, en lecture seule. Vos messages restent visibles pour les autres membres."
         confirmLabel="Quitter la conversation"
         onConfirm={() => {
           const target = pendingLeave;

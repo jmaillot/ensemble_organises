@@ -374,7 +374,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
 
       {readOnly ? (
         <p className="m-0 border-t border-border px-3 py-2.5 text-center text-[11px] text-muted">
-          Vous avez quitté cette conversation : l’historique reste lisible, sans écriture possible.
+          Vous avez quitté cette conversation : seuls les messages jusqu’à votre départ restent lisibles, sans
+          écriture possible.
         </p>
       ) : (
         <>

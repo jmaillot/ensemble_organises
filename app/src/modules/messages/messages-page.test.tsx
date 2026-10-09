@@ -4,7 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
-import type { ConversationMemberRow, MessageRow } from '@/types';
+import type { ConversationMemberRow, MessageRow, RowFilter } from '@/types';
 import { useHouseholdStore } from '@/stores/household-store';
 import MessagesPage from './messages-page';
 
@@ -569,6 +569,105 @@ describe('Messages', () => {
     const log = screen.getByRole('log', { name: /Messages de Lina/ });
     expect(within(log).getByText('Camille Martin a quitté la conversation')).toBeInTheDocument();
     expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+  });
+
+  it('annonce des archives figées au départ, pas un fil vivant', async () => {
+    // D-10, miroir copie : le panneau lecture seule dit la fenêtre gelée
+    // (« jusqu'à votre départ »), jamais un historique vivant.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText(/jusqu’à votre départ/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+  });
+
+  it('masque au partant le message postérieur à son départ', async () => {
+    // D-10, miroir borne serveur : en ligne, `messages_select` (0102,
+    // `can_read_message`) ne rend au partant que `created_at <= left_at` —
+    // en démo il n'y a pas de RLS, donc cet espion applique exactement ce
+    // prédicat à la couture `data.list` au lieu de leurrer la porte (ne
+    // simule jamais un refus inventé : même table, même filtre, même
+    // pierre). La preuve de la porte vit en 0041 ; ici on prouve que le
+    // rendu s'en tient à ce que le serveur rend.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    const boundList = data.list.bind(data);
+    // Ancrage du décor : la pierre porte l'instant du départ, qui précède
+    // ici les ensemencés figés (10:42-10:45) — on la recale après eux pour
+    // que l'historique reste dans la fenêtre, comme en production où le
+    // départ suit toujours les messages qu'il fige. Le message piégé
+    // (2999-06) reste au-delà dans tous les cas. Le départ lui-même (toast,
+    // bascule en archives) a déjà été prouvé au-dessus.
+    await data.removeWhere('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+    });
+    await data.create<ConversationMemberRow>('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+      left_at: '2999-01-01T00:00:00',
+    });
+    const spy = vi.spyOn(data, 'list').mockImplementation((async (table: string, filter?: RowFilter) => {
+      const rows = await boundList(table, filter ?? {});
+      if (table !== 'messages') return rows;
+      const members = await boundList('conversation_members', {});
+      const bounds = new Map(
+        members
+          .filter((member) => member.member_id === DEMO_MEMBERS.camille && member.left_at)
+          .map((member) => [member.conversation_id, member.left_at as string]),
+      );
+      return rows.filter((row) => {
+        const bound = bounds.get(row.conversation_id as string);
+        // Comparaison temporelle, pas lexicographique : les ensemencés sont
+        // en format local sans fuseau, la pierre en ISO-Z — l'ordre des
+        // chaînes mentirait (même piège qu'en 08-04), le serveur compare des
+        // `timestamptz`.
+        return !bound || new Date(row.created_at as string) <= new Date(bound);
+      });
+    }) as unknown as typeof data.list);
+
+    // Message serveur postérieur au départ : la borne le retient.
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: DEMO_MEMBERS.lina,
+      content: 'Message postérieur au départ',
+      media_url: null,
+      created_at: '2999-06-01T12:00:00',
+    });
+
+    try {
+      // Recharger le fil à travers la borne (détour par Thomas puis retour).
+      await user.click(await screen.findByRole('button', { name: /^Thomas/ }));
+      await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+      const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+      await waitFor(() =>
+        expect(within(log).getByText('Tu as vu le nouveau parc ?')).toBeInTheDocument(),
+      );
+      expect(within(log).queryByText('Message postérieur au départ')).not.toBeInTheDocument();
+      expect(screen.getByText(/jusqu’à votre départ/)).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('supprime une conversation et son fil après confirmation', async () => {
