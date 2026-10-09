@@ -542,6 +542,71 @@ describe('Messages', () => {
     expect(within(log).queryByText('Membre du foyer :')).not.toBeInTheDocument();
   });
 
+  it('affiche une annonce d’arrivée centrée, sans actions', async () => {
+    // D-11, miroir fil : la ligne d'arrivée (expéditeur nul, comme l'écrit le
+    // déclencheur 0103) se rend comme une ligne de départ — annonce centrée
+    // atténuée, ni avatar, ni nom, ni Modifier/Supprimer.
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Noé Martin a rejoint la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const announcement = within(log).getByText('Noé Martin a rejoint la conversation');
+    expect(announcement.tagName).toBe('P');
+    expect(announcement.className).toMatch(/text-center/);
+    const container = announcement.closest('p') as HTMLElement;
+    expect(within(container).queryByRole('button')).not.toBeInTheDocument();
+    // L'annonce ne porte pas de préfixe d'auteur.
+    expect(within(log).queryByText('Membre du foyer :')).not.toBeInTheDocument();
+  });
+
+  it('ne compte jamais une ligne d’arrivée en non-lu', async () => {
+    // D-11, miroir non-lus : la ligne d'arrivée est la plus récente du fil —
+    // la liste ne porte aucune pastille « non lu » pour Lina, comme pour les
+    // départs (même forme, même exclusion).
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Noé Martin a rejoint la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+    renderWithProviders(<MessagesPage />);
+
+    // Nom exact, sans suffixe « N messages non lus ».
+    expect(await screen.findByRole('button', { name: 'Lina' })).toBeInTheDocument();
+  });
+
+  it('n’invente aucune annonce d’arrivée en démo : seul le serveur annonce', async () => {
+    // D-11, miroir couture : en démo il n'y a pas de déclencheur — ajouter un
+    // membre écrit la ligne du registre, sans ligne système (le serveur seul
+    // annonce, prouvé en 0042). Ce test verrouille l'absence d'annonce
+    // fabriquée côté client, pas la porte.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(await screen.findByRole('button', { name: /Ajouter un membre/ }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Ajouter Noé Martin' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // L'ajout a fait passer le direct à trois : le titre suit le registre
+    // (« Noé, Lina »), le fil reste le même.
+    const log = await screen.findByRole('log', { name: /Messages de Noé, Lina/ });
+    expect(within(log).queryByText(/a rejoint la conversation/)).not.toBeInTheDocument();
+  });
+
   it('ne compte jamais une ligne système en non-lu', async () => {
     // D-09, miroir non-lus : la ligne système est la plus récente du fil —
     // la liste ne porte aucune pastille « non lu » pour Lina.
