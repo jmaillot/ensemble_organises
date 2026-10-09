@@ -9,6 +9,8 @@ export interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Icône du bouton d'action principal (`plus` par défaut, `refresh` pour un réessai). */
+  actionIcon?: IconName;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   className?: string;
@@ -21,6 +23,7 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
+  actionIcon = 'plus',
   secondaryActionLabel,
   onSecondaryAction,
   className,
@@ -41,7 +44,7 @@ export function EmptyState({
         {(actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction) ? (
           <div className="flex flex-wrap justify-center gap-2">
             {actionLabel && onAction ? (
-              <Button onClick={onAction} icon="plus">
+              <Button onClick={onAction} icon={actionIcon}>
                 {actionLabel}
               </Button>
             ) : null}
@@ -54,6 +57,28 @@ export function EmptyState({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Cache vide hors ligne (D-07) : dit que rien n'est chargé, qu'une première
+ * visite avec du réseau est nécessaire, et propose de réessayer au retour
+ * réseau — jamais une liste vide muette, jamais une erreur brute. À distinguer
+ * de `EmptyState` (zéro ligne côté serveur) et de l'état périmé 09-01 (cache
+ * présent mais daté). Partagé : chaque liste branchée sur `useResource` rend
+ * le même état via `isEmptyCacheOffline` (câblé module par module, prouvé par
+ * module — pas de réécriture spéculative).
+ */
+export function OfflineEmptyState({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <EmptyState
+      icon="wifi"
+      title="Aucune donnée en cache"
+      description="Reconnecte-toi pour charger le contenu du foyer : une première visite avec du réseau est nécessaire, ensuite il restera disponible hors ligne."
+      actionLabel={onRetry ? 'Réessayer' : undefined}
+      onAction={onRetry}
+      actionIcon="refresh"
+    />
   );
 }
 

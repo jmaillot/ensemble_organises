@@ -14,6 +14,8 @@ export interface TaskRowProps {
   onDelete: (task: Task) => void;
   /** Rôle `enfant` : lecture seule, sans poignée ni actions d'écriture. */
   readOnly?: boolean;
+  /** Création mise en file (D-07) : marquée jusqu'à confirmation serveur. */
+  pending?: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ export interface TaskRowProps {
  * assignataires, rappel, priorité et actions. Le glisser-déposer s'appuie sur
  * dnd-kit, la poignée restant un vrai bouton utilisable au clavier.
  */
-export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false }: TaskRowProps) {
+export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, pending = false }: TaskRowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -83,6 +85,12 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false }: 
               <span aria-hidden="true">·</span>
               <Icon name="bell" size="sm" />
               {task.reminderLabel}
+            </span>
+          ) : null}
+          {pending ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true">·</span>
+              <span className="font-semibold">En attente de synchronisation</span>
             </span>
           ) : null}
         </div>

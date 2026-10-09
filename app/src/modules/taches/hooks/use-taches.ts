@@ -59,6 +59,10 @@ export interface UseTachesResult extends TaskMetrics {
   isFetching: boolean;
   isError: boolean;
   error: Error | null;
+  /** Cache vide hors ligne (D-07) : l'UI rend l'état explicite partagé. */
+  isEmptyCacheOffline: boolean;
+  /** Créations en file, en attente de confirmation serveur (D-07). */
+  pendingIds: string[];
   isMutating: boolean;
   refetch: () => void;
   /** Bascule optimiste « à faire » / « terminée ». */
@@ -116,8 +120,20 @@ export function useTaches(): UseTachesResult {
   );
 
   const canWrite = currentMember?.role !== 'enfant';
-  const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
-    useResource<TaskRow>(TASKS_TABLE);
+  const {
+    rows,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    isEmptyCacheOffline,
+    pendingIds,
+    refetch,
+    create,
+    update,
+    remove,
+    isMutating,
+  } = useResource<TaskRow>(TASKS_TABLE);
 
   // `rows` est une référence stable tant que le cache ne change pas.
   const taskIds = useMemo(() => rows.map((row) => row.id), [rows]);
@@ -265,6 +281,8 @@ export function useTaches(): UseTachesResult {
     isFetching: isFetching || assigneesQuery.isFetching || remindersQuery.isFetching,
     isError: isError || assigneesQuery.isError || remindersQuery.isError,
     error: error ?? assigneesQuery.error ?? remindersQuery.error,
+    isEmptyCacheOffline,
+    pendingIds,
     isMutating,
     refetch,
     toggleStatus,
