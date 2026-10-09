@@ -465,6 +465,112 @@ describe('Messages', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
+  it('affiche une annonce de départ centrée, sans actions', async () => {
+    // D-09, miroir fil : la ligne système (expéditeur nul, comme l'écrit le
+    // déclencheur 0101) se rend en annonce centrée atténuée — ni avatar, ni
+    // nom, ni Modifier/Supprimer/Répondre.
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Lina Martin a quitté la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const announcement = within(log).getByText('Lina Martin a quitté la conversation');
+    expect(announcement.tagName).toBe('P');
+    expect(announcement.className).toMatch(/text-center/);
+    const container = announcement.closest('p') as HTMLElement;
+    expect(within(container).queryByRole('button')).not.toBeInTheDocument();
+    // L'annonce ne porte pas de préfixe d'auteur.
+    expect(within(log).queryByText('Membre du foyer :')).not.toBeInTheDocument();
+  });
+
+  it('ne compte jamais une ligne système en non-lu', async () => {
+    // D-09, miroir non-lus : la ligne système est la plus récente du fil —
+    // la liste ne porte aucune pastille « non lu » pour Lina.
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Lina Martin a quitté la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+    renderWithProviders(<MessagesPage />);
+
+    // Nom exact, sans suffixe « N messages non lus ».
+    expect(await screen.findByRole('button', { name: 'Lina' })).toBeInTheDocument();
+  });
+
+  it('propose des actions bulle en icônes compactes, modale intacte', async () => {
+    // D-09, miroir actions : Modifier/Supprimer sont des boutons d'icône
+    // (sans libellé visible, noms accessibles conservés) ; la suppression
+    // ouvre toujours la modale de confirmation.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const bubble = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    expect(bubble).not.toBeNull();
+
+    const edit = within(bubble as HTMLElement).getByRole('button', { name: 'Modifier ce message' });
+    const remove = within(bubble as HTMLElement).getByRole('button', { name: 'Supprimer ce message' });
+    expect(edit).toHaveTextContent('');
+    expect(remove).toHaveTextContent('');
+    expect(edit.className).toMatch(/size-8/);
+    expect(remove.className).toMatch(/size-8/);
+
+    // L'édition inline s'ouvre toujours depuis l'icône.
+    await user.click(edit);
+    expect(within(bubble as HTMLElement).getByLabelText('Modifier votre message')).toBeInTheDocument();
+    await user.click(within(bubble as HTMLElement).getByRole('button', { name: 'Annuler' }));
+
+    // La suppression demande toujours confirmation (la bulle est ré-rendue
+    // après l'édition : on réévalue le bouton, jamais sur un nœud périmé).
+    const fresh = within(log).getByText('Pas encore, tu me donneras l’adresse ?').closest('div');
+    await user.click(within(fresh as HTMLElement).getByRole('button', { name: 'Supprimer ce message' }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(alert).toHaveTextContent('disparaîtra pour tous les membres');
+    await user.click(within(alert).getByRole('button', { name: 'Annuler' }));
+    expect(within(log).getByText('Pas encore, tu me donneras l’adresse ?')).toBeInTheDocument();
+  });
+
+  it('quitte en archivant le fil avec son annonce visible', async () => {
+    // D-09, miroir archives : l'annonce (écrite côté serveur par 0101,
+    // ensemencée ici comme elle) reste lisible dans le fil archivé, sans
+    // écriture possible.
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Camille Martin a quitté la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    const log = screen.getByRole('log', { name: /Messages de Lina/ });
+    expect(within(log).getByText('Camille Martin a quitté la conversation')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+  });
+
   it('supprime une conversation et son fil après confirmation', async () => {
     // Dernier : la cascade retire le fil de Lina, déjà quitté plus haut —
     // l'opération admin ne dépend d'aucune appartenance.
