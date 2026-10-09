@@ -138,8 +138,10 @@ describe('CalendrierPage', () => {
     expect(await screen.findByText('Balade au lac')).toBeInTheDocument();
     expect(screen.getByText('Parc du Quartier')).toBeInTheDocument();
 
-    // La pastille de la grille passe à « a un événement ».
-    const dayButton = screen.getByRole('button', {
+    // La pastille de la grille passe à « a un événement » — requête
+    // async : la grille se rafraîchit dans un cycle après l'agenda
+    // (course critique préexistante, élargie par les refetch 09-05).
+    const dayButton = await screen.findByRole('button', {
       name: new RegExp(`^${dayLabel(freeDay)}, \\d+ événement`),
     });
     expect(dayButton).toHaveAttribute('data-has-event', 'true');
