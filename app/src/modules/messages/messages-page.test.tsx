@@ -834,6 +834,98 @@ describe('Messages', () => {
     }
   });
 
+  it('masque au ré-admis les messages parus pendant son absence', async () => {
+    // D-13, miroir fenêtres serveur : en ligne, `messages_select` (0105,
+    // `in_membership_presence`) ne rend au ré-admis que les lignes couvertes
+    // par ses fenêtres — l'avant-départ et ses propres annonces, jamais le
+    // creux (normal comme système). En démo il n'y a pas de déclencheurs,
+    // donc cet espion applique exactement ce prédicat à la couture
+    // `data.list` au lieu de leurrer la porte (même table, mêmes fenêtres,
+    // ancrées sur les lignes ensemencées comme le serveur les écrirait ;
+    // jamais un refus inventé). La preuve de la porte vit en 0044 ; ici on
+    // prouve que le rendu s'en tient à ce que le serveur rend.
+    const LEAVE = '2999-01-01T00:00:00';
+    const INTERIM = '2999-06-01T12:00:00';
+    const REJOIN = '2999-12-01T12:00:00';
+
+    // Pierre posée comme le départ local l'écrirait, annonce de départ et de
+    // retour comme le serveur 0101/0104 les écrirait, creux normal entre eux.
+    await data.removeWhere('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+    });
+    await data.create<ConversationMemberRow>('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+      left_at: LEAVE,
+    });
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Camille Martin a quitté la conversation',
+      media_url: null,
+      created_at: LEAVE,
+    });
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: DEMO_MEMBERS.lina,
+      content: 'Message pendant l absence de Camille',
+      media_url: null,
+      created_at: INTERIM,
+    });
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Camille Martin a rejoint la conversation',
+      media_url: null,
+      created_at: REJOIN,
+    });
+
+    // Réadmission par le chemin client (08-07 : une seule ligne, pierre
+    // effacée) — le rendu suit à travers la porte.
+    await addConversationMembers('conversation-1', [DEMO_MEMBERS.camille]);
+
+    const boundList = data.list.bind(data);
+    const leaveAt = new Date(LEAVE).getTime();
+    const rejoinAt = new Date(REJOIN).getTime();
+    const spy = vi.spyOn(data, 'list').mockImplementation((async (table: string, filter?: RowFilter) => {
+      const rows = await boundList(table, filter ?? {});
+      if (table !== 'messages') return rows;
+      // Prédicat 0105 : couvert par [-infini, départ] ou [retour, +infini] —
+      // le creux (départ, retour) est exclu. Comparaison temporelle, pas
+      // lexicographique (même piège qu'en 08-04/08-05 : ISO-Z contre local).
+      return rows.filter((row) => {
+        if (row.conversation_id !== 'conversation-1') return true;
+        const at = new Date(row.created_at as string).getTime();
+        return at <= leaveAt || at >= rejoinAt;
+      });
+    }) as unknown as typeof data.list);
+
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<MessagesPage />);
+
+      await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+      const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+      await waitFor(() =>
+        expect(within(log).getByText('Tu as vu le nouveau parc ?')).toBeInTheDocument(),
+      );
+      // Avant-départ et annonces propres rendus...
+      expect(within(log).getByText('Camille Martin a quitté la conversation')).toBeInTheDocument();
+      expect(within(log).getByText('Camille Martin a rejoint la conversation')).toBeInTheDocument();
+      // ... creux tu.
+      expect(within(log).queryByText('Message pendant l absence de Camille')).not.toBeInTheDocument();
+      // Fil actif à nouveau : compositeur revenu, pas de copie d'archives.
+      expect(screen.getByLabelText('Écrire un message')).toBeInTheDocument();
+      expect(screen.queryByText(/jusqu’à votre départ/)).not.toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('supprime une conversation et son fil après confirmation', async () => {
     // Dernier : la cascade retire le fil de Lina, déjà quitté plus haut —
     // l'opération admin ne dépend d'aucune appartenance.
