@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
+import { useFullSync } from '@/lib/data/use-full-sync';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
 import { useResource } from '@/lib/data/useResource';
@@ -35,6 +36,9 @@ export function AppShell() {
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
   const { online, pending, syncing, syncNow } = useOfflineSync();
+  // Synchro foyer périodique (D-08) : ouverte et en ligne, toutes les 15 min.
+  // Aucun rendu — le minuteur vit dans le hook, le bouton dans le panneau.
+  useFullSync();
   const [showOffline, setShowOffline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
