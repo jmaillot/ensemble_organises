@@ -247,8 +247,10 @@ export async function createConversation(draft: ConversationDraft): Promise<Conv
  * Ajout ultérieur de membres à une conversation existante. La RLS
  * (`can_join_conversation`) réserve l'opération aux participants actifs et
  * aux admins ; les doublons actifs sont ignorés avant tout appel réseau.
- * Une pierre tombale ne se ré-insère pas (conflit de clé) : elle se ranime
- * (retrait + création, réservé aux admins côté serveur, D-08) — le partant
+ * Une pierre tombale ne se ré-insère pas (conflit de clé) : elle s'efface en
+ * une seule mise à jour (D-12, politique `conversation_members_update`,
+ * 0104) — le même habilité que l'ajout, jamais un supprimer-puis-recréer ;
+ * l'arrivée s'annonce côté serveur comme tout ajout ultérieur. Le partant
  * seul ne se ré-ajoute pas.
  */
 export async function addConversationMembers(conversationId: string, memberIds: string[]): Promise<void> {
@@ -267,8 +269,21 @@ export async function addConversationMembers(conversationId: string, memberIds: 
       }),
     ),
   );
-  // Réadhésion (D-08) : la pierre est retirée puis la ligne ré-insérée —
-  // les deux opérations sont réservées aux admins côté serveur.
+  // Réadhésion (D-12) : la pierre s'efface, la ligne demeure. En ligne une
+  // mise à jour accordée aux participants actifs et aux admins (0104),
+  // annoncée côté serveur ; en local la même transition sans RLS à traverser
+  // (aucun déclencheur en démo — verrouillé par test, le serveur seul annonce).
+  if (isSupabaseConfigured && supabase) {
+    for (const memberId of left) {
+      const { error } = await supabase
+        .from('conversation_members')
+        .update({ left_at: null })
+        .eq('conversation_id', conversationId)
+        .eq('member_id', memberId);
+      if (error) throw new DataError(error.message || 'La réadhésion n’a pas pu être enregistrée.', error);
+    }
+    return;
+  }
   for (const memberId of left) {
     await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
     await data.create<ConversationMemberRow>('conversation_members', {

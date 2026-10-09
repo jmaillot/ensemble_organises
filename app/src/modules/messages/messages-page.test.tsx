@@ -6,6 +6,7 @@ import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { ConversationMemberRow, MessageRow, RowFilter } from '@/types';
 import { useHouseholdStore } from '@/stores/household-store';
+import { addConversationMembers } from './api';
 import MessagesPage from './messages-page';
 
 describe('Messages', () => {
@@ -605,6 +606,53 @@ describe('Messages', () => {
     // (« Noé, Lina »), le fil reste le même.
     const log = await screen.findByRole('log', { name: /Messages de Noé, Lina/ });
     expect(within(log).queryByText(/a rejoint la conversation/)).not.toBeInTheDocument();
+  });
+
+  it('réadmet un partant tombé : registre actif, annonce visible, archives allégées', async () => {
+    // D-12, miroir fil : Camille partie (pierre posée comme le départ local
+    // l'écrirait), ranimée par le chemin client — en démo il n'y a pas de
+    // déclencheur, la ligne d'arrivée est donc posée comme le serveur 0104
+    // l'écrirait (même forme que 0103, prouvée en 0043). Le fil quitte les
+    // archives, l'annonce se rend centrée, le compositeur revient.
+    await data.removeWhere('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+    });
+    await data.create<ConversationMemberRow>('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+      left_at: '2026-01-01T00:00:00Z',
+    });
+    await data.create<MessageRow>('messages', {
+      conversation_id: 'conversation-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: null,
+      content: 'Camille Martin a rejoint la conversation',
+      media_url: null,
+      created_at: '2999-01-01T00:00:01',
+    });
+
+    await addConversationMembers('conversation-1', [DEMO_MEMBERS.camille]);
+
+    // Une seule ligne, pierre effacée — jamais de doublon supprimer+recréer.
+    const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: 'conversation-1' });
+    expect(rows.filter((row) => row.member_id === DEMO_MEMBERS.camille)).toHaveLength(1);
+    expect(rows.find((row) => row.member_id === DEMO_MEMBERS.camille)?.left_at).toBeNull();
+
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    // Le fil a quitté les archives : liste active, pas de section anciennes.
+    expect(await screen.findByRole('button', { name: 'Lina' })).toBeInTheDocument();
+    expect(screen.queryByText('Anciennes conversations')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Lina' }));
+    const log = await screen.findByRole('log', { name: /Messages de Lina/ });
+    const announcement = within(log).getByText('Camille Martin a rejoint la conversation');
+    expect(announcement.tagName).toBe('P');
+    expect(announcement.className).toMatch(/text-center/);
+    // Membre actif à nouveau : le compositeur est revenu.
+    expect(screen.getByLabelText('Écrire un message')).toBeInTheDocument();
   });
 
   it('ne compte jamais une ligne système en non-lu', async () => {
