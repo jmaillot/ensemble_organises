@@ -73,6 +73,7 @@ begin
           ('trips', ARRAY['id', 'household_id', 'name', 'destination', 'start_date', 'end_date', 'cover_photo', 'notes', 'created_at']::text[]),
           ('conversations', ARRAY['id', 'household_id', 'type', 'title', 'created_at']::text[]),
           ('conversation_members', ARRAY['conversation_id', 'member_id', 'left_at']::text[]),
+          ('conversation_membership_periods', ARRAY['id', 'conversation_id', 'member_id', 'joined_at', 'left_at']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),
           ('push_subscriptions', ARRAY['id', 'user_id', 'endpoint', 'p256dh', 'auth_secret', 'expiration_time', 'user_agent', 'device_label', 'created_at', 'updated_at', 'last_success_at', 'failure_count', 'last_status']::text[]),
@@ -162,6 +163,9 @@ $$;
 --     une table métier.
 --   * `message_notifications` de même : file serveur (trigger, lecture et
 --     consommation serveur), jamais touchée par un client.
+--   * `conversation_membership_periods` de même (0105) : historique de
+--     présence (déclencheurs seuls, lecture via `can_read_message`),
+--     jamais touchée par un client.
 do $$
 declare
   v_sans text;
@@ -172,7 +176,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -200,6 +204,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''message_notifications'''),
     0::bigint,
     'message_notifications reste sans politique : file serveur uniquement'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''conversation_membership_periods'''),
+    0::bigint,
+    'conversation_membership_periods reste sans politique : historique serveur uniquement'
   );
 end;
 $$;
