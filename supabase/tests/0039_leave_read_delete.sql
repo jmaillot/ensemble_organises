@@ -6,11 +6,13 @@
 -- 1 ligne (D-07 refusé) et « le partant relit l'historique » rendait 0
 -- (D-08 aveugle) — les deux reproduits avant la migration, qui les inverse.
 -- Après 0100, toute la suite est verte : suppression auteur seul, fil entier
--- toujours supprimable par un admin (levier de modération, cascade intacte),
--- retrait dur d'autrui conservé, départ tombé idempotent, histoire relue en
--- lecture seule, écritures du partant refusées, registre et ventilateur push
--- en actifs seuls, retrait des archives par sa propre pierre, réadhésion par
--- un admin. Le partant seul ne se ré-ajoute pas (aucune politique UPDATE).
+-- supprimable par un admin (levier de modération, cascade intacte — régime
+-- retiré en 0106 au profit de l'archivage-pour-tous D-14, voir l'amendement
+-- ci-dessous et la preuve canonique 0045), retrait dur d'autrui conservé,
+-- départ tombé idempotent, histoire relue en lecture seule, écritures du
+-- partant refusées, registre et ventilateur push en actifs seuls, retrait des
+-- archives par sa propre pierre, réadhésion par un admin. Le partant seul ne
+-- se ré-ajoute pas (aucune politique UPDATE).
 --
 -- Bornes (AGENTS.md §D.2) : chaque comptage est borné au foyer, au fil ou à
 -- l'objet via testkit.fx — jamais de total nu sur une table entière.
@@ -96,25 +98,27 @@ select testkit.eq(testkit.count(format(
 reset role;
 
 -- ===========================================================================
--- Levier de modération intact : l'admin supprime le fil entier (cascade).
+-- D-14 (0106, amende le levier ci-dessus) : destruction retirée — l'admin ne
+-- vaporise plus le fil, il l'archive-pour-tous via `archive_conversation`
+-- (preuve canonique en 0045). La tentative directe ne touche aucune ligne.
 -- ===========================================================================
 select testkit.as_user(user_id, 'mleave-alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
   'delete from public.conversations where id = %L',
-  (select row_id from testkit.fx where key = 'conv_mod'))), 1::bigint,
-  'l''admin supprime le fil entier (moderation)');
+  (select row_id from testkit.fx where key = 'conv_mod'))), 0::bigint,
+  'l''admin ne supprime plus le fil (destruction retiree D-14, 0 ligne)');
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.messages where conversation_id = %L',
-  (select row_id from testkit.fx where key = 'conv_mod'))), 0::bigint,
-  'la cascade emporte les messages du fil supprime');
+  (select row_id from testkit.fx where key = 'conv_mod'))), 1::bigint,
+  'l''histoire du fil survit a la tentative (retrait 0106)');
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.conversation_members where conversation_id = %L',
-  (select row_id from testkit.fx where key = 'conv_mod'))), 0::bigint,
-  'la cascade emporte les appartenances du fil supprime');
+  (select row_id from testkit.fx where key = 'conv_mod'))), 2::bigint,
+  'les appartenances du fil survivent a la tentative (retrait 0106)');
 
 reset role;
 
