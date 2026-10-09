@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { ModuleShell, MetricRow, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
@@ -61,6 +63,11 @@ export default function NotesPage() {
   } = useNotes();
   const [dialog, setDialog] = useState<{ open: boolean; note: Note | null }>({ open: false, note: null });
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03
+  // (en ligne + lignes + dernière lecture réussie excluent l'état), adopté
+  // au niveau de la page — les crochets n'exposent pas le drapeau partagé.
+  const isEmptyCacheOffline = !online && notes.length === 0 && (isLoading || isError);
 
   const openCreate = () => setDialog({ open: true, note: null });
   const openEdit = (note: Note) => setDialog({ open: true, note });
@@ -181,7 +188,9 @@ export default function NotesPage() {
         </div>
       ) : null}
 
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState
           message={error?.message ?? 'Les notes du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
@@ -309,6 +318,13 @@ export default function NotesPage() {
             closeDialog();
             toast(editing ? 'Note mise à jour.' : 'Note enregistrée dans votre espace.');
           } catch (submissionError) {
+            // Mise en file hors ligne (D-07) : une promesse de rejeu, jamais
+            // un toast d'erreur — même motif que la page des tâches (09-03).
+            if (submissionError instanceof DataError && submissionError.queuedForSync) {
+              closeDialog();
+              toast('Note enregistrée — elle sera synchronisée au retour du réseau.');
+              return;
+            }
             toast(
               submissionError instanceof Error
                 ? submissionError.message

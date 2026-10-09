@@ -3,7 +3,9 @@ import { cn } from '@/lib/utils';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { useToast } from '@/components/ui/toast';
 import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
@@ -63,6 +65,22 @@ export default function MessagesPage() {
   // les archives n'ont pas de compositeur, donc pas d'avis.
   const isSolo = !isArchived && activeId !== null && declaredIds.length === 1;
   const leavingTitle = active?.title ?? 'cette conversation';
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline =
+    !online &&
+    conversations.length === 0 &&
+    archivedConversations.length === 0 &&
+    (feed.isLoading || feed.isError);
+
+  if (isEmptyCacheOffline) {
+    return (
+      <ModuleShell module="messages">
+        <OfflineEmptyState onRetry={feed.refetch} />
+      </ModuleShell>
+    );
+  }
 
   if (feed.isError) {
     return (
@@ -167,6 +185,11 @@ export default function MessagesPage() {
           onSend={(content) => {
             if (!active || isArchived) return;
             void feed.send(active.id, content).catch((error: unknown) => {
+              // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+              if (error instanceof DataError && error.queuedForSync) {
+                toast('Message en file — il sera envoyé au retour du réseau.');
+                return;
+              }
               toast(error instanceof Error ? error.message : 'Message non envoyé.', 'error');
             });
           }}
@@ -174,6 +197,11 @@ export default function MessagesPage() {
             active && !isArchived
               ? (content, image) => {
                   void feed.sendMedia(active.id, content, image).catch((error: unknown) => {
+                    // Mise en file hors ligne (D-07) : promesse de rejeu.
+                    if (error instanceof DataError && error.queuedForSync) {
+                      toast('Image en file — elle sera envoyée au retour du réseau.');
+                      return;
+                    }
                     toast(error instanceof Error ? error.message : 'Image non envoyée.', 'error');
                   });
                 }
@@ -228,6 +256,12 @@ export default function MessagesPage() {
             setSelectedId(id);
             toast('Conversation démarrée.');
           } catch (error) {
+            // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+            if (error instanceof DataError && error.queuedForSync) {
+              setCreateOpen(false);
+              toast('Conversation en file — elle sera créée au retour du réseau.');
+              return;
+            }
             toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être créée.', 'error');
           }
         }}

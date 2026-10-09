@@ -4,7 +4,8 @@ import { ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { Badge, Progress } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useVoyages } from './hooks/use-voyages';
 import { TripFormDialog } from './components/trip-form-dialog';
@@ -28,6 +29,11 @@ export default function VoyagesPage() {
 
   const trip = trips.find((entry) => entry.id === selectedId) ?? featuredTrip;
   const others = trips.filter((entry) => entry.id !== trip?.id);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page. La confirmation de création vit dans le
+  // crochet (`save` y notifie lui-même), hors périmètre de ce plan.
+  const isEmptyCacheOffline = !online && trips.length === 0 && (isLoading || isError);
 
   const openCreate = () => {
     setEditing(null);
@@ -48,7 +54,9 @@ export default function VoyagesPage() {
         </Button>
       }
     >
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState message={error?.message ?? 'Les voyages n’ont pas pu être chargés.'} onRetry={refetch} />
       ) : isLoading ? (
         <LoadingRows rows={2} />

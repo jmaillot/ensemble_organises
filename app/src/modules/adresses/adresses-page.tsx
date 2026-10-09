@@ -2,7 +2,9 @@ import { useCallback, useState } from 'react';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { SearchInput, Select } from '@/components/ui/input';
 import { Badge, Switch } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
@@ -55,6 +57,10 @@ export default function AdressesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Place | null>(null);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && places.length === 0 && (isLoading || isError);
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -77,6 +83,11 @@ export default function AdressesPage() {
           toast('Lieu enregistré.', 'success');
         }
       } catch (caught) {
+        // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+        if (caught instanceof DataError && caught.queuedForSync) {
+          toast('Lieu enregistré — il sera synchronisé au retour du réseau.');
+          return;
+        }
         toast(caught instanceof Error ? caught.message : 'Enregistrement impossible.', 'error');
       }
     },
@@ -193,7 +204,9 @@ export default function AdressesPage() {
         </span>
       </div>
 
-      {isLoading ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isLoading ? (
         <LoadingRows rows={4} />
       ) : isError ? (
         <ErrorState message={error?.message ?? 'Les adresses n’ont pas pu être chargées.'} onRetry={refetch} />

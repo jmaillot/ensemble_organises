@@ -3,7 +3,9 @@ import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { Input, SearchInput, Select } from '@/components/ui/input';
 import { Badge, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
@@ -104,6 +106,11 @@ export default function CadeauxPage() {
   const [promoteListId, setPromoteListId] = useState('');
 
   const currentMemberId = currentMember?.id ?? null;
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page (instantané unique : listes + idées).
+  const isEmptyCacheOffline =
+    !online && lists.length === 0 && ideas.length === 0 && (isLoading || isError);
   const [listFilter, setListFilter] = useState<'toutes' | 'privees' | 'foyer' | 'partagees'>('toutes');
   const shownLists = useMemo(
     () =>
@@ -181,6 +188,13 @@ export default function CadeauxPage() {
       setFormOpen(false);
       setEditedItem(null);
     } catch (creationError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (creationError instanceof DataError && creationError.queuedForSync) {
+        setFormOpen(false);
+        setEditedItem(null);
+        toast('Idée ajoutée — elle sera synchronisée au retour du réseau.');
+        return;
+      }
       toast(creationError instanceof Error ? creationError.message : 'Enregistrement impossible.', 'error');
     }
   };
@@ -219,6 +233,15 @@ export default function CadeauxPage() {
     } catch (creationError) {
       // Compensation T-05-09 : aucun dépôt orphelin en bucket privé.
       if (depositedPath) await removeHouseholdFile(depositedPath).catch(() => {});
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      // (En mode Supabase, cette voie écrit en direct : la file ne s'applique
+      // qu'au repli `data.*` — voir les limites documentées en résumé.)
+      if (creationError instanceof DataError && creationError.queuedForSync) {
+        setIdeaFormOpen(false);
+        setEditedIdea(null);
+        toast('Idée ajoutée — elle sera synchronisée au retour du réseau.');
+        return;
+      }
       toast(creationError instanceof Error ? creationError.message : 'Enregistrement impossible.', 'error');
     }
   };
@@ -276,6 +299,12 @@ export default function CadeauxPage() {
       setPromotedIdea(null);
       toast(`Article ajouté à « ${target?.name ?? 'la liste'} ».`);
     } catch (promotionError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (promotionError instanceof DataError && promotionError.queuedForSync) {
+        setPromotedIdea(null);
+        toast('Article ajouté — il sera synchronisé au retour du réseau.');
+        return;
+      }
       toast(promotionError instanceof Error ? promotionError.message : 'Ajout impossible.', 'error');
     }
   };
@@ -365,7 +394,14 @@ export default function CadeauxPage() {
       setNewListName('');
       setCreatingList(false);
       toast('Liste créée.');
-    } catch {
+    } catch (createError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (createError instanceof DataError && createError.queuedForSync) {
+        setNewListName('');
+        setCreatingList(false);
+        toast('Liste créée — elle sera synchronisée au retour du réseau.');
+        return;
+      }
       toast('Création impossible.', 'error');
     }
   };
@@ -673,7 +709,9 @@ export default function CadeauxPage() {
             </p>
           ) : null}
 
-          {isLoading ? (
+          {isEmptyCacheOffline ? (
+            <OfflineEmptyState onRetry={refetch} />
+          ) : isLoading ? (
             <LoadingRows rows={3} />
           ) : isError ? (
             <ErrorState message={error?.message ?? 'Les listes de cadeaux sont inaccessibles.'} onRetry={refetch} />
@@ -852,7 +890,9 @@ export default function CadeauxPage() {
             description="Pour qui, quel prix, quel statut — et la prochaine occasion du contact lié."
           />
 
-          {isLoading ? (
+          {isEmptyCacheOffline ? (
+            <OfflineEmptyState onRetry={refetch} />
+          ) : isLoading ? (
             <LoadingRows rows={3} />
           ) : isError ? (
             <ErrorState message={error?.message ?? 'Les idées cadeau sont inaccessibles.'} onRetry={refetch} />

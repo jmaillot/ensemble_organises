@@ -4,7 +4,9 @@ import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { cn, pluralize } from '@/lib/utils';
@@ -53,6 +55,11 @@ export default function ContactsPage() {
 
   const openCreate = () => setDialog({ open: true, contact: null });
   const openEdit = (contact: Contact) => setDialog({ open: true, contact });
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page (listes + fiches : rien en cache du tout).
+  const isEmptyCacheOffline =
+    !online && lists.length === 0 && contacts.length === 0 && (isLoading || isError);
 
   return (
     <ModuleShell
@@ -76,7 +83,9 @@ export default function ContactsPage() {
         ]}
       />
 
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState message={error?.message ?? 'Les contacts du foyer n’ont pas pu être chargés.'} onRetry={refetch} />
       ) : (
         <Panel
@@ -219,6 +228,12 @@ export default function ContactsPage() {
             setDialog({ open: false, contact: null });
             toast(editing ? 'Modification enregistrée.' : 'Contact ajouté au foyer.');
           } catch (error) {
+            // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+            if (error instanceof DataError && error.queuedForSync) {
+              setDialog({ open: false, contact: null });
+              toast('Contact ajouté — il sera synchronisé au retour du réseau.');
+              return;
+            }
             toast(error instanceof Error ? error.message : 'Le contact n’a pas pu être enregistré.', 'error');
           }
         }}

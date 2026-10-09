@@ -7,7 +7,9 @@ import { ModuleShell, Panel, MetricRow } from '@/components/shared/module-shell'
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogActions } from '@/components/ui/dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -74,6 +76,10 @@ export default function CoursesPage() {
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
   const navigate = useNavigate();
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && lists.length === 0 && (isLoading || isError);
 
   const {
     register,
@@ -88,23 +94,52 @@ export default function CoursesPage() {
   };
 
   const submitList = handleSubmit(async (values) => {
-    const created = await addList(values.name);
-    if (created) setActiveListId(created.id);
-    setListDialogOpen(false);
-    toast(`Liste « ${values.name.trim()} » créée.`, 'success');
+    try {
+      const created = await addList(values.name);
+      if (created) setActiveListId(created.id);
+      setListDialogOpen(false);
+      toast(`Liste « ${values.name.trim()} » créée.`, 'success');
+    } catch (submitError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (submitError instanceof DataError && submitError.queuedForSync) {
+        setListDialogOpen(false);
+        toast(`Liste « ${values.name.trim()} » créée — elle sera synchronisée au retour du réseau.`);
+        return;
+      }
+      toast(submitError instanceof Error ? submitError.message : 'La liste n’a pas pu être créée.', 'error');
+    }
   });
 
   const submitItem = async (values: ItemFormValues) => {
-    await addItem(values);
-    setItemDialog({ open: false });
-    toast(`« ${values.name.trim()} » ajouté à votre liste.`, 'success');
+    try {
+      await addItem(values);
+      setItemDialog({ open: false });
+      toast(`« ${values.name.trim()} » ajouté à votre liste.`, 'success');
+    } catch (submitError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (submitError instanceof DataError && submitError.queuedForSync) {
+        setItemDialog({ open: false });
+        toast(`« ${values.name.trim()} » ajouté — il sera synchronisé au retour du réseau.`);
+        return;
+      }
+      toast(submitError instanceof Error ? submitError.message : 'L’article n’a pas pu être ajouté.', 'error');
+    }
   };
 
   const submitItemEdit = async (values: ItemFormValues) => {
     if (!editingItem) return;
-    await editItem(editingItem.id, values);
-    setEditingItem(null);
-    toast(`« ${values.name.trim()} » mis à jour.`, 'success');
+    try {
+      await editItem(editingItem.id, values);
+      setEditingItem(null);
+      toast(`« ${values.name.trim()} » mis à jour.`, 'success');
+    } catch (submitError) {
+      if (submitError instanceof DataError && submitError.queuedForSync) {
+        setEditingItem(null);
+        toast(`« ${values.name.trim()} » mis à jour — ce sera synchronisé au retour du réseau.`);
+        return;
+      }
+      toast(submitError instanceof Error ? submitError.message : 'L’article n’a pas pu être mis à jour.', 'error');
+    }
   };
 
   /** L'apparition de la ligne suffit comme retour : seul l'erreur est signalée. */
@@ -243,7 +278,9 @@ export default function CoursesPage() {
         >
           {isLoading ? <LoadingRows rows={3} /> : null}
 
-          {!isLoading && isError ? (
+          {isEmptyCacheOffline ? (
+            <OfflineEmptyState onRetry={refetch} />
+          ) : !isLoading && isError ? (
             <ErrorState message={error?.message ?? 'Les listes de courses sont inaccessibles.'} onRetry={refetch} />
           ) : null}
 

@@ -4,7 +4,9 @@ import { ModuleShell, MetricRow, Panel, CountBadge } from '@/components/shared/m
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { Field } from '@/components/ui/field';
 import { Select, Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
@@ -73,6 +75,10 @@ export default function CalendrierPage() {
     event: null,
     date: grid.selected,
   });
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && events.length === 0 && (isLoading || isError);
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
   // Sortie du secret (D-04) : déplacement Perso → Commun en attente de confirmation.
   const [pendingMove, setPendingMove] = useState<{ event: CalendarEvent; values: EventFormValues } | null>(null);
@@ -198,6 +204,12 @@ export default function CalendrierPage() {
       setDialog((current) => ({ ...current, open: false }));
       toast(editing ? 'Modification enregistrée.' : 'Ajouté au foyer.');
     } catch (error) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (error instanceof DataError && error.queuedForSync) {
+        setDialog((current) => ({ ...current, open: false }));
+        toast('Événement ajouté — il sera synchronisé au retour du réseau.');
+        return;
+      }
       toast(error instanceof Error ? error.message : 'L’événement n’a pas pu être enregistré.', 'error');
     }
   };
@@ -445,7 +457,9 @@ export default function CalendrierPage() {
         </p>
       ) : null}
 
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState
           message={error?.message ?? 'Le calendrier du foyer n’a pas pu être chargé.'}
           onRetry={refetch}
@@ -546,7 +560,7 @@ export default function CalendrierPage() {
         </div>
       )}
 
-      {isLoading && !isError ? <LoadingRows rows={2} className="mt-4" /> : null}
+      {isLoading && !isError && !isEmptyCacheOffline ? <LoadingRows rows={2} className="mt-4" /> : null}
 
       <EventFormDialog
         open={dialog.open}
@@ -597,9 +611,15 @@ export default function CalendrierPage() {
                   refetch();
                   toast(`Calendrier « ${calendar.name} » créé.`);
                 })
-                .catch((createError: unknown) =>
-                  toast(createError instanceof Error ? createError.message : 'Le calendrier n’a pas pu être créé.', 'error'),
-                )
+                .catch((createError: unknown) => {
+                  // Mise en file hors ligne (D-07) : promesse de rejeu.
+                  if (createError instanceof DataError && createError.queuedForSync) {
+                    setCalendarDialogOpen(false);
+                    toast(`Calendrier « ${calendarName.trim()} » créé — il sera synchronisé au retour du réseau.`);
+                    return;
+                  }
+                  toast(createError instanceof Error ? createError.message : 'Le calendrier n’a pas pu être créé.', 'error');
+                })
                 .finally(() => setIsCreatingCalendar(false));
             }}
           >
@@ -653,9 +673,15 @@ export default function CalendrierPage() {
                   refetch();
                   toast(`Catégorie « ${category.name} » créée.`);
                 })
-                .catch((createError: unknown) =>
-                  toast(createError instanceof Error ? createError.message : 'La catégorie n’a pas pu être créée.', 'error'),
-                )
+                .catch((createError: unknown) => {
+                  // Mise en file hors ligne (D-07) : promesse de rejeu.
+                  if (createError instanceof DataError && createError.queuedForSync) {
+                    setCategoryDialogOpen(false);
+                    toast(`Catégorie « ${categoryName.trim()} » créée — elle sera synchronisée au retour du réseau.`);
+                    return;
+                  }
+                  toast(createError instanceof Error ? createError.message : 'La catégorie n’a pas pu être créée.', 'error');
+                })
                 .finally(() => setIsCreatingCategory(false));
             }}
           >

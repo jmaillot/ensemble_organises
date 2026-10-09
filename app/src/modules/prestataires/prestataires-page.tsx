@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { SearchInput, Select } from '@/components/ui/input';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
@@ -24,6 +26,10 @@ export default function PrestatairesPage() {
   const [form, setForm] = useState<{ open: boolean; provider: Provider | null }>({ open: false, provider: null });
   const [typesOpen, setTypesOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<Provider | null>(null);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && providers.length === 0 && (isLoading || isError);
 
   const visible = useMemo(
     () =>
@@ -56,6 +62,12 @@ export default function PrestatairesPage() {
       setForm((current) => ({ ...current, open: false }));
       toast(editing ? 'Prestataire mis à jour.' : 'Prestataire ajouté.', 'success');
     } catch (saveError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (saveError instanceof DataError && saveError.queuedForSync) {
+        setForm((current) => ({ ...current, open: false }));
+        toast('Prestataire ajouté — il sera synchronisé au retour du réseau.');
+        return;
+      }
       toast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.', 'error');
     }
   };
@@ -146,10 +158,15 @@ export default function PrestatairesPage() {
         </p>
       </div>
 
-      {isLoading ? <LoadingRows rows={4} /> : null}
-      {isError ? <ErrorState message={error?.message ?? 'Lecture impossible.'} onRetry={refetch} /> : null}
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : null}
+      {!isEmptyCacheOffline && isLoading ? <LoadingRows rows={4} /> : null}
+      {!isEmptyCacheOffline && isError ? (
+        <ErrorState message={error?.message ?? 'Lecture impossible.'} onRetry={refetch} />
+      ) : null}
 
-      {!isLoading && !isError && providers.length === 0 ? (
+      {!isEmptyCacheOffline && !isLoading && !isError && providers.length === 0 ? (
         <EmptyState
           icon="settings"
           title="Aucun prestataire"
@@ -161,7 +178,7 @@ export default function PrestatairesPage() {
         />
       ) : null}
 
-      {!isLoading && !isError && providers.length > 0 && visible.length === 0 ? (
+      {!isEmptyCacheOffline && !isLoading && !isError && providers.length > 0 && visible.length === 0 ? (
         <EmptyState
           icon="search"
           title="Aucun prestataire trouvé"
@@ -171,7 +188,7 @@ export default function PrestatairesPage() {
         />
       ) : null}
 
-      {visible.length > 0 ? (
+      {!isEmptyCacheOffline && visible.length > 0 ? (
         <div className="grid grid-cols-2 gap-3.5 max-[650px]:grid-cols-1">
           {visible.map((provider) => (
             <article key={provider.id} className="panel-surface rounded-[16px] p-[17px]">

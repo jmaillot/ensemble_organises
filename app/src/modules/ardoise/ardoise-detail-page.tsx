@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
@@ -175,6 +177,10 @@ export default function ArdoiseDetailPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<Expense | null>(null);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && expenses.length === 0 && (isLoading || isError);
 
   const openEditor = (expense: Expense) => {
     setEditingExpense(expense);
@@ -224,6 +230,13 @@ export default function ArdoiseDetailPage() {
         setEditingExpense(null);
         toast('Dépense mise à jour, les soldes sont à jour.');
       } catch (updateError) {
+        // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+        if (updateError instanceof DataError && updateError.queuedForSync) {
+          setExpenseDialogOpen(false);
+          setEditingExpense(null);
+          toast('Dépense mise à jour — elle sera synchronisée au retour du réseau.');
+          return;
+        }
         toast(updateError instanceof Error ? updateError.message : 'Modification impossible.', 'error');
       }
       return;
@@ -234,6 +247,12 @@ export default function ArdoiseDetailPage() {
       setExpenseDialogOpen(false);
       toast('Dépense ajoutée, les soldes sont à jour.');
     } catch (creationError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (creationError instanceof DataError && creationError.queuedForSync) {
+        setExpenseDialogOpen(false);
+        toast('Dépense ajoutée — elle sera synchronisée au retour du réseau.');
+        return;
+      }
       toast(creationError instanceof Error ? creationError.message : 'Dépense impossible.', 'error');
     }
   };
@@ -300,7 +319,9 @@ export default function ArdoiseDetailPage() {
         ))}
       </div>
 
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState message={error?.message ?? 'L’ardoise n’a pas pu être chargée.'} onRetry={refetch} />
       ) : isLoading ? (
         <LoadingRows rows={3} />

@@ -5,7 +5,9 @@ import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar'
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { SearchInput } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
@@ -40,6 +42,10 @@ export default function AnniversairesPage() {
 
   const openCreate = () => setDialog({ open: true, birthday: null });
   const openEdit = (birthday: Birthday) => setDialog({ open: true, birthday });
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && rows.length === 0 && (isLoading || isError);
 
   return (
     <ModuleShell
@@ -83,7 +89,9 @@ export default function AnniversairesPage() {
         </div>
       ) : null}
 
-      {isError ? (
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : isError ? (
         <ErrorState message={error?.message ?? 'Les anniversaires du foyer n’ont pas pu être chargés.'} onRetry={refetch} />
       ) : (
         <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] gap-[18px] max-[920px]:grid-cols-1">
@@ -239,6 +247,12 @@ export default function AnniversairesPage() {
             setDialog({ open: false, birthday: null });
             toast(editing ? 'Modification enregistrée.' : 'Ajouté au foyer.');
           } catch (error) {
+            // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+            if (error instanceof DataError && error.queuedForSync) {
+              setDialog({ open: false, birthday: null });
+              toast('Anniversaire ajouté — il sera synchronisé au retour du réseau.');
+              return;
+            }
             toast(error instanceof Error ? error.message : 'L’anniversaire n’a pas pu être enregistré.', 'error');
           }
         }}

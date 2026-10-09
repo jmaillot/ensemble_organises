@@ -3,7 +3,9 @@ import { CountBadge, ModuleShell, Panel } from '@/components/shared/module-shell
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
-import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { useOnline } from '@/hooks/use-online';
+import { DataError } from '@/lib/data';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
@@ -96,6 +98,10 @@ export default function AnimauxPage() {
     removeAttachment,
   } = usePetAttachments(pet?.id ?? null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const online = useOnline();
+  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
+  // adopté au niveau de la page.
+  const isEmptyCacheOffline = !online && pets.length === 0 && (isLoading || isError);
 
   const recordsByKind = useMemo(() => {
     const grouped = new Map<PetRecord['kind'], PetRecord[]>();
@@ -115,6 +121,12 @@ export default function AnimauxPage() {
       setPetForm((current) => ({ ...current, open: false }));
       toast(editing ? 'Fiche animal enregistrée.' : 'Fiche animal créée.', 'success');
     } catch (saveError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (saveError instanceof DataError && saveError.queuedForSync) {
+        setPetForm((current) => ({ ...current, open: false }));
+        toast('Fiche animal créée — elle sera synchronisée au retour du réseau.');
+        return;
+      }
       toast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.', 'error');
     }
   };
@@ -125,6 +137,12 @@ export default function AnimauxPage() {
       setRecordDialogOpen(false);
       toast('Suivi ajouté au carnet de santé.', 'success');
     } catch (saveError) {
+      // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
+      if (saveError instanceof DataError && saveError.queuedForSync) {
+        setRecordDialogOpen(false);
+        toast('Suivi ajouté — il sera synchronisé au retour du réseau.');
+        return;
+      }
       toast(saveError instanceof Error ? saveError.message : 'Ajout impossible.', 'error');
     }
   };
@@ -181,10 +199,15 @@ export default function AnimauxPage() {
         </Button>
       }
     >
-      {isLoading ? <LoadingRows rows={3} /> : null}
-      {isError ? <ErrorState message={error?.message ?? 'Lecture impossible.'} onRetry={refetch} /> : null}
+      {isEmptyCacheOffline ? (
+        <OfflineEmptyState onRetry={refetch} />
+      ) : null}
+      {!isEmptyCacheOffline && isLoading ? <LoadingRows rows={3} /> : null}
+      {!isEmptyCacheOffline && isError ? (
+        <ErrorState message={error?.message ?? 'Lecture impossible.'} onRetry={refetch} />
+      ) : null}
 
-      {!isLoading && !isError && pets.length === 0 ? (
+      {!isEmptyCacheOffline && !isLoading && !isError && pets.length === 0 ? (
         <EmptyState
           icon="heart"
           title="Aucune fiche animal"
