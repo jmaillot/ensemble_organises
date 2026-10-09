@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useFullSync } from '@/lib/data/use-full-sync';
+import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
 import { useResource } from '@/lib/data/useResource';
@@ -39,6 +40,16 @@ export function AppShell() {
   // Synchro foyer périodique (D-08) : ouverte et en ligne, toutes les 15 min.
   // Aucun rendu — le minuteur vit dans le hook, le bouton dans le panneau.
   useFullSync();
+  // Navigation fiable hors ligne (D-09) : précharge les morceaux de routes en
+  // arrière-plan, à l'idle et en ligne seulement. Monté une fois, échec avalé
+  // (T-09-07) : le préchargement ne doit jamais casser le shell.
+  useEffect(() => {
+    try {
+      preloadRouteChunks();
+    } catch {
+      // Préchargement indisponible : la garde par route couvre l'échec.
+    }
+  }, []);
   const [showOffline, setShowOffline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);

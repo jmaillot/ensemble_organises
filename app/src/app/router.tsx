@@ -1,8 +1,10 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ToastProvider, useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/empty-state';
+import { LazyRoute, RouteFallback } from '@/components/ui/route-error';
+import { routeChunkLoaders } from './route-preload';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AppShell } from './app-shell';
@@ -11,38 +13,6 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { data } from '@/lib/data';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import type { ProfileRow } from '@/types';
-
-const LandingPage = lazy(() => import('@/modules/landing/landing-page'));
-const SignInPage = lazy(() => import('@/modules/landing/sign-in-page'));
-const PrivacyPage = lazy(() => import('@/modules/landing/privacy-page'));
-const TermsPage = lazy(() => import('@/modules/landing/terms-page'));
-const GuestArdoisePage = lazy(() => import('@/modules/ardoise/guest-ardoise-page'));
-const GuestCadeauPage = lazy(() => import('@/modules/cadeaux/guest-cadeau-page'));
-const WelcomePage = lazy(() => import('@/modules/landing/welcome-page'));
-const CreateHouseholdPage = lazy(() => import('@/modules/landing/create-household-page'));
-const JoinHouseholdPage = lazy(() => import('@/modules/landing/join-household-page'));
-const DashboardPage = lazy(() => import('@/modules/dashboard/dashboard-page'));
-const TachesPage = lazy(() => import('@/modules/taches/taches-page'));
-const CalendrierPage = lazy(() => import('@/modules/calendrier/calendrier-page'));
-const NotesPage = lazy(() => import('@/modules/notes/notes-page'));
-const CoursesPage = lazy(() => import('@/modules/courses/courses-page'));
-const ProductCatalogPage = lazy(() => import('@/modules/courses/product-catalog-page'));
-const RoutinesPage = lazy(() => import('@/modules/routines/routines-page'));
-const RecettesPage = lazy(() => import('@/modules/recettes/recettes-page'));
-const ArdoisePage = lazy(() => import('@/modules/ardoise/ardoise-page'));
-const ArdoiseDetailPage = lazy(() => import('@/modules/ardoise/ardoise-detail-page'));
-const CadeauxPage = lazy(() => import('@/modules/cadeaux/cadeaux-page'));
-const AnniversairesPage = lazy(() => import('@/modules/anniversaires/anniversaires-page'));
-const ContactsPage = lazy(() => import('@/modules/contacts/contacts-page'));
-const AnimauxPage = lazy(() => import('@/modules/animaux/animaux-page'));
-const PrestatairesPage = lazy(() => import('@/modules/prestataires/prestataires-page'));
-const FidelitePage = lazy(() => import('@/modules/fidelite/fidelite-page'));
-const AdressesPage = lazy(() => import('@/modules/adresses/adresses-page'));
-const CerclePage = lazy(() => import('@/modules/cercle/cercle-page'));
-const VoyagesPage = lazy(() => import('@/modules/voyages/voyages-page'));
-const MessagesPage = lazy(() => import('@/modules/messages/messages-page'));
-const ParametresPage = lazy(() => import('@/modules/parametres/parametres-page'));
-const NotFoundPage = lazy(() => import('./not-found-page'));
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,19 +25,6 @@ export const queryClient = new QueryClient({
     mutations: { retry: 0 },
   },
 });
-
-function RouteFallback() {
-  return (
-    <div className="mx-auto w-full max-w-[1480px] px-[38px] py-9 max-[650px]:px-[15px]" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Chargement de la page…</span>
-      <div className="mb-6 h-9 w-64 animate-pulse rounded-[11px] bg-accent-faint" />
-      <div className="grid gap-3.5 sm:grid-cols-2">
-        <div className="h-44 animate-pulse rounded-[16px] bg-accent-faint" />
-        <div className="h-44 animate-pulse rounded-[16px] bg-accent-faint" />
-      </div>
-    </div>
-  );
-}
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated();
@@ -209,17 +166,13 @@ export function AppRoutes() {
       <Route
         path="/"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <LandingPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.landing} />
         }
       />
       <Route
         path="/connexion"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <SignInPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.signIn} />
         }
       />
       <Route
@@ -227,9 +180,7 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <RequireNoHousehold>
-              <Suspense fallback={<RouteFallback />}>
-                <WelcomePage />
-              </Suspense>
+              <LazyRoute load={routeChunkLoaders.welcome} />
             </RequireNoHousehold>
           </RequireAuth>
         }
@@ -237,49 +188,37 @@ export function AppRoutes() {
       <Route
         path="/foyer/nouveau"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <CreateHouseholdPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.createHousehold} />
         }
       />
       <Route
         path="/foyer/rejoindre"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <JoinHouseholdPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.joinHousehold} />
         }
       />
       <Route
         path="/invitation/ardoise"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <GuestArdoisePage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.guestArdoise} />
         }
       />
       <Route
         path="/invitation/cadeau"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <GuestCadeauPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.guestCadeau} />
         }
       />
       <Route
         path="/confidentialite"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <PrivacyPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.privacy} />
         }
       />
       <Route
         path="/conditions-utilisation"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <TermsPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.terms} />
         }
       />
       <Route
@@ -294,178 +233,134 @@ export function AppRoutes() {
         <Route
           path="/accueil"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <DashboardPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.dashboard} />
           }
         />
         <Route
           path="/taches"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <TachesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.taches} />
           }
         />
         <Route
           path="/calendrier"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <CalendrierPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.calendrier} />
           }
         />
         <Route
           path="/notes"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <NotesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.notes} />
           }
         />
         <Route
           path="/courses"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <CoursesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.courses} />
           }
         />
         <Route
           path="/courses/catalogue"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <ProductCatalogPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.productCatalog} />
           }
         />
         <Route
           path="/routines"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <RoutinesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.routines} />
           }
         />
         <Route
           path="/recettes"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <RecettesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.recettes} />
           }
         />
         <Route
           path="/ardoise"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <ArdoisePage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.ardoise} />
           }
         />
         <Route
           path="/ardoise/:id"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <ArdoiseDetailPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.ardoiseDetail} />
           }
         />
         <Route
           path="/cadeaux"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <CadeauxPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.cadeaux} />
           }
         />
         <Route
           path="/anniversaires"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <AnniversairesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.anniversaires} />
           }
         />
         <Route
           path="/contacts"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <ContactsPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.contacts} />
           }
         />
         <Route
           path="/animaux"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <AnimauxPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.animaux} />
           }
         />
         <Route
           path="/prestataires"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <PrestatairesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.prestataires} />
           }
         />
         <Route
           path="/fidelite"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <FidelitePage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.fidelite} />
           }
         />
         <Route
           path="/adresses"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <AdressesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.adresses} />
           }
         />
         <Route
           path="/cercle"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <CerclePage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.cercle} />
           }
         />
         <Route
           path="/voyages"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <VoyagesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.voyages} />
           }
         />
         <Route
           path="/messages"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <MessagesPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.messages} />
           }
         />
         <Route
           path="/parametres"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <ParametresPage />
-            </Suspense>
+            <LazyRoute load={routeChunkLoaders.parametres} />
           }
         />
       </Route>
       <Route
         path="*"
         element={
-          <Suspense fallback={<RouteFallback />}>
-            <NotFoundPage />
-          </Suspense>
+          <LazyRoute load={routeChunkLoaders.notFound} />
         }
       />
     </Routes>
