@@ -29,7 +29,7 @@ export interface ConversationSummary {
 export interface Message {
   id: string;
   conversationId: string;
-  /** Auteur membre ; `null` pour une ligne système serveur (départ D-09). */
+  /** Auteur membre ; `null` pour une ligne système serveur (départ D-09, arrivée D-11). */
   senderId: string | null;
   senderName: string;
   senderColorTag: MemberColorTag;
@@ -101,7 +101,7 @@ export function toMessage(
     senderColorTag: sender?.color_tag ?? 'accent',
     content: row.content,
     // Une ligne système n'a pas d'auteur : elle n'est jamais « à moi », donc
-    // jamais un signal de non-lu — le prédicat est prouvé côté SQL (0040).
+    // jamais un signal de non-lu — le prédicat est prouvé côté SQL (0040/0042).
     isSystem: row.sender_id == null,
     mediaUrl: row.media_url ?? null,
     createdAt: row.created_at,

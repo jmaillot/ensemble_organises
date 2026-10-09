@@ -28,6 +28,11 @@ export interface ChatPanelProps {
   leaveDisabledReason?: string | null;
   /** Fil quitté (D-08) : historique en lecture seule, sans compositeur ni actions d'écriture. */
   readOnly?: boolean;
+  /**
+   * Fil solo (D-11) : un seul membre actif — indication sobre au compositeur,
+   * jamais un blocage d'envoi. Dérivé du registre actif déjà chargé.
+   */
+  showSoloNotice?: boolean;
   /** Retire ce fil quitté de ses archives (sa propre pierre, D-08) ; absent, le bouton est masqué. */
   onRemoveArchived?: () => void;
   /** Fenêtre chargée du fil : affiche « Charger plus » quand des anciens restent déchargés. */
@@ -143,7 +148,7 @@ function MessageBubble({
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onDeleteConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, showSoloNotice = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -334,7 +339,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           </p>
         ) : (
           messages.map((message) =>
-            // Ligne système (départ D-09) : annonce centrée atténuée, sans
+            // Ligne système (départ D-09, arrivée D-11) : annonce centrée atténuée, sans
             // avatar, sans nom, sans actions (ni édition, ni suppression, ni
             // réponse) — le fil lui-même est le signal.
             message.isSystem ? (
@@ -379,6 +384,14 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         </p>
       ) : (
         <>
+      {/* Fil solo (D-11) : indication atténuée au compositeur, sans visuel
+          d'alarme — l'envoi reste pleinement permis, la copie dit l'instant
+          présent (un futur membre relira l'historique en rejoignant). */}
+      {showSoloNotice ? (
+        <p role="status" className="m-0 border-t border-border px-3 pt-2 text-center text-[11px] text-muted">
+          Vous êtes seul dans cette conversation — aucun autre membre ne peut lire ce message pour l’instant.
+        </p>
+      ) : null}
       {attachment ? (
         <div className="flex items-center gap-2 border-t border-border px-3 pt-2.5">
           <img src={attachment.previewUrl} alt="" className="h-11 w-auto rounded-[8px]" />

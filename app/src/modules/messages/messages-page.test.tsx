@@ -465,6 +465,57 @@ describe('Messages', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
+  it('signale le fil solo au compositeur sans bloquer l’envoi', async () => {
+    // D-11 : `conversation-3` (Maya) ne déclare que Camille — l'avis sobre
+    // s'affiche au compositeur et l'envoi reste pleinement permis
+    // (indication, jamais blocage).
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Maya/ }));
+    expect(await screen.findByRole('log', { name: 'Messages de Maya' })).toBeInTheDocument();
+
+    expect(screen.getByText(/seul dans cette conversation/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Écrire un message'), 'Message en solo');
+    await user.click(screen.getByRole('button', { name: 'Envoyer' }));
+
+    const log = screen.getByRole('log', { name: /Messages de Maya/ });
+    await waitFor(() => expect(within(log).getByText('Message en solo')).toBeInTheDocument(), { timeout: 5000 });
+    // L'avis demeure : le registre n'a pas changé.
+    expect(screen.getByText(/seul dans cette conversation/)).toBeInTheDocument();
+  });
+
+  it('ne signale rien au compositeur quand le fil compte deux membres actifs', async () => {
+    // D-11 : le fil de Lina déclare deux actifs — aucun avis, compositeur nu.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
+
+    expect(screen.getByLabelText('Écrire un message')).toBeInTheDocument();
+    expect(screen.queryByText(/seul dans cette conversation/)).not.toBeInTheDocument();
+  });
+
+  it('ne signale rien dans un fil archivé, sans compositeur', async () => {
+    // D-11 : les archives n'ont pas de compositeur, donc pas d'avis.
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /^Lina/ }));
+    await user.click(screen.getByRole('button', { name: 'Quitter la conversation Lina' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitter la conversation' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Conversation quittée : elle reste dans vos anciennes conversations.')).toBeInTheDocument(),
+    );
+
+    expect(screen.queryByText(/seul dans cette conversation/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+  });
+
   it('affiche une annonce de départ centrée, sans actions', async () => {
     // D-09, miroir fil : la ligne système (expéditeur nul, comme l'écrit le
     // déclencheur 0101) se rend en annonce centrée atténuée — ni avatar, ni

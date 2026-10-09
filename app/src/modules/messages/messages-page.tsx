@@ -57,6 +57,11 @@ export default function MessagesPage() {
     : declaredIds.length > 1
       ? null
       : 'Vous êtes le dernier membre de cette conversation : supprimez-la (admin) pour la fermer.';
+  // Fil solo (D-11) : un seul membre actif dans le registre déclaré — signalé
+  // au compositeur comme indication, jamais comme blocage d'envoi. Même
+  // source que le bouton Quitter (pierres exclues), aucune requête ajoutée ;
+  // les archives n'ont pas de compositeur, donc pas d'avis.
+  const isSolo = !isArchived && activeId !== null && declaredIds.length === 1;
   const leavingTitle = active?.title ?? 'cette conversation';
 
   if (feed.isError) {
@@ -145,6 +150,7 @@ export default function MessagesPage() {
           messages={thread.messages}
           isSending={feed.isSending}
           readOnly={isArchived}
+          showSoloNotice={isSolo}
           onRemoveArchived={isArchived && active ? () => setPendingArchiveRemoval(active.id) : undefined}
           pageInfo={
             active

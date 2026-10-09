@@ -160,7 +160,7 @@ export function useMessagesFeed(): MessagesFeed {
       // afficher « Foyer » à la place d'un prénom. Seul l'aperçu alimente le
       // repli (pas le fil entier) : les expéditrices anciennes d'un fil non
       // ouvert restent invisibles tant qu'il n'est pas chargé. Une ligne
-      // système (départ D-09) n'a pas d'auteur : elle ne nourrit pas le repli.
+      // système (départ D-09, arrivée D-11) n'a pas d'auteur : elle ne nourrit pas le repli.
       const preview = previewByConversation.get(row.id);
       const memberIds = [
         ...(memberIdsByConversation.get(row.id) ?? []),
@@ -172,8 +172,8 @@ export function useMessagesFeed(): MessagesFeed {
         .map(toParticipant);
       const last = preview ? toMessage(preview, { currentMemberId, members }) : null;
       const readAt = readMap[row.id] ?? '';
-      // Une ligne système (départ D-09) n'est jamais un non-lu : le fil
-      // lui-même est le signal, sans pastille (prouvé côté SQL par 0040,
+      // Une ligne système (départ D-09, arrivée D-11) n'est jamais un non-lu : le fil
+      // lui-même est le signal, sans pastille (prouvé côté SQL par 0040/0042,
       // côté VITest par la suite messages).
       const unseenLatest = last !== null && !last.isMine && !last.isSystem && isUnseen(last.createdAt, readAt);
       return {
@@ -580,7 +580,7 @@ export function useThreadPage(conversationId: string | null): ThreadPage {
   }, [currentMemberId, members, threadQuery.data]);
 
   const readAt = (conversationId && readMap[conversationId]) ?? '';
-  // Les lignes système (départs D-09) ne comptent jamais en non-lus.
+  // Les lignes système (départs D-09, arrivées D-11) ne comptent jamais en non-lus.
   const unread = messages.filter((message) => !message.isSystem && !message.isMine && isUnseen(message.createdAt, readAt)).length;
 
   const total = threadQuery.data?.total ?? 0;
