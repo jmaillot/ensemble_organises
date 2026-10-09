@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { nextBirthdayDate } from '@/modules/anniversaires/types';
 import { renderWithProviders } from '@/test/render';
@@ -688,5 +689,70 @@ describe('CadeauxPage — décocher Reçu (G-06-20)', () => {
     const scope = within(card as HTMLElement);
     expect(scope.getByText('Réservé')).toBeInTheDocument();
     expect(scope.queryByRole('button', { name: /Libérer/ })).not.toBeInTheDocument();
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** Les écritures échouent en mode file (`queuedForSync`), comme hors ligne. */
+function mockOfflineQueue() {
+  return vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+    await enqueueMutation({
+      table,
+      operation: 'insert',
+      rowId: String((values as { id?: unknown }).id ?? ''),
+      values: values as Record<string, unknown>,
+    });
+    throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+  });
+}
+
+describe('CadeauxPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    // Instantané unique, deux sections : les deux rendent le même état.
+    expect(await screen.findAllByText(EMPTY_CACHE_TITLE)).not.toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: 'Réessayer' }).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Les listes de cadeaux sont inaccessibles.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Les idées cadeau sont inaccessibles.')).not.toBeInTheDocument();
+  });
+
+  it('ajout d’idée hors ligne : confirmation mise en file, jamais un toast d’erreur', async () => {
+    const user = userEvent.setup();
+    // `createGiftItem` passe par `data.*` dans tous les modes : la file s'y
+    // applique. (Idées/dossiers : écriture directe en mode Supabase — limite
+    // documentée en résumé.)
+    mockOfflineQueue();
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une idée' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Nom du cadeau/), 'Cadeau hors ligne');
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’idée' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.getByText('Idée ajoutée — elle sera synchronisée au retour du réseau.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });

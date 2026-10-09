@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { data, DataError } from '@/lib/data';
 import RecettesPage from './recettes-page';
 
 describe('Module Recettes', () => {
@@ -34,5 +35,30 @@ describe('Module Recettes', () => {
         screen.getByText('C’est noté, nous vous préviendrons dès l’ouverture des recettes.'),
       ).toBeInTheDocument();
     });
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+describe('RecettesPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<RecettesPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Les recettes sont inaccessibles.')).not.toBeInTheDocument();
   });
 });

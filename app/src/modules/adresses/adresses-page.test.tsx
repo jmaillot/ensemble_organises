@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import AdressesPage from './adresses-page';
 
 describe('Adresses', () => {
@@ -63,5 +65,65 @@ describe('Adresses', () => {
       'aria-checked',
       'false',
     );
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** Les écritures échouent en mode file (`queuedForSync`), comme hors ligne. */
+function mockOfflineQueue() {
+  return vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+    await enqueueMutation({
+      table,
+      operation: 'insert',
+      rowId: String((values as { id?: unknown }).id ?? ''),
+      values: values as Record<string, unknown>,
+    });
+    throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+  });
+}
+
+describe('AdressesPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<AdressesPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Les adresses n’ont pas pu être chargées.')).not.toBeInTheDocument();
+  });
+
+  it('création hors ligne : retenue en file, jamais un toast d’erreur', async () => {
+    const user = userEvent.setup();
+    // `addPlace` passe par `resource.create` (09-03) : la mise en file y est
+    // retenue et l'appel se résout — aucun toast d'erreur.
+    mockOfflineQueue();
+    renderWithProviders(<AdressesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /ajouter une adresse/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/nom du lieu/i), 'Librairie Horsligne');
+    await user.selectOptions(within(dialog).getByLabelText(/type de lieu/i), 'restaurant');
+    await user.selectOptions(within(dialog).getByLabelText(/^note \*/i), '5');
+    await user.type(within(dialog).getByLabelText(/ville/i), 'Villeurbanne');
+    await user.click(within(dialog).getByRole('button', { name: /enregistrer le lieu/i }));
+
+    await waitFor(() => expect(screen.getByText('Lieu enregistré.')).toBeInTheDocument());
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });

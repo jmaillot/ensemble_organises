@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addDays, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import { renderWithProviders } from '@/test/render';
 import type { RoutineAssigneeRow, RoutineRow } from '@/types';
 import RoutinesPage from './routines-page';
@@ -311,5 +312,79 @@ describe('RoutinesPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const rows = await data.list<RoutineRow>('routines');
     expect(rows.find((row) => row.name === MONDAY)?.recurrence_rule).toBe('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** jsdom n'implémente pas `scrollIntoView`, utilisé par Radix à l'ouverture d'un dialogue. */
+function supportScrollIntoView() {
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+      return undefined;
+    };
+  }
+}
+
+describe('RoutinesPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<RoutinesPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Les routines du foyer n’ont pas pu être chargées.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aucune routine dans le foyer')).not.toBeInTheDocument();
+  });
+
+  it('création hors ligne : confirmation mise en file, jamais un toast d’erreur', async () => {
+    supportScrollIntoView();
+    const user = userEvent.setup();
+    // File partielle réaliste : la ligne principale passe (le serveur la
+    // daterait), une écriture secondaire est mise en file — la page confirme
+    // la mise en file au lieu d'afficher l'erreur brute. (La rétention d'une
+    // ligne optimiste sans `created_at` fait chuter le lecteur de séries :
+    // limite du motif 09-03 documentée en résumé, non déclenchée ici.)
+    vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+      if (table === 'routines') {
+        const now = new Date().toISOString();
+        return { ...(values as Record<string, unknown>), created_at: now, updated_at: now } as never;
+      }
+      await enqueueMutation({
+        table,
+        operation: 'insert',
+        rowId: String((values as { id?: unknown }).id ?? ''),
+        values: values as Record<string, unknown>,
+      });
+      throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+    });
+    renderWithProviders(<RoutinesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Nouvelle routine' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(/Nom de la routine/), 'Routine hors ligne');
+    await user.selectOptions(dialog.getByLabelText(/Récurrence/), 'hebdomadaire');
+    await user.click(dialog.getByRole('button', { name: 'Créer la routine' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.getByText('Routine ajoutée — elle sera synchronisée au retour du réseau.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });

@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { formatEuro } from '@/lib/utils';
+import { data, DataError } from '@/lib/data';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import ArdoiseDetailPage from './ardoise-detail-page';
 import type { ArdoiseServerSettlement } from './api';
@@ -277,5 +278,32 @@ describe('ArdoiseDetailPage', () => {
       vi.unstubAllGlobals();
       localStorage.clear();
     }
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+describe('ArdoiseDetailPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    // Ce fichier substitue l'adaptateur local : l'espion vise ce même objet.
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderDetail();
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('L’ardoise n’a pas pu être chargée.')).not.toBeInTheDocument();
   });
 });

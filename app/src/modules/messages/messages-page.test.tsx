@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { ConversationMemberRow, MessageRow, RowFilter } from '@/types';
 import { useHouseholdStore } from '@/stores/household-store';
@@ -963,5 +964,65 @@ describe('Messages', () => {
     const archived = screen.getByRole('list', { name: 'Anciennes conversations' });
     expect(within(archived).getByRole('button', { name: /^Lina/ })).toBeInTheDocument();
     expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** Les écritures échouent en mode file (`queuedForSync`), comme hors ligne. */
+function mockOfflineQueue() {
+  return vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+    await enqueueMutation({
+      table,
+      operation: 'insert',
+      rowId: String((values as { id?: unknown }).id ?? ''),
+      values: values as Record<string, unknown>,
+    });
+    throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+  });
+}
+
+describe('MessagesPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<MessagesPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('La messagerie est momentanément inaccessible.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aucune conversation')).not.toBeInTheDocument();
+  });
+
+  it('envoi hors ligne : confirmation mise en file, jamais un toast d’erreur', async () => {
+    const user = userEvent.setup();
+    // `createMessage` passe par `data.*` dans tous les modes : la file s'y
+    // applique. (Création de conversation : RPC en mode Supabase — limite
+    // documentée en résumé.)
+    mockOfflineQueue();
+    renderWithProviders(<MessagesPage />);
+    await screen.findByRole('button', { name: /^Lina/ });
+
+    await user.type(screen.getByLabelText('Écrire un message'), 'Message rédigé sans réseau');
+    await user.click(screen.getByRole('button', { name: 'Envoyer' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Message en file — il sera envoyé au retour du réseau.')).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });

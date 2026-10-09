@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import PrestatairesPage from './prestataires-page';
 
 describe('PrestatairesPage', () => {
@@ -120,5 +122,63 @@ describe('PrestatairesPage', () => {
     const form = await screen.findByRole('dialog', { name: 'Ajouter un prestataire' });
     expect(within(form).getByLabelText(/Type/)).toHaveDisplayValue('Sans type');
     expect(within(form).getByRole('option', { name: 'Kinésithérapeute' })).toBeInTheDocument();
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** Les écritures échouent en mode file (`queuedForSync`), comme hors ligne. */
+function mockOfflineQueue() {
+  return vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+    await enqueueMutation({
+      table,
+      operation: 'insert',
+      rowId: String((values as { id?: unknown }).id ?? ''),
+      values: values as Record<string, unknown>,
+    });
+    throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+  });
+}
+
+describe('PrestatairesPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<PrestatairesPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Lecture impossible.')).not.toBeInTheDocument();
+  });
+
+  it('création hors ligne : confirmation mise en file, jamais un toast d’erreur', async () => {
+    const user = userEvent.setup();
+    mockOfflineQueue();
+    renderWithProviders(<PrestatairesPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Ajouter un prestataire' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ajouter un prestataire' });
+    await user.type(within(dialog).getByLabelText(/^Nom/), 'Plombier Horsligne');
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter le contact' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.getByText('Prestataire ajouté — il sera synchronisé au retour du réseau.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });

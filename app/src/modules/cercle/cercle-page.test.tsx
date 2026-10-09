@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { PostCommentRow } from '@/types';
 import CerclePage from './cercle-page';
@@ -103,5 +103,31 @@ describe('Cercle', () => {
     await waitFor(() => expect(within(card).getByText('1 nouveau commentaire')).toBeInTheDocument());
     expect(screen.getByText('1 non lus')).toBeInTheDocument();
     expect(screen.getByText('nouveaux commentaires')).toBeInTheDocument();
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+describe('CerclePage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<CerclePage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Le fil n’a pas pu être chargé.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Le fil est encore vide')).not.toBeInTheDocument();
   });
 });

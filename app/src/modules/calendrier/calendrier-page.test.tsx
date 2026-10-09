@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import CalendrierPage from './calendrier-page';
-import { data } from '@/lib/data';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, pendingCount } from '@/lib/data/sync-queue';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
 import { addDays, daysBetween, formatLongDate, formatMonthLabel, todayIso, toIsoDate } from '@/lib/utils';
@@ -399,5 +400,68 @@ describe('CalendrierPage', () => {
         (row) => row.id === persoId,
       ),
     ).toBe(false);
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+/** Les écritures échouent en mode file (`queuedForSync`), comme hors ligne. */
+function mockOfflineQueue() {
+  return vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+    await enqueueMutation({
+      table,
+      operation: 'insert',
+      rowId: String((values as { id?: unknown }).id ?? ''),
+      values: values as Record<string, unknown>,
+    });
+    throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+  });
+}
+
+describe('CalendrierPage hors ligne (09-05)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('cache vide hors ligne : état explicite avec réessai, jamais l’erreur brute', async () => {
+    setOnlineStatus(false);
+    vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<CalendrierPage />);
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Le calendrier du foyer n’a pas pu être chargé.')).not.toBeInTheDocument();
+  });
+
+  it('création d’événement hors ligne : confirmation mise en file, jamais un toast d’erreur', async () => {
+    const user = userEvent.setup();
+    mockOfflineQueue();
+    renderWithProviders(<CalendrierPage />);
+
+    // Attendre la fin du chargement : les boutons d’ajout n’apparaissent qu’alors.
+    const panel = document.getElementById('calendar-agenda-panel')!;
+    await waitFor(() =>
+      expect(within(panel).queryByRole('button', { name: 'Ajouter un événement' })).toBeInTheDocument(),
+    );
+    await user.click(within(panel).getByRole('button', { name: 'Ajouter un événement' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Titre/), 'Balade hors ligne');
+    await user.click(within(dialog).getByRole('button', { name: /Ajouter l’événement/ }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.getByText('Événement ajouté — il sera synchronisé au retour du réseau.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
   });
 });
