@@ -184,10 +184,19 @@ select testkit.as_user(user_id, 'mleave-bob@example.fr') from testkit.fx where k
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
-  'select 1 from public.messages where household_id = %L and conversation_id = %L',
+  'select 1 from public.messages where household_id = %L and conversation_id = %L and sender_id is not null',
   (select household_id from testkit.fx where key = 'home'),
   (select row_id from testkit.fx where key = 'conv'))), 3::bigint,
   'le partant relit l''historique de son fil quitte');
+
+-- D-09 (0101) : les deux départs survenus (retrait admin puis départ
+-- volontaire) ont chacun annoncé le fil — l'histoire lue comprend les lignes
+-- système, preuve en 0040.
+select testkit.eq(testkit.count(format(
+  'select 1 from public.messages where household_id = %L and conversation_id = %L and sender_id is null',
+  (select household_id from testkit.fx where key = 'home'),
+  (select row_id from testkit.fx where key = 'conv'))), 2::bigint,
+  'le partant relit aussi les deux annonces de depart (D-09)');
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.conversations where household_id = %L and id = %L',
