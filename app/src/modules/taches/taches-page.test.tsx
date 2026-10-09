@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TachesPage from './taches-page';
+import { data, DataError } from '@/lib/data';
+import { enqueueMutation, flushWithAdapter, pendingCount } from '@/lib/data/sync-queue';
 import { renderWithProviders } from '@/test/render';
 
 /**
@@ -113,5 +115,123 @@ describe('TachesPage', () => {
 
     await findTaskList();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+const EMPTY_CACHE_TITLE = 'Aucune donnée en cache';
+
+/** Bascule `navigator.onLine` et notifie les abonnés, comme le navigateur. */
+function setOnlineStatus(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+}
+
+describe('TachesPage hors ligne (09-03)', () => {
+  afterEach(() => {
+    setOnlineStatus(true);
+    vi.restoreAllMocks();
+  });
+
+  it('premier lancement hors ligne : état de cache vide explicite, jamais une liste muette', async () => {
+    setOnlineStatus(false);
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    // Socle rouge : la requête reste en pause, seuls des squelettes muets
+    // s'affichent, sans jamais dire que le cache est vide.
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.getByText(/reconnecte-toi pour charger/i)).toBeInTheDocument();
+    // Ni la vraie liste vide (zéro ligne serveur), ni une erreur brute.
+    expect(screen.queryByText('Aucune tâche à faire')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ce contenu n’a pas pu être chargé')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+  });
+
+  it('lecture en échec hors ligne : état explicite, jamais l’erreur brute', async () => {
+    const listSpy = vi.spyOn(data, 'list').mockRejectedValue(new DataError('fetch failed'));
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    // En ligne : l'erreur existante s'affiche comme avant.
+    expect(await screen.findByText('Ce contenu n’a pas pu être chargé')).toBeInTheDocument();
+
+    // Hors ligne : le même échec devient l'état de cache vide explicite.
+    setOnlineStatus(false);
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    expect(screen.queryByText('Ce contenu n’a pas pu être chargé')).not.toBeInTheDocument();
+    expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('la reconnexion recharge la liste sans action manuelle', async () => {
+    setOnlineStatus(false);
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+
+    setOnlineStatus(true);
+    // Le réessai suit le retour réseau (mécanisme de reconnexion partagé).
+    await findTaskList();
+    expect(screen.queryByText(EMPTY_CACHE_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('le bouton Réessayer est sans danger hors ligne puis recharge au retour réseau', async () => {
+    const user = userEvent.setup();
+    setOnlineStatus(false);
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    expect(await screen.findByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Réessayer' }));
+    // Toujours hors ligne : l'état persiste, sans erreur ni plantage.
+    expect(screen.getByText(EMPTY_CACHE_TITLE)).toBeInTheDocument();
+
+    setOnlineStatus(true);
+    await findTaskList();
+  });
+
+  it('création hors ligne : confirmation mise en file, ligne en attente, confirmée au rejeu sans doublon', async () => {
+    supportDialogEnvironment();
+    const user = userEvent.setup();
+    // Les écritures échouent en mode file (signal `queuedForSync`), les
+    // lectures restent en direct : c'est la copie d'erreur qui est le bug,
+    // pas la file (les lignes se rejouent plus bas). La mise en file passe
+    // par la vraie `enqueueMutation` : le rejeu est une preuve, pas un simulacre.
+    const createSpy = vi.spyOn(data, 'create').mockImplementation(async (table, values) => {
+      await enqueueMutation({
+        table,
+        operation: 'insert',
+        rowId: String((values as { id?: unknown }).id ?? ''),
+        values: values as Record<string, unknown>,
+      });
+      throw new DataError('Hors ligne : la modification sera synchronisée au retour du réseau.', null, true);
+    });
+    const { queryClient } = renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(/Nom de la tâche/), 'Acheter des piles hors ligne');
+    await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche' }));
+
+    // Socle rouge : la file remontait comme une erreur (toast d'erreur,
+    // dialogue bloqué ouvert, ligne invisible).
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByText('Tâche ajoutée — elle sera synchronisée au retour du réseau.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Hors ligne : la modification sera synchronisée au retour du réseau.'),
+    ).not.toBeInTheDocument();
+    const list = await findTaskList();
+    expect(list.getByText('Acheter des piles hors ligne')).toBeInTheDocument();
+    expect(screen.getByText('En attente de synchronisation')).toBeInTheDocument();
+    expect(createSpy).toHaveBeenCalled();
+    await waitFor(async () => expect(await pendingCount()).toBeGreaterThan(0));
+
+    // Rejeu : la file se vide vers le stockage, la ligne est confirmée sans
+    // doublon et la marque d'attente disparaît.
+    createSpy.mockRestore();
+    const flushed = await flushWithAdapter(data);
+    expect(flushed.replayed).toBeGreaterThan(0);
+    await queryClient.invalidateQueries();
+    const confirmed = await findTaskList();
+    expect(confirmed.getAllByText('Acheter des piles hors ligne')).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByText('En attente de synchronisation')).not.toBeInTheDocument());
   });
 });
