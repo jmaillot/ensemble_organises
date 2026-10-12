@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useResource } from '@/lib/data/useResource';
 import type { PlaceRow } from '@/types';
-import { PLACES_TABLE, placeMetrics, toPlacePayload, toVisitedPayload, type PlaceMetrics } from '../api';
+import { PLACES_TABLE, deletePlacePhoto, isPlacePhotoPath, placeMetrics, resolvePlacePhotoUrls, toEditPlacePayload, toPlacePayload, toVisitedPayload, uploadPlacePhoto, type PlaceMetrics } from '../api';
 import {
   emptyPlaceFilters,
   filterPlaces,
@@ -19,7 +19,7 @@ export interface UseAdressesResult extends PlaceMetrics {
   places: Place[];
   /** Lieux après application des filtres de recherche. */
   visiblePlaces: Place[];
-  /** Lieux visibles regroupés par ville, pour la vue « carte ». */
+  /** Lieux visibles regroupés par ville, pour la vue « par ville ». */
   cityGroups: { city: string; places: Place[] }[];
   filters: PlaceFilters;
   setFilters: (filters: Partial<PlaceFilters>) => void;
@@ -68,7 +68,36 @@ export function useAdresses(): UseAdressesResult {
   const refresh = useRef(refetch);
   refresh.current = refetch;
 
-  const places = useMemo(() => rows.map(toPlace).sort((a, b) => a.name.localeCompare(b.name, 'fr')), [rows]);
+  // Les lignes portent des chemins (D-04) : on forge les photos affichables
+  // à la lecture, en échec fermé (annulation stricte, jamais d'état éventé).
+  // Les valeurs non-chemin (`data:` hérités, `/assets`, aperçus) rendent en
+  // synchrone — aucun rendu ajouté ; seuls les chemins passent par l'effet.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const pending = rows.filter((row) => row.photo_url && isPlacePhotoPath(row.photo_url));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolvePlacePhotoUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+
+  const places = useMemo(
+    () =>
+      rows
+        .map((row) => {
+          const stored = row.photo_url;
+          // Non-chemin : valeur affichable telle quelle (synchrone) ; chemin :
+          // URL forgée par l'effet, `null` en attendant ou en échec fermé.
+          const photoUrl = !stored || !isPlacePhotoPath(stored) ? stored : (photoUrls[row.id] ?? null);
+          return { ...toPlace(row), photoUrl };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    [rows, photoUrls],
+  );
   const visiblePlaces = useMemo(() => filterPlaces(places, filters), [filters, places]);
   const cityGroups = useMemo(() => groupPlacesByCity(visiblePlaces), [visiblePlaces]);
   const metrics = useMemo(() => placeMetrics(places), [places]);
@@ -82,7 +111,9 @@ export function useAdresses(): UseAdressesResult {
 
   const addPlace = useCallback(
     async (input: PlaceInput) => {
-      await create(toPlacePayload(input, requireHousehold()));
+      const householdId = requireHousehold();
+      const photoUrl = input.photoFile ? await uploadPlacePhoto(householdId, input.photoFile) : input.photoUrl;
+      await create(toPlacePayload({ ...input, photoUrl }, householdId));
       refresh.current();
     },
     [create, requireHousehold],
@@ -90,18 +121,26 @@ export function useAdresses(): UseAdressesResult {
 
   const editPlace = useCallback(
     async (place: Place, input: PlaceInput) => {
-      await update(place.id, toPlacePayload(input, requireHousehold()));
+      const householdId = requireHousehold();
+      const previous = rows.find((row) => row.id === place.id)?.photo_url ?? null;
+      const photoUrl = input.photoFile ? await uploadPlacePhoto(householdId, input.photoFile) : input.photoUrl;
+      // `visited` est omis de la charge (D-06) : l'édition ne le touche plus.
+      await update(place.id, toEditPlacePayload({ ...input, photoUrl }, householdId));
+      // Photo remplacée ou retirée : l'ancien fichier part avec (pas d'orphelin).
+      if (previous && previous !== photoUrl) await deletePlacePhoto(previous);
       refresh.current();
     },
-    [requireHousehold, update],
+    [requireHousehold, rows, update],
   );
 
   const removePlace = useCallback(
     async (place: Place) => {
+      const stored = rows.find((row) => row.id === place.id)?.photo_url ?? null;
       await remove(place.id);
+      await deletePlacePhoto(stored);
       refresh.current();
     },
-    [remove],
+    [remove, rows],
   );
 
   const toggleVisited = useCallback(

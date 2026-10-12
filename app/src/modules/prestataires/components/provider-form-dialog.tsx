@@ -163,7 +163,7 @@ export function ProviderFormDialog({ open, onOpenChange, provider, types, saving
                   <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Fichiers déjà joints">
                     {existing.map((attachment) => (
                       <li key={attachment.id} className="flex items-center gap-2 rounded-[9px] bg-bg px-2.5 py-2">
-                        {isImageMime(attachment.mime) ? (
+                        {isImageMime(attachment.mime) && attachment.url ? (
                           <img
                             src={attachment.url}
                             alt={`Aperçu de ${attachment.fileName}`}

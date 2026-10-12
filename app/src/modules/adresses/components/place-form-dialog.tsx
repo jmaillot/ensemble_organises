@@ -8,7 +8,6 @@ import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { compressPlacePhoto } from '../api';
 import { placeTypeIcon, placeTypes, type Place, type PlaceInput, type PlaceType } from '../types';
 
 const schema = z.object({
@@ -59,6 +58,9 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(place?.photoUrl ?? null);
+  // Fichier choisi mais pas encore déposé (D-04) : le dépôt a lieu à
+  // l'enregistrement, jamais à la sélection — annuler ne laisse aucun orphelin.
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
   const {
     register,
     handleSubmit,
@@ -91,6 +93,7 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
       phone: nullable(values.phone),
       note: nullable(values.note),
       photoUrl: nullable(values.photoUrl),
+      photoFile: pickedFile,
     });
     onOpenChange(false);
   });
@@ -99,9 +102,14 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
     if (!file) return;
     setPhotoBusy(true);
     try {
-      const dataUrl = await compressPlacePhoto(file);
-      setValue('photoUrl', dataUrl, { shouldValidate: true });
-      setPhotoPreview(dataUrl);
+      // Aperçu local immédiat ; le dépôt bucket attend l'enregistrement.
+      // `createObjectURL` peut lever sous jsdom : l'aperçu est un confort.
+      try {
+        setPhotoPreview(URL.createObjectURL(file));
+      } catch {
+        setPhotoPreview(null);
+      }
+      setPickedFile(file);
     } catch (caught) {
       toast(caught instanceof Error ? caught.message : 'Photo illisible.', 'error');
     } finally {
@@ -148,6 +156,7 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
                 size="sm"
                 onClick={() => {
                   setValue('photoUrl', '', { shouldValidate: true });
+                  setPickedFile(null);
                   setPhotoPreview(null);
                 }}
               >

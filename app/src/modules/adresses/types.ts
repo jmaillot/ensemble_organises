@@ -62,6 +62,12 @@ export interface PlaceInput {
   phone: string | null;
   note: string | null;
   photoUrl: string | null;
+  /**
+   * Nouveau fichier à déposer au bucket à l'enregistrement (D-04) :
+   * `undefined` = photo inchangée, `File` = dépôt puis stockage du chemin,
+   * avec `photoUrl: null` = retrait sans remplacement.
+   */
+  photoFile?: File | null;
 }
 
 function toNullable(value: string | null | undefined): string | null {
@@ -138,7 +144,7 @@ export function filterPlaces(places: Place[], filters: PlaceFilters): Place[] {
   });
 }
 
-/** Regroupement géographique de la vue « carte ». */
+/** Regroupement par ville (regroupement textuel, pas de carte géographique). */
 export function groupPlacesByCity(places: Place[]): { city: string; places: Place[] }[] {
   const groups = new Map<string, Place[]>();
   for (const place of places) {

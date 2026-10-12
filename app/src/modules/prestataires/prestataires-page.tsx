@@ -225,28 +225,38 @@ export default function PrestatairesPage() {
                   <span className="flex items-start gap-2">
                     <Icon name="receipt" size="sm" className="mt-px" />
                     <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-                      {provider.attachments.map((attachment) => (
-                        <a
-                          key={attachment.id}
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-bold text-fg transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-accent-strong"
-                          aria-label={`Ouvrir ${attachment.fileName}`}
-                        >
-                          {isImageMime(attachment.mime) ? (
-                            <img
-                              src={attachment.url}
-                              alt=""
-                              className="size-5 shrink-0 rounded-[5px] border border-border object-cover"
-                            />
-                          ) : (
+                      {provider.attachments.map((attachment) =>
+                        attachment.url ? (
+                          <a
+                            key={attachment.id}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-bold text-fg transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-accent-strong"
+                            aria-label={`Ouvrir ${attachment.fileName}`}
+                          >
+                            {isImageMime(attachment.mime) ? (
+                              <img
+                                src={attachment.url}
+                                alt=""
+                                className="size-5 shrink-0 rounded-[5px] border border-border object-cover"
+                              />
+                            ) : (
+                              <Icon name="receipt" size="sm" />
+                            )}
+                            <span className="truncate">{attachment.fileName}</span>
+                            <span className="shrink-0 font-semibold text-muted">{formatBytes(attachment.size)}</span>
+                          </a>
+                        ) : (
+                          <span
+                            key={attachment.id}
+                            className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-bold text-muted"
+                          >
                             <Icon name="receipt" size="sm" />
-                          )}
-                          <span className="truncate">{attachment.fileName}</span>
-                          <span className="shrink-0 font-semibold text-muted">{formatBytes(attachment.size)}</span>
-                        </a>
-                      ))}
+                            <span className="truncate">{attachment.fileName}</span>
+                          </span>
+                        ),
+                      )}
                     </span>
                   </span>
                 ) : null}

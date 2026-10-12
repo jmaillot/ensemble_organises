@@ -148,18 +148,22 @@ export interface Provider {
 export interface ProviderAttachment {
   id: string;
   providerId: string;
-  url: string;
+  /**
+   * URL affichable forgée à la lecture (D-03), `null` en échec fermé : le DOM
+   * ne reçoit jamais un chemin brut ni un lien mort.
+   */
+  url: string | null;
   fileName: string;
   mime: string;
   size: number;
   createdAt: string;
 }
 
-export function toProviderAttachment(row: ProviderAttachmentRow): ProviderAttachment {
+export function toProviderAttachment(row: ProviderAttachmentRow, url: string | null = null): ProviderAttachment {
   return {
     id: row.id,
     providerId: row.provider_id,
-    url: row.file_url,
+    url,
     fileName: row.file_name,
     mime: row.mime_type,
     size: row.size_bytes,

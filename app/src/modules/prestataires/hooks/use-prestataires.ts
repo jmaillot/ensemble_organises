@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
@@ -7,9 +7,11 @@ import {
   createProvider,
   createProviderAttachment,
   createProviderType,
+  isAttachmentPath,
   removeProvider as removeProviderRow,
   removeProviderAttachment as removeProviderAttachmentRow,
   removeProviderType as removeProviderTypeRow,
+  resolveAttachmentUrls,
   updateProvider,
   updateProviderType,
 } from '../api';
@@ -56,6 +58,24 @@ export function usePrestataires(): UsePrestatairesResult {
   const attachmentsResource = useResource<ProviderAttachmentRow>('provider_attachments');
   const queryClient = useQueryClient();
 
+  // Les lignes portent des chemins (D-03) : on forge les URL affichables à
+  // la lecture, en échec fermé (annulation stricte, jamais d'état éventé).
+  // Les valeurs non-chemin (aperçus démo, http(s) héritées) rendent en
+  // synchrone — aucun rendu ajouté ; seuls les chemins passent par l'effet.
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const attachmentRows = attachmentsResource.rows;
+  useEffect(() => {
+    const pending = attachmentRows.filter((row) => isAttachmentPath(row.file_url));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveAttachmentUrls(pending).then((resolved) => {
+      if (!cancelled) setAttachmentUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentRows]);
+
   const types = useMemo(
     () => typesResource.rows.map(toProviderType).sort((left, right) => left.name.localeCompare(right.name, 'fr')),
     [typesResource.rows],
@@ -63,8 +83,11 @@ export function usePrestataires(): UsePrestatairesResult {
 
   const attachmentsByProvider = useMemo(() => {
     const grouped = new Map<string, ProviderAttachment[]>();
-    for (const row of attachmentsResource.rows) {
-      const attachment = toProviderAttachment(row);
+    for (const row of attachmentRows) {
+      // Non-chemin : valeur affichable telle quelle (synchrone) ; chemin :
+      // URL forgée par l'effet, `null` en attendant ou en échec fermé.
+      const url = isAttachmentPath(row.file_url) ? (attachmentUrls[row.id] ?? null) : row.file_url;
+      const attachment = toProviderAttachment(row, url);
       const list = grouped.get(attachment.providerId) ?? [];
       list.push(attachment);
       grouped.set(attachment.providerId, list);
@@ -73,7 +96,7 @@ export function usePrestataires(): UsePrestatairesResult {
       list.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     }
     return grouped;
-  }, [attachmentsResource.rows]);
+  }, [attachmentRows, attachmentUrls]);
 
   const providers = useMemo(
     () =>
