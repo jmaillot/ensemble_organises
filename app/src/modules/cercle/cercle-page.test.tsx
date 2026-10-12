@@ -392,4 +392,116 @@ describe('Cercle', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Publier' }));
     expect(await within(dialog).findByText('Le commentaire est limité à 2000 caractères.')).toBeInTheDocument();
   });
+
+  it('répond en ligne sans ouvrir la modale et garde l’historique complet', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    await user.type(within(card).getByLabelText(/Répondre à/), 'On apporte la nappe à carreaux.');
+    await user.click(within(card).getByRole('button', { name: /Envoyer la réponse/ }));
+
+    // Le commentaire apparaît en ligne, sans modale ouverte.
+    await waitFor(() => expect(within(card).getByText('On apporte la nappe à carreaux.')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Ouvrir les commentaires' })).toHaveTextContent('3 commentaires');
+    // L’historique masqué devient accessible via le lien dédié.
+    expect(within(card).getByText('Tous les commentaires (3)')).toBeInTheDocument();
+
+    // Le dialogue complet garde l’historique, inline compris.
+    await user.click(within(card).getByText('Tous les commentaires (3)'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('On apporte la nappe à carreaux.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Parfait, je prépare le sac.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Je suis partant pour 16 h.')).toBeInTheDocument();
+  });
+
+  it('ignore l’envoi inline vide sans rien changer', async () => {
+    renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    const reply = within(card).getByLabelText(/Répondre à/) as HTMLInputElement;
+    expect(reply).toHaveValue('');
+    fireEvent.submit(reply.closest('form') as HTMLFormElement);
+
+    // Rien ne part : ni modale, ni commentaire, ni compteur modifié.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Ouvrir les commentaires' })).toHaveTextContent('2 commentaires');
+    expect(within(card).queryByText(/Tous les commentaires/)).not.toBeInTheDocument();
+  });
+
+  it('montre les N derniers commentaires en ligne avec les affordances d’auteur', async () => {
+    const user = userEvent.setup();
+    const camille = demoMembers.find((member) => member.id === DEMO_MEMBERS.camille) ?? null;
+    const thomas = demoMembers.find((member) => member.id === DEMO_MEMBERS.thomas) ?? null;
+    const now = new Date().toISOString();
+    const noop = () => {};
+    const sent: { postId: string; content: string }[] = [];
+    const opened: string[] = [];
+    const inlinePost: FeedPost = {
+      id: 'post-inline',
+      authorId: DEMO_MEMBERS.thomas,
+      author: thomas,
+      text: 'Fil inline.',
+      createdAt: now,
+      createdLabel: 'À l’instant',
+      media: [],
+      comments: [
+        { id: 'c-old', postId: 'post-inline', authorId: DEMO_MEMBERS.thomas, author: thomas, content: 'Premier, masqué.', createdAt: now },
+        { id: 'c-mid', postId: 'post-inline', authorId: DEMO_MEMBERS.thomas, author: thomas, content: 'Deuxième de Thomas.', createdAt: now },
+        { id: 'c-own', postId: 'post-inline', authorId: DEMO_MEMBERS.camille, author: camille, content: 'Réponse de Camille.', createdAt: now },
+      ],
+      commentCount: 3,
+      reactionCount: 0,
+      liked: false,
+      unreadComments: 0,
+      mine: false,
+    };
+    renderWithProviders(
+      <PostCard
+        post={inlinePost}
+        active={false}
+        canDelete={false}
+        canEdit={false}
+        currentMemberId={DEMO_MEMBERS.camille}
+        isAdmin={false}
+        onSubmitComment={async (input) => {
+          sent.push(input);
+          return true;
+        }}
+        onUpdateComment={async () => true}
+        onDeleteComment={async () => {}}
+        onSelect={noop}
+        onToggleReaction={noop}
+        onOpenComments={() => {
+          opened.push(inlinePost.id);
+        }}
+        onRequestDelete={noop}
+        onSaveEdit={async () => true}
+      />,
+    );
+
+    // Seuls les 2 derniers sont visibles en ligne, l’historique passe par le lien.
+    expect(screen.queryByText('Premier, masqué.')).not.toBeInTheDocument();
+    expect(screen.getByText('Deuxième de Thomas.')).toBeInTheDocument();
+    expect(screen.getByText('Réponse de Camille.')).toBeInTheDocument();
+    expect(screen.getByText('Tous les commentaires (3)')).toBeInTheDocument();
+
+    // Affordances d’auteur intactes : Camille retouche et retire le sien, pas celui de Thomas.
+    const ownRow = screen.getByText('Réponse de Camille.').closest('li') as HTMLElement;
+    const otherRow = screen.getByText('Deuxième de Thomas.').closest('li') as HTMLElement;
+    expect(within(ownRow).getByRole('button', { name: 'Modifier ce commentaire' })).toBeInTheDocument();
+    expect(within(ownRow).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+    expect(within(otherRow).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
+    expect(within(otherRow).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
+
+    // Le lien ouvre le dialogue existant, inchangé.
+    await user.click(screen.getByText('Tous les commentaires (3)'));
+    expect(opened).toEqual(['post-inline']);
+
+    // Le compositeur inline envoie par le verbe partagé.
+    await user.type(screen.getByLabelText(/Répondre à/), 'Bien reçu !');
+    await user.click(screen.getByRole('button', { name: /Envoyer la réponse/ }));
+    await waitFor(() => expect(sent).toEqual([{ postId: 'post-inline', content: 'Bien reçu !' }]));
+  });
 });
