@@ -161,6 +161,15 @@ export default function VoyagesPage() {
                       other.id === selectedId && 'border-accent shadow-[inset_0_0_0_1px_var(--color-accent)]',
                     )}
                   >
+                    {isServableCoverUrl(other.coverPhoto) ? (
+                      <img
+                        src={other.coverPhoto}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        className="mb-3 h-24 w-full rounded-[10px] object-cover"
+                      />
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => setSelectedId(other.id)}
