@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
-import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 import type { PostCommentRow } from '@/types';
 import CerclePage from './cercle-page';
+import { PostCard } from './components/post-card';
+import { CommentsDialog } from './components/comments-dialog';
+import type { FeedPost } from './types';
 
 describe('Cercle', () => {
   it('publie un moment depuis le composeur et l’ajoute en tête du fil', async () => {
@@ -132,5 +135,261 @@ describe('Cercle', () => {
     expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
     // Les deux publications d’origine survivent : la suppression ne déborde pas.
     expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(2);
+  });
+
+  it('modifie sa propre publication en ligne et l’annonce', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    expect(await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Votre commentaire/), 'Moment à retoucher.');
+    await user.click(screen.getByRole('button', { name: 'Publier' }));
+    const card = (await screen.findByText('Moment à retoucher.')).closest('article') as HTMLElement;
+
+    // L’auteur seul voit « Modifier » ; l’éditeur est pré-rempli.
+    await user.click(within(card).getByRole('button', { name: /Modifier la publication de Camille Martin/ }));
+    const editor = within(card).getByLabelText('Modifier votre publication');
+    expect(editor).toHaveValue('Moment à retoucher.');
+    await user.clear(editor);
+    await user.type(editor, 'Moment retouché par son auteur.');
+    await user.click(within(card).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() =>
+      expect(within(card).getByText('Moment retouché par son auteur.')).toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Publication modifiée.')).toBeInTheDocument();
+  });
+
+  it('annule l’édition d’une publication sans rien changer', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    expect(await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Votre commentaire/), 'Moment à garder tel quel.');
+    await user.click(screen.getByRole('button', { name: 'Publier' }));
+    const card = (await screen.findByText('Moment à garder tel quel.')).closest('article') as HTMLElement;
+
+    await user.click(within(card).getByRole('button', { name: /Modifier la publication de Camille Martin/ }));
+    const editor = within(card).getByLabelText('Modifier votre publication');
+    await user.type(editor, ' (brouillon abandonné)');
+    await user.click(within(card).getByRole('button', { name: 'Annuler' }));
+
+    // L’éditeur se referme, le texte d’origine est intact, rien n’est annoncé.
+    await waitFor(() =>
+      expect(within(card).queryByLabelText('Modifier votre publication')).not.toBeInTheDocument(),
+    );
+    expect(within(card).getByText('Moment à garder tel quel.')).toBeInTheDocument();
+    expect(screen.queryByText('Publication modifiée.')).not.toBeInTheDocument();
+  });
+
+  it('modifie son propre commentaire en ligne et l’annonce', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Ouvrir les commentaires' }));
+    const dialog = await screen.findByRole('dialog');
+
+    // Son propre commentaire (Camille) porte l’édition inline.
+    const row = within(dialog).getByText('Parfait, je prépare le sac.').closest('li') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: 'Modifier ce commentaire' }));
+    const editor = within(row).getByLabelText('Modifier votre commentaire');
+    expect(editor).toHaveValue('Parfait, je prépare le sac.');
+    await user.clear(editor);
+    await user.type(editor, 'Parfait, je prépare deux sacs.');
+    await user.click(within(row).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() =>
+      expect(within(dialog).getByText('Parfait, je prépare deux sacs.')).toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Commentaire modifié.')).toBeInTheDocument();
+  });
+
+  it('supprime son propre commentaire après confirmation et l’annonce', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Ouvrir les commentaires' }));
+    const dialog = await screen.findByRole('dialog');
+
+    const row = within(dialog).getByText('Parfait, je prépare le sac.').closest('li') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: 'Supprimer ce commentaire' }));
+    const confirm = await screen.findByRole('alertdialog');
+    expect(within(confirm).getByText('Supprimer ce commentaire ?')).toBeInTheDocument();
+    await user.click(within(confirm).getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() =>
+      expect(within(dialog).queryByText('Parfait, je prépare le sac.')).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Commentaire supprimé.')).toBeInTheDocument();
+    // Le commentaire de Thomas survit : la suppression ne déborde pas.
+    expect(within(dialog).getByText('Je suis partant pour 16 h.')).toBeInTheDocument();
+  });
+
+  it('l’admin supprime la publication d’autrui après confirmation', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<CerclePage />);
+
+    // post-1 appartient à Lina ; Camille, admin de démonstration, peut la modérer.
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    expect(within(card).queryByRole('button', { name: /Modifier la publication/ })).not.toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: /Supprimer la publication/ }));
+    const confirm = await screen.findByRole('alertdialog');
+    expect(within(confirm).getByText('Supprimer cette publication ?')).toBeInTheDocument();
+    await user.click(within(confirm).getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Le soleil est enfin revenu/)).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(1);
+  });
+
+  it('n’offre aucune affordance d’écriture sur le contenu d’autrui (non-admin)', () => {
+    const thomas = demoMembers.find((member) => member.id === DEMO_MEMBERS.thomas) ?? null;
+    const camille = demoMembers.find((member) => member.id === DEMO_MEMBERS.camille) ?? null;
+    const now = new Date().toISOString();
+    const foreignPost: FeedPost = {
+      id: 'post-x',
+      authorId: DEMO_MEMBERS.thomas,
+      author: thomas,
+      text: 'Contenu d’autrui.',
+      createdAt: now,
+      createdLabel: 'À l’instant',
+      media: [],
+      comments: [
+        { id: 'c-1', postId: 'post-x', authorId: DEMO_MEMBERS.thomas, author: thomas, content: 'À moi.', createdAt: now },
+        { id: 'c-2', postId: 'post-x', authorId: DEMO_MEMBERS.camille, author: camille, content: 'À Camille.', createdAt: now },
+      ],
+      commentCount: 2,
+      reactionCount: 0,
+      liked: false,
+      unreadComments: 0,
+      mine: false,
+    };
+    const noop = () => {};
+
+    // Carte : ni Modifier ni Supprimer sur le post d’autrui…
+    renderWithProviders(
+      <PostCard
+        post={foreignPost}
+        active={false}
+        canDelete={false}
+        canEdit={false}
+        onSelect={noop}
+        onToggleReaction={noop}
+        onOpenComments={noop}
+        onRequestDelete={noop}
+        onSaveEdit={async () => true}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Modifier la publication/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Supprimer la publication/ })).not.toBeInTheDocument();
+    // …mais la réaction et les commentaires restent offerts.
+    expect(screen.getByRole('button', { name: 'Réagir à cette publication' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ouvrir les commentaires' })).toBeInTheDocument();
+
+    // Fil : Thomas non-admin retouche et retire le sien, ne touche pas à celui de Camille.
+    renderWithProviders(
+      <CommentsDialog
+        post={foreignPost}
+        open
+        currentMemberId={DEMO_MEMBERS.thomas}
+        isAdmin={false}
+        onOpenChange={noop}
+        onSubmit={async () => true}
+        onUpdateComment={async () => true}
+        onDeleteComment={async () => {}}
+      />,
+    );
+    const dialog = screen.getByRole('dialog');
+    const ownRow = within(dialog).getByText('À moi.').closest('li') as HTMLElement;
+    const otherRow = within(dialog).getByText('À Camille.').closest('li') as HTMLElement;
+    expect(within(ownRow).getByRole('button', { name: 'Modifier ce commentaire' })).toBeInTheDocument();
+    expect(within(ownRow).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+    expect(within(otherRow).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
+    expect(within(otherRow).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
+  });
+
+  it('l’admin supprime mais ne retouche pas le commentaire d’autrui', () => {
+    const thomas = demoMembers.find((member) => member.id === DEMO_MEMBERS.thomas) ?? null;
+    const camille = demoMembers.find((member) => member.id === DEMO_MEMBERS.camille) ?? null;
+    const now = new Date().toISOString();
+    const noop = () => {};
+    renderWithProviders(
+      <CommentsDialog
+        post={{
+          id: 'post-y',
+          authorId: DEMO_MEMBERS.thomas,
+          author: thomas,
+          text: 'Fil modéré.',
+          createdAt: now,
+          createdLabel: 'À l’instant',
+          media: [],
+          comments: [
+            { id: 'c-9', postId: 'post-y', authorId: DEMO_MEMBERS.camille, author: camille, content: 'À modérer.', createdAt: now },
+          ],
+          commentCount: 1,
+          reactionCount: 0,
+          liked: false,
+          unreadComments: 0,
+          mine: false,
+        }}
+        open
+        currentMemberId={DEMO_MEMBERS.thomas}
+        isAdmin
+        onOpenChange={noop}
+        onSubmit={async () => true}
+        onUpdateComment={async () => true}
+        onDeleteComment={async () => {}}
+      />,
+    );
+    const row = within(screen.getByRole('dialog')).getByText('À modérer.').closest('li') as HTMLElement;
+    expect(within(row).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+  });
+
+  it('publie un texte long sous le plafond base et refuse au-delà', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<CerclePage />);
+
+    expect(await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).toBeInTheDocument();
+
+    // 800 caractères : au-delà de l’ancien 600, dans le CHECK base (4000).
+    const withinDb = `a`.repeat(800);
+    fireEvent.change(screen.getByLabelText(/Votre commentaire/), { target: { value: withinDb } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publier' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Publier' }));
+    await screen.findByText(withinDb);
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
+
+    // 4001 caractères : la validation client reflète le CHECK et rien ne part.
+    fireEvent.change(screen.getByLabelText(/Votre commentaire/), { target: { value: `b`.repeat(4001) } });
+    await user.click(screen.getByRole('button', { name: 'Publier' }));
+    expect(await screen.findByText('Le message est limité à 4000 caractères.')).toBeInTheDocument();
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
+  });
+
+  it('publie un commentaire long sous le plafond base et refuse au-delà', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Ouvrir les commentaires' }));
+    const dialog = await screen.findByRole('dialog');
+
+    // 600 caractères : au-delà de l’ancien 400, dans le CHECK base (2000).
+    const withinDb = `c`.repeat(600);
+    fireEvent.change(within(dialog).getByLabelText(/Répondre au foyer/), { target: { value: withinDb } });
+    await user.click(within(dialog).getByRole('button', { name: 'Publier' }));
+    await waitFor(() => expect(within(dialog).getByText(withinDb)).toBeInTheDocument());
+
+    // 2001 caractères : la validation client reflète le CHECK et rien ne part.
+    fireEvent.change(within(dialog).getByLabelText(/Répondre au foyer/), { target: { value: `d`.repeat(2001) } });
+    await user.click(within(dialog).getByRole('button', { name: 'Publier' }));
+    expect(await within(dialog).findByText('Le commentaire est limité à 2000 caractères.')).toBeInTheDocument();
   });
 });
