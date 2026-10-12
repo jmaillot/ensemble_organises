@@ -189,7 +189,7 @@ export default function PrivacyPage() {
           </h2>
           <p className="m-0">
             L’application utilise uniquement des mécanismes strictement nécessaires : session de connexion et stockage
-            local du navigateur pour le fonctionnement hors ligne (cache, données synchronisées). Ils ne nécessitent
+            local du navigateur (cache de l’application installable, jeu de démonstration local). Ils ne nécessitent
             pas votre consentement et ne servent à aucun suivi.
           </p>
         </section>

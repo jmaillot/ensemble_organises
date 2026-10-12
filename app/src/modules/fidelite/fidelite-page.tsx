@@ -105,7 +105,11 @@ export default function FidelitePage() {
           { label: 'Cartes', value: total, caption: 'fidélités sauvegardées' },
           { label: 'Code-barres', value: barcodes, caption: 'scannables' },
           { label: 'QR Codes', value: qrCodes, caption: 'prêts à scanner' },
-          { label: 'Synchronisation', value: 'Auto', caption: 'sur cet appareil' },
+          {
+            label: 'Enseignes',
+            value: new Set(cards.map((card) => card.category).filter((category) => category !== null)).size,
+            caption: 'catégories distinctes',
+          },
         ]}
       />
 

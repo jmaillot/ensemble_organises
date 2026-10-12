@@ -39,7 +39,7 @@ export default function PrestatairesPage() {
       { label: 'Prestataires', value: providers.length, caption: 'contacts enregistrés' },
       { label: 'Types', value: types.length, caption: 'types personnalisés' },
       { label: 'Cette semaine', value: providers.filter(isCallable).length, caption: 'appels à passer' },
-      { label: 'Partagés', value: providers.filter(isShared).length, caption: 'e-mail renseigné' },
+      { label: 'Joignables', value: providers.filter(isShared).length, caption: 'e-mail renseigné' },
     ],
     [providers, types],
   );

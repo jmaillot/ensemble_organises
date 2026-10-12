@@ -84,7 +84,7 @@ export class LazyRoute extends Component<{ load: RouteChunkLoader }, LazyRouteSt
       return (
         <div className="mx-auto w-full max-w-[1480px] px-[38px] py-9 max-[650px]:px-[15px]">
           <ErrorState
-            message="La page n'a pas pu se charger — tu es peut-être hors ligne et cette page n'a pas encore été mise en cache. Reconnecte-toi puis réessaie : la page se rechargera aussi toute seule au retour du réseau."
+            message="La page n’a pas pu se charger — vérifiez votre connexion puis réessayez : la page se rechargera aussi toute seule au retour du réseau."
             onRetry={this.retry}
           />
         </div>

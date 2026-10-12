@@ -51,7 +51,7 @@ export default function AdressesPage() {
   } = useAdresses();
   const toast = useToast();
 
-  const [view, setView] = useState<'grid' | 'map'>('grid');
+  const [view, setView] = useState<'grid' | 'villes'>('grid');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Place | null>(null);
@@ -114,11 +114,11 @@ export default function AdressesPage() {
         <>
           <Button
             variant="secondary"
-            icon={view === 'grid' ? 'map' : 'grid'}
-            aria-pressed={view === 'map'}
-            onClick={() => setView(view === 'grid' ? 'map' : 'grid')}
+            icon={view === 'grid' ? 'pin' : 'grid'}
+            aria-pressed={view === 'villes'}
+            onClick={() => setView(view === 'grid' ? 'villes' : 'grid')}
           >
-            {view === 'grid' ? 'Vue carte' : 'Vue grille'}
+            {view === 'grid' ? 'Vue par ville' : 'Vue grille'}
           </Button>
           <Button icon="plus" onClick={openCreate}>
             Ajouter une adresse
@@ -213,8 +213,8 @@ export default function AdressesPage() {
           actionLabel="Réinitialiser les filtres"
           onAction={resetFilters}
         />
-      ) : view === 'map' ? (
-        <MapView groups={cityGroups} onSelect={openEdit} />
+      ) : view === 'villes' ? (
+        <CityGroupsView groups={cityGroups} onSelect={openEdit} />
       ) : (
         <div className="grid grid-cols-2 gap-3.5 max-[650px]:grid-cols-1" aria-busy={isFetching}>
           {visiblePlaces.map((place) => (
@@ -326,9 +326,10 @@ function PlaceCard({ place, onEdit, onDelete, onToggleVisited }: PlaceCardProps)
   );
 }
 
-function MapView({ groups, onSelect }: { groups: { city: string; places: Place[] }[]; onSelect: (place: Place) => void }) {
+/** Regroupement des lieux par ville : liste textuelle, pas de carte géographique. */
+function CityGroupsView({ groups, onSelect }: { groups: { city: string; places: Place[] }[]; onSelect: (place: Place) => void }) {
   return (
-    <div className="grid gap-3.5" data-view="map">
+    <div className="grid gap-3.5" data-view="villes">
       {groups.map((group) => (
         <section key={group.city} className="rounded-[16px] border border-border bg-accent-faint p-4">
           <div className="mb-3 flex items-center gap-2">

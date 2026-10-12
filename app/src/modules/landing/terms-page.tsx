@@ -131,9 +131,8 @@ export default function TermsPage() {
           </h2>
           <p className="m-0">
             Le service est fourni <strong>« en l’état »</strong>, sans garantie de disponibilité continue
-            (maintenance, mises à jour, pannes). L’application fonctionne partiellement hors ligne (PWA), avec
-            synchronisation différée au retour de la connexion : des conflits de synchronisation peuvent survenir,
-            auquel cas la version la plus récente prévaut.
+            (maintenance, mises à jour, pannes). L’application lit et écrit directement sur le serveur : une
+            connexion est nécessaire, et toute erreur réseau ou serveur s’affiche telle quelle.
           </p>
         </section>
 

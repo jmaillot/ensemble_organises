@@ -10,7 +10,7 @@ const highlights: { icon: IconName; title: string; text: string }[] = [
   { icon: 'checkCircle', title: 'Priorités partagées', text: 'Chacun voit ce qui le concerne, avec son code couleur et ses rappels.' },
   { icon: 'wallet', title: 'Ardoise transparente', text: 'Le partage est calculé automatiquement, chacun sait ce qu’il doit à qui.' },
   { icon: 'people', title: 'Un seul fil', text: 'Tâches, courses, anniversaires et souvenirs reunited au même endroit.' },
-  { icon: 'wifi', title: 'Utilisable hors ligne', text: 'L’application reste consultable et les saisies repartent à la reconnexion.' },
+  { icon: 'wifi', title: 'En ligne d’abord', text: 'Chaque lecture et chaque écriture part directement sur le serveur du foyer.' },
 ];
 
 export default function LandingPage() {
@@ -160,8 +160,8 @@ export default function LandingPage() {
                 a: 'Uniquement les membres du foyer concerné. Chaque table est protégée par des politiques de sécurité au niveau des lignes, et les opérations sensibles (rôles, rappels, tokens) passent par des fonctions serveur.',
               },
               {
-                q: 'Est-ce que ça marche sans réseau ?',
-                a: 'Oui. Les données consultées sont mises en cache localement, et les saisies en attente sont rejouées à la reconnexion.',
+                q: 'Faut-il une connexion pour utiliser l’application ?',
+                a: 'Oui. L’application lit et écrit directement sur le serveur de votre foyer : sans connexion, impossible de charger une page ou d’enregistrer quoi que ce soit.',
               },
             ].map((item, index) => {
               const open = openFaq === index;
@@ -208,7 +208,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-5 py-6 text-[11px] text-muted max-[650px]:px-[15px]">
           <span>Ensemble &amp; Organisés — l’espace familial pour tout garder en mouvement.</span>
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>Application web installable, utilisable hors ligne.</span>
+            <span>Application web installable, utilisable en ligne.</span>
             <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
               Conditions d’utilisation
             </Link>

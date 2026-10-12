@@ -202,7 +202,7 @@ export function toProvider(row: ProviderRow, types: ProviderType[], attachments:
   };
 }
 
-/** Un contact est partageable dès qu'un e-mail est renseigné. */
+/** Un contact est joignable par e-mail dès qu'une adresse est renseignée (pas un partage). */
 export const isShared = (provider: Provider) => Boolean(provider.email);
 
 /** Un appel direct n'a de sens que si un numéro est disponible. */

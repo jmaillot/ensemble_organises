@@ -74,8 +74,8 @@ export default function SignInPage() {
             Reprenez le fil de votre foyer, où que vous soyez.
           </h1>
           <p className="m-0 max-w-[420px] text-[13px] text-on-dark">
-            Vos tâches, vos courses, vos anniversaires et votre ardoise restent accessibles hors ligne, et les
-            modifications se propagent dès le retour du réseau.
+            Vos tâches, vos courses, vos anniversaires et votre ardoise vivent sur le serveur de votre foyer :
+            connectez-vous en ligne pour les retrouver, où que vous soyez.
           </p>
         </div>
         <p className="m-0 text-[11px] text-on-dark">Données hébergées sur votre propre instance Supabase.</p>
