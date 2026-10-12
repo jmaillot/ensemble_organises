@@ -34,6 +34,8 @@ export interface VoyagesState {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
+  /** Échec de la lecture des tâches du foyer : la carte reste honnête au lieu de masquer le compteur. */
+  tasksError: Error | null;
   refetch: () => void;
   isMutating: boolean;
   save: (input: TripInput, id?: string | null) => Promise<boolean>;
@@ -172,6 +174,7 @@ export function useVoyages(): VoyagesState {
     isLoading: tripsQuery.isLoading,
     isError: tripsQuery.isError,
     error: (tripsQuery.error as Error | null) ?? null,
+    tasksError: (tasksQuery.error as Error | null) ?? null,
     refetch: () => void tripsQuery.refetch(),
     isMutating: createMutation.isPending || updateMutation.isPending || removeMutation.isPending,
     save,

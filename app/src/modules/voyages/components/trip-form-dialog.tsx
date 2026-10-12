@@ -2,22 +2,12 @@ import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { addDays, todayIso } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
-import {
-  DEFAULT_TRIP_COVER,
-  EMPTY_TRIP_INPUT,
-  TRIP_COVER_PRESETS,
-  TRIP_STATUSES,
-  TRIP_STATUS_LABELS,
-  type Trip,
-  type TripInput,
-  type TripStatus,
-} from '../types';
+import { DEFAULT_TRIP_COVER, EMPTY_TRIP_INPUT, TRIP_COVER_PRESETS, type Trip, type TripInput } from '../types';
 
 const schema = z
   .object({
@@ -27,7 +17,6 @@ const schema = z
     endDate: z.string().min(1, 'Indiquez la date de retour.'),
     coverPhoto: z.string().trim().min(1, 'Choisissez une photo de couverture.'),
     notes: z.string().trim().max(600, 'Les notes sont limitées à 600 caractères.'),
-    status: z.enum(TRIP_STATUSES),
   })
   .refine((values) => values.endDate >= values.startDate, {
     message: 'La date de retour doit suivre la date de départ.',
@@ -35,18 +24,6 @@ const schema = z
   });
 
 type FormValues = z.infer<typeof schema>;
-
-/**
- * `trips` ne stocke pas de statut : chaque statut propose une période cohérente
- * (fenêtre de dates) que l'on applique quand les dates ne sont pas encore
- * saisies. Le héros, lui, affiche toujours le statut dérivé des dates.
- */
-const statusWindows: Record<TripStatus, { start: string; end: string } | null> = {
-  a_preparer: { start: '', end: '' },
-  confirme: { start: addDays(todayIso(), 30), end: addDays(todayIso(), 36) },
-  en_cours: { start: addDays(todayIso(), -2), end: addDays(todayIso(), 4) },
-  termine: { start: addDays(todayIso(), -30), end: addDays(todayIso(), -24) },
-};
 
 export interface TripFormDialogProps {
   open: boolean;
@@ -69,9 +46,8 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
             endDate: trip.endDate,
             coverPhoto: trip.coverPhoto,
             notes: trip.notes,
-            status: trip.status,
           }
-        : { ...EMPTY_TRIP_INPUT, coverPhoto: DEFAULT_TRIP_COVER, status: 'a_preparer' as TripStatus },
+        : { ...EMPTY_TRIP_INPUT, coverPhoto: DEFAULT_TRIP_COVER },
     [trip],
   );
 
@@ -80,7 +56,6 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
     handleSubmit,
     reset,
     setValue,
-    getValues,
     watch,
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults, mode: 'onSubmit' });
@@ -89,17 +64,6 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
   useEffect(() => {
     if (open) reset(defaults);
   }, [open, defaults, reset]);
-
-  const onSelectStatus = (status: TripStatus) => {
-    const window = statusWindows[status];
-    setValue('status', status, { shouldDirty: true });
-    const { startDate, endDate } = getValues();
-    // Une période n'est proposée que si le voyage n'a pas encore de dates.
-    if (window && (!startDate || !endDate)) {
-      if (window.start) setValue('startDate', window.start, { shouldDirty: true, shouldValidate: true });
-      if (window.end) setValue('endDate', window.end, { shouldDirty: true, shouldValidate: true });
-    }
-  };
 
   const onSubmitForm = handleSubmit(async (values) => {
     const saved = await onSubmit(
@@ -146,22 +110,6 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
               {(props) => <Input {...props} type="date" {...register('endDate')} />}
             </Field>
           </div>
-
-          <Field
-            label="Statut"
-            hint="Le statut suit les dates : sans dates, le voyage reste « à préparer »."
-            error={errors.status?.message}
-          >
-            {(props) => (
-              <Select {...props} {...register('status')} onChange={(event) => onSelectStatus(event.target.value as TripStatus)}>
-                {TRIP_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {TRIP_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
 
           <Field
             label="Photo de couverture"

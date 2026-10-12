@@ -6,14 +6,41 @@ import { Badge, Progress } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { useIsAdmin } from '@/stores/household-store';
 import { useVoyages } from './hooks/use-voyages';
 import { TripFormDialog } from './components/trip-form-dialog';
-import { DEFAULT_TRIP_COVER, memberStack, type Trip } from './types';
+import { memberStack, type Trip } from './types';
 
 const MAX_STACK = 3;
 
+/**
+ * Garde de rendu de la couverture (D-06) : seules les URL http(s) et les
+ * chemins racine du site atteignent le héros. Toute autre forme (schéma
+ * exotique, donnée corrompue) ne rend aucune image : échec fermé côté
+ * client, jamais d'erreur. Les chemins racine restent admis car les
+ * couvertures de l'export et le repli `DEFAULT_TRIP_COVER` sont des actifs
+ * premier parti (`/assets/…`), pas des URL arbitraires.
+ */
+export function isServableCoverUrl(value: string | null | undefined): value is string {
+  return typeof value === 'string' && (/^https?:\/\//i.test(value) || value.startsWith('/'));
+}
+
 export default function VoyagesPage() {
-  const { trips, featuredTrip, prep, members, isLoading, isError, error, refetch, isMutating, save, remove } = useVoyages();
+  const {
+    trips,
+    featuredTrip,
+    prep,
+    members,
+    isLoading,
+    isError,
+    error,
+    tasksError,
+    refetch,
+    isMutating,
+    save,
+    remove,
+  } = useVoyages();
+  const isAdmin = useIsAdmin();
   const stack = memberStack(members, MAX_STACK);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -64,7 +91,7 @@ export default function VoyagesPage() {
         <>
           <section
             className="relative mb-[18px] min-h-[350px] overflow-hidden rounded-[22px] bg-cover bg-center max-[650px]:min-h-[280px]"
-            style={{ backgroundImage: `url(${trip.coverPhoto || DEFAULT_TRIP_COVER})` }}
+            style={isServableCoverUrl(trip.coverPhoto) ? { backgroundImage: `url(${trip.coverPhoto})` } : undefined}
             aria-label={`Voyage vers ${trip.destination}`}
           >
             <div className="trip-overlay absolute inset-0" aria-hidden="true" />
@@ -83,8 +110,13 @@ export default function VoyagesPage() {
           <div className="mb-[18px] grid grid-cols-3 gap-3.5 max-[650px]:grid-cols-1">
             <div className="rounded-[16px] border border-border bg-surface p-[17px]">
               <strong className="block font-display text-[25px] tracking-[-0.05em]">{prep.openTasks}</strong>
-              <span className="text-[11px] text-muted">éléments à préparer</span>
+              <span className="text-[11px] text-muted">tâches du foyer à préparer</span>
               <Progress value={prep.progress} label="Avancement des tâches du foyer" />
+              {tasksError ? (
+                <p className="mt-2 mb-0 text-[11px] text-muted" role="status">
+                  Les tâches du foyer n’ont pas pu être chargées : le compteur est incomplet.
+                </p>
+              ) : null}
             </div>
             <div className="rounded-[16px] border border-border bg-surface p-[17px]">
               <strong className="block font-display text-[25px] tracking-[-0.05em]">{trip.days}</strong>
@@ -93,7 +125,7 @@ export default function VoyagesPage() {
             </div>
             <div className="rounded-[16px] border border-border bg-surface p-[17px]">
               <strong className="block font-display text-[25px] tracking-[-0.05em]">{members.length}</strong>
-              <span className="text-[11px] text-muted">membres invités</span>
+              <span className="text-[11px] text-muted">membres du foyer</span>
               <div className="mt-[13px] flex items-center">
                 {stack.shown.map((member) => (
                   <MemberAvatar key={member.id} member={member} size="sm" className="-ml-[7px] border-2 border-surface first:ml-0" />
@@ -140,15 +172,17 @@ export default function VoyagesPage() {
                         <Button variant="secondary" size="sm" icon="edit" onClick={() => openEdit(other)}>
                           Modifier
                         </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          icon="trash"
-                          onClick={() => setPendingDelete(other)}
-                          aria-label={`Supprimer le voyage vers ${other.destination}`}
-                        >
-                          <span className="sr-only">Supprimer</span>
-                        </Button>
+                        {isAdmin ? (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon="trash"
+                            onClick={() => setPendingDelete(other)}
+                            aria-label={`Supprimer le voyage vers ${other.destination}`}
+                          >
+                            <span className="sr-only">Supprimer</span>
+                          </Button>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -161,9 +195,11 @@ export default function VoyagesPage() {
             <Button variant="secondary" icon="edit" onClick={() => openEdit(trip)}>
               Modifier ce voyage
             </Button>
-            <Button variant="danger" icon="trash" onClick={() => setPendingDelete(trip)}>
-              Supprimer ce voyage
-            </Button>
+            {isAdmin ? (
+              <Button variant="danger" icon="trash" onClick={() => setPendingDelete(trip)}>
+                Supprimer ce voyage
+              </Button>
+            ) : null}
           </div>
         </>
       )}
