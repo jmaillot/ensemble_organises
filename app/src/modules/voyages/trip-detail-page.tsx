@@ -15,6 +15,7 @@ import { TripTasksTab } from './components/trip-tasks-tab';
 import { TripCoursesTab } from './components/trip-courses-tab';
 import { TripNotesTab } from './components/trip-notes-tab';
 import { TripPlacesTab } from './components/trip-places-tab';
+import { TripBudgetTab } from './components/trip-budget-tab';
 import { isServableCoverUrl } from './voyages-page';
 import {
   closeTrip,
@@ -148,6 +149,8 @@ export default function TripDetailPage() {
               <TripNotesMount detail={detail} />
             ) : activeTab === 'adresses' ? (
               <TripPlacesMount detail={detail} />
+            ) : activeTab === 'budget' ? (
+              <TripBudgetMount detail={detail} />
             ) : (
               <TripTabPlaceholder
                 label={visible.find((tab) => tab.key === activeTab)?.label ?? ''}
@@ -558,6 +561,30 @@ function TripNotesMount({ detail }: { detail: TripDetailState }) {
 
 function TripPlacesMount({ detail }: { detail: TripDetailState }) {
   return <TripForkMount detail={detail} kind="adresses" />;
+}
+
+/**
+ * Montage de l'onglet Budget (15-03) : enveloppe fine sur l'ardoise liée —
+ * participants et invités du voyage pour les dépenses, lecture seule si
+ * figé ou modération.
+ */
+function TripBudgetMount({ detail }: { detail: TripDetailState }) {
+  return <TripBudgetForkMount detail={detail} />;
+}
+
+function TripBudgetForkMount({ detail }: { detail: TripDetailState }) {
+  const mount = useTripForkMount(detail);
+  if (!mount) return null;
+  return (
+    <TripBudgetTab
+      tripId={mount.tripId}
+      householdId={mount.householdId}
+      members={detail.participantMembers}
+      guests={detail.guests}
+      currentMemberId={mount.currentMemberId}
+      readOnly={mount.readOnly}
+    />
+  );
 }
 
 function TripForkMount({ detail, kind }: { detail: TripDetailState; kind: 'courses' | 'notes' | 'adresses' }) {

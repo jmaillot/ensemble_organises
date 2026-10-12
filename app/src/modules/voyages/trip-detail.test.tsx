@@ -50,7 +50,8 @@ describe('TripDetailPage — fiche avec barre d’onglets (tracer 15-02)', () =>
     await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
     await user.click(within(tablist()).getByRole('tab', { name: 'Budget' }));
 
-    expect(await screen.findByText('Budget : bientôt relié au voyage')).toBeInTheDocument();
+    // 15-03 : l'onglet Budget montre l'ardoise liée, plus le placeholder.
+    expect(await screen.findByText('Vols aller-retour')).toBeInTheDocument();
     expect(within(tablist()).getByRole('tab', { name: 'Budget' })).toHaveAttribute('aria-selected', 'true');
   });
 

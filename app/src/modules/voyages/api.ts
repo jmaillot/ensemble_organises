@@ -817,3 +817,100 @@ export async function createTripPlace(args: CreateTripPlaceArgs): Promise<PlaceR
     trip_id: args.tripId,
   } as Partial<PlaceRow>);
 }
+
+/* ------------------------------------------------------------------ */
+/* Onglet Budget (tâche 3) : enveloppe fine sur l'ardoise liée          */
+/*                                                                     */
+/* Aucune logique de règlement forkée (D-09) : l'ardoise est résolue   */
+/* strictement par `ardoises.trip_id = voyage courant` (T-15-13), le    */
+/* détail et la répartition viennent du hook et des panneaux existants */
+/* (`useArdoiseDetail`, `fetchArdoiseSettlement` tels quels). Les       */
+/* dépenses membres suivent les chemins membres ; les dépenses invités  */
+/* passent par l'action Edge `guest-expense-create` sous ticket vérifié */
+/* (jamais PostgREST — D-04).                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Résolution stricte de l'ardoise liée (T-15-13) : `trip_id` ET foyer
+ * doivent correspondre — une ardoise d'un autre voyage (même du même
+ * foyer) ne résout jamais.
+ */
+export function resolveTripArdoiseId(
+  rows: { id: string; trip_id: string | null; household_id: string }[],
+  tripId: string,
+  householdId: string,
+): string | null {
+  return rows.find((row) => row.trip_id === tripId && row.household_id === householdId)?.id ?? null;
+}
+
+/** Ardoise liée au voyage (`null` honnête si absente — jamais un onglet vide). */
+export async function fetchTripArdoise(tripId: string, householdId: string) {
+  const rows = await data.list<{ id: string; trip_id: string | null; household_id: string }>('ardoises', {
+    trip_id: tripId,
+  });
+  const id = resolveTripArdoiseId(rows, tripId, householdId);
+  if (!id) return null;
+  return (rows.find((row) => row.id === id) ?? null) as import('@/types').ArdoiseRow | null;
+}
+
+export interface TripGuestExpensePart {
+  participantType: 'membre' | 'guest';
+  /** Membre inscrit à l'ardoise (parts `membre`). */
+  memberId?: string;
+  /** Invité du voyage, id miroir (parts `guest`, dual 0064). */
+  guestId?: string;
+  shareAmount: number;
+}
+
+export interface TripGuestExpenseArgs {
+  /** Ticket brut `eo:trip:ticket:<tripId>` : seule credence, au corps. */
+  ticket: string;
+  title: string;
+  amount: number;
+  expenseDate?: string;
+  /** Parts membres et/ou invités (dual member/guest, D-03). */
+  parts: TripGuestExpensePart[];
+}
+
+/**
+ * Corps de l'action `guest-expense-create` : validé ici (montant, libellé,
+ * au moins une part, chaque part qualifiée), vérifié en base par le RPC
+ * (`create_trip_guest_expense`, ticket haché, voyage non figé).
+ */
+export function toTripGuestExpenseBody(args: TripGuestExpenseArgs): Record<string, unknown> {
+  const ticket = args.ticket.trim();
+  if (!ticket) throw new Error('Ticket invalide.');
+  const title = args.title.trim();
+  if (title.length === 0 || title.length > 200) throw new Error('Nommez la dépense (1 à 200 caractères).');
+  const amount = Math.round(args.amount * 100) / 100;
+  if (!(amount > 0)) throw new Error('Le montant doit être supérieur à zéro.');
+  if (args.parts.length === 0) throw new Error('Choisissez au moins une personne qui partage la dépense.');
+  const parts = args.parts.map((part) => {
+    if (part.participantType === 'membre' && !part.memberId) throw new Error('Participant invalide.');
+    if (part.participantType === 'guest' && !part.guestId) throw new Error('Participant invalide.');
+    const shareAmount = Math.round(part.shareAmount * 100) / 100;
+    if (!(shareAmount > 0)) throw new Error('Part invalide.');
+    return {
+      participantType: part.participantType,
+      ...(part.participantType === 'membre' ? { memberId: part.memberId } : { guestId: part.guestId }),
+      shareAmount,
+    };
+  });
+  return {
+    ticket,
+    title,
+    amount,
+    ...(args.expenseDate ? { expenseDate: args.expenseDate } : {}),
+    splitType: 'egal',
+    parts,
+  };
+}
+
+/**
+ * Dépense d'invité (D-04) : via l'Edge `trip-invite` sous ticket, jamais en
+ * PostgREST direct. Le payeur est l'invité porteur du ticket (résolu en
+ * base) ; les parts portent les ids miroirs membres/invités.
+ */
+export async function createTripGuestExpense(args: TripGuestExpenseArgs): Promise<unknown> {
+  return callTripInvitePublishable('guest-expense-create', toTripGuestExpenseBody(args));
+}
