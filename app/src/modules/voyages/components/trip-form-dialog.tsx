@@ -69,20 +69,25 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
   }, [open, defaults, reset]);
 
   // Aperçu local du fichier choisi (motif idées cadeaux) : le dépôt réel a
-  // lieu à l'enregistrement, jamais à la sélection. La garde jsdom n'expose
-  // pas `createObjectURL` — sans elle les tests planteraient ici.
+  // lieu à l'enregistrement, jamais à la sélection. L'aperçu reste un
+  // confort : si le navigateur (ou jsdom) refuse de le forger, on continue
+  // sans — l'enregistrement n'en dépend pas.
   useEffect(() => {
     if (!coverFile) {
       setCoverPreview(null);
       return;
     }
-    if (typeof URL.createObjectURL !== 'function') {
+    try {
+      if (typeof URL.createObjectURL !== 'function') {
+        setCoverPreview(null);
+        return;
+      }
+      const url = URL.createObjectURL(coverFile);
+      setCoverPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } catch {
       setCoverPreview(null);
-      return;
     }
-    const url = URL.createObjectURL(coverFile);
-    setCoverPreview(url);
-    return () => URL.revokeObjectURL(url);
   }, [coverFile]);
 
   const onSubmitForm = handleSubmit(async (values) => {
