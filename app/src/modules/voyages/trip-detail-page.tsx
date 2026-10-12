@@ -12,6 +12,9 @@ import { useTripDetail, type TripDetailState } from './hooks/use-trip-detail';
 import { TripFormDialog } from './components/trip-form-dialog';
 import { TripShareDialog } from './components/trip-share-dialog';
 import { TripTasksTab } from './components/trip-tasks-tab';
+import { TripCoursesTab } from './components/trip-courses-tab';
+import { TripNotesTab } from './components/trip-notes-tab';
+import { TripPlacesTab } from './components/trip-places-tab';
 import { isServableCoverUrl } from './voyages-page';
 import {
   closeTrip,
@@ -139,6 +142,12 @@ export default function TripDetailPage() {
               <TripParametresTab detail={detail} trip={trip} />
             ) : activeTab === 'taches' ? (
               <TripTasksMount detail={detail} />
+            ) : activeTab === 'courses' ? (
+              <TripCoursesMount detail={detail} />
+            ) : activeTab === 'notes' ? (
+              <TripNotesMount detail={detail} />
+            ) : activeTab === 'adresses' ? (
+              <TripPlacesMount detail={detail} />
             ) : (
               <TripTabPlaceholder
                 label={visible.find((tab) => tab.key === activeTab)?.label ?? ''}
@@ -514,6 +523,67 @@ function TripTasksMount({ detail }: { detail: TripDetailState }) {
       readOnly={detail.readOnly || detail.trip?.closed === true}
     />
   );
+}
+
+/**
+ * Socle commun des fourches Courses/Notes/Adresses : identifiants, foyer,
+ * lecture seule (figé ou modération).
+ */
+function useTripForkMount(detail: TripDetailState): {
+  tripId: string;
+  householdId: string;
+  currentMemberId: string | null;
+  readOnly: boolean;
+} | null {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
+  if (!householdId || !detail.tripId) return null;
+  return {
+    tripId: detail.tripId,
+    householdId,
+    currentMemberId,
+    readOnly: detail.readOnly || detail.trip?.closed === true,
+  };
+}
+
+function TripCoursesMount({ detail }: { detail: TripDetailState }) {
+  // Les hooks ne sont jamais conditionnels : le socle est lu dans un
+  // composant enfant qui rend `null` sans identifiants.
+  return <TripForkMount detail={detail} kind="courses" />;
+}
+
+function TripNotesMount({ detail }: { detail: TripDetailState }) {
+  return <TripForkMount detail={detail} kind="notes" />;
+}
+
+function TripPlacesMount({ detail }: { detail: TripDetailState }) {
+  return <TripForkMount detail={detail} kind="adresses" />;
+}
+
+function TripForkMount({ detail, kind }: { detail: TripDetailState; kind: 'courses' | 'notes' | 'adresses' }) {
+  const mount = useTripForkMount(detail);
+  if (!mount) return null;
+  if (kind === 'courses') {
+    return (
+      <TripCoursesTab
+        tripId={mount.tripId}
+        householdId={mount.householdId}
+        currentMemberId={mount.currentMemberId}
+        readOnly={mount.readOnly}
+      />
+    );
+  }
+  if (kind === 'notes') {
+    return (
+      <TripNotesTab
+        tripId={mount.tripId}
+        householdId={mount.householdId}
+        currentMemberId={mount.currentMemberId}
+        readOnly={mount.readOnly}
+      />
+    );
+  }
+  return <TripPlacesTab tripId={mount.tripId} householdId={mount.householdId} readOnly={mount.readOnly} />;
 }
 
 function TripTabPlaceholder({ label }: { label: string }) {

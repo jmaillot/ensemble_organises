@@ -7,7 +7,7 @@
 import { data } from '@/lib/data';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import type { TaskRow, TripGuestRow, TripMemberRow, TripRow } from '@/types';
+import type { NoteRow, PlaceRow, ShoppingListItemRow, ShoppingListRow, TaskRow, TripGuestRow, TripMemberRow, TripRow } from '@/types';
 import { randomId } from '@/lib/utils';
 import { DEFAULT_TRIP_COVER, tabStateFromEnabled, type TabState, type TripInput } from './types';
 
@@ -697,4 +697,123 @@ export async function createTripTask(args: CreateTripTaskArgs): Promise<TaskRow>
 export function listTripTaskAssignees(taskIds: string[]) {
   if (taskIds.length === 0) return Promise.resolve([] as { task_id: string; member_id: string }[]);
   return data.list<{ task_id: string; member_id: string }>('task_assignees', { task_id: taskIds });
+}
+
+/* ------------------------------------------------------------------ */
+/* Fourches Courses / Notes / Adresses (tâche 2) : même contrat que la  */
+/* fourche Tâches — filtre `trip_id`, création posée, dossiers au foyer. */
+/* Les articles suivent leur liste ; les pièces jointes suivent leur    */
+/* note ; les photos de lieux restent supportées en lecture.            */
+/* ------------------------------------------------------------------ */
+
+/** Listes de courses de CE voyage (les articles suivent par `list_id`). */
+export function fetchTripShoppingLists(tripId: string): Promise<ShoppingListRow[]> {
+  return data.list<ShoppingListRow>('shopping_lists', { trip_id: tripId });
+}
+
+/** Articles des listes données (héritent du voyage par leur liste). */
+export function fetchTripListItems(listIds: string[]): Promise<ShoppingListItemRow[]> {
+  if (listIds.length === 0) return Promise.resolve([]);
+  return data.list<ShoppingListItemRow>('shopping_list_items', { list_id: listIds });
+}
+
+export interface CreateTripListArgs {
+  tripId: string;
+  householdId: string;
+  name: string;
+  createdBy?: string | null;
+}
+
+/** Création d'une liste de voyage : `trip_id` posé explicitement. */
+export async function createTripList(args: CreateTripListArgs): Promise<ShoppingListRow> {
+  const name = args.name.trim();
+  if (name.length === 0 || name.length > 120) throw new Error('Nommez la liste (1 à 120 caractères).');
+  return data.create<ShoppingListRow>('shopping_lists', {
+    household_id: args.householdId,
+    trip_id: args.tripId,
+    name,
+    created_by: args.createdBy ?? null,
+    created_at: new Date().toISOString(),
+  } as Partial<ShoppingListRow>);
+}
+
+/** Notes de CE voyage (`note_folders` reste au foyer : `folder_id` NULL). */
+export function fetchTripNotes(tripId: string): Promise<NoteRow[]> {
+  return data.list<NoteRow>('notes', { trip_id: tripId });
+}
+
+export interface CreateTripNoteArgs {
+  tripId: string;
+  householdId: string;
+  title: string;
+  content: string;
+  category?: string | null;
+  createdBy?: string | null;
+}
+
+/** Création d'une note de voyage : `trip_id` posé, dossier à NULL. */
+export async function createTripNote(args: CreateTripNoteArgs): Promise<NoteRow> {
+  const title = args.title.trim();
+  if (title.length === 0 || title.length > 200) throw new Error('Titre requis (1 à 200 caractères).');
+  const stamped = new Date().toISOString();
+  return data.create<NoteRow>('notes', {
+    household_id: args.householdId,
+    trip_id: args.tripId,
+    title,
+    content: args.content.trim(),
+    category: args.category?.trim() || 'Voyage',
+    color: null,
+    folder_id: null,
+    created_by: args.createdBy ?? null,
+    created_at: stamped,
+    updated_at: stamped,
+  } as Partial<NoteRow>);
+}
+
+/** Adresses de CE voyage (photos relues telles quelles, sans dépôt ici). */
+export function fetchTripPlaces(tripId: string): Promise<PlaceRow[]> {
+  return data.list<PlaceRow>('places', { trip_id: tripId });
+}
+
+export interface CreateTripPlaceArgs {
+  tripId: string;
+  householdId: string;
+  /** Charge du formulaire, `visited` exclu (bascule dédiée seule). */
+  input: {
+    name: string;
+    type: PlaceRow['type'];
+    rating?: number;
+    street?: string | null;
+    postalCode?: string | null;
+    city?: string | null;
+    phone?: string | null;
+    note?: string | null;
+  };
+}
+
+/**
+ * Création d'une adresse de voyage : charge du formulaire foyer
+ * (`toPlacePayload`, jamais réinventée) + `trip_id` posé explicitement.
+ */
+export async function createTripPlace(args: CreateTripPlaceArgs): Promise<PlaceRow> {
+  const { toPlacePayload } = await import('@/modules/adresses/api');
+  const name = args.input.name.trim();
+  if (name.length === 0 || name.length > 120) throw new Error('Nommez le lieu (1 à 120 caractères).');
+  return data.create<PlaceRow>('places', {
+    ...toPlacePayload(
+      {
+        name,
+        type: args.input.type,
+        rating: args.input.rating ?? 0,
+        street: args.input.street?.trim() || null,
+        postalCode: args.input.postalCode?.trim() || null,
+        city: args.input.city?.trim() || null,
+        phone: args.input.phone?.trim() || null,
+        note: args.input.note?.trim() || null,
+        photoUrl: null,
+      },
+      args.householdId,
+    ),
+    trip_id: args.tripId,
+  } as Partial<PlaceRow>);
 }
