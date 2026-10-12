@@ -23,6 +23,20 @@ describe('LandingPage', () => {
     expect(question).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText(/Uniquement les membres du foyer concerné/)).toBeInTheDocument();
   });
+
+  it('ne promet plus aucun fonctionnement hors ligne (D-07)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LandingPage />, { withHousehold: false });
+
+    expect(screen.getByText('En ligne d’abord')).toBeInTheDocument();
+    expect(screen.queryByText('Utilisable hors ligne')).not.toBeInTheDocument();
+    expect(screen.getByText('Application web installable, utilisable en ligne.')).toBeInTheDocument();
+
+    const offlineQuestion = screen.getByRole('button', { name: /Faut-il une connexion/ });
+    await user.click(offlineQuestion);
+    expect(screen.getByText(/sans connexion, impossible de charger une page/)).toBeInTheDocument();
+    expect(screen.queryByText(/rejouées à la reconnexion/)).not.toBeInTheDocument();
+  });
 });
 
 describe('SignInPage', () => {
@@ -37,6 +51,13 @@ describe('SignInPage', () => {
     renderWithProviders(<SignInPage />, { withHousehold: false });
     expect(screen.getByRole('heading', { name: 'Mode démonstration' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entrer dans la démonstration' })).toBeInTheDocument();
+  });
+
+  it('annonce l’hébergement serveur, pas le hors ligne (D-07)', () => {
+    renderWithProviders(<SignInPage />, { withHousehold: false });
+    expect(screen.getByText(/vivent sur le serveur de votre foyer/)).toBeInTheDocument();
+    expect(screen.queryByText(/accessibles hors ligne/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/retour du réseau/)).not.toBeInTheDocument();
   });
 });
 

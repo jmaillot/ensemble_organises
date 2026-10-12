@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
@@ -25,6 +25,74 @@ describe('Adresses', () => {
     expect(await screen.findByText('Aucun lieu ne correspond')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Modifier Le Parc du Quartier/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Modifier Le Café du Matin/ })).toBeNull();
+  });
+
+  it('préserve « Déjà visité » lors d’une modification (D-06)', async () => {
+    // Le bogue : l’édition réécrivait `visited: false`. La charge d’édition
+    // omet désormais `visited` — seule la bascule y touche.
+    const user = userEvent.setup();
+    renderWithProviders(<AdressesPage />);
+
+    const toggle = await screen.findByRole('switch', { name: 'Marquer Le Parc du Quartier comme visité' });
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('switch', { name: 'Marquer Le Parc du Quartier comme non visité' }),
+      ).toHaveAttribute('aria-checked', 'true'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Modifier Le Parc du Quartier/ }));
+    const dialog = await screen.findByRole('dialog', { name: /modifier le lieu/i });
+    await user.clear(within(dialog).getByLabelText(/nom du lieu/i));
+    await user.type(within(dialog).getByLabelText(/nom du lieu/i), 'Le Parc du Quartier Agrandi');
+    await user.click(within(dialog).getByRole('button', { name: /enregistrer les modifications/i }));
+
+    await screen.findByRole('button', { name: /Modifier Le Parc du Quartier Agrandi/ });
+    expect(
+      screen.getByRole('switch', { name: 'Marquer Le Parc du Quartier Agrandi comme non visité' }),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('intitule honnêtement le regroupement par ville (D-06)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdressesPage />);
+
+    await screen.findByRole('button', { name: /Modifier Le Café du Matin/ });
+    expect(screen.getByRole('button', { name: 'Vue par ville' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Vue carte' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Vue par ville' }));
+    expect(await screen.findByRole('button', { name: 'Vue grille' })).toBeInTheDocument();
+    // Regroupement textuel par ville, pas de carte géographique.
+    expect(screen.getByText('Lyon')).toBeInTheDocument();
+  });
+
+  it('dépose la photo au bucket et l’affiche sur la carte (D-04)', async () => {
+    // Mode démo : le dépôt renvoie un aperçu local, stocké tel quel et rendu
+    // aussitôt ; en mode Supabase, la même valeur est un chemin forgé à la
+    // lecture (prouvé en api.test.ts).
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:photo-lieu' });
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<AdressesPage />);
+
+      await user.click(await screen.findByRole('button', { name: /ajouter une adresse/i }));
+      const dialog = await screen.findByRole('dialog', { name: /ajouter une adresse/i });
+      await user.type(within(dialog).getByLabelText(/nom du lieu/i), 'Guinguette du Fleuve');
+      await user.upload(
+        within(dialog).getByLabelText('Photo du lieu'),
+        new File(['pixels'], 'guinguette.jpg', { type: 'image/jpeg' }),
+      );
+      await user.click(within(dialog).getByRole('button', { name: /enregistrer le lieu/i }));
+
+      const card = (await screen.findByRole('button', { name: /Modifier Guinguette du Fleuve/ })).closest('article');
+      expect(card).not.toBeNull();
+      // L’image décorative (`alt=""`) rend l’aperçu déposé, pas une donnée inline.
+      const photo = (card as HTMLElement).querySelector('img');
+      expect(photo?.getAttribute('src')).toBe('blob:photo-lieu');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('filtre par recherche et par type de lieu', async () => {

@@ -21,4 +21,17 @@ describe('TermsPage', () => {
     expect(privacyLinks.length).toBeGreaterThanOrEqual(1);
     expect(privacyLinks[0]).toHaveAttribute('href', '/confidentialite');
   });
+
+  it('article 7 honnête : connexion requise, aucune synchronisation différée (D-07)', () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/conditions-utilisation" element={<TermsPage />} />
+      </Routes>,
+      { route: '/conditions-utilisation', withHousehold: false },
+    );
+
+    expect(screen.getByText(/une connexion est nécessaire/)).toBeInTheDocument();
+    expect(screen.queryByText(/synchronisation différée/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/fonctionne partiellement hors ligne/)).not.toBeInTheDocument();
+  });
 });

@@ -33,6 +33,17 @@ describe('Fidélité', () => {
     expect(screen.getByText('99887766')).toBeInTheDocument();
   });
 
+  it('affiche une métrique « Enseignes » honnête, sans promesse de synchronisation', async () => {
+    // D-07 : aucune file ni_SYNC — le 4e chiffre compte les catégories distinctes.
+    renderWithProviders(<FidelitePage />);
+
+    await screen.findByRole('button', { name: 'Afficher le code de Marché de proximité en plein écran' });
+    expect(screen.getByText('Enseignes')).toBeInTheDocument();
+    expect(screen.getByText('catégories distinctes')).toBeInTheDocument();
+    expect(screen.queryByText('Synchronisation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Auto')).not.toBeInTheDocument();
+  });
+
   it('explique l’absence de caméra et propose la saisie manuelle', async () => {
     const user = userEvent.setup();
     // jsdom n’expose ni `BarcodeDetector` ni `mediaDevices`.

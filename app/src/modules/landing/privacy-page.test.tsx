@@ -24,4 +24,16 @@ describe('PrivacyPage', () => {
     expect(screen.getByRole('link', { name: 'www.cnil.fr' })).toHaveAttribute('href', 'https://www.cnil.fr');
     expect(screen.getByRole('link', { name: /Retour à l’accueil/ })).toHaveAttribute('href', '/');
   });
+
+  it('stockage local honnête : cache applicatif, pas de fonctionnement hors ligne (D-07)', () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/confidentialite" element={<PrivacyPage />} />
+      </Routes>,
+      { route: '/confidentialite', withHousehold: false },
+    );
+
+    expect(screen.getByText(/jeu de démonstration local/)).toBeInTheDocument();
+    expect(screen.queryByText(/données synchronisées/)).not.toBeInTheDocument();
+  });
 });

@@ -100,6 +100,46 @@ describe('PrestatairesPage', () => {
     }
   });
 
+  it('affiche la métrique honnête « Joignables », sans promesse de partage', async () => {
+    // D-08 : un e-mail renseigné rend joignable, jamais « partagé ».
+    renderWithProviders(<PrestatairesPage />, { route: '/prestataires' });
+
+    await screen.findByRole('heading', { name: 'Cabinet du Dr Morel' });
+    expect(screen.getByText('Joignables')).toBeInTheDocument();
+    expect(screen.queryByText('Partagés')).not.toBeInTheDocument();
+  });
+
+  it('rend la pièce jointe sur son URL forgée à la lecture', async () => {
+    // Mode démo : l’aperçu local passe tel quel (voie synchrone) ; en mode
+    // Supabase, la même valeur est une URL courte forgée (prouvé en api.test.ts).
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:piece-jointe' });
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<PrestatairesPage />, { route: '/prestataires' });
+
+      await screen.findByRole('heading', { name: 'Cabinet du Dr Morel' });
+      await user.click(screen.getByRole('button', { name: 'Ajouter un prestataire' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Ajouter un prestataire' });
+      await user.type(within(dialog).getByLabelText(/^Nom/), 'Plombier Forgeron');
+      await user.upload(
+        within(dialog).getByLabelText(/Joindre des fichiers/),
+        new File(['%PDF'], 'devis.pdf', { type: 'application/pdf' }),
+      );
+      await user.click(within(dialog).getByRole('button', { name: 'Ajouter le contact' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const card = (await screen.findByRole('heading', { name: 'Plombier Forgeron' })).closest('article');
+      expect(card).not.toBeNull();
+      expect(within(card as HTMLElement).getByRole('link', { name: 'Ouvrir devis.pdf' })).toHaveAttribute(
+        'href',
+        'blob:piece-jointe',
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('gère les types depuis le dialogue dédié', async () => {
     const user = userEvent.setup();
     renderWithProviders(<PrestatairesPage />, { route: '/prestataires' });
