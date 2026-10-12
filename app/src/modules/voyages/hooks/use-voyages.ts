@@ -11,7 +11,7 @@ import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { useToast } from '@/components/ui/toast';
 import { randomId, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, TaskRow, TripRow } from '@/types';
-import { createTrip, deleteTrip, deleteTripCover, isTripCoverPath, listTasks, listTrips, resolveTripCoverUrls, tripCoverPathOf, updateTrip, uploadTripCover, type TripMutationArgs } from '../api';
+import { createTrip, deleteTrip, deleteTripCover, householdTasksOf, isTripCoverPath, listTasks, listTrips, resolveTripCoverUrls, tripCoverPathOf, updateTrip, uploadTripCover, type TripMutationArgs } from '../api';
 import { computeTripPrepStats, nextTrip, toTrip, type Trip, type TripInput, type TripPrepStats } from '../types';
 
 export const voyagesKeys = {
@@ -122,7 +122,10 @@ export function useVoyages(): VoyagesState {
     [tripRows, coverUrls, today],
   );
 
-  const prep = useMemo(() => computeTripPrepStats((tasksQuery.data ?? []) as TaskRow[]), [tasksQuery.data]);
+  const prep = useMemo(
+    () => computeTripPrepStats(householdTasksOf((tasksQuery.data ?? []) as TaskRow[])),
+    [tasksQuery.data],
+  );
 
   const createMutation = useMutation({ mutationFn: (args: TripMutationArgs) => createTrip(args) });
   const updateMutation = useMutation({ mutationFn: (args: TripMutationArgs) => updateTrip(args) });

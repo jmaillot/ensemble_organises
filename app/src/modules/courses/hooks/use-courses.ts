@@ -86,6 +86,25 @@ export function useCourses(): UseCoursesResult {
   const productResource = useResource<ProductRow>(PRODUCTS_TABLE);
 
   /**
+   * Phase 15 : les listes propres à un voyage (`trip_id` renseigné) — et
+   * leurs articles, rattachés par liste — ne vivent pas dans les courses du
+   * foyer : régime historique `trip_id NULL` (15-01). Les fourches voyage
+   * (15-03) liront le même magasin par voyage.
+   */
+  const foyerListIds = useMemo(
+    () => new Set(listResource.rows.filter((row) => row.trip_id == null).map((row) => row.id)),
+    [listResource.rows],
+  );
+  const foyerLists = useMemo(
+    () => listResource.rows.filter((row) => row.trip_id == null),
+    [listResource.rows],
+  );
+  const foyerItems = useMemo(
+    () => itemResource.rows.filter((row) => foyerListIds.has(row.list_id)),
+    [itemResource.rows, foyerListIds],
+  );
+
+  /**
    * Invalidation par préfixe de table : la clé de `useResource` commence par le
    * nom de la table, ce qui touche aussi les requêtes filtrées de la page.
    */
@@ -99,13 +118,13 @@ export function useCourses(): UseCoursesResult {
 
   const lists = useMemo<ShoppingListView[]>(() => {
     const itemsByList = new Map<string, ShoppingItem[]>();
-    for (const row of itemResource.rows) {
+    for (const row of foyerItems) {
       const item = toShoppingItem(row);
       const bucket = itemsByList.get(item.listId);
       if (bucket) bucket.push(item);
       else itemsByList.set(item.listId, [item]);
     }
-    return listResource.rows
+    return foyerLists
       .map((row) => toShoppingList(row))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'fr'))
       .map((list) => {
@@ -115,10 +134,10 @@ export function useCourses(): UseCoursesResult {
         const checked = items.filter((item) => item.checked).length;
         return { ...list, items, checkedCount: checked, pendingCount: items.length - checked };
       });
-  }, [itemResource.rows, listResource.rows]);
+  }, [foyerItems, foyerLists]);
 
-  const itemCount = itemResource.rows.length;
-  const checkedCount = itemResource.rows.filter((row) => row.checked).length;
+  const itemCount = foyerItems.length;
+  const checkedCount = foyerItems.filter((row) => row.checked).length;
 
   /**
    * Historique d'ajout : les articles déjà cochés, comptés par nom, avec le
@@ -126,7 +145,7 @@ export function useCourses(): UseCoursesResult {
    */
   const history = useMemo(() => {
     const frequency = new Map<string, { name: string; rayon: string; count: number }>();
-    for (const row of itemResource.rows) {
+    for (const row of foyerItems) {
       if (!row.checked) continue;
       const key = row.name.trim().toLowerCase();
       const entry = frequency.get(key);
@@ -140,7 +159,7 @@ export function useCourses(): UseCoursesResult {
     return [...frequency.values()].sort(
       (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr'),
     );
-  }, [itemResource.rows]);
+  }, [foyerItems]);
 
   /**
    * Produits du catalogue du foyer (D-03) : triés par nom pour un ordre

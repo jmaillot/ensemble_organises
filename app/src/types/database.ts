@@ -113,6 +113,8 @@ export interface InvitationRow {
 export interface ShoppingListRow {
   id: Uuid;
   household_id: Uuid;
+  /** Voyage propriétaire (phase 15, 0118) ; NULL = liste de foyer. */
+  trip_id: Uuid | null;
   name: string;
   created_by: Uuid | null;
   created_at: IsoDateTime;
@@ -221,6 +223,8 @@ export interface EventReminderRow {
 export interface NoteRow {
   id: Uuid;
   household_id: Uuid;
+  /** Voyage propriétaire (phase 15, 0118) ; NULL = note de foyer. */
+  trip_id: Uuid | null;
   title: string;
   content: string;
   category: string;
@@ -291,6 +295,8 @@ export type TaskPriority = 'haute' | 'normale' | 'basse';
 export interface TaskRow {
   id: Uuid;
   household_id: Uuid;
+  /** Voyage propriétaire (phase 15, 0118) ; NULL = tâche de foyer. */
+  trip_id: Uuid | null;
   name: string;
   description: string | null;
   due_date: IsoDate | null;
@@ -385,6 +391,8 @@ export interface ArdoiseRow {
   use_count: number;
   expires_at: IsoDateTime | null;
   created_by: Uuid | null;
+  /** Voyage propriétaire (phase 15, 0118, UNIQUE) ; NULL = ardoise de foyer. */
+  trip_id: Uuid | null;
   created_at: IsoDateTime;
 }
 
@@ -618,6 +626,8 @@ export type PlaceType =
 export interface PlaceRow {
   id: Uuid;
   household_id: Uuid;
+  /** Voyage propriétaire (phase 15, 0118) ; NULL = adresse de foyer. */
+  trip_id: Uuid | null;
   type: PlaceType;
   photo_url: string | null;
   name: string;

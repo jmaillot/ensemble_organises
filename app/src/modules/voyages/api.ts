@@ -37,6 +37,15 @@ export function listTasks(householdId: string | null): Promise<TaskRow[]> {
   return data.list<TaskRow>('tasks', { household_id: requireHousehold(householdId) });
 }
 
+/**
+ * Tâches du foyer (phase 15) : les lignes propres à un voyage (`trip_id`
+ * renseigné) ne comptent pas dans les indicateurs du foyer — le régime
+ * historique ne voit que les lignes `trip_id NULL` (15-01).
+ */
+export function householdTasksOf(rows: TaskRow[]): TaskRow[] {
+  return rows.filter((row) => row.trip_id == null);
+}
+
 export interface TripMutationArgs {
   /** Identifiant préparé par l'appelant (publication optimiste). */
   id: string;

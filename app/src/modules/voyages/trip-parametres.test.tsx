@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders, seedHouseholdStore } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
-import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
 import TripDetailPage from './trip-detail-page';
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -92,94 +92,24 @@ async function openParametres(user: ReturnType<typeof userEvent.setup>) {
 const plain = (value: string | null | undefined) => (value ?? '').replace(/\s/g, ' ');
 
 describe('TripDetailPage — Infos réelles (tâche 2)', () => {
-  it('affiche participants, invités et compteurs issus de lectures réelles', async () => {
-    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
-    const adapter = getLocalAdapter();
-    await adapter.create('shopping_lists', {
-      id: 'trip-list-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      trip_id: 'trip-1',
-      name: 'Valise',
-      created_by: DEMO_MEMBERS.camille,
-    } as never);
-    await adapter.create('notes', {
-      id: 'trip-note-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      trip_id: 'trip-1',
-      title: 'Passeports',
-      content: 'Vérifier les dates.',
-      created_by: DEMO_MEMBERS.camille,
-    } as never);
-    await adapter.create('tasks', {
-      id: 'trip-task-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      trip_id: 'trip-1',
-      name: 'Réserver le vol',
-      status: 'a_faire',
-      created_by: DEMO_MEMBERS.thomas,
-    } as never);
-    await adapter.create('places', {
-      id: 'trip-place-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      trip_id: 'trip-1',
-      type: 'cafe',
-      name: 'Café du port',
-    } as never);
-    await adapter.create('ardoises', {
-      id: 'ardoise-trip-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      trip_id: 'trip-1',
-      name: 'Week-end à Lisbonne',
-      created_by: DEMO_MEMBERS.camille,
-    } as never);
-    await adapter.create('expenses', {
-      id: 'trip-expense-1',
-      household_id: DEMO_HOUSEHOLD_ID,
-      ardoise_id: 'ardoise-trip-1',
-      title: 'Vol aller',
-      amount: 30,
-      paid_by: DEMO_MEMBERS.camille,
-      expense_date: '2027-04-12',
-      split_type: 'egal',
-    } as never);
-    await adapter.create('expenses', {
-      id: 'trip-expense-2',
-      household_id: DEMO_HOUSEHOLD_ID,
-      ardoise_id: 'ardoise-trip-1',
-      title: 'Hôtel',
-      amount: 20,
-      paid_by: DEMO_MEMBERS.thomas,
-      expense_date: '2027-04-12',
-      split_type: 'egal',
-    } as never);
-    try {
-      renderDetail();
+  it('affiche participants, invité démo et compteurs issus de lectures réelles', async () => {
+    renderDetail();
 
-      await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
-      // Participants réels, pas de chiffre décoratif.
-      expect(screen.getByText('Camille Martin')).toBeInTheDocument();
-      expect(screen.getByText('Thomas Martin')).toBeInTheDocument();
-      // Un compteur par table tripée.
-      expect(await screen.findByText('listes de courses du voyage')).toBeInTheDocument();
-      const cards = screen.getAllByText(/du voyage$/);
-      expect(cards).toHaveLength(4);
-      for (const card of cards) {
-        const value = card.previousSibling as HTMLElement | null;
-        expect(value?.textContent).toBe('1');
-      }
-      // Budget lié : 2 dépenses, total 50 €.
-      const budget = await screen.findByText(/dépense/);
-      expect(plain(budget.textContent)).toContain('2 dépenses');
-      expect(plain(budget.textContent)).toContain('50,00');
-    } finally {
-      await adapter.remove('expenses', 'trip-expense-1').catch(() => undefined);
-      await adapter.remove('expenses', 'trip-expense-2').catch(() => undefined);
-      await adapter.remove('ardoises', 'ardoise-trip-1').catch(() => undefined);
-      await adapter.remove('places', 'trip-place-1').catch(() => undefined);
-      await adapter.remove('tasks', 'trip-task-1').catch(() => undefined);
-      await adapter.remove('notes', 'trip-note-1').catch(() => undefined);
-      await adapter.remove('shopping_lists', 'trip-list-1').catch(() => undefined);
-    }
+    await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
+    // Participants réels + invité démo, pas de chiffre décoratif.
+    expect(screen.getByText('Camille Martin')).toBeInTheDocument();
+    expect(screen.getByText('Thomas Martin')).toBeInTheDocument();
+    expect(screen.getByText(/Invités : Mamie/)).toBeInTheDocument();
+    // Un compteur par table tripée, lus en direct (graines démo trip-1).
+    expect(await screen.findByText('listes de courses du voyage')).toBeInTheDocument();
+    const cards = screen.getAllByText(/du voyage$/);
+    expect(cards).toHaveLength(4);
+    const values = cards.map((card) => (card.previousSibling as HTMLElement | null)?.textContent);
+    expect(values).toEqual(['1', '2', '2', '2']);
+    // Budget lié : 2 dépenses démo (120 + 200), total 320 €.
+    const budget = await screen.findByText(/dépense/);
+    expect(plain(budget.textContent)).toContain('2 dépenses');
+    expect(plain(budget.textContent)).toContain('320,00');
   });
 });
 

@@ -5,6 +5,7 @@ import type { EventRow, TaskRow } from '@/types';
 const task = (overrides: Partial<TaskRow>): TaskRow => ({
   id: 't',
   household_id: 'h',
+  trip_id: null,
   name: 'Tâche',
   description: null,
   due_date: null,

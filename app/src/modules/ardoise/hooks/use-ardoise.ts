@@ -73,7 +73,13 @@ export function useArdoises(): ArdoisesData {
   });
 
   return {
-    ardoises: query.data ?? [],
+    /**
+     * Phase 15 : les ardoises liées à un voyage vivent dans sa fiche Budget,
+     * pas dans la liste du foyer (régime historique `trip_id NULL`, 15-01).
+     * Le détail par id (`useArdoiseDetail`) reste inchangé : la fiche Budget
+     * (15-03) le réutilise tel quel.
+     */
+    ardoises: (query.data ?? []).filter((row) => row.trip_id == null),
     isLoading: query.isLoading,
     isError: query.isError,
     error: (query.error as Error | null) ?? null,

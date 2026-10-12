@@ -45,6 +45,7 @@ import type {
   TaskAssigneeRow,
   TaskReminderRow,
   TaskRow,
+  TripGuestRow,
   TripMemberRow,
   TripRow,
 } from '@/types';
@@ -155,8 +156,8 @@ export const demoMembers: HouseholdMemberRow[] = [
 ];
 
 export const demoShoppingLists: ShoppingListRow[] = [
-  { id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fresque', created_by: DEMO_MEMBERS.camille, created_at: now() },
-  { id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Maison', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, trip_id: null, name: 'Fresque', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, trip_id: null, name: 'Maison', created_by: DEMO_MEMBERS.camille, created_at: now() },
 ];
 
 export const demoShoppingItems: ShoppingListItemRow[] = [
@@ -246,7 +247,7 @@ export const demoEventCategories: EventCategoryRow[] = [
 export const demoNotes: NoteRow[] = [
   {
     id: 'note-1',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     title: 'Liste de rentrée',
     content: 'Cartables, crayons, gourdes et un goûter pour le premier jour.',
     category: 'Maison',
@@ -258,7 +259,7 @@ export const demoNotes: NoteRow[] = [
   },
   {
     id: 'note-2',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     title: 'Idées de week-end',
     content: 'Une balade au bord du lac, puis un déjeuner dehors si le temps reste doux.',
     category: 'Loisirs',
@@ -270,7 +271,7 @@ export const demoNotes: NoteRow[] = [
   },
   {
     id: 'note-3',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     title: 'À demander à Léa',
     content: 'Son nouveau numéro pour le groupe des parents et les horaires de piscine.',
     category: 'Foyer',
@@ -285,7 +286,7 @@ export const demoNotes: NoteRow[] = [
 export const demoTasks: TaskRow[] = [
   {
     id: 'task-1',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     name: 'Valider les rendez-vous du carnet',
     description: 'Appeler le cabinet puis mettre à jour le carnet.',
     due_date: day(0),
@@ -297,7 +298,7 @@ export const demoTasks: TaskRow[] = [
   },
   {
     id: 'task-2',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     name: 'Ajouter le lait d’agne',
     description: 'Pour la recette de samedi.',
     due_date: day(1),
@@ -309,7 +310,7 @@ export const demoTasks: TaskRow[] = [
   },
   {
     id: 'task-3',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     name: 'Ranger les photos de l’été',
     description: null,
     due_date: day(2),
@@ -321,7 +322,7 @@ export const demoTasks: TaskRow[] = [
   },
   {
     id: 'task-4',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     name: 'Choisir le menu du week-end',
     description: null,
     due_date: day(-1),
@@ -421,7 +422,7 @@ export const demoRecipes: RecipeRow[] = [
 export const demoArdoises: ArdoiseRow[] = [
   {
     id: 'ardoise-foyer',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     name: 'Ardoise du foyer',
     description: 'Les dépenses partagées du quotidien.',
     cover_url: null,
@@ -914,7 +915,7 @@ export const demoLoyaltyCards: LoyaltyCardRow[] = [
 export const demoPlaces: PlaceRow[] = [
   {
     id: 'place-1',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     type: 'cafe',
     photo_url: '/assets/adresses.jpg',
     name: 'Le Café du Matin',
@@ -929,7 +930,7 @@ export const demoPlaces: PlaceRow[] = [
   },
   {
     id: 'place-2',
-    household_id: DEMO_HOUSEHOLD_ID,
+    household_id: DEMO_HOUSEHOLD_ID, trip_id: null,
     type: 'parc',
     photo_url: '/assets/voyages.jpg',
     name: 'Le Parc du Quartier',
@@ -1011,11 +1012,184 @@ export const demoTrips: TripRow[] = [
 /**
  * Participants du voyage démo (phase 15, D-01) : Camille et Thomas, tous deux
  * admin/membre — jamais Noé (enfant). La fiche détail prouve l'appartenance
- * sur ces lignes ; 15-02 tâche 3 complète (invité, lignes tripées, ardoise).
+ * sur ces lignes.
  */
 export const demoTripMembers: TripMemberRow[] = [
   { trip_id: 'trip-1', member_id: DEMO_MEMBERS.camille, created_at: now() },
   { trip_id: 'trip-1', member_id: DEMO_MEMBERS.thomas, created_at: now() },
+];
+
+/**
+ * Invité externe du voyage démo (phase 15, D-01) : déclaré sans ticket
+ * (`ticket_hash` NULL, motif payeur-nommé) — un ticket réel naît de
+ * l'échange (`redeem-guest`), jamais d'une graine.
+ */
+export const demoTripGuests: TripGuestRow[] = [
+  { id: 'trip-guest-mamie', trip_id: 'trip-1', display_name: 'Mamie', ticket_hash: null, created_at: now() },
+];
+
+/** Lignes propres au voyage démo (phase 15, D-02) : `trip_id` trip-1, jamais de foyer. */
+export const demoTripShoppingLists: ShoppingListRow[] = [
+  { id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, trip_id: 'trip-1', name: 'Valise', created_by: DEMO_MEMBERS.camille, created_at: now() },
+];
+
+export const demoTripShoppingItems: ShoppingListItemRow[] = [
+  { id: 'trip-item-1', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème solaire', quantity: 1, unit: 'tube', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
+  { id: 'trip-item-2', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Guide de Lisbonne', quantity: 1, unit: 'exemplaire', category: 'Loisirs', checked: true, added_by: DEMO_MEMBERS.thomas, product_id: null, created_at: now() },
+];
+
+export const demoTripNotes: NoteRow[] = [
+  {
+    id: 'trip-note-passeports',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    title: 'Passeports',
+    content: 'Vérifier les dates de validité avant de réserver.',
+    category: 'Voyage',
+    color: 'accent',
+    folder_id: null,
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+    updated_at: now(),
+  },
+  {
+    id: 'trip-note-activites',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    title: 'Idées d’activités',
+    content: 'Tour en bateau sur le Tage, puis dîner dans l’Alfama.',
+    category: 'Loisirs',
+    color: null,
+    folder_id: null,
+    created_by: DEMO_MEMBERS.thomas,
+    created_at: now(),
+    updated_at: now(),
+  },
+];
+
+export const demoTripTasks: TaskRow[] = [
+  {
+    id: 'trip-task-vol',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    name: 'Réserver le vol',
+    description: 'Comparer les allers-retours d’avril.',
+    due_date: '2027-03-15',
+    priority_order: 0,
+    status: 'a_faire',
+    folder_id: null,
+    created_by: DEMO_MEMBERS.thomas,
+    created_at: now(),
+  },
+  {
+    id: 'trip-task-valise',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    name: 'Préparer la valise',
+    description: null,
+    due_date: '2027-04-10',
+    priority_order: 1,
+    status: 'a_faire',
+    folder_id: null,
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+  },
+];
+
+export const demoTripTaskAssignees: TaskAssigneeRow[] = [
+  { task_id: 'trip-task-vol', member_id: DEMO_MEMBERS.thomas },
+  { task_id: 'trip-task-valise', member_id: DEMO_MEMBERS.camille },
+];
+
+export const demoTripPlaces: PlaceRow[] = [
+  {
+    id: 'trip-place-cafe',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    type: 'cafe',
+    photo_url: null,
+    name: 'Café du port',
+    street: 'Rua do Mar 4',
+    postal_code: '1100-999',
+    city: 'Lisbonne',
+    phone: null,
+    rating: 4,
+    visited: false,
+    note: 'Petit-déjeuner du premier matin.',
+    created_at: now(),
+  },
+  {
+    id: 'trip-place-musee',
+    household_id: DEMO_HOUSEHOLD_ID,
+    trip_id: 'trip-1',
+    type: 'musee',
+    photo_url: null,
+    name: 'Musée du Fado',
+    street: null,
+    postal_code: null,
+    city: 'Lisbonne',
+    phone: null,
+    rating: 5,
+    visited: false,
+    note: 'À réserver en ligne.',
+    created_at: now(),
+  },
+];
+
+/** Ardoise liée au voyage démo (phase 15, D-03) : un voyage = une ardoise, participants miroirs. */
+export const demoTripArdoise: ArdoiseRow = {
+  id: 'ardoise-trip-1',
+  household_id: DEMO_HOUSEHOLD_ID,
+  name: 'Week-end à Lisbonne',
+  description: 'Le budget partagé du voyage.',
+  cover_url: null,
+  invite_hash: null,
+  is_active: true,
+  max_uses: null,
+  use_count: 0,
+  expires_at: null,
+  created_by: DEMO_MEMBERS.camille,
+  trip_id: 'trip-1',
+  created_at: now(),
+};
+
+export const demoTripArdoiseMembers: ArdoiseMemberRow[] = [
+  { ardoise_id: 'ardoise-trip-1', member_id: DEMO_MEMBERS.camille },
+  { ardoise_id: 'ardoise-trip-1', member_id: DEMO_MEMBERS.thomas },
+];
+
+export const demoTripExpenses: ExpenseRow[] = [
+  {
+    id: 'trip-expense-vol',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ardoise_id: 'ardoise-trip-1',
+    title: 'Vols aller-retour',
+    amount: 120,
+    paid_by: DEMO_MEMBERS.camille,
+    paid_by_guest: null,
+    expense_date: '2027-04-12',
+    split_type: 'egal',
+    created_at: now(),
+  },
+  {
+    id: 'trip-expense-logement',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ardoise_id: 'ardoise-trip-1',
+    title: 'Logement',
+    amount: 200,
+    paid_by: DEMO_MEMBERS.thomas,
+    paid_by_guest: null,
+    expense_date: '2027-04-12',
+    split_type: 'egal',
+    created_at: now(),
+  },
+];
+
+export const demoTripExpenseParticipants: ExpenseParticipantRow[] = [
+  { id: 'trip-ep-1', expense_id: 'trip-expense-vol', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, guest_id: null, share_amount: 60 },
+  { id: 'trip-ep-2', expense_id: 'trip-expense-vol', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, guest_id: null, share_amount: 60 },
+  { id: 'trip-ep-3', expense_id: 'trip-expense-logement', participant_type: 'membre', member_id: DEMO_MEMBERS.camille, guest_id: null, share_amount: 100 },
+  { id: 'trip-ep-4', expense_id: 'trip-expense-logement', participant_type: 'membre', member_id: DEMO_MEMBERS.thomas, guest_id: null, share_amount: 100 },
 ];
 
 export const demoConversations: ConversationRow[] = [
@@ -1157,23 +1331,23 @@ const seedTables: Record<string, Row[]> = {
     } as unknown as Row,
   ],
   household_members: demoMembers as unknown as Row[],
-  shopping_lists: demoShoppingLists as unknown as Row[],
-  shopping_list_items: demoShoppingItems as unknown as Row[],
+  shopping_lists: [...demoShoppingLists, ...demoTripShoppingLists] as unknown as Row[],
+  shopping_list_items: [...demoShoppingItems, ...demoTripShoppingItems] as unknown as Row[],
   events: demoEvents as unknown as Row[],
   event_reminders: demoEventReminders as unknown as Row[],
   event_categories: demoEventCategories as unknown as Row[],
-  notes: demoNotes as unknown as Row[],
-  tasks: demoTasks as unknown as Row[],
-  task_assignees: demoTaskAssignees as unknown as Row[],
+  notes: [...demoNotes, ...demoTripNotes] as unknown as Row[],
+  tasks: [...demoTasks, ...demoTripTasks] as unknown as Row[],
+  task_assignees: [...demoTaskAssignees, ...demoTripTaskAssignees] as unknown as Row[],
   task_reminders: demoTaskReminders as unknown as Row[],
   routines: demoRoutines as unknown as Row[],
   routine_assignees: demoRoutineAssignees as unknown as Row[],
   routine_completions: demoRoutineCompletions as unknown as Row[],
   recipes: demoRecipes as unknown as Row[],
-  expenses: demoExpenses as unknown as Row[],
-  expense_participants: demoExpenseParticipants as unknown as Row[],
-  ardoises: demoArdoises as unknown as Row[],
-  ardoise_members: demoArdoiseMembers as unknown as Row[],
+  expenses: [...demoExpenses, ...demoTripExpenses] as unknown as Row[],
+  expense_participants: [...demoExpenseParticipants, ...demoTripExpenseParticipants] as unknown as Row[],
+  ardoises: [...demoArdoises, demoTripArdoise] as unknown as Row[],
+  ardoise_members: [...demoArdoiseMembers, ...demoTripArdoiseMembers] as unknown as Row[],
   ardoise_guests: demoArdoiseGuests as unknown as Row[],
   gift_lists: demoGiftLists as unknown as Row[],
   gift_items: demoGiftItems as unknown as Row[],
@@ -1190,16 +1364,14 @@ const seedTables: Record<string, Row[]> = {
   provider_types: demoProviderTypes as unknown as Row[],
   providers: demoProviders as unknown as Row[],
   loyalty_cards: demoLoyaltyCards as unknown as Row[],
-  places: demoPlaces as unknown as Row[],
+  places: [...demoPlaces, ...demoTripPlaces] as unknown as Row[],
   posts: demoPosts as unknown as Row[],
   post_media: demoPostMedia as unknown as Row[],
   post_comments: demoPostComments as unknown as Row[],
   post_reactions: demoPostReactions as unknown as Row[],
   trips: demoTrips as unknown as Row[],
   trip_members: demoTripMembers as unknown as Row[],
-  // Invités du voyage démo : table lue par la fiche même vide (RLS côté
-  // serveur, magasin local en démo). 15-02 tâche 3 y sème l'invité.
-  trip_guests: [] as unknown as Row[],
+  trip_guests: demoTripGuests as unknown as Row[],
   conversations: demoConversations as unknown as Row[],
   conversation_members: demoConversationMembers as unknown as Row[],
   messages: demoMessages as unknown as Row[],

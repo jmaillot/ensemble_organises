@@ -116,8 +116,15 @@ export function useTaches(): UseTachesResult {
   );
 
   const canWrite = currentMember?.role !== 'enfant';
-  const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
+  const { rows: allRows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<TaskRow>(TASKS_TABLE);
+
+  /**
+   * Phase 15 : les tâches propres à un voyage (`trip_id` renseigné) ne
+   * vivent pas dans la liste du foyer — régime historique `trip_id NULL`
+   * (15-01). Les fourches voyage (15-03) liront le même magasin par voyage.
+   */
+  const rows = useMemo(() => allRows.filter((row) => row.trip_id == null), [allRows]);
 
   // `rows` est une référence stable tant que le cache ne change pas.
   const taskIds = useMemo(() => rows.map((row) => row.id), [rows]);

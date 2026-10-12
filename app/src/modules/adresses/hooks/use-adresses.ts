@@ -50,7 +50,7 @@ export function useAdresses(): UseAdressesResult {
   const requireHousehold = useRequireHousehold();
   const [filters, setFiltersState] = useState<PlaceFilters>(emptyPlaceFilters);
   const {
-    rows,
+    rows: allRows,
     isLoading,
     isFetching,
     isError,
@@ -61,6 +61,13 @@ export function useAdresses(): UseAdressesResult {
     remove,
     isMutating,
   } = useResource<PlaceRow>(PLACES_TABLE);
+
+  /**
+   * Phase 15 : les adresses propres à un voyage (`trip_id` renseigné) ne
+   * vivent pas dans le carnet du foyer — régime historique `trip_id NULL`
+   * (15-01). Les fourches voyage (15-03) liront le même magasin par voyage.
+   */
+  const rows = useMemo(() => allRows.filter((row) => row.trip_id == null), [allRows]);
 
   // `useResource` invalide la clé `['all', table]`, qui ne correspond pas à la
   // clé de sa requête (`[table, householdId, filtre]`) : on relance donc la

@@ -58,8 +58,14 @@ export function useNotes(): UseNotesResult {
   const householdId = useHouseholdStore((state) => state.householdId);
   const currentMember = useCurrentMember();
   const [filters, setFiltersState] = useState<NoteFilters>(emptyNoteFilters);
-  const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
+  const { rows: allRows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<NoteRow>(NOTES_TABLE);
+  /**
+   * Phase 15 : les notes propres à un voyage (`trip_id` renseigné) ne
+   * vivent pas dans l'espace du foyer — régime historique `trip_id NULL`
+   * (15-01). Les fourches voyage (15-03) liront le même magasin par voyage.
+   */
+  const rows = useMemo(() => allRows.filter((row) => row.trip_id == null), [allRows]);
   const attachmentsResource = useResource<NoteAttachmentRow>('note_attachments');
   const foldersResource = useResource<NoteFolderRow>(NOTE_FOLDERS_TABLE);
   const folders = useMemo(

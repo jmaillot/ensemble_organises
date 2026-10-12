@@ -23,6 +23,7 @@ export const routeChunkLoaders = {
   terms: () => import('@/modules/landing/terms-page'),
   guestArdoise: () => import('@/modules/ardoise/guest-ardoise-page'),
   guestCadeau: () => import('@/modules/cadeaux/guest-cadeau-page'),
+  guestVoyage: () => import('@/modules/voyages/guest-trip-page'),
   welcome: () => import('@/modules/landing/welcome-page'),
   createHousehold: () => import('@/modules/landing/create-household-page'),
   joinHousehold: () => import('@/modules/landing/join-household-page'),

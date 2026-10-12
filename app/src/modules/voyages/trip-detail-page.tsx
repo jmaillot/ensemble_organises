@@ -10,6 +10,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { formatEuro } from '@/lib/utils';
 import { useTripDetail, type TripDetailState } from './hooks/use-trip-detail';
 import { TripFormDialog } from './components/trip-form-dialog';
+import { TripShareDialog } from './components/trip-share-dialog';
 import { isServableCoverUrl } from './voyages-page';
 import {
   closeTrip,
@@ -185,7 +186,7 @@ function TripInfosTab({ detail }: { detail: TripDetailState }) {
           </p>
         ) : (
           <p className="mt-2.5 mb-0 text-[12px] text-muted" role="status">
-            Aucun invité pour le moment — le partage par code arrive avec la tâche suivante.
+            Aucun invité pour le moment — le partage par code se gère dans l’onglet Paramètres.
           </p>
         )}
       </Panel>
@@ -232,6 +233,7 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
   const householdId = useHouseholdStore((state) => state.householdId);
   const { tabState, isParticipant, isAdmin, readOnly, storedCover } = detail;
   const [editOpen, setEditOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<TripTabKey | null>(null);
   const [pendingClose, setPendingClose] = useState(false);
@@ -248,9 +250,16 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
         description="Vue de modération : ce voyage ne vous attend pas comme participant."
       >
         <p className="m-0 text-[13px] text-muted">
-          Édition, rubriques, fermeture et départ sont réservés aux participants ; la réouverture d’un voyage
-          figé reste possible ci-dessous pour les administrateurs.
+          Édition, rubriques, fermeture et départ sont réservés aux participants ; le partage par code et la
+          réouverture d’un voyage figé restent possibles ci-dessous pour les administrateurs.
         </p>
+        {!frozen && isAdmin ? (
+          <div className="mt-3">
+            <Button variant="secondary" icon="share" onClick={() => setShareOpen(true)}>
+              Partager le voyage
+            </Button>
+          </div>
+        ) : null}
         {frozen && isAdmin ? (
           <div className="mt-3">
             <Button
@@ -274,6 +283,12 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
             </Button>
           </div>
         ) : null}
+        <TripShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          tripId={detail.tripId}
+          tripName={trip.name}
+        />
       </Panel>
     );
   }
@@ -382,6 +397,24 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
       </Panel>
 
       <Panel
+        id="trip-parametres-share"
+        title="Partage par code"
+        description="Un proche hors foyer rejoint avec le code : avec son compte il participe, sans compte il visite en invité."
+      >
+        {frozen ? (
+          <p className="m-0 text-[12px] text-muted" role="status">
+            Voyage figé : le partage reprendra à la réouverture.
+          </p>
+        ) : (
+          <div>
+            <Button variant="secondary" icon="share" onClick={() => setShareOpen(true)}>
+              Partager le voyage
+            </Button>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
         id="trip-parametres-lifecycle"
         title="Cycle de vie"
         description="Fermer fige sans détruire ; partir retire sans effacer ; rouvrir répare (admin seul)."
@@ -431,6 +464,13 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
         trip={trip}
         busy={saving}
         onSubmit={saveEdit}
+      />
+
+      <TripShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        tripId={detail.tripId}
+        tripName={trip.name}
       />
 
       <ConfirmDialog
