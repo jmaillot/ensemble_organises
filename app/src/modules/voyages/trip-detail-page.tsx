@@ -11,6 +11,7 @@ import { formatEuro } from '@/lib/utils';
 import { useTripDetail, type TripDetailState } from './hooks/use-trip-detail';
 import { TripFormDialog } from './components/trip-form-dialog';
 import { TripShareDialog } from './components/trip-share-dialog';
+import { TripTasksTab } from './components/trip-tasks-tab';
 import { isServableCoverUrl } from './voyages-page';
 import {
   closeTrip,
@@ -136,6 +137,8 @@ export default function TripDetailPage() {
               <TripInfosTab detail={detail} />
             ) : activeTab === 'parametres' ? (
               <TripParametresTab detail={detail} trip={trip} />
+            ) : activeTab === 'taches' ? (
+              <TripTasksMount detail={detail} />
             ) : (
               <TripTabPlaceholder
                 label={visible.find((tab) => tab.key === activeTab)?.label ?? ''}
@@ -491,6 +494,25 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
         onConfirm={confirmLeave}
       />
     </div>
+  );
+}
+
+/**
+ * Montage de l'onglet Tâches (15-03) : la fourche reçoit les participants
+ * du voyage (assignations trip-only) ; figé ou modération = lecture seule.
+ */
+function TripTasksMount({ detail }: { detail: TripDetailState }) {
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
+  if (!householdId || !detail.tripId) return null;
+  return (
+    <TripTasksTab
+      tripId={detail.tripId}
+      householdId={householdId}
+      members={detail.participantMembers}
+      currentMemberId={currentMemberId}
+      readOnly={detail.readOnly || detail.trip?.closed === true}
+    />
   );
 }
 

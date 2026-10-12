@@ -609,3 +609,92 @@ export async function fetchTripLinkView(code: string): Promise<TripGuestView> {
   const view = await callTripInvitePublishable<unknown>('link-view', { code: assertTripCode(code) });
   return toTripGuestView(view);
 }
+
+/* ------------------------------------------------------------------ */
+/* Onglets du voyage (phase 15, 15-03) : fourches à filtre `tripId`     */
+/*                                                                     */
+/* Chaque onglet est une fourche, jamais un drop-in du composant foyer */
+/* (D-09) : la requête filtre `trip_id = voyage courant`, la création  */
+/* pose `trip_id` explicitement (les triggers d'alignement 15-01 ne    */
+/* sont qu'un garde-fou, jamais le poseur), et les dossiers restent au */
+/* foyer (`folder_id = NULL` sur les lignes tripées). Le filtre client */
+/* est un confort ; la conjonction RLS 15-01 est la vraie frontière.   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Filtre strict d'étanchéité : seules les lignes de ce voyage passent —
+ * ni les lignes du foyer (`trip_id NULL`), ni celles d'un autre voyage.
+ */
+export function tripRowsOf<T extends { trip_id: string | null }>(rows: T[], tripId: string): T[] {
+  return rows.filter((row) => row.trip_id === tripId);
+}
+
+/**
+ * Garde d'assignation (T-15-12) : l'onglet ne propose que les participants
+ * du voyage ; toute tentative hors voyage lève ici, et le garde de portée
+ * serveur 15-01 tranche en dernier ressort.
+ */
+export function assertTripAssignees(assigneeIds: string[], tripMemberIds: string[]): void {
+  const allowed = new Set(tripMemberIds);
+  for (const assigneeId of assigneeIds) {
+    if (!allowed.has(assigneeId)) {
+      throw new Error('Assigné hors voyage : seuls les participants du voyage peuvent être assignés.');
+    }
+  }
+}
+
+/** Tâches de CE voyage (jamais celles du foyer ni d'un voyage sibling). */
+export function fetchTripTasks(tripId: string): Promise<TaskRow[]> {
+  return data.list<TaskRow>('tasks', { trip_id: tripId });
+}
+
+export interface CreateTripTaskArgs {
+  tripId: string;
+  householdId: string;
+  name: string;
+  dueDate?: string | null;
+  /** Assignataires : tous doivent être participants du voyage (T-15-12). */
+  assigneeIds?: string[];
+  tripMemberIds: string[];
+  createdBy?: string | null;
+}
+
+/**
+ * Création d'une tâche de voyage : `trip_id` posé explicitement,
+ * `folder_id` à NULL (les dossiers `task_lists` restent au foyer),
+ * assignataires validés contre les participants du voyage.
+ */
+export async function createTripTask(args: CreateTripTaskArgs): Promise<TaskRow> {
+  const name = args.name.trim();
+  if (name.length === 0 || name.length > 200) throw new Error('Nommez la tâche (1 à 200 caractères).');
+  const assigneeIds = args.assigneeIds ?? [];
+  assertTripAssignees(assigneeIds, args.tripMemberIds);
+  const existing = await fetchTripTasks(args.tripId).catch(() => []);
+  const priorityOrder = existing.reduce((max, row) => Math.max(max, row.priority_order ?? 0), -1) + 1;
+  const created = await data.create<TaskRow>('tasks', {
+    household_id: args.householdId,
+    trip_id: args.tripId,
+    name,
+    description: null,
+    due_date: args.dueDate?.trim() || null,
+    priority_order: priorityOrder,
+    status: 'a_faire',
+    folder_id: null,
+    created_by: args.createdBy ?? null,
+    created_at: new Date().toISOString(),
+  } as Partial<TaskRow>);
+  if (assigneeIds.length > 0) {
+    await Promise.all(
+      assigneeIds.map((memberId) =>
+        data.create('task_assignees', { task_id: created.id, member_id: memberId }),
+      ),
+    );
+  }
+  return created;
+}
+
+/** Assignataires d'un ensemble de tâches du voyage (jointure sans foyer). */
+export function listTripTaskAssignees(taskIds: string[]) {
+  if (taskIds.length === 0) return Promise.resolve([] as { task_id: string; member_id: string }[]);
+  return data.list<{ task_id: string; member_id: string }>('task_assignees', { task_id: taskIds });
+}
