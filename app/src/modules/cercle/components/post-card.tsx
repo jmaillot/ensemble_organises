@@ -27,7 +27,6 @@ export interface PostCardProps {
   onSaveEdit: (postId: string, text: string) => Promise<boolean>;
   /** Contexte d'auteur pour les affordances inline (mêmes grilles que le dialogue). */
   currentMemberId?: string;
-  isAdmin?: boolean;
   /** Verbe create-comment existant — absent = pas de compositeur inline (rendu direct en test). */
   onSubmitComment?: (input: { postId: string; content: string }) => Promise<boolean>;
   onUpdateComment?: (commentId: string, content: string) => Promise<boolean>;
@@ -45,7 +44,6 @@ function PostCardComponent({
   onRequestDelete,
   onSaveEdit,
   currentMemberId,
-  isAdmin = false,
   onSubmitComment,
   onUpdateComment,
   onDeleteComment,
@@ -64,7 +62,7 @@ function PostCardComponent({
   const replyTrimmed = reply.trim();
   const replyOverCap = replyTrimmed.length > COMMENT_CONTENT_MAX;
 
-  // Édition/suppression inline : mêmes grilles auteur-ou-admin que le dialogue.
+  // Édition/suppression inline : mêmes grilles auteur-seul (D-07) que le dialogue.
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingComment, setSavingComment] = useState(false);
@@ -123,7 +121,7 @@ function PostCardComponent({
   const canEditInline = (comment: FeedComment) =>
     Boolean(onUpdateComment) && comment.authorId === currentMemberId;
   const canDeleteInline = (comment: FeedComment) =>
-    Boolean(onDeleteComment) && (comment.authorId === currentMemberId || isAdmin);
+    Boolean(onDeleteComment) && comment.authorId === currentMemberId;
 
   const visibleComments = post.comments.slice(-INLINE_COMMENT_COUNT);
   const hiddenCount = post.commentCount - visibleComments.length;

@@ -27,7 +27,6 @@ export interface CommentsDialogProps {
   post: FeedPost | null;
   open: boolean;
   currentMemberId: string;
-  isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: { postId: string; content: string }) => Promise<boolean>;
   onUpdateComment: (commentId: string, content: string) => Promise<boolean>;
@@ -39,7 +38,6 @@ export function CommentsDialog({
   post,
   open,
   currentMemberId,
-  isAdmin,
   onOpenChange,
   onSubmit,
   onUpdateComment,
@@ -93,8 +91,9 @@ export function CommentsDialog({
     if (done) cancelEdit();
   };
 
+  // D-07 : suppression strictement auteur — aucune branche admin.
   const canDeleteComment = (comment: FeedComment) =>
-    comment.authorId === currentMemberId || isAdmin;
+    comment.authorId === currentMemberId;
 
   return (
     <>

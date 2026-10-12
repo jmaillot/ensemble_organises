@@ -14,7 +14,7 @@ import { ROLE_LABELS } from './types';
 const MAX_STACK = 3;
 
 export default function CerclePage() {
-  const { feed, members, currentMemberId, isAdmin, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead } =
+  const { feed, members, currentMemberId, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead } =
     useCercleFeed();
   const [focusSignal, setFocusSignal] = useState(0);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -78,7 +78,6 @@ export default function CerclePage() {
                   canDelete={canDelete(post)}
                   canEdit={canEditPost(post)}
                   currentMemberId={currentMemberId}
-                  isAdmin={isAdmin}
                   onSubmitComment={addComment}
                   onUpdateComment={(commentId, content) => updateComment(commentId, content)}
                   onDeleteComment={(commentId) => deleteComment(commentId)}
@@ -136,8 +135,8 @@ export default function CerclePage() {
 
           <Panel title="À propos du Cercle" description="Un fil familial, calme et privé.">
             <p className="m-0 text-[12px] leading-[1.55] text-muted">
-              Chaque publication peut recevoir des réactions et des commentaires. L’auteur et les administrateurs du foyer
-              peuvent retirer une publication, toujours après confirmation.
+              Chaque publication peut recevoir des réactions et des commentaires. Seul l’auteur
+              peut retirer sa publication, toujours après confirmation.
             </p>
           </Panel>
         </aside>
@@ -147,7 +146,6 @@ export default function CerclePage() {
         post={commentsPost}
         open={commentsPostId !== null}
         currentMemberId={currentMemberId}
-        isAdmin={isAdmin}
         onOpenChange={(open) => {
           if (!open) setCommentsPostId(null);
         }}

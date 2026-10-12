@@ -375,16 +375,14 @@ export function useCercleFeed(): CercleFeed {
     [householdId, invalidate, toast],
   );
 
-  const canDelete = useCallback(
-    (post: FeedPost) => post.mine || isAdmin,
-    [isAdmin],
-  );
+  // D-07 : suppression unitaire strictement auteur — plus de branche admin.
+  const canDelete = useCallback((post: FeedPost) => post.mine, []);
 
   const canEditPost = useCallback((post: FeedPost) => post.mine, []);
 
   const canDeleteComment = useCallback(
-    (comment: FeedComment) => comment.authorId === currentMemberId || isAdmin,
-    [currentMemberId, isAdmin],
+    (comment: FeedComment) => comment.authorId === currentMemberId,
+    [currentMemberId],
   );
 
   const canEditComment = useCallback(
