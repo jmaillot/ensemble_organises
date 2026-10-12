@@ -6,10 +6,7 @@ import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Badge } from '@/components/ui/primitives';
 import { pluralize } from '@/lib/utils';
-import type { FeedPost } from '../types';
-
-/** Plafond du contenu des publications, miroir du CHECK base (0004). */
-export const POST_TEXT_MAX = 4000;
+import { POST_TEXT_MAX, type FeedPost } from '../types';
 
 export interface PostCardProps {
   post: FeedPost;
@@ -126,6 +123,7 @@ function PostCardComponent({
           <div className="flex items-center justify-between gap-2">
             <small className="text-[10px] text-muted">
               {trimmed.length} / {POST_TEXT_MAX} caractères
+              {trimmed.length > POST_TEXT_MAX ? ' — limite dépassée' : ''}
             </small>
             <div className="flex justify-end gap-1.5">
               <Button type="button" variant="quiet" size="sm" onClick={() => setEditing(false)}>

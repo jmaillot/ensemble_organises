@@ -10,10 +10,15 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMomentLabel } from '../types';
+import { COMMENT_CONTENT_MAX } from '../types';
 import type { FeedComment, FeedPost } from '../types';
 
 const schema = z.object({
-  content: z.string().trim().min(1, 'Écrivez un commentaire.').max(400, 'Le commentaire est limité à 400 caractères.'),
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Écrivez un commentaire.')
+    .max(COMMENT_CONTENT_MAX, `Le commentaire est limité à ${COMMENT_CONTENT_MAX} caractères.`),
 });
 
 type CommentValues = z.infer<typeof schema>;
@@ -44,8 +49,10 @@ export function CommentsDialog({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<CommentValues>({ resolver: zodResolver(schema), defaultValues: { content: '' } });
+  const contentValue = watch('content') ?? '';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -109,7 +116,9 @@ export function CommentsDialog({
               const editing = editingId === comment.id;
               const editTrimmed = editDraft.trim();
               const canSaveEdit =
-                editTrimmed !== '' && editTrimmed !== comment.content;
+                editTrimmed !== '' &&
+                editTrimmed.length <= COMMENT_CONTENT_MAX &&
+                editTrimmed !== comment.content;
               return (
                 <li key={comment.id} className="flex items-start gap-2.5 border-t border-border pt-3 first:border-0 first:pt-0">
                   <MemberAvatar member={comment.author} name={comment.author?.display_name ?? 'Membre'} size="sm" />
@@ -132,13 +141,19 @@ export function CommentsDialog({
                           aria-label="Modifier votre commentaire"
                           autoFocus
                         />
-                        <div className="flex justify-end gap-1.5">
-                          <Button type="button" variant="quiet" size="sm" onClick={cancelEdit}>
-                            Annuler
-                          </Button>
-                          <Button type="submit" variant="secondary" size="sm" disabled={!canSaveEdit || savingEdit}>
-                            {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
-                          </Button>
+                        <div className="flex items-center justify-between gap-2">
+                          <small className="text-[10px] text-muted">
+                            {editTrimmed.length} / {COMMENT_CONTENT_MAX} caractères
+                            {editTrimmed.length > COMMENT_CONTENT_MAX ? ' — limite dépassée' : ''}
+                          </small>
+                          <div className="flex justify-end gap-1.5">
+                            <Button type="button" variant="quiet" size="sm" onClick={cancelEdit}>
+                              Annuler
+                            </Button>
+                            <Button type="submit" variant="secondary" size="sm" disabled={!canSaveEdit || savingEdit}>
+                              {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
+                            </Button>
+                          </div>
                         </div>
                       </form>
                     ) : (
@@ -186,7 +201,11 @@ export function CommentsDialog({
         )}
 
         <form onSubmit={onSubmitComment} className="grid gap-3" noValidate>
-          <Field label="Votre commentaire" error={errors.content?.message}>
+          <Field
+            label="Votre commentaire"
+            hint={`${contentValue.trim().length} / ${COMMENT_CONTENT_MAX} caractères`}
+            error={errors.content?.message}
+          >
             {(props) => (
               <Textarea
                 {...props}

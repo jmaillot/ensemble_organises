@@ -59,6 +59,13 @@ export interface PublishInput {
   image?: CompressedImage | null;
 }
 
+/**
+ * Plafonds miroirs des CHECK base (0004 : posts.text 4000,
+ * post_comments.content 2000). Le client reflète la base, jamais l'inverse.
+ */
+export const POST_TEXT_MAX = 4000;
+export const COMMENT_CONTENT_MAX = 2000;
+
 export const ROLE_LABELS: Record<HouseholdMemberRow['role'], string> = {
   admin: 'Admin',
   membre: 'Membre',

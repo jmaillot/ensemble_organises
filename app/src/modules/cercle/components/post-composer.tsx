@@ -10,10 +10,11 @@ import { Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { compressImage, describeFile, type CompressedImage } from '../lib/media';
+import { POST_TEXT_MAX } from '../types';
 import type { PublishInput } from '../types';
 
 const schema = z.object({
-  text: z.string().trim().max(600, 'Le message est limité à 600 caractères.'),
+  text: z.string().trim().max(POST_TEXT_MAX, `Le message est limité à ${POST_TEXT_MAX} caractères.`),
 });
 
 type ComposerValues = z.infer<typeof schema>;
@@ -91,7 +92,7 @@ export function PostComposer({ onPublish, focusSignal = 0, disabled }: PostCompo
         <Field
           label="Votre commentaire"
           error={errors.text?.message}
-          hint="Les publications sont visibles par tout le foyer."
+          hint={`Les publications sont visibles par tout le foyer. ${text.trim().length} / ${POST_TEXT_MAX} caractères.`}
         >
           {(props) => (
             <Textarea
