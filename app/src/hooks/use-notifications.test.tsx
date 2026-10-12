@@ -128,4 +128,42 @@ describe('centre de notifications', () => {
       expect(result.current.conversations.find((c) => c.id === 'conversation-1')?.unread).toBe(0);
     });
   });
+
+  it('fait surface un message posté dans un fil non ouvert (cloche affamée)', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+
+    // Base saine : on solde le fil, sans jamais l'ouvrir (aucun useThreadPage,
+    // aucun marquage post-envoi). Le fil non ouvert ne doit plus peser.
+    const row = result.current.items.find((item) => item.id === 'message:conversation-2');
+    expect(row).toBeDefined();
+    await act(async () => {
+      result.current.markItem(row!);
+    });
+    await waitFor(() => expect(result.current.items.some((item) => item.id === 'message:conversation-2')).toBe(false));
+
+    // Le second membre poste dans ce fil non ouvert : la cloche doit lever la
+    // pastille et la ligne (titre, extrait, lien) sans rechargement.
+    const body = `Le pain est pris à ${new Date().toISOString()}`;
+    await data.create('messages', {
+      conversation_id: 'conversation-2',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: DEMO_MEMBERS.thomas,
+      content: body,
+      created_at: new Date().toISOString(),
+    });
+
+    await waitFor(() => {
+      const raised = result.current.items.find((item) => item.id === 'message:conversation-2');
+      expect(raised).toBeDefined();
+      expect(raised?.detail).toBe(body);
+      expect(raised?.href).toBe('/messages');
+    });
+    expect(result.current.messagesUnread).toBeGreaterThan(0);
+  });
 });

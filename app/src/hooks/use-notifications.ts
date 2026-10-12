@@ -3,7 +3,7 @@ import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { fromProfileColumns } from '@/modules/parametres/lib/push';
-import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
+import { useMessagesFeed, useMessagesRealtime } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
 import { toTask } from '@/modules/taches/types';
@@ -111,6 +111,11 @@ export function maskExpiryIso(from = new Date()): string {
 export function useNotifications(): NotificationsSummary {
   const user = useSessionUser();
   const householdId = useHouseholdStore((state) => state.householdId);
+  // La cloche vit dans le shell, montée une fois pour toute la session : sans
+  // cet abonnement, un message posté depuis un autre appareil n'invalidait
+  // jamais ses requêtes — pastille et lignes restaient gelées tant que
+  // l'utilisateur n'ouvrait pas la page Messages (seul montage précédent).
+  useMessagesRealtime();
   const feed = useMessagesFeed();
   const cercle = useCercleFeed();
   const routinesFeed = useRoutines();
