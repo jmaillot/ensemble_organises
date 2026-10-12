@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -150,7 +150,63 @@ export function useNotifications(): NotificationsSummary {
       return next;
     });
   }, []);
+  const unmaskIds = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setMasked((previous) => {
+      if (!ids.some((id) => previous[id] !== undefined)) return previous;
+      const next = cleanMasked(previous);
+      let changed = false;
+      for (const id of ids) {
+        if (next[id] !== undefined) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      if (!changed) return previous;
+      saveMasked(next);
+      return next;
+    });
+  }, []);
   const isMasked = (id: string) => masked[id] !== undefined && masked[id] > nowIso;
+
+  /** Identifiants marquables non lus (`message:<conv>`, `cercle:<post>`) :
+   * les rappels calculés (tâches, événements, routines) n'y figurent jamais —
+   * ils se résorbent d'eux-mêmes et ne sont masqués que par la croix. */
+  const unreadKey = useMemo(() => {
+    const ids: string[] = [];
+    for (const conversation of feed.conversations) {
+      if (conversation.unread > 0) ids.push(`message:${conversation.id}`);
+    }
+    for (const post of cercle.feed) {
+      if (post.unreadComments > 0) ids.push(`cercle:${post.id}`);
+    }
+    return ids.sort().join('\n');
+  }, [cercle.feed, feed.conversations]);
+
+  /** Masquage dérivé des transitions lu/non-lu, pas des appels de marquage :
+   * un fil soldé quitte le centre (onglets « Non lues » ET « Toutes ») quel
+   * que soit le chemin qui l'a soldé — clic sur la cloche (`markItem`),
+   * ouverture du fil (marquage direct au niveau du feed, sans `markItem`),
+   * ou « tout marquer comme lu ». Une activité fraîche sur un fil masqué
+   * (retour à non-lu) le démasque aussitôt : un masque périmé n'avale jamais
+   * du non-lu. Même magasin et même horizon « jusqu'à demain » que la croix —
+   * aucun second mécanisme, aucune date supplémentaire. */
+  const previousUnreadKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (previousUnreadKey.current === null) {
+      previousUnreadKey.current = unreadKey;
+      return;
+    }
+    const previous = new Set(previousUnreadKey.current === '' ? [] : previousUnreadKey.current.split('\n'));
+    const current = new Set(unreadKey === '' ? [] : unreadKey.split('\n'));
+    previousUnreadKey.current = unreadKey;
+    const newlyRead = [...previous].filter((id) => !current.has(id));
+    const newlyUnread = [...current].filter((id) => !previous.has(id));
+    // Dissocier les deux directions : un même rendu peut solder un fil et en
+    // réveiller un autre (tout marquer + message entrant entre deux rendus).
+    if (newlyRead.length > 0) maskIds(newlyRead);
+    if (newlyUnread.length > 0) unmaskIds(newlyUnread);
+  }, [maskIds, unmaskIds, unreadKey]);
 
   const items = useMemo<NotificationItem[]>(() => {
     const now = new Date();
