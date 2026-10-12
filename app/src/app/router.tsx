@@ -412,7 +412,17 @@ export function AppRouter() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter>
+        {/*
+          Navigation synchrone (15-04) : sans `useTransitions={false}`,
+          React Router enveloppe la mise à jour de localisation dans une
+          transition qui suspend sur le morceau paresseux de destination —
+          et cette transition ne se résout jamais (la page reste figée sur
+          l'ancienne route malgré l'URL à jour : création de voyage qui
+          n'ouvre pas sa fiche, tuiles d'accueil inertes). En synchrone, la
+          suspension affiche le repli de chargement prévu (`RouteFallback`)
+          puis la page — le régime dessiné par `LazyRoute`.
+        */}
+        <BrowserRouter useTransitions={false}>
           <ScrollToTop />
           <AppRoutes />
         </BrowserRouter>
