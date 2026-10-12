@@ -7,7 +7,7 @@ Ce document sert de référence pour tout agent (humain ou IA) travaillant sur l
 ## 1. Vue d'ensemble
 
 **Nom** : Ensemble & Organisés
-**Type** : Progressive Web App (PWA), installable, offline-first partiel
+**Type** : Progressive Web App (PWA), installable, en ligne d'abord + démo locale (offline retiré le 2026-10-12, D-10 phase 09)
 **Cible** : familles / foyers qui veulent centraliser l'organisation du quotidien (tâches, courses, calendrier, budget partagé, souvenirs...)
 **Unité de base** : le **foyer** (household). Chaque utilisateur appartient à un ou plusieurs foyers, chaque foyer a des membres avec des rôles.
 
@@ -38,7 +38,7 @@ Ce document sert de référence pour tout agent (humain ou IA) travaillant sur l
 | Calendrier UI | Composant maison basé sur `date-fns` | Contrôle complet du rendu mobile-first; `react-big-calendar` n'est pas retenu par défaut |
 | Scan code-barres / QR | API native **BarcodeDetector** + repli `html5-qrcode` | Meilleure intégration quand l'API est disponible, sans abandonner la compatibilité navigateur |
 | Compression images avant upload | `createImageBitmap` + `<canvas>`/`toBlob` | Traitement natif côté navigateur, sans dépendance supplémentaire; WebP lorsque disponible, JPEG sinon |
-| Offline cache | **Dexie v4** + service worker Workbox via **`vite-plugin-pwa` v1** | Cache applicatif IndexedDB et pré-cache des assets générés par Vite |
+| Offline cache | Supprimé le 2026-10-12 (D-10 phase 09) : lectures/écritures directes backend, erreurs d'origine ; **Dexie v4** ne sert plus que le mode démo local ; SW : précache + push uniquement |
 | Notifications push | **Web Push API** + VAPID, implémentées dans une Edge Function auto-hébergée | Abonnements et envoi contrôlés par l'application, sans service d'hébergement tiers |
 
 TypeScript 7.0 n'expose pas encore son API publique de compilateur. Utiliser `tsc` 7 pour le build, mais vérifier les plugins qui consomment l'API TypeScript; si nécessaire, installer `@typescript/typescript6` en parallèle pour ces outils plutôt que de dégrader le vérificateur du projet.
@@ -365,7 +365,7 @@ second demande une preuve d'absence, ce qui est plus dur que l'inverse.
     /components/shared            # composants métier partagés
     /lib
       /supabase                  # client et accès aux services auto-hébergés
-      /offline                   # cache Dexie et queue de synchronisation
+      /data                      # adaptateurs (Supabase direct, démo locale IndexedDB/Dexie)
       /notifications
     /hooks
     /stores

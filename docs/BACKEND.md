@@ -1100,7 +1100,7 @@ en base, puis agrégat JSON des soldes et des transferts. Le pont est
 > Le frontend affiche les soldes du serveur quand il est connecté
 > (`useServerSettlement`, même requête partagée par la page Ardoise et le
 > résumé de l'accueil) : le calcul local de `types.ts` ne sert que de repli
-> (démo, hors ligne, fonction injoignable). Les participants externes ne
+> (démo, fonction injoignable — plus de cas hors ligne depuis D-10 phase 09). Les participants externes ne
 > peuvent plus être ajoutés aux dépenses (0038) ; les affichages qui les
 > nomment encore ne concernent que des lignes antérieures. Le panneau des
 > soldes dit sa source (« Soldes calculés côté serveur. ») plutôt que de la
