@@ -6,6 +6,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import VoyagesPage from './voyages-page';
 import { isServableCoverUrl } from './voyages-page';
+import { DEFAULT_TRIP_COVER } from './types';
 import {
   deleteTripCover,
   isTripCoverPath,
@@ -310,5 +311,62 @@ describe('Voyages', () => {
     await deleteTripCover('blob:apercu-demo');
     await deleteTripCover(null);
     expect(removeFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cartes : vignette pour le voyage couvert, rien pour le sans-couverture, héros intact (12-04)', async () => {
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    await adapter.create('trips', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Séjour couvert à Rome',
+      destination: 'Rome',
+      start_date: '2027-05-10',
+      end_date: '2027-05-16',
+      cover_photo: 'https://exemple.fr/rome.jpg',
+    } as never);
+    // Couverture inutilisable : échec fermé côté carte comme côté héros.
+    await adapter.create('trips', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Séjour illisible à Oslo',
+      destination: 'Oslo',
+      start_date: '2027-06-10',
+      end_date: '2027-06-16',
+      cover_photo: 'ftp://exemple.fr/oslo.jpg',
+    } as never);
+    // Sans couverture : repli premier parti, comme le héros.
+    await adapter.create('trips', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Séjour nu à Tromso',
+      destination: 'Tromso',
+      start_date: '2027-07-10',
+      end_date: '2027-07-16',
+      cover_photo: null,
+    } as never);
+    renderWithProviders(<VoyagesPage />);
+
+    await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
+
+    // Carte couverte : la vignette reprend la couverture lisible (même chemin que le héros).
+    const romeButton = screen.getByRole('button', { name: 'Rome10 — 16 mai 2027' });
+    const romeCard = romeButton.parentElement as HTMLElement;
+    const romeImg = romeCard.querySelector('img');
+    expect(romeImg).not.toBeNull();
+    expect(romeImg?.getAttribute('src')).toBe('https://exemple.fr/rome.jpg');
+    expect(romeImg?.getAttribute('loading')).toBe('lazy');
+
+    // Carte sans couverture utilisable : aucune image, affordances inchangées.
+    const osloButton = screen.getByRole('button', { name: 'Oslo10 — 16 juin 2027' });
+    const osloCard = osloButton.parentElement as HTMLElement;
+    expect(osloCard.querySelector('img')).toBeNull();
+    expect(within(osloCard).getByRole('button', { name: 'Modifier' })).toBeInTheDocument();
+
+    // Repli nul : la vignette reprend la couverture par défaut, comme le héros.
+    const tromsoButton = screen.getByRole('button', { name: 'Tromso10 — 16 juillet 2027' });
+    const tromsoCard = tromsoButton.parentElement as HTMLElement;
+    expect(tromsoCard.querySelector('img')?.getAttribute('src')).toBe(DEFAULT_TRIP_COVER);
+
+    // Héros intact : toujours la couverture du voyage mis en avant.
+    const hero = screen.getByRole('region', { name: 'Voyage vers Lisbonne' });
+    expect((hero as HTMLElement).style.backgroundImage).toContain('/assets/lisbonne.jpg');
   });
 });
