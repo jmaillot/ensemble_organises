@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AppShell } from './app-shell';
 import { signOut, useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { Forbidden } from '@/components/ui/forbidden';
 import { data } from '@/lib/data';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import type { ProfileRow } from '@/types';
@@ -160,6 +161,22 @@ function ScrollToTop() {
   return <span key={pathname} className="sr-only" aria-live="polite" />;
 }
 
+/**
+ * Garde « réservé aux grands » (phase 14, D-06) : un accès direct à l'URL
+ * d'un des 5 modules hors périmètre enfant rend la page « non autorisé »
+ * sobre — jamais une 404 mensongère, jamais une redirection silencieuse. Le
+ * serveur refuse de toute façon (14-01) : contourner le masquage ne donne
+ * rien. Les parcours d'invitation anonymes (`/invitation/*`, hors shell)
+ * restent ouverts à tous par construction.
+ */
+function RequireGrownUp({ children }: { children: ReactNode }) {
+  const currentMember = useCurrentMember();
+  if (currentMember?.role === 'enfant') {
+    return <Forbidden />;
+  }
+  return <>{children}</>;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -281,19 +298,25 @@ export function AppRoutes() {
         <Route
           path="/ardoise"
           element={
-            <LazyRoute load={routeChunkLoaders.ardoise} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.ardoise} />
+            </RequireGrownUp>
           }
         />
         <Route
           path="/ardoise/:id"
           element={
-            <LazyRoute load={routeChunkLoaders.ardoiseDetail} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.ardoiseDetail} />
+            </RequireGrownUp>
           }
         />
         <Route
           path="/cadeaux"
           element={
-            <LazyRoute load={routeChunkLoaders.cadeaux} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.cadeaux} />
+            </RequireGrownUp>
           }
         />
         <Route
@@ -311,19 +334,25 @@ export function AppRoutes() {
         <Route
           path="/animaux"
           element={
-            <LazyRoute load={routeChunkLoaders.animaux} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.animaux} />
+            </RequireGrownUp>
           }
         />
         <Route
           path="/prestataires"
           element={
-            <LazyRoute load={routeChunkLoaders.prestataires} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.prestataires} />
+            </RequireGrownUp>
           }
         />
         <Route
           path="/fidelite"
           element={
-            <LazyRoute load={routeChunkLoaders.fidelite} />
+            <RequireGrownUp>
+              <LazyRoute load={routeChunkLoaders.fidelite} />
+            </RequireGrownUp>
           }
         />
         <Route

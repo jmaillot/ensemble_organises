@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
-import { catalogueModules } from '@/lib/modules';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { catalogueModules, isChildHiddenModule } from '@/lib/modules';
 import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
 
@@ -189,6 +190,52 @@ describe('AppShell — catalogue des espaces', () => {
     } finally {
       // @ts-expect-error restauration de l'environnement jsdom
       delete window.navigator.serviceWorker;
+    }
+  });
+});
+
+/**
+ * Périmètre enfant (phase 14, D-05) : ni le catalogue, ni le tiroir mobile
+ * n'exposent les 5 modules hors périmètre au rôle `enfant`. Les vues
+ * admin/membre restent byte-identiques (prouvé par les suites ci-dessus, qui
+ * tournent en admin par défaut).
+ */
+describe('AppShell — périmètre enfant', () => {
+  const hiddenLabels = ['Ardoise', 'Cadeaux', 'Animaux', 'Prestataires', 'Fidélité'];
+
+  function renderShellAsChild(route: string) {
+    renderShell(route);
+    act(() => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+    });
+  }
+
+  it('retire les 5 modules du catalogue pour un enfant', () => {
+    renderShellAsChild('/accueil');
+    const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
+    const links = within(grid).getAllByRole('link');
+    const expected = catalogueModules.filter((entry) => !isChildHiddenModule(entry.key));
+    expect(links).toHaveLength(expected.length);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(expected.map((entry) => `/${entry.key}`));
+    for (const label of hiddenLabels) {
+      expect(within(grid).queryByRole('link', { name: label })).not.toBeInTheDocument();
+    }
+    // Les espaces autorisés restent joignables, sans entrée focusable cachée.
+    expect(within(grid).getByRole('link', { name: 'Courses' })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: 'Contacts' })).toBeInTheDocument();
+  });
+
+  it('retire les 5 modules du tiroir mobile pour un enfant', async () => {
+    const user = userEvent.setup();
+    renderShellAsChild('/accueil');
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    // Maison + douze espaces : 13 liens, aucun hollow, aucun masqué en CSS.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(13);
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir Maison' })).toBeInTheDocument();
+    for (const label of ['Ardoise', 'Cadeaux', 'Animaux', 'Prestataires', 'Fidélité']) {
+      expect(within(dialog).queryByRole('link', { name: `Ouvrir ${label}` })).not.toBeInTheDocument();
     }
   });
 });

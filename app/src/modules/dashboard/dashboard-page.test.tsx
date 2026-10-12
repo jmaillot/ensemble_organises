@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
 import DashboardPage from './dashboard-page';
 import { layoutWidgets, reorderPreferences, resetPreferences, toggleWidget } from './types';
 
@@ -120,6 +122,31 @@ describe('Accueil — rendu', () => {
     const checkboxes = await within(widget).findAllByRole('checkbox', {}, { timeout: 5000 });
     expect(checkboxes.length).toBeGreaterThan(0);
     expect(checkboxes[0].getAttribute('aria-label')).toMatch(/^Terminer : /);
+  });
+
+  it('masque à un enfant les tuiles et la colonne Ardoise/activité (phase 14, D-05/D-07)', async () => {
+    renderWithProviders(<DashboardPage />);
+    await screen.findByRole('heading', { level: 1, name: /Bonjour/ });
+
+    act(() => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+    });
+
+    // Douze tuiles : les 5 modules hors périmètre ont disparu, les autres
+    // restent byte-identiques.
+    const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
+    expect(within(grid).getAllByRole('button')).toHaveLength(12);
+    for (const name of ['Ardoise', 'Cadeaux', 'Fidélité', 'Prestataires', 'Animaux']) {
+      expect(within(grid).queryByRole('button', { name: new RegExp(name) })).not.toBeInTheDocument();
+    }
+    expect(within(grid).getByRole('button', { name: /Courses/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('button', { name: /Contacts/ })).toBeInTheDocument();
+    // La colonne latérale qui lit les dépenses disparaît avec elles : aucun
+    // total ni aucune ligne d'activité ne fuite vers l'enfant.
+    expect(screen.queryByText(/dépenses du foyer/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Activité du foyer' })).not.toBeInTheDocument();
+    // Les espaces autorisés restent : anniversaires et courses visibles.
+    expect(screen.getByRole('heading', { name: 'Anniversaires' })).toBeInTheDocument();
   });
 
 });
