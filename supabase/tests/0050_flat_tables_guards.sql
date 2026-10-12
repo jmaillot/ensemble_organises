@@ -267,14 +267,14 @@ select testkit.as_user(user_id, 'plate13-enfant@example.fr') from testkit.fx whe
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
-  'select 1 from public.provider_types where id = %L', (select row_id from testkit.fx where key = 'type_a'))), 1::bigint,
-  'un enfant lit les types de son foyer');
+  'select 1 from public.provider_types where id = %L', (select row_id from testkit.fx where key = 'type_a'))), 0::bigint,
+  'un enfant ne lit plus les types de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.providers where id = %L', (select row_id from testkit.fx where key = 'prov_a'))), 1::bigint,
-  'un enfant lit les prestataires de son foyer');
+  'select 1 from public.providers where id = %L', (select row_id from testkit.fx where key = 'prov_a'))), 0::bigint,
+  'un enfant ne lit plus les prestataires de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.loyalty_cards where id = %L', (select row_id from testkit.fx where key = 'card_a'))), 1::bigint,
-  'un enfant lit les cartes de son foyer');
+  'select 1 from public.loyalty_cards where id = %L', (select row_id from testkit.fx where key = 'card_a'))), 0::bigint,
+  'un enfant ne lit plus les cartes de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.places where id = %L', (select row_id from testkit.fx where key = 'place_a'))), 1::bigint,
   'un enfant lit les lieux de son foyer');

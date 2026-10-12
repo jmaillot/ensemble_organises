@@ -116,13 +116,14 @@ select testkit.expect_denied(format(
 
 reset role;
 
--- Enfant : lecture seule, comme sur le reste du foyer.
+-- Enfant : ni lecture ni ecriture sur les pieces jointes animales (0113,
+-- phase 14) ; lecture seule sur les notes, comme avant.
 select testkit.as_user(user_id, 'pj-kid@example.fr') from testkit.fx where key = 'kid';
 set local role authenticated;
 
 select testkit.eq(
   (select count(*) from public.pet_attachments where id = 'pj-pa-1'),
-  1::bigint, 'un enfant lit les pièces jointes de son foyer');
+  0::bigint, 'un enfant ne lit plus les pieces jointes animales (0113, phase 14)');
 
 select testkit.expect_denied(format(
   'insert into public.note_attachments (id, note_id, household_id, file_url, file_name, mime_type, size_bytes)'

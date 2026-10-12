@@ -239,11 +239,11 @@ select testkit.eq(testkit.count(format(
   'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 1::bigint,
   'un enfant lit les voyages de son foyer');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.pets where id = %L', (select row_id from testkit.fx where key = 'pet_a'))), 1::bigint,
-  'un enfant lit les animaux de son foyer');
+  'select 1 from public.pets where id = %L', (select row_id from testkit.fx where key = 'pet_a'))), 0::bigint,
+  'un enfant ne lit plus les animaux de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.pet_records where id = %L', (select row_id from testkit.fx where key = 'rec_a1'))), 1::bigint,
-  'un enfant lit les suivis de son foyer');
+  'select 1 from public.pet_records where id = %L', (select row_id from testkit.fx where key = 'rec_a1'))), 0::bigint,
+  'un enfant ne lit plus les suivis de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.recipes where id = %L', (select row_id from testkit.fx where key = 'recipe_a'))), 1::bigint,
   'un enfant lit les recettes de son foyer');

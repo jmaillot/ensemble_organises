@@ -89,13 +89,14 @@ select testkit.expect_denied(format(
 
 reset role;
 
--- Enfant : lecture seule, comme sur le reste du foyer.
+-- Enfant : ni lecture ni ecriture sur les pieces jointes prestataires
+-- (0113, phase 14) ; le reste du foyer reste en lecture seule.
 select testkit.as_user(user_id, 'pp-kid@example.fr') from testkit.fx where key = 'kid';
 set local role authenticated;
 
 select testkit.eq(
   (select count(*) from public.provider_attachments where id = 'pp-pa-1'),
-  1::bigint, 'un enfant lit les pièces jointes de son foyer');
+  0::bigint, 'un enfant ne lit plus les pieces jointes prestataires (0113, phase 14)');
 
 select testkit.expect_denied(format(
   'insert into public.provider_attachments (id, provider_id, household_id, file_url, file_name, mime_type, size_bytes)'

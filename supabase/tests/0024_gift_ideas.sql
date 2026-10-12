@@ -114,13 +114,13 @@ select testkit.eq(testkit.affected(format(
 reset role;
 
 -- ===========================================================================
--- Noé, rôle `enfant` : lecture seule
+-- Noé, rôle `enfant` : ni lecture ni ecriture sur les idees (0113, phase 14)
 -- ===========================================================================
 select testkit.as_user(user_id, 'enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.gift_ideas'), 1::bigint,
-  'un enfant lit l''idee de son foyer (il n''en est pas le destinataire)');
+select testkit.eq(testkit.count('select 1 from public.gift_ideas'), 0::bigint,
+  'un enfant ne lit plus les idees de son foyer (0113, phase 14)');
 select testkit.expect_denied(format(
   'insert into public.gift_ideas (id, household_id, name) values (%L, %L, %L)',
   'idea_kid', (select household_id from testkit.fx where key = 'enfant'), 'Bonbons'),
