@@ -87,7 +87,7 @@ describe('LazyRoute — garde d\u2019erreur par route', () => {
     render(<LazyRoute load={() => Promise.reject(new Error('Failed to fetch chunk'))} />);
 
     expect(await screen.findByRole('button', { name: /réessayer/i })).toBeInTheDocument();
-    expect(screen.getByText(/n'a pas pu se charger/)).toBeInTheDocument();
+    expect(screen.getByText(/n’a pas pu se charger/)).toBeInTheDocument();
     // Le repli de chargement a cédé la place à l'état d'échec.
     expect(screen.queryByText('Chargement de la page…')).not.toBeInTheDocument();
   });

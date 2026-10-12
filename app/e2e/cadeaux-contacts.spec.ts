@@ -257,3 +257,90 @@ test.describe('Cadeaux vers contacts et anniversaires', () => {
     await expect(page.getByText('Bougie parfumée')).toBeVisible();
   });
 });
+
+test.describe('Périmètre enfant — masquage client (phase 14, D-05/D-06/D-07)', () => {
+  /**
+   * Session enfant en démonstration : même idiome que les suites Vitest
+   * (`currentMemberId` = Noé, rôle `enfant`), posé via le store zustand
+   * persisté. Au rechargement, le bootstrap démo conserve le membre persisté
+   * (aucun `setHousehold` quand le foyer est déjà chargé) — sans toucher au
+   * code de production.
+   */
+  async function openChildSession(page: Page) {
+    await openDemoSession(page);
+    await page.evaluate(() => {
+      const key = 'ensemble-organises-household';
+      const raw = localStorage.getItem(key);
+      if (!raw) throw new Error('store foyer absent');
+      const parsed = JSON.parse(raw) as { state: Record<string, unknown> };
+      localStorage.setItem(
+        key,
+        JSON.stringify({ ...parsed, state: { ...parsed.state, currentMemberId: 'member-noe' } }),
+      );
+    });
+    await page.reload();
+    await page.waitForURL('**/accueil');
+    await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
+  }
+
+  const hiddenTiles = ['Ouvrir Ardoise', 'Ouvrir Cadeaux', 'Ouvrir Fidélité', 'Ouvrir Prestataires', 'Ouvrir Animaux'];
+
+  test('enfant : aucune tuile ni carte Ardoise/activité sur l’accueil', async ({ page }) => {
+    await openChildSession(page);
+
+    const grid = page.getByRole('list', { name: 'Espaces du foyer' });
+    await expect(grid.getByRole('button', { name: /Ouvrir / })).toHaveCount(12);
+    for (const name of hiddenTiles) {
+      await expect(grid.getByRole('button', { name, exact: true })).toHaveCount(0);
+    }
+    // Les espaces autorisés restent joignables.
+    await expect(grid.getByRole('button', { name: 'Ouvrir Courses' })).toBeVisible();
+    await expect(grid.getByRole('button', { name: 'Ouvrir Contacts' })).toBeVisible();
+    // La colonne latérale qui lit les dépenses disparaît avec elles (D-07).
+    await expect(page.getByText('dépenses du foyer')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Activité du foyer' })).toHaveCount(0);
+  });
+
+  test('enfant : tiroir mobile sans les 5 espaces', async ({ page }) => {
+    await openChildSession(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    // Maison + douze espaces : 13 liens, aucun intitulé vide, aucun masqué en CSS.
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(13);
+    await expect(dialog.getByRole('link', { name: 'Ouvrir Maison' })).toBeVisible();
+    for (const name of hiddenTiles) {
+      await expect(dialog.getByRole('link', { name, exact: true })).toHaveCount(0);
+    }
+  });
+
+  test('enfant : URL directe rend non-autorisé, jamais 404 ni redirection', async ({ page }) => {
+    await openChildSession(page);
+
+    for (const path of ['/ardoise', '/ardoise/n-importe-quoi', '/cadeaux', '/animaux', '/prestataires', '/fidelite']) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { name: 'Un espace réservé aux grands' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Cette page n’existe pas' })).toHaveCount(0);
+      // L'URL ne bouge pas : pas de redirection silencieuse.
+      expect(page.url()).toContain(path === '/ardoise/n-importe-quoi' ? '/ardoise/' : path);
+    }
+
+    // Le lien ramène au tableau de bord.
+    await page.getByRole('link', { name: 'Retour au tableau de bord' }).click();
+    await page.waitForURL('**/accueil');
+    await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
+  });
+
+  test('admin : tuiles et cartes Ardoise/activité inchangées', async ({ page }) => {
+    // Camille, admin de démo : les suites ci-dessus prouvent déjà ses vues,
+    // ce test verrouille que le masquage enfant ne les a pas rognées.
+    await openDemoSession(page);
+
+    const grid = page.getByRole('list', { name: 'Espaces du foyer' });
+    await expect(grid.getByRole('button', { name: /Ouvrir / })).toHaveCount(17);
+    await expect(grid.getByRole('button', { name: 'Ouvrir Ardoise' })).toBeVisible();
+    await expect(page.getByText('dépenses du foyer')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Activité du foyer' })).toBeVisible();
+  });
+});
