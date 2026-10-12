@@ -104,4 +104,33 @@ describe('Cercle', () => {
     expect(screen.getByText('1 non lus')).toBeInTheDocument();
     expect(screen.getByText('nouveaux commentaires')).toBeInTheDocument();
   });
+
+  it('supprime sa propre publication après confirmation et l’annonce', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<CerclePage />);
+
+    expect(await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).toBeInTheDocument();
+
+    // Sa propre publication (Camille) porte l’affordance offerte par canDelete = mienne.
+    await user.type(screen.getByLabelText(/Votre commentaire/), 'Pique-nique annulé, pluie annoncée.');
+    await user.click(screen.getByRole('button', { name: 'Publier' }));
+    const card = (await screen.findByText('Pique-nique annulé, pluie annoncée.')).closest(
+      'article',
+    ) as HTMLElement;
+
+    // Corbeille → modale de confirmation (AGENTS.md §6) → suppression annoncée.
+    await user.click(
+      within(card).getByRole('button', { name: /Supprimer la publication de Camille Martin/ }),
+    );
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Supprimer cette publication ?')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Pique-nique annulé, pluie annoncée.')).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
+    // Les deux publications d’origine survivent : la suppression ne déborde pas.
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(2);
+  });
 });
