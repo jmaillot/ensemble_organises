@@ -179,6 +179,9 @@ export function useVoyages(): VoyagesState {
         end_date: payload.endDate,
         cover_photo: payload.coverPhoto,
         notes: payload.notes,
+        created_by: null,
+        tab_state: null,
+        is_closed: false,
         created_at: new Date().toISOString(),
       } as TripRow;
       queryClient.setQueryData<TripRow[]>(voyagesKeys.trips(householdId), (previous) => [

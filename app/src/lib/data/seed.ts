@@ -45,6 +45,7 @@ import type {
   TaskAssigneeRow,
   TaskReminderRow,
   TaskRow,
+  TripMemberRow,
   TripRow,
 } from '@/types';
 import type { Row } from '@/types';
@@ -1000,8 +1001,21 @@ export const demoTrips: TripRow[] = [
     end_date: '2027-04-18',
     cover_photo: '/assets/lisbonne.jpg',
     notes: 'Un voyage à préparer tranquillement.',
+    created_by: DEMO_MEMBERS.camille,
+    tab_state: null,
+    is_closed: false,
     created_at: now(),
   },
+];
+
+/**
+ * Participants du voyage démo (phase 15, D-01) : Camille et Thomas, tous deux
+ * admin/membre — jamais Noé (enfant). La fiche détail prouve l'appartenance
+ * sur ces lignes ; 15-02 tâche 3 complète (invité, lignes tripées, ardoise).
+ */
+export const demoTripMembers: TripMemberRow[] = [
+  { trip_id: 'trip-1', member_id: DEMO_MEMBERS.camille, created_at: now() },
+  { trip_id: 'trip-1', member_id: DEMO_MEMBERS.thomas, created_at: now() },
 ];
 
 export const demoConversations: ConversationRow[] = [
@@ -1182,6 +1196,10 @@ const seedTables: Record<string, Row[]> = {
   post_comments: demoPostComments as unknown as Row[],
   post_reactions: demoPostReactions as unknown as Row[],
   trips: demoTrips as unknown as Row[],
+  trip_members: demoTripMembers as unknown as Row[],
+  // Invités du voyage démo : table lue par la fiche même vide (RLS côté
+  // serveur, magasin local en démo). 15-02 tâche 3 y sème l'invité.
+  trip_guests: [] as unknown as Row[],
   conversations: demoConversations as unknown as Row[],
   conversation_members: demoConversationMembers as unknown as Row[],
   messages: demoMessages as unknown as Row[],

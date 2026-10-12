@@ -374,6 +374,12 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/voyages/:tripId"
+          element={
+            <LazyRoute load={routeChunkLoaders.voyageDetail} />
+          }
+        />
+        <Route
           path="/messages"
           element={
             <LazyRoute load={routeChunkLoaders.messages} />

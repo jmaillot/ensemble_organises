@@ -143,8 +143,8 @@ describe('preloadRouteChunks — préchargement idle', () => {
   });
 
   it('la table couvre un morceau par route paresseuse', () => {
-    expect(ROUTE_CHUNK_COUNT).toBe(31);
-    expect(Object.keys(routeChunkLoaders)).toHaveLength(31);
+    expect(ROUTE_CHUNK_COUNT).toBe(32);
+    expect(Object.keys(routeChunkLoaders)).toHaveLength(32);
   });
 
   it("ne télécharge rien avant l'idle, puis chaque morceau en ligne", async () => {

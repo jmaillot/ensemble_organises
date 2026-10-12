@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
@@ -6,9 +8,12 @@ import { Badge, Progress } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { MemberAvatar } from '@/components/shared/member-avatar';
-import { useIsAdmin } from '@/stores/household-store';
-import { useVoyages } from './hooks/use-voyages';
+import { useToast } from '@/components/ui/toast';
+import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
+import { useVoyages, voyagesKeys } from './hooks/use-voyages';
 import { TripFormDialog } from './components/trip-form-dialog';
+import { TripCreateDialog, type TripCreateValues } from './components/trip-create-dialog';
+import { createTripFlow } from './api';
 import { memberStack, type Trip } from './types';
 
 const MAX_STACK = 3;
@@ -49,7 +54,14 @@ export default function VoyagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Trip | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Trip | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const currentMember = useCurrentMember();
 
   // Le voyage mis en avant suit le prochain voyage tant que rien n'est choisi.
   useEffect(() => {
@@ -61,8 +73,43 @@ export default function VoyagesPage() {
   const others = trips.filter((entry) => entry.id !== trip?.id);
 
   const openCreate = () => {
-    setEditing(null);
-    setFormOpen(true);
+    setCreateOpen(true);
+  };
+
+  /**
+   * Création espace voyage (phase 15) : Edge atomique en ligne, repli local
+   * en démo — puis navigation vers la fiche. Renvoie l'id pour fermer le
+   * dialogue, `null` en échec (le dialogue reste ouvert et dit l'erreur).
+   */
+  const createAndGo = async (values: TripCreateValues): Promise<string | null> => {
+    if (!householdId || isCreating) return null;
+    setIsCreating(true);
+    try {
+      const tripId = await createTripFlow({
+        householdId,
+        input: {
+          name: values.name,
+          destination: values.destination,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          coverPhoto: values.coverPhoto,
+          coverFile: values.coverFile,
+          notes: values.notes,
+          participantIds: values.participantIds,
+          enabledTabs: values.enabledTabs,
+        },
+        createdByMemberId: currentMember?.id ?? null,
+      });
+      await queryClient.invalidateQueries({ queryKey: voyagesKeys.all });
+      toast('Voyage créé : bienvenue dans sa fiche.', 'success');
+      navigate(`/voyages/${tripId}`);
+      return tripId;
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Création impossible.', 'error');
+      return null;
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const openEdit = (target: Trip) => {
@@ -224,6 +271,8 @@ export default function VoyagesPage() {
         busy={isMutating}
         onSubmit={(input, id) => save(input, id)}
       />
+
+      <TripCreateDialog open={createOpen} onOpenChange={setCreateOpen} busy={isCreating} onSubmit={createAndGo} />
 
       <ConfirmDialog
         open={pendingDelete !== null}

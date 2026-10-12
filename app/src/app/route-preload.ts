@@ -45,6 +45,7 @@ export const routeChunkLoaders = {
   adresses: () => import('@/modules/adresses/adresses-page'),
   cercle: () => import('@/modules/cercle/cercle-page'),
   voyages: () => import('@/modules/voyages/voyages-page'),
+  voyageDetail: () => import('@/modules/voyages/trip-detail-page'),
   messages: () => import('@/modules/messages/messages-page'),
   parametres: () => import('@/modules/parametres/parametres-page'),
   notFound: () => import('./not-found-page'),

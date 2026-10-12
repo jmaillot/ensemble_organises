@@ -51,6 +51,68 @@ export interface Trip {
   dateLabel: string;
   /** Voyage à venir ou en cours (exclut les voyages terminés). */
   upcoming: boolean;
+  /** Membre créateur (modération, phase 15) ; null en démo héritée. */
+  createdBy: string | null;
+  /** Onglets de la fiche : désactivé = masqué, jamais supprimé (D-05). */
+  tabState: TabState;
+  /** Fermeture douce (D-08) : figé, réouvrable admin, jamais supprimé. */
+  closed: boolean;
+}
+
+/**
+ * Onglets de la fiche voyage (phase 15, D-05). `infos` et `parametres` sont
+ * structurels (toujours affichés) ; les cinq autres se basculent depuis
+ * Paramètres — masqués, jamais supprimés.
+ */
+export type TripTabKey = 'infos' | 'courses' | 'notes' | 'taches' | 'adresses' | 'budget' | 'parametres';
+
+export const TRIP_TABS: readonly { key: TripTabKey; label: string }[] = [
+  { key: 'infos', label: 'Infos' },
+  { key: 'courses', label: 'Courses' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'taches', label: 'Tâches' },
+  { key: 'adresses', label: 'Adresses' },
+  { key: 'budget', label: 'Budget' },
+  { key: 'parametres', label: 'Paramètres' },
+];
+
+/** Onglets basculables depuis la création et Paramètres (infos/parametres exclus). */
+export const TRIP_TOGGLABLE_TABS: readonly TripTabKey[] = ['courses', 'notes', 'taches', 'adresses', 'budget'];
+
+export type TabState = Record<TripTabKey, boolean>;
+
+export const DEFAULT_TAB_STATE: TabState = {
+  infos: true,
+  courses: true,
+  notes: true,
+  taches: true,
+  adresses: true,
+  budget: true,
+  parametres: true,
+};
+
+/**
+ * Coercition défensive du `tab_state` servi (jsonb, lignes démo héritées sans
+ * la colonne) : clés inconnues ignorées, clés absentes à `true` (jamais de
+ * masquage silencieux par une valeur manquante).
+ */
+export function parseTabState(value: unknown): TabState {
+  const record = (value ?? {}) as Partial<Record<TripTabKey, unknown>>;
+  const read = (key: TripTabKey): boolean => (record[key] === false ? false : true);
+  return {
+    infos: true,
+    courses: read('courses'),
+    notes: read('notes'),
+    taches: read('taches'),
+    adresses: read('adresses'),
+    budget: read('budget'),
+    parametres: true,
+  };
+}
+
+/** Onglets visibles de la fiche : structurels + bascules activées. */
+export function visibleTripTabs(tabState: TabState): Array<{ key: TripTabKey; label: string }> {
+  return TRIP_TABS.filter((tab) => tabState[tab.key]);
 }
 
 export interface TripInput {
@@ -66,6 +128,18 @@ export interface TripInput {
    */
   coverFile?: File | null;
   notes: string;
+  /**
+   * Participants sélectionnés (phase 15, D-01) : identifiants de membres
+   * admin/membre du foyer — les enfants ne sont jamais proposés, et le
+   * serveur ré-valide (Edge + RPC). Vide = régime historique (création
+   * simple sans participants, liste du foyer).
+   */
+  participantIds?: string[];
+  /**
+   * Onglets activés à la création (phase 15, D-05) : les clés absentes
+   * restent affichées. `infos`/`parametres` sont structurels.
+   */
+  enabledTabs?: TripTabKey[];
 }
 
 export const EMPTY_TRIP_INPUT: TripInput = {
@@ -121,6 +195,27 @@ export function toTrip(row: TripRow, today: IsoDate = todayIso()): Trip {
     days: startDate && endDate ? Math.max(1, daysBetween(startDate, endDate)) : 0,
     dateLabel: formatTripRange(startDate, endDate),
     upcoming: status === 'confirme' || status === 'en_cours',
+    createdBy: row.created_by ?? null,
+    tabState: parseTabState(row.tab_state),
+    closed: row.is_closed === true,
+  };
+}
+
+/**
+ * Construit le `tab_state` à envoyer au serveur depuis les onglets cochés :
+ * `infos`/`parametres` structurels, toujours à `true`.
+ */
+export function tabStateFromEnabled(enabled: TripTabKey[]): TabState {
+  const kept = new Set(enabled);
+  const read = (key: TripTabKey): boolean => kept.has(key);
+  return {
+    infos: true,
+    courses: read('courses'),
+    notes: read('notes'),
+    taches: read('taches'),
+    adresses: read('adresses'),
+    budget: read('budget'),
+    parametres: true,
   };
 }
 

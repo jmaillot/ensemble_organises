@@ -674,6 +674,39 @@ export interface TripRow {
   end_date: IsoDate;
   cover_photo: string | null;
   notes: string | null;
+  /**
+   * Membre créateur (phase 15, 0118) : modération, NULL si le membre a
+   * disparu. Immuable côté client (trigger `guard_trip_server_flags`).
+   */
+  created_by: Uuid | null;
+  /**
+   * Onglets de la fiche (phase 15, 0118) : désactiver = masquer, jamais
+   * supprimer. Mis à jour en PostgREST direct par les participants.
+   */
+  tab_state: Record<string, boolean> | null;
+  /**
+   * Fermeture douce (phase 15, 0118, D-08) : fige les écritures, réouvrable
+   * admin. Immuable côté client — seuls les RPC serveur la font bouger, via
+   * l'Edge `trip-invite` (actions `close`/`reopen`).
+   */
+  is_closed: boolean;
+  created_at: IsoDateTime;
+}
+
+/** Participants d'un voyage (phase 15, 0118) : admin/membre du foyer, enfants exclus. */
+export interface TripMemberRow {
+  trip_id: Uuid;
+  member_id: Uuid;
+  created_at: IsoDateTime;
+}
+
+/** Invités externes d'un voyage (phase 15, 0118, miroir ardoise_guests). */
+export interface TripGuestRow {
+  id: Uuid;
+  trip_id: Uuid;
+  display_name: string;
+  /** NULL = payeur nommé sans accès ; sinon empreinte du ticket. */
+  ticket_hash: string | null;
   created_at: IsoDateTime;
 }
 
