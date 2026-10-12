@@ -76,6 +76,11 @@ services:
       # invalidation de tous les codes de liste actifs. Sans lui, l'Edge
       # échoue fermée en 500 explicite au lieu de signer avec du vide.
       GIFT_LIST_INVITE_HMAC_SECRET: ${GIFT_LIST_INVITE_HMAC_SECRET:-}
+      # Partage des voyages (`trip-invite`, phase 15 plan 01) : secret DÉDIÉ,
+      # jamais réutilisé d'un autre HMAC. Génération : openssl rand -base64 48
+      # (≥ 256 bits) ; rotation = invalidation de tous les codes de voyage
+      # actifs. Sans lui, l'Edge échoue fermée en 500 explicite.
+      TRIP_INVITE_HMAC_SECRET: ${TRIP_INVITE_HMAC_SECRET:-}
       # Signature des envois Web Push (RFC 8292), lue par `push-notify` seule.
       # Générées par `sh scripts/generate-vapid-keys.sh`, qui écrit `.env.vapid`
       # sans jamais afficher la clé privée : il reste à reporter les trois
