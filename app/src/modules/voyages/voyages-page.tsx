@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,8 @@ import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useVoyages, voyagesKeys } from './hooks/use-voyages';
 import { TripFormDialog } from './components/trip-form-dialog';
 import { TripCreateDialog, type TripCreateValues } from './components/trip-create-dialog';
-import { createTripFlow } from './api';
-import { memberStack, type Trip } from './types';
+import { createTripFlow, fetchTripTasks } from './api';
+import { computeTripPrepStats, memberStack, type Trip } from './types';
 
 const MAX_STACK = 3;
 
@@ -37,12 +37,10 @@ export default function VoyagesPage() {
   const {
     trips,
     featuredTrip,
-    prep,
     members,
     isLoading,
     isError,
     error,
-    tasksError,
     refetch,
     isMutating,
     save,
@@ -66,7 +64,6 @@ export default function VoyagesPage() {
   }, [featuredTrip, selectedId, trips]);
 
   const trip = trips.find((entry) => entry.id === selectedId) ?? featuredTrip;
-  const others = trips.filter((entry) => entry.id !== trip?.id);
 
   const openCreate = () => {
     setCreateOpen(true);
@@ -155,16 +152,7 @@ export default function VoyagesPage() {
           </section>
 
           <div className="mb-[18px] grid grid-cols-3 gap-3.5 max-[650px]:grid-cols-1">
-            <div className="rounded-[16px] border border-border bg-surface p-[17px]">
-              <strong className="block font-display text-[25px] tracking-[-0.05em]">{prep.openTasks}</strong>
-              <span className="text-[11px] text-muted">tâches du foyer à préparer</span>
-              <Progress value={prep.progress} label="Avancement des tâches du foyer" />
-              {tasksError ? (
-                <p className="mt-2 mb-0 text-[11px] text-muted" role="status">
-                  Les tâches du foyer n’ont pas pu être chargées : le compteur est incomplet.
-                </p>
-              ) : null}
-            </div>
+            <VoyageTasksCard tripId={trip.id} />
             <div className="rounded-[16px] border border-border bg-surface p-[17px]">
               <strong className="block font-display text-[25px] tracking-[-0.05em]">{trip.days}</strong>
               <span className="text-[11px] text-muted">jours sur place</span>
@@ -189,16 +177,17 @@ export default function VoyagesPage() {
             </div>
           </div>
 
-          {others.length > 0 ? (
+          {trips.length > 0 ? (
             <section>
               <SectionHeading
-                title={others.length === 1 ? 'Un autre voyage' : 'Autres voyages'}
-                description="Sélectionnez un voyage pour l’afficher dans le héros."
+                title={trips.length === 1 ? 'Ce voyage' : 'Tous les voyages par date de départ'}
+                description="Du plus proche départ au plus lointain — ouvrez la fiche pour voir ses rubriques."
               />
-              <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-                {others.map((other) => (
+              <div role="list" aria-label="Voyages par date de départ" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                {trips.map((other) => (
                   <div
                     key={other.id}
+                    role="listitem"
                     className={cn(
                       'rounded-[16px] border border-border bg-surface p-[17px]',
                       other.id === selectedId && 'border-accent shadow-[inset_0_0_0_1px_var(--color-accent)]',
@@ -225,6 +214,9 @@ export default function VoyagesPage() {
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <Badge tone={other.upcoming ? 'accent' : 'muted'}>{other.statusLabel}</Badge>
                       <span className="flex gap-1.5">
+                        <Button asChild variant="secondary" size="sm" icon="arrow">
+                          <Link to={`/voyages/${other.id}`}>Ouvrir</Link>
+                        </Button>
                         <Button variant="secondary" size="sm" icon="edit" onClick={() => openEdit(other)}>
                           Modifier
                         </Button>
@@ -237,6 +229,9 @@ export default function VoyagesPage() {
           ) : null}
 
           <div className="mt-[18px] flex flex-wrap gap-2">
+            <Button asChild variant="secondary" icon="arrow">
+              <Link to={`/voyages/${trip.id}`}>Ouvrir la fiche du voyage</Link>
+            </Button>
             <Button variant="secondary" icon="edit" onClick={() => openEdit(trip)}>
               Modifier ce voyage
             </Button>
@@ -254,5 +249,30 @@ export default function VoyagesPage() {
 
       <TripCreateDialog open={createOpen} onOpenChange={setCreateOpen} busy={isCreating} onSubmit={createAndGo} />
     </ModuleShell>
+  );
+}
+
+/**
+ * Compteur du voyage affiché (0119) : tâches de CE voyage (`trip_id`),
+ * jamais celles du foyer. `null` honnête en erreur de lecture.
+ */
+function VoyageTasksCard({ tripId }: { tripId: string }) {
+  const tasksQuery = useQuery({
+    queryKey: ['voyages', 'trip-tasks-count', tripId],
+    queryFn: () => fetchTripTasks(tripId),
+  });
+  const stats = computeTripPrepStats((tasksQuery.data ?? []).map((task) => ({ status: task.status })));
+  const display = tasksQuery.isLoading || tasksQuery.isError ? '—' : String(stats.openTasks);
+  return (
+    <div className="rounded-[16px] border border-border bg-surface p-[17px]">
+      <strong className="block font-display text-[25px] tracking-[-0.05em]">{display}</strong>
+      <span className="text-[11px] text-muted">tâches du voyage à préparer</span>
+      <Progress value={tasksQuery.isError || tasksQuery.isLoading ? 0 : stats.progress} label="Avancement des tâches du voyage" />
+      {tasksQuery.isError ? (
+        <p className="mt-2 mb-0 text-[11px] text-muted" role="status">
+          Les tâches du voyage n’ont pas pu être chargées : le compteur est incomplet.
+        </p>
+      ) : null}
+    </div>
   );
 }

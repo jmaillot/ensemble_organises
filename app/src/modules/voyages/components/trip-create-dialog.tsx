@@ -56,16 +56,17 @@ export interface TripCreateDialogProps {
 }
 
 /**
- * Création d'un voyage (phase 15, D-01/D-09) : infos (mêmes champs que le
- * formulaire historique), composants activés et participants. Seuls les
- * membres admin/membre du foyer sont proposés — les enfants n'apparaissent
- * jamais (le serveur ré-valide : Edge + RPC, T-15-06).
+ * Création d'un voyage (phase 15, D-01 révisé 0119) : infos (mêmes champs que
+ * le formulaire historique), composants activés et participants. Tous les
+ * membres du foyer sont proposés, enfants compris — ils voyagent mais ne
+ * touchent pas au budget (l'onglet Budget les filtre, comme l'ardoise).
+ * Le serveur ré-valide (Edge + RPC, T-15-06).
  */
 export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCreateDialogProps) {
   const toast = useToast();
   const members = useMembers();
-  // D-01 : les enfants ne participent pas aux voyages (comme l'ardoise).
-  const eligible = useMemo(() => members.filter((member) => member.role !== 'enfant'), [members]);
+  // 0119 : toute la famille voyage — enfants inclus (budget seul les exclut).
+  const eligible = useMemo(() => members, [members]);
   const eligibleIds = useMemo(() => eligible.map((member) => member.id), [eligible]);
   const tabLabels = useMemo(() => new Map(TRIP_TABS.map((tab) => [tab.key, tab.label])), []);
 
@@ -227,8 +228,8 @@ export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCre
           <fieldset className="grid gap-2">
             <legend className="text-[11px] font-extrabold text-muted">Participants du voyage</legend>
             <p className="m-0 text-[11px] text-muted">
-              Membres admin et membre uniquement — les enfants ne voyagent pas ici, et les invités externes
-              rejoignent ensuite par code.
+              Toute la famille voyage, enfants compris — les invités externes
+              rejoignent ensuite par code (le budget reste aux adultes).
             </p>
             {eligible.map((member) => {
               const checked = selectedParticipants.includes(member.id);

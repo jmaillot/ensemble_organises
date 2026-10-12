@@ -129,10 +129,9 @@ export interface TripInput {
   coverFile?: File | null;
   notes: string;
   /**
-   * Participants sélectionnés (phase 15, D-01) : identifiants de membres
-   * admin/membre du foyer — les enfants ne sont jamais proposés, et le
-   * serveur ré-valide (Edge + RPC). Vide = régime historique (création
-   * simple sans participants, liste du foyer).
+   * Participants sélectionnés (phase 15, 0119) : identifiants de membres du
+   * foyer, enfants compris (ils voyagent, budget aux adultes seuls).
+   * Vide = régime historique (création simple sans participants).
    */
   participantIds?: string[];
   /**

@@ -504,14 +504,19 @@ begin
     'select 1 from public.ardoise_members where ardoise_id = %L', ardoise_c)), 2::bigint,
     'les inscriptions ardoise sont synchronisees');
 
-  -- Enfant et hors-foyer dans la selection : ignores, jamais inscrits.
+  -- 0119 : enfant et hors-foyer dans la selection — l'enfant voyage
+  -- (sans ardoise), l'inconnu et le hors-foyer sont ignores.
   res := public.create_trip_atomic(
     henri, home_c, 'Crete C', 'Crete', '2027-08-01', '2027-08-07',
     null, array[henri_m, kid_m, 'membre-fantome',
       (select row_id from testkit.fx where key = 'carol_m')], null);
   perform testkit.eq(testkit.count(format(
-    'select 1 from public.trip_members where trip_id = %L', res ->> 'trip_id')), 1::bigint,
-    'enfant, inconnu et hors-foyer sont exclus de la selection');
+    'select 1 from public.trip_members where trip_id = %L', res ->> 'trip_id')), 2::bigint,
+    'enfant voyage, inconnu et hors-foyer sont exclus de la selection');
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.ardoise_members where ardoise_id = (select id from public.ardoises where trip_id = %L)',
+    res ->> 'trip_id')), 1::bigint,
+    'l''ardoise liee reste aux adultes (enfant voyageur, jamais payeur)');
 end;
 $$;
 
@@ -632,8 +637,9 @@ begin
   v_out := public.revoke_trip_invite(v_henri, v_trip_c);
   perform testkit.eq((v_out ->> 'revoked')::integer, 1, 'la revocation coupe le code');
 
-  -- Oracle uniforme : inconnu, malforme, expire, revoque, epuise, enfant —
-  -- un seul message, jamais d'existence revelee.
+  -- Oracle uniforme : inconnu, malforme, expire, revoque, epuise —
+  -- un seul message, jamais d'existence revelee (0119 : l'enfant rejoint,
+  -- il n'est plus sous oracle).
   begin perform public.redeem_trip_invite(v_hx, null, 'Zoe'); exception when others then m_unknown := sqlerrm; end;
   begin perform public.redeem_trip_invite('zzz', null, 'Zoe'); exception when others then m_malformed := sqlerrm; end;
 
@@ -652,16 +658,24 @@ begin
     'l''echange invite rend un ticket une seule fois');
   begin perform public.redeem_trip_invite(v_h4, null, 'Autre'); exception when others then m_exhausted := sqlerrm; end;
 
-  -- Enfant sur code VALIDE : la branche enfant repond sous oracle (le code
-  -- revoque v_h1 ne prouverait que la revocation, pas la branche).
+  -- 0119 : enfant sur code VALIDE — il rejoint le voyage (sans ardoise),
+  -- oracle inchangé pour inconnu/malformé/expiré/révoqué/épuisé.
   perform public.create_trip_invite(v_henri, v_trip_c, v_h5);
-  begin perform public.redeem_trip_invite(v_h5, v_kid, null); exception when others then m_enfant := sqlerrm; end;
+  v_out := public.redeem_trip_invite(v_h5, v_kid, null);
+  perform testkit.ok(not (v_out ->> 'already_member')::boolean, 'enfant inscrit au voyage');
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.trip_members where trip_id = %L and member_id = (select row_id from testkit.fx where key = %L)',
+    v_trip_c, 'kid_m')), 1::bigint,
+    'l''enfant est participant du voyage');
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.ardoise_members where member_id = (select row_id from testkit.fx where key = %L)',
+    'kid_m')), 0::bigint,
+    'l''enfant voyageur n''est jamais inscrit a l''ardoise');
 
   perform testkit.eq(m_malformed, m_unknown, 'oracle : malforme = inconnu');
   perform testkit.eq(m_expired, m_unknown, 'oracle : expire = inconnu');
   perform testkit.eq(m_revoked, m_unknown, 'oracle : revoque = inconnu');
   perform testkit.eq(m_exhausted, m_unknown, 'oracle : epuise = inconnu');
-  perform testkit.eq(m_enfant, m_unknown, 'oracle : enfant = inconnu');
 
   -- Ticket : verifiable, et le miroir payeur existe sur l'ardoise liee.
   v_thash := encode(extensions.digest(v_ticket, 'sha256'), 'hex');

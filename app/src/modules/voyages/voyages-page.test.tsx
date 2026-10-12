@@ -82,12 +82,17 @@ describe('Voyages', () => {
     const hero = await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
     expect(hero).toBeInTheDocument();
     expect(screen.getByText(/Prochain voyage · Confirmé/)).toBeInTheDocument();
-    // La période apparaît dans le héros puis dans l’indicateur « jours sur place ».
-    expect(screen.getAllByText(/12 — 18 avril 2027/)).toHaveLength(2);
-    // Les indicateurs : jours sur place, tâches et membres nommés à l'échelle du foyer.
+    // La période apparaît dans le héros, dans l’indicateur « jours sur place » et dans la liste ordonnée.
+    expect(screen.getAllByText(/12 — 18 avril 2027/)).toHaveLength(3);
+    // Les indicateurs : jours sur place, tâches DU VOYAGE et membres nommés à l'échelle du foyer.
     expect(screen.getByText('jours sur place').previousSibling).toHaveTextContent('6');
-    expect(screen.getByText('tâches du foyer à préparer').previousSibling).toHaveTextContent('3');
+    await waitFor(() => {
+      expect(screen.getByText('tâches du voyage à préparer').previousSibling).toHaveTextContent('2');
+    });
     expect(screen.getByText('membres du foyer').previousSibling).toHaveTextContent('5');
+    // Chaque voyage de la liste ordonnée par départ ouvre sa fiche.
+    expect(screen.getAllByRole('link', { name: 'Ouvrir' }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('link', { name: 'Ouvrir la fiche du voyage' })).toHaveAttribute('href', '/voyages/trip-1');
   });
 
   it('crée un voyage depuis le dialogue et le fait apparaître', async () => {

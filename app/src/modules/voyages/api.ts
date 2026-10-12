@@ -212,8 +212,9 @@ export interface CreateTripViaEdgeArgs {
 
 /**
  * Création atomique via l'Edge `create-trip` : le serveur génère l'id, crée
- * les participants (admin/membre seuls, enfants ignorés) et l'ardoise liée
- * dans la même transaction. L'identité vient du JWT, jamais d'un id passé.
+ * les participants (0119 : toute la famille, enfants compris — ardoise liée
+ * aux adultes seuls) et l'ardoise liée dans la même transaction. L'identité
+ * vient du JWT, jamais d'un id passé.
  */
 export async function createTripViaEdge(args: CreateTripViaEdgeArgs): Promise<{ tripId: string; ardoiseId: string }> {
   const created = await callTripInvite<{ trip_id: string; ardoise_id: string }>('create-trip', {

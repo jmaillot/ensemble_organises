@@ -60,14 +60,16 @@
  * TICKET CÔTÉ CLIENT : `localStorage["eo:trip:ticket:<tripId>"]` (le plan
  * client le consomme ; cette fonction ne le pose jamais elle-même).
  *
- * REFUS ENFANT (D-01) : chaque action `user` résout le rôle du foyer côté
- * serveur (lookup `household_members` en `service_role` — jamais un claim
- * client) et refuse `enfant` AVANT tout RPC, avec l'erreur uniforme de sa
- * famille (`child-guard.ts`, miroir byte-identique des sorties
- * `translateRpcError` ci-dessous). `member-leave` suit le même régime que
- * les autres actions user (le RPC tranche l'oracle, le guard ne fait que
- * refuser l'enfant avéré). `redeem-guest`, `guest-view`, `link-view` et
- * `guest-expense-create` restent sans identité, ouverts par construction.
+ * REFUS ENFANT (D-01, assoupli 0119) : chaque action `user` de GESTION
+ * résout le rôle du foyer côté serveur (lookup `household_members` en
+ * `service_role` — jamais un claim client) et refuse `enfant` AVANT tout
+ * RPC, avec l'erreur uniforme de sa famille (`child-guard.ts`, miroir
+ * byte-identique des sorties `translateRpcError` ci-dessous). `member-leave`
+ * suit le même régime que les autres actions user (le RPC tranche l'oracle,
+ * le guard ne fait que refuser l'enfant avéré). `join` accepte les enfants
+ * depuis 0119 (voyageurs sans ardoise) : le RPC inscrit sans oracle.
+ * `redeem-guest`, `guest-view`, `link-view` et `guest-expense-create`
+ * restent sans identité, ouverts par construction.
  */
 
 // Spécificateur BARE, comme `ardoise-invite` : le runtime épingle
@@ -151,8 +153,9 @@ const requestSchema = z.discriminatedUnion('action', [
     endDate: z.string().date(),
     notes: z.string().trim().max(2000).optional(),
     householdId: tripField.optional(),
-    /** Sélection initiale : identifiants de membres du foyer (admin/membre).
-     * Absent = tous (régime 0066) ; les inconnus, enfants et hors-foyer
+    /** Sélection initiale : identifiants de membres du foyer (0119 : toute
+     * la famille, enfants compris — l'ardoise liée reste aux adultes).
+     * Absent = tous (régime 0066) ; les inconnus et hors-foyer
      * sont ignorés en base. */
     memberIds: z.array(z.string().trim().min(1).max(128)).max(100).optional(),
     tabState: z.record(z.string(), z.boolean()).optional(),
@@ -583,9 +586,8 @@ async function handleJoin(admin: AdminClient, user: SupabaseClient, userId: stri
       if (!membership) {
         throw new TripInviteError(403, 'Vous n’appartenez pas au foyer de ce voyage : utilisez le lien invité.');
       }
-      // D-01 : un enfant membre ne rejoint pas — même oracle `code invalide`
-      // que tout code inconnu (le foyer vient du code, pas du client).
-      await refuseEnfant(admin, userId, householdId, 'code');
+      // 0119 : enfants compris — le RPC inscrit le membre au voyage (sans
+      // ardoise pour un enfant), l'oracle `code invalide` restant au RPC.
     }
   }
 
