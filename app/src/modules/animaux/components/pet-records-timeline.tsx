@@ -24,14 +24,18 @@ export interface PetRecordsTimelineProps {
   records: PetRecord[];
   /** En cours de suppression : la ligne concernée est neutralisée. */
   busyId?: string | null;
-  onDelete: (record: PetRecord) => void;
+  /** Quand la modification n'est pas offerte, seule la lecture s'affiche. */
+  onEdit?: (record: PetRecord) => void;
+  /** Absent pour les non-administrateurs : aucune suppression proposee. */
+  onDelete?: (record: PetRecord) => void;
 }
 
 /**
  * Vue chronologique du carnet de santé : pastille de type, date, échéance et
- * notes. Toute suppression passe par une confirmation.
+ * notes. La modification ouvre le dialogue en mode edition ; toute
+ * suppression passe par une confirmation.
  */
-export function PetRecordsTimeline({ records, busyId, onDelete }: PetRecordsTimelineProps) {
+export function PetRecordsTimeline({ records, busyId, onEdit, onDelete }: PetRecordsTimelineProps) {
   const [pending, setPending] = useState<PetRecord | null>(null);
 
   if (records.length === 0) {
@@ -80,14 +84,26 @@ export function PetRecordsTimeline({ records, busyId, onDelete }: PetRecordsTime
                 </p>
                 {record.notes ? <p className="mt-1 mb-0 text-xs">{record.notes}</p> : null}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                icon="trash"
-                className="size-[31px] text-muted hover:bg-coral-soft hover:text-coral"
-                aria-label={`Supprimer le suivi ${record.name}`}
-                onClick={() => setPending(record)}
-              />
+              {onEdit ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  icon="edit"
+                  className="size-[31px] text-muted hover:bg-accent-faint hover:text-accent-strong"
+                  aria-label={`Modifier le suivi ${record.name}`}
+                  onClick={() => onEdit(record)}
+                />
+              ) : null}
+              {onDelete ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  icon="trash"
+                  className="size-[31px] text-muted hover:bg-coral-soft hover:text-coral"
+                  aria-label={`Supprimer le suivi ${record.name}`}
+                  onClick={() => setPending(record)}
+                />
+              ) : null}
             </li>
           );
         })}
@@ -105,7 +121,7 @@ export function PetRecordsTimeline({ records, busyId, onDelete }: PetRecordsTime
         }
         confirmLabel="Supprimer le suivi"
         onConfirm={() => {
-          if (pending) onDelete(pending);
+          if (pending && onDelete) onDelete(pending);
           setPending(null);
         }}
       />

@@ -513,6 +513,10 @@ export interface PetRow {
   birth_date: IsoDate | null;
   identification_number: string | null;
   photo_url: string | null;
+  /** Informations libres de la fiche (0111, ex-ligne magique). */
+  notes: string | null;
+  /** Prochain rappel de la fiche (0111, ex-ligne magique), NULL quand aucun. */
+  next_reminder_date: IsoDate | null;
   created_at: IsoDateTime;
 }
 
@@ -527,7 +531,6 @@ export interface PetRecordRow {
   record_date: IsoDate;
   next_due_date: IsoDate | null;
   notes: string | null;
-  attachment_url: string | null;
 }
 
 export interface PetAttachmentRow {

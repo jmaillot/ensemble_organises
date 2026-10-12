@@ -1,10 +1,10 @@
 import { data } from '@/lib/data';
-import { randomId, todayIso } from '@/lib/utils';
+import { randomId } from '@/lib/utils';
 import { depositHouseholdFile } from '@/lib/storage';
 import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
-import { PET_SUMMARY_RECORD_NAME, type PetDraft, type PetRecordDraft } from './types';
+import type { PetDraft, PetRecordDraft } from './types';
 
-/** Colonnes `pets` alimentées par le formulaire de fiche. */
+/** Colonnes `pets` alimentées par le formulaire de fiche, rappel et notes compris (0111). */
 function petValues(draft: PetDraft) {
   return {
     name: draft.name,
@@ -14,6 +14,8 @@ function petValues(draft: PetDraft) {
     birth_date: draft.birthDate,
     identification_number: draft.identificationNumber,
     photo_url: draft.photoUrl,
+    notes: draft.notes,
+    next_reminder_date: draft.nextReminderDate,
   };
 }
 
@@ -89,34 +91,4 @@ export async function createPetAttachment(
 
 export async function removePetAttachment(id: string): Promise<void> {
   await data.remove('pet_attachments', id);
-}
-
-/**
- * Enregistre les informations libres et le prochain rappel de la fiche dans
- * l'entrée `pet_records` de synthèse (créée, mise à jour ou supprimée selon
- * les valeurs saisies). Le nom fait office de clé fonctionnelle.
- */
-export async function savePetSummary(
-  householdId: string,
-  petId: string,
-  { notes, nextReminderDate }: { notes: string | null; nextReminderDate: string | null },
-): Promise<void> {
-  const [existing] = await data.list<PetRecordRow>('pet_records', { pet_id: petId, name: PET_SUMMARY_RECORD_NAME });
-  if (!notes && !nextReminderDate) {
-    if (existing) await data.remove('pet_records', existing.id);
-    return;
-  }
-  if (existing) {
-    await data.update<PetRecordRow>('pet_records', existing.id, { notes, next_due_date: nextReminderDate });
-    return;
-  }
-  await data.create<PetRecordRow>('pet_records', {
-    household_id: householdId,
-    pet_id: petId,
-    type: 'info',
-    name: PET_SUMMARY_RECORD_NAME,
-    record_date: todayIso(),
-    next_due_date: nextReminderDate,
-    notes,
-  });
 }

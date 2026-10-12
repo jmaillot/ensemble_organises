@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { assetUrl } from '@/lib/modules';
+import { useIsAdmin } from '@/stores/household-store';
 import { cn, formatLongDate, formatMediumDate } from '@/lib/utils';
 import { usePetRecords, usePetAttachments, usePets } from './hooks/use-animaux';
 import { PetFormDialog } from './components/pet-form-dialog';
@@ -79,10 +80,12 @@ function RecordList({ records, kind }: { records: PetRecord[]; kind: PetRecord['
 
 export default function AnimauxPage() {
   const toast = useToast();
+  const isAdmin = useIsAdmin();
   const { pets, isLoading, isError, error, refetch, isMutating, savePet, deletePet } = usePets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [petForm, setPetForm] = useState<{ open: boolean; pet: Pet | null }>({ open: false, pet: null });
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<PetRecord | null>(null);
   const [pendingPetDeletion, setPendingPetDeletion] = useState<Pet | null>(null);
   const [busyRecordId, setBusyRecordId] = useState<string | null>(null);
 
@@ -105,8 +108,10 @@ export default function AnimauxPage() {
     return grouped;
   }, [records]);
 
-  const summary = useMemo(() => petSummaryOf(records), [records]);
-  const reminder = useMemo(() => nextReminderOf(records), [records]);
+  const summary = useMemo(() => petSummaryOf(pet ?? null), [pet]);
+  // Le rappel pose sur la fiche prime (champ « Prochain rappel ») ; a defaut,
+  // l'echeance reelle la plus proche du carnet prend le relais.
+  const reminderDate = pet?.nextReminderDate ?? nextReminderOf(records)?.nextDueDate ?? null;
 
   const handleSubmitPet = async (draft: PetDraft) => {
     const editing = petForm.pet;
@@ -120,13 +125,30 @@ export default function AnimauxPage() {
   };
 
   const handleSaveRecord = async (draft: PetRecordDraft) => {
+    const editingId = editingRecord?.id ?? null;
     try {
-      await saveRecord(null, draft);
+      await saveRecord(editingId, draft);
       setRecordDialogOpen(false);
-      toast('Suivi ajouté au carnet de santé.', 'success');
+      setEditingRecord(null);
+      toast(editingId ? 'Suivi modifié.' : 'Suivi ajouté au carnet de santé.', 'success');
     } catch (saveError) {
-      toast(saveError instanceof Error ? saveError.message : 'Ajout impossible.', 'error');
+      toast(saveError instanceof Error ? saveError.message : editingId ? 'Modification impossible.' : 'Ajout impossible.', 'error');
     }
+  };
+
+  const openCreateRecord = () => {
+    setEditingRecord(null);
+    setRecordDialogOpen(true);
+  };
+
+  const openEditRecord = (record: PetRecord) => {
+    setEditingRecord(record);
+    setRecordDialogOpen(true);
+  };
+
+  const closeRecordDialog = (open: boolean) => {
+    setRecordDialogOpen(open);
+    if (!open) setEditingRecord(null);
   };
 
   const handleDeleteRecord = async (record: PetRecord) => {
@@ -239,24 +261,26 @@ export default function AnimauxPage() {
                 <Fact label="Identifiant" value={pet.identificationNumber ?? '—'} />
                 <Fact
                   label="Prochain rappel"
-                  value={reminder?.nextDueDate ? formatMediumDate(reminder.nextDueDate) : '—'}
+                  value={reminderDate ? formatMediumDate(reminderDate) : '—'}
                 />
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Button variant="secondary" icon="edit" onClick={() => setPetForm({ open: true, pet })}>
                   Modifier la fiche
                 </Button>
-                <Button icon="plus" onClick={() => setRecordDialogOpen(true)}>
+                <Button icon="plus" onClick={openCreateRecord}>
                   Ajouter un suivi
                 </Button>
-                <Button
-                  variant="ghost"
-                  icon="trash"
-                  className="text-muted hover:bg-coral-soft hover:text-coral"
-                  onClick={() => setPendingPetDeletion(pet)}
-                >
-                  Supprimer la fiche
-                </Button>
+                {isAdmin ? (
+                  <Button
+                    variant="ghost"
+                    icon="trash"
+                    className="text-muted hover:bg-coral-soft hover:text-coral"
+                    onClick={() => setPendingPetDeletion(pet)}
+                  >
+                    Supprimer la fiche
+                  </Button>
+                ) : null}
               </div>
               {summary.notes ? (
                 <p className="mt-4 mb-0 rounded-[11px] bg-accent-faint px-3 py-2.5 text-xs">
@@ -296,7 +320,7 @@ export default function AnimauxPage() {
             title="Carnet de santé"
             description="L’historique chronologique de tous les suivis."
             action={
-              <Button variant="secondary" size="sm" icon="plus" onClick={() => setRecordDialogOpen(true)}>
+              <Button variant="secondary" size="sm" icon="plus" onClick={openCreateRecord}>
                 Ajouter un suivi
               </Button>
             }
@@ -304,7 +328,12 @@ export default function AnimauxPage() {
             {recordsLoading ? (
               <LoadingRows rows={3} />
             ) : (
-              <PetRecordsTimeline records={records} busyId={busyRecordId} onDelete={handleDeleteRecord} />
+              <PetRecordsTimeline
+                records={records}
+                busyId={busyRecordId}
+                onEdit={openEditRecord}
+                onDelete={isAdmin ? handleDeleteRecord : undefined}
+              />
             )}
           </Panel>
 
@@ -315,14 +344,14 @@ export default function AnimauxPage() {
             uploading={attachmentsMutating}
             uploadError={attachmentError}
             onAdd={handleAddAttachments}
-            onDelete={handleDeleteAttachment}
+            onDelete={isAdmin ? handleDeleteAttachment : undefined}
           />
 
           <PetRecordDialog
             open={recordDialogOpen}
-            onOpenChange={setRecordDialogOpen}
+            onOpenChange={closeRecordDialog}
             petName={pet.name}
-            record={null}
+            record={editingRecord}
             onSubmit={handleSaveRecord}
           />
         </>

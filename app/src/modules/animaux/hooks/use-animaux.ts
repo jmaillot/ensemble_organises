@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { data } from '@/lib/data';
 import { useResource } from '@/lib/data/useResource';
 import { useHouseholdStore } from '@/stores/household-store';
 import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
@@ -11,11 +12,11 @@ import {
   removePet as removePetRow,
   removePetAttachment as removePetAttachmentRow,
   removePetRecord as removePetRecordRow,
-  savePetSummary,
   updatePet,
   updatePetRecord,
 } from '../api';
 import {
+  isLegacySummaryRow,
   toPet,
   toPetAttachment,
   toPetRecord,
@@ -63,6 +64,11 @@ export function usePets(): UsePetsResult {
     await invalidateTables(queryClient, ['pets', 'pet_records']);
   }, [queryClient]);
 
+  // Un animal cree ou modifie par un autre membre du foyer arrive sans
+  // rechargement (publication 0110) ; l'invalidation apres mutation propre
+  // reste en renfort.
+  useEffect(() => data.subscribe('pets', () => void invalidate()), [invalidate]);
+
   const savePet = useCallback(
     async (id: string | null, draft: PetDraft) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
@@ -79,10 +85,8 @@ export function usePets(): UsePetsResult {
           throw photoError;
         }
       }
-      await savePetSummary(householdId, saved.id, {
-        notes: draft.notes,
-        nextReminderDate: draft.nextReminderDate,
-      });
+      // Notes et rappel partent avec la fiche (`pets.notes`,
+      // `pets.next_reminder_date`, 0111) : plus de ligne magique.
       await invalidate();
     },
     [householdId, invalidate],
@@ -129,6 +133,11 @@ export function usePetRecords(petId: string | null): UsePetRecordsResult {
   const records = useMemo(
     () =>
       resource.rows
+        // Residus d'avant 0111 : les ex-lignes magiques encore presentes dans
+        // une base locale ne comptent ni dans les onglets ni dans la
+        // chronologie. Seule la conjonction type + nom est masquee : un suivi
+        // utilisateur qui ne partage que le nom reste visible.
+        .filter((row) => !isLegacySummaryRow({ type: row.type, name: row.name }))
         .map(toPetRecord)
         .sort(
           (left, right) =>
@@ -140,6 +149,10 @@ export function usePetRecords(petId: string | null): UsePetRecordsResult {
   const invalidate = useCallback(async () => {
     await invalidateTables(queryClient, ['pet_records']);
   }, [queryClient]);
+
+  // Le carnet suit les ecritures des autres membres (publication 0110),
+  // sans rechargement manuel ; l'invalidation apres mutation reste en renfort.
+  useEffect(() => data.subscribe('pet_records', () => void invalidate()), [invalidate]);
 
   const saveRecord = useCallback(
     async (id: string | null, draft: PetRecordDraft) => {

@@ -15,11 +15,20 @@ export const PET_RECORD_TABS: { kind: PetRecordType; label: string; icon: IconNa
 ];
 
 /**
- * `pets` ne possède ni colonne `notes` ni colonne de rappel : les
- * informations libres et le prochain rappel de la fiche sont portés par une
- * entrée `pet_records` de type `info` portant ce nom (voir `api.ts`).
+ * Nom de l'ex-ligne magique de synthese (avant 0111) : `savePetSummary`
+ * portait les notes et le rappel de la fiche dans une entree `pet_records`
+ * de type `info` portant ce nom. La migration a recopie le contenu vers
+ * `pets` puis supprime ces lignes, mais des bases locales (demo IndexedDB)
+ * peuvent encore en contenir : elles sont filtrees a la lecture, jamais
+ * ecrites. Seule la conjonction type + nom est filtree — un suivi
+ * utilisateur qui ne partage que le nom reste un vrai suivi.
  */
 export const PET_SUMMARY_RECORD_NAME = 'Informations de la fiche';
+
+/** Vrai si la ligne est un residu de l'ex-synthese magique, a masquer. */
+export function isLegacySummaryRow(row: { type: PetRecordType; name: string }): boolean {
+  return row.type === 'info' && row.name === PET_SUMMARY_RECORD_NAME;
+}
 
 /** Fenêtre d'alerte d'une échéance, en jours. */
 export const REMINDER_WINDOW_DAYS = 14;
@@ -33,6 +42,10 @@ export interface Pet {
   birthDate: string | null;
   identificationNumber: string | null;
   photoUrl: string | null;
+  /** Informations libres de la fiche (`pets.notes`, 0111). */
+  notes: string | null;
+  /** Prochain rappel de la fiche (`pets.next_reminder_date`, 0111). */
+  nextReminderDate: string | null;
   createdAt: string;
 }
 
@@ -60,6 +73,8 @@ export function toPet(row: PetRow): Pet {
     birthDate: row.birth_date,
     identificationNumber: row.identification_number,
     photoUrl: row.photo_url,
+    notes: row.notes,
+    nextReminderDate: row.next_reminder_date,
     createdAt: row.created_at,
   };
 }
@@ -79,7 +94,6 @@ export interface PetRecord {
   recordDate: string;
   nextDueDate: string | null;
   notes: string | null;
-  attachmentUrl: string | null;
 }
 
 export interface PetRecordDraft {
@@ -99,7 +113,6 @@ export function toPetRecord(row: PetRecordRow): PetRecord {
     recordDate: row.record_date,
     nextDueDate: row.next_due_date,
     notes: row.notes,
-    attachmentUrl: row.attachment_url,
   };
 }
 
@@ -141,7 +154,12 @@ export function reminderAlert(kind: PetRecordType, nextDueDate: string | null) {
   return state === 'soon' || state === 'overdue' ? REMINDER_ALERTS[state] : null;
 }
 
-/** Prochain rappel de la fiche : échéance à venir la plus proche, sinon la plus récente. */
+/**
+ * Plus proche echeance reelle du carnet : a venir la plus proche, sinon la
+ * plus recente. Ne porte que sur des suivis reels — la synthese magique
+ * (avant 0111) n'existe plus et les residus locaux sont filtres en amont ;
+ * le rappel de la fiche vit dans `pets.next_reminder_date` (voir la page).
+ */
 export function nextReminderOf(records: PetRecord[]): PetRecord | null {
   const dated = records.filter((record) => record.nextDueDate !== null);
   if (dated.length === 0) return null;
@@ -150,15 +168,14 @@ export function nextReminderOf(records: PetRecord[]): PetRecord | null {
   return [...pool].sort((left, right) => (left.nextDueDate as string).localeCompare(right.nextDueDate as string))[0];
 }
 
-/** Informations libres et rappel global, portés par l'entrée `info` de synthèse. */
+/** Informations libres et rappel global, lus sur les colonnes de la fiche (0111). */
 export interface PetSummary {
   notes: string | null;
   nextReminderDate: string | null;
 }
 
-export function petSummaryOf(records: PetRecord[]): PetSummary {
-  const summary = records.find((record) => record.name === PET_SUMMARY_RECORD_NAME);
-  return { notes: summary?.notes ?? null, nextReminderDate: summary?.nextDueDate ?? null };
+export function petSummaryOf(pet: Pet | null): PetSummary {
+  return { notes: pet?.notes ?? null, nextReminderDate: pet?.nextReminderDate ?? null };
 }
 
 /** Pièce jointe d'une fiche animal : ordonnance, facture, compte rendu. */

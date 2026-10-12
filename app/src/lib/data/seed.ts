@@ -23,6 +23,7 @@ import type {
   LoyaltyCardRow,
   MessageRow,
   NoteRow,
+  PetAttachmentRow,
   PetRecordRow,
   PetRow,
   PlaceRow,
@@ -782,6 +783,8 @@ export const demoPets: PetRow[] = [
     birth_date: '2021-03-12',
     identification_number: 'FR-483920',
     photo_url: '/assets/animaux.jpg',
+    notes: 'Suivie chez le vétérinaire du quartier, rappel antiparasitaire à planifier.',
+    next_reminder_date: day(13),
     created_at: now(),
   },
 ];
@@ -796,7 +799,6 @@ export const demoPetRecords: PetRecordRow[] = [
     record_date: '2025-10-08',
     next_due_date: day(13),
     notes: 'À faire chez le vétérinaire habituel.',
-    attachment_url: null,
   },
   {
     id: 'pet-record-2',
@@ -807,7 +809,6 @@ export const demoPetRecords: PetRecordRow[] = [
     record_date: day(-1),
     next_due_date: day(11),
     notes: 'Un sac pour 12 jours.',
-    attachment_url: null,
   },
   {
     id: 'pet-record-3',
@@ -818,7 +819,6 @@ export const demoPetRecords: PetRecordRow[] = [
     record_date: day(-40),
     next_due_date: day(13),
     notes: 'Gouttes en spot-on.',
-    attachment_url: null,
   },
   {
     id: 'pet-record-4',
@@ -829,12 +829,28 @@ export const demoPetRecords: PetRecordRow[] = [
     record_date: '2026-06-14',
     next_due_date: null,
     notes: 'Poids stable, dents à surveiller.',
-    attachment_url: null,
   },
 ];
 
-export const demoProviderTypes: ProviderTypeRow[] = [
-  { id: 'provider-type-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Médecin', icon: 'heart', created_at: now() },
+/**
+ * Piece jointe de demonstration : la section « Pieces jointes » de la fiche
+ * n'est plus vide en demo, et le panneau a un contenu a afficher et a
+ * compter des sa premiere montee.
+ */
+export const demoPetAttachments: PetAttachmentRow[] = [
+  {
+    id: 'pet-attachment-1',
+    pet_id: 'pet-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    file_url: '/assets/ordonnance-nala.pdf',
+    file_name: 'Ordonnance — Nala.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 48210,
+    created_at: now(),
+  },
+];
+
+export const demoProviderTypes: ProviderTypeRow[] = [  { id: 'provider-type-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Médecin', icon: 'heart', created_at: now() },
   { id: 'provider-type-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Artisan', icon: 'settings', created_at: now() },
   { id: 'provider-type-3', household_id: DEMO_HOUSEHOLD_ID, name: 'École', icon: 'checkCircle', created_at: now() },
   { id: 'provider-type-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Admin', icon: 'checkCircle', created_at: now() },
@@ -1156,6 +1172,7 @@ const seedTables: Record<string, Row[]> = {
   contacts: demoContacts as unknown as Row[],
   pets: demoPets as unknown as Row[],
   pet_records: demoPetRecords as unknown as Row[],
+  pet_attachments: demoPetAttachments as unknown as Row[],
   provider_types: demoProviderTypes as unknown as Row[],
   providers: demoProviders as unknown as Row[],
   loyalty_cards: demoLoyaltyCards as unknown as Row[],

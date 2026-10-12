@@ -13,7 +13,8 @@ export interface PetAttachmentsPanelProps {
   uploading?: boolean;
   uploadError?: string | null;
   onAdd: (files: File[]) => void | Promise<void>;
-  onDelete: (attachment: PetAttachment) => void | Promise<void>;
+  /** Absent pour les non-administrateurs : aucune suppression proposee. */
+  onDelete?: (attachment: PetAttachment) => void | Promise<void>;
 }
 
 /**
@@ -100,14 +101,16 @@ export function PetAttachmentsPanel({
               >
                 <Icon name="link" size="sm" />
               </a>
-              <Button
-                variant="ghost"
-                size="icon"
-                icon="trash"
-                className="size-[31px] shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
-                aria-label={`Supprimer ${attachment.fileName}`}
-                onClick={() => setPending(attachment)}
-              />
+              {onDelete ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  icon="trash"
+                  className="size-[31px] shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+                  aria-label={`Supprimer ${attachment.fileName}`}
+                  onClick={() => setPending(attachment)}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
@@ -126,7 +129,7 @@ export function PetAttachmentsPanel({
         }
         confirmLabel="Supprimer le fichier"
         onConfirm={() => {
-          if (pending) void onDelete(pending);
+          if (pending && onDelete) void onDelete(pending);
           setPending(null);
         }}
       />
