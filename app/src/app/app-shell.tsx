@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
 import {
   moduleMap,
@@ -208,7 +208,9 @@ export function AppShell() {
             <Icon name="menu" />
           </button>
           <nav aria-label="Fil d’Ariane" className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted max-[650px]:hidden">
-            <span>Ensemble &amp; Organisés</span>
+            <Link to="/accueil" className="transition-colors hover:text-fg">
+              Ensemble &amp; Organisés
+            </Link>
             <span aria-hidden="true">/</span>
             <strong className="font-[750] text-fg">{currentLabel}</strong>
           </nav>
@@ -243,17 +245,20 @@ export function AppShell() {
               onDismissItem={(item: NotificationItem) => notifications.dismissItem(item)}
               onClearAll={notifications.clearAll}
             />
-            <div className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1">
+            <button
+              type="button"
+              onClick={() => navigate('/parametres')}
+              className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1"
+              aria-label="Ouvrir les préférences du foyer"
+            >
               <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName?.trim() ? user.displayName : 'Profil'}</span>
-              <button
-                type="button"
-                onClick={() => navigate('/parametres')}
+              <span
+                aria-hidden="true"
                 className="grid size-8 place-items-center rounded-full bg-fg text-[11px] font-extrabold text-surface"
-                aria-label="Ouvrir les préférences du foyer"
               >
                 {initials(user?.displayName?.trim() ? user.displayName : 'Profil')}
-              </button>
-            </div>
+              </span>
+            </button>
           </div>
         </header>
 
