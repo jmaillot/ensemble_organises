@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
-import { moduleMap, modulePath, type ModuleKey } from '@/lib/modules';
+import { isChildHiddenModule, moduleMap, modulePath, type ModuleKey } from '@/lib/modules';
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { signOut } from '@/hooks/use-auth';
 import { useToast } from '@/components/ui/toast';
 import { Icon, type IconName } from './icon';
 import { memberTagClass } from './member-avatar';
 import { Input } from '@/components/ui/input';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 
 type DrawerKey = ModuleKey | 'accueil';
 
@@ -38,6 +38,23 @@ export const MOBILE_DRAWER_GROUPS: Array<{ title: string; keys: DrawerKey[] }> =
 ];
 
 const ALL_ENTRIES: DrawerEntry[] = MOBILE_DRAWER_GROUPS.flatMap((group) => group.keys.map(entryFor));
+
+/**
+ * Entrées visibles pour le rôle courant (phase 14, D-05) : le rôle `enfant`
+ * ne voit ni les 5 modules hors périmètre, ni un intitulé de groupe vidé de
+ * son contenu. Le tiroir rend aujourd'hui une liste plate (aucun intitulé
+ * affiché), mais le filtrage se fait au niveau des groupes pour qu'un
+ * regroupement futur n'y réexpose jamais un espace masqué.
+ */
+function useVisibleDrawerEntries(): DrawerEntry[] {
+  const isChild = useCurrentMember()?.role === 'enfant';
+  return useMemo(() => {
+    if (!isChild) return ALL_ENTRIES;
+    return MOBILE_DRAWER_GROUPS.flatMap((group) =>
+      group.keys.filter((key) => key === 'accueil' || !isChildHiddenModule(key)).map(entryFor),
+    );
+  }, [isChild]);
+}
 
 /** `id` stable du tiroir, visé par `aria-controls` du hamburger. */
 export const MOBILE_DRAWER_ID = 'tiroir-mobile';
@@ -99,8 +116,9 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   }, [open]);
 
   const normalized = normalizeQuery(query);
+  const visibleEntries = useVisibleDrawerEntries();
   const filtered = normalized
-    ? ALL_ENTRIES.filter((entry) => normalizeQuery(entry.label).includes(normalized))
+    ? visibleEntries.filter((entry) => normalizeQuery(entry.label).includes(normalized))
     : null;
 
   const handleLogout = async () => {
@@ -179,7 +197,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
               déconnexion) reste épinglé en bas du tiroir. */}
           <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
             <ul className="m-0 grid list-none gap-1 p-0">
-              {(filtered ?? ALL_ENTRIES).map((entry) => (
+              {(filtered ?? visibleEntries).map((entry) => (
                 <li key={entry.key}>
                   <DrawerLink entry={entry} onNavigate={() => onOpenChange(false)} />
                 </li>

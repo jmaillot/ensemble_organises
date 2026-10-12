@@ -22,9 +22,9 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
 import { ModuleTile } from '@/components/shared/module-tile';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
-import { modules } from '@/lib/modules';
+import { isChildHiddenModule, modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { useDashboard } from './hooks/use-dashboard';
@@ -52,6 +52,12 @@ export default function DashboardPage() {
   const householdName = useHouseholdStore((state) => state.householdName);
   const [isEditing, setIsEditing] = useState(false);
   const dashboard = useDashboard();
+  // Rôle `enfant` (phase 14, D-05 + relais 14-01) : les tuiles des 5 modules
+  // hors périmètre disparaissent, et la colonne latérale qui lit les dépenses
+  // (totaux Ardoise, activité) avec elles — présentation seulement, le
+  // serveur renvoie de toute façon 0 ligne à un enfant.
+  const isChild = useCurrentMember()?.role === 'enfant';
+  const visibleTiles = isChild ? modules.filter((entry) => entry.tile && !isChildHiddenModule(entry.key)) : modules.filter((entry) => entry.tile);
 
   // Souris : déplacement immédiat. Tactile : appui long (le défilement
   // garde la priorité sur un toucher bref) ; `touch-action: none` sur les
@@ -222,14 +228,13 @@ export default function DashboardPage() {
             <SectionHeading
               title="Tout le foyer"
               description="Un espace pour chaque petite et grande organisation."
-              action={<CountBadge value={modules.filter((entry) => entry.tile).length} label="espaces" />}
+              action={<CountBadge value={visibleTiles.length} label="espaces" />}
             />
             <ul
               aria-label="Espaces du foyer"
               className="m-0 grid list-none grid-cols-4 gap-3 p-0 max-[1180px]:grid-cols-3 max-[650px]:grid-cols-1"
             >
-              {modules
-                .filter((entry) => entry.tile)
+              {visibleTiles
                 .map((entry) => (
                   <li key={entry.key} className="min-w-0">
                     <ModuleTile entry={entry} />
@@ -240,12 +245,16 @@ export default function DashboardPage() {
         </div>
 
         <aside className="grid min-w-0 grid-cols-1 gap-3.5 max-[920px]:grid-cols-2 max-[650px]:grid-cols-1">
-          <BoardSummaryCard
-            total={dashboard.board.total}
-            monthLabel={dashboard.board.monthLabel}
-            balances={dashboard.board.members}
-          />
-          <ActivityCard entries={dashboard.activity} />
+          {isChild ? null : (
+            <>
+              <BoardSummaryCard
+                total={dashboard.board.total}
+                monthLabel={dashboard.board.monthLabel}
+                balances={dashboard.board.members}
+              />
+              <ActivityCard entries={dashboard.activity} />
+            </>
+          )}
           <BirthdayPreview
             birthdays={dashboard.upcomingBirthdays}
             onOpen={() => navigate('/anniversaires')}

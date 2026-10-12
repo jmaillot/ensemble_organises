@@ -4,6 +4,7 @@ import { cn, initials } from '@/lib/utils';
 import {
   moduleMap,
   modulePath,
+  isChildHiddenModule,
   navLabelOf,
   navModules,
   type ModuleKey,
@@ -84,6 +85,11 @@ export function AppShell() {
   const currentLabel = fallbackLabels[currentKey]
     ?? (currentKey === 'accueil' ? 'Maison' : moduleMap[currentKey] ? navLabelOf(moduleMap[currentKey]) : 'Maison');
   const isAdmin = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'admin');
+  // Rôle `enfant` (phase 14, D-05) : les accès rapides épinglés suivent le
+  // même masquage que le catalogue (aucun des 5 n'y figure aujourd'hui, mais
+  // un ajout futur ne doit pas les réexposer par mégarde).
+  const isChild = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'enfant');
+  const visibleNavModules = isChild ? navModules.filter((key) => !isChildHiddenModule(key)) : navModules;
 
   return (
     <div className="flex min-h-screen">
@@ -118,7 +124,7 @@ export function AppShell() {
                   <span className="max-[920px]:sr-only">Maison</span>
                 </NavLink>
               </li>
-              {navModules.map((key) => {
+              {visibleNavModules.map((key) => {
                 const entry = moduleMap[key];
                 return (
                   <li key={key}>

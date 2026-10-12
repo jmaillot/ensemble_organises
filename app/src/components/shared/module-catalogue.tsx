@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
 import { NavLink } from 'react-router';
 import { cn } from '@/lib/utils';
-import { catalogueModules, modulePath } from '@/lib/modules';
+import { catalogueModules, isChildHiddenModule, modulePath } from '@/lib/modules';
+import { useCurrentMember } from '@/stores/household-store';
 import { Icon } from './icon';
 
 /**
@@ -24,6 +25,10 @@ export const navItemClass = ({ isActive }: { isActive: boolean }) =>
 export function ModuleCatalogueNav({ className }: { className?: string }) {
   const [open, setOpen] = useState(true);
   const panelId = useId();
+  // Rôle `enfant` (phase 14, D-05) : les 5 modules hors périmètre sortent du
+  // catalogue, comme les tuiles et le tiroir — présentation seulement.
+  const isChild = useCurrentMember()?.role === 'enfant';
+  const visibleModules = isChild ? catalogueModules.filter((entry) => !isChildHiddenModule(entry.key)) : catalogueModules;
 
   return (
     <div className={cn('mt-6', className)}>
@@ -36,7 +41,7 @@ export function ModuleCatalogueNav({ className }: { className?: string }) {
       >
         <Icon name="grid" size="sm" />
         <span className="section-kicker flex-1 max-[920px]:sr-only">Tous les espaces</span>
-        <span className="text-[11px] font-[760] text-muted max-[920px]:hidden">{catalogueModules.length}</span>
+        <span className="text-[11px] font-[760] text-muted max-[920px]:hidden">{visibleModules.length}</span>
         <Icon
           name="chevronDown"
           size="sm"
@@ -50,7 +55,7 @@ export function ModuleCatalogueNav({ className }: { className?: string }) {
           ceux qui n'ont pas la liste sous les yeux. */}
       {open ? (
         <ul id={panelId} aria-label="Espaces du foyer" className="mt-1 grid list-none gap-0.5 p-0">
-          {catalogueModules.map((entry) => (
+          {visibleModules.map((entry) => (
             <li key={entry.key}>
               <NavLink to={modulePath(entry.key)} className={navItemClass}>
                 <Icon name={entry.icon} size="sm" />

@@ -84,8 +84,18 @@ export const navModules: ModuleKey[] = modules.filter((entry) => entry.nav).map(
  */
 export const catalogueModules: ModuleEntry[] = modules;
 
-export const modulePath = (key: ModuleKey) => `/${key}`;
+/**
+ * Modules hors périmètre du rôle `enfant` (phase 14, D-05) : ni tuile, ni
+ * entrée de navigation, ni route accessible — présentation seulement, le
+ * serveur refuse de toute façon (14-01). Même signal que le gating D-06
+ * (`role === 'enfant'` sur le membre courant, aucune source d'identité neuve).
+ */
+export const CHILD_HIDDEN_MODULES: ModuleKey[] = ['ardoise', 'cadeaux', 'fidelite', 'prestataires', 'animaux'];
 
+/** Vrai pour les 5 modules masqués au rôle `enfant`. */
+export const isChildHiddenModule = (key: ModuleKey): boolean => CHILD_HIDDEN_MODULES.includes(key);
+
+export const modulePath = (key: ModuleKey) => `/${key}`;
 export const assetUrl = (file: string) => `/assets/${file}`;
 
 /** Libellé affiché dans la barre latérale et le fil d'Ariane. */
