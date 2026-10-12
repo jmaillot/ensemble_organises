@@ -251,20 +251,31 @@ select testkit.eq(testkit.count(format(
 reset role;
 
 -- ===========================================================================
--- D-03 : l'admin modere (supprime le contenu d'autrui, reactions comprises).
+-- D-07 (0117, amende D-03 ci-dessus) : branche admin retiree — l'admin ne
+-- supprime plus le contenu unitaire d'autrui, il l'archivait (fil) ou le
+-- laissait a son auteur. La preuve canonique vit en 0052 ; ici l'amendement
+-- minimal : les deux assertions attendent 0 et l'intact, le reste du fichier
+-- (dont la cascade auteur du fil post_a, poste par Alice elle-meme) est
+-- inchange.
 -- ===========================================================================
 select testkit.as_user(user_id, 'cercle-alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
   'delete from public.posts where id = %L',
+  (select row_id from testkit.fx where key = 'post_c'))), 0::bigint,
+  'l''admin ne supprime plus le post d''autrui (D-07)');
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.posts where household_id = %L and id = %L',
+  (select household_id from testkit.fx where key = 'home_a'),
   (select row_id from testkit.fx where key = 'post_c'))), 1::bigint,
-  'l''admin supprime le post d''autrui');
+  'le post d''autrui survit a la tentative admin (D-07)');
 
 select testkit.eq(testkit.affected(format(
   'delete from public.post_reactions where id = %L',
-  (select row_id from testkit.fx where key = 'react_b1'))), 1::bigint,
-  'l''admin supprime la reaction d''autrui');
+  (select row_id from testkit.fx where key = 'react_b1'))), 0::bigint,
+  'l''admin ne supprime plus la reaction d''autrui (D-07)');
 
 reset role;
 
