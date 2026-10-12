@@ -17,8 +17,6 @@ import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawe
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
-import { useOfflineSync } from '@/hooks/use-offline-sync';
-import { useFullSync } from '@/lib/data/use-full-sync';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
@@ -36,11 +34,7 @@ export function AppShell() {
   const members = useHouseholdStore((state) => state.members);
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
-  const { online, pending, syncing, syncNow } = useOfflineSync();
-  // Synchro foyer périodique (D-08) : ouverte et en ligne, toutes les 15 min.
-  // Aucun rendu — le minuteur vit dans le hook, le bouton dans le panneau.
-  useFullSync();
-  // Navigation fiable hors ligne (D-09) : précharge les morceaux de routes en
+  // Navigation fiable (D-09) : précharge les morceaux de routes en
   // arrière-plan, à l'idle et en ligne seulement. Monté une fois, échec avalé
   // (T-09-07) : le préchargement ne doit jamais casser le shell.
   useEffect(() => {
@@ -50,7 +44,6 @@ export function AppShell() {
       // Préchargement indisponible : la garde par route couvre l'échec.
     }
   }, []);
-  const [showOffline, setShowOffline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifications = useNotifications();
@@ -263,40 +256,6 @@ export function AppShell() {
         </header>
 
         <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(28px+env(safe-area-inset-bottom))]">
-          {!online && showOffline ? (
-            <div
-              role="status"
-              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-amber/40 bg-amber-soft px-4 py-3 text-xs"
-            >
-              <span className="flex items-center gap-2">
-                <Icon name="cloud" size="sm" />
-                Vous êtes hors ligne. Les données affichées peuvent venir du cache local et être périmées.
-                {pending > 0 ? ` ${pending} modification(s) en attente de synchronisation.` : ''}
-              </span>
-              <span className="flex gap-2">
-                <Button size="sm" variant="secondary" disabled={syncing} onClick={() => void syncNow()}>
-                  {syncing ? 'Synchronisation…' : 'Réessayer'}
-                </Button>
-                <Button size="sm" variant="quiet" onClick={() => setShowOffline(false)}>
-                  Masquer
-                </Button>
-              </span>
-            </div>
-          ) : null}
-          {online && pending > 0 ? (
-            <div
-              role="status"
-              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 py-3 text-xs"
-            >
-              <span className="flex items-center gap-2">
-                <Icon name="refresh" size="sm" />
-                {pending} modification(s) en attente de synchronisation, rejouées dans l’ordre à la reconnexion.
-              </span>
-              <Button size="sm" variant="secondary" disabled={syncing} onClick={() => void syncNow()}>
-                {syncing ? 'Synchronisation…' : 'Synchroniser'}
-              </Button>
-            </div>
-          ) : null}
           <Outlet />
         </main>
       </div>

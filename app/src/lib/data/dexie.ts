@@ -9,31 +9,22 @@ export interface StoredRow {
   updatedAt: number;
 }
 
-export interface PendingMutation {
-  id?: number;
-  table: string;
-  /**
-   * `deleteWhere` = suppression de lignes de jointure par filtre (les valeurs
-   * portent alors le filtre, pas une ligne). Rejoué dans l'ordre comme les
-   * autres verbes (D-02).
-   */
-  operation: 'insert' | 'update' | 'delete' | 'deleteWhere';
-  rowId: string;
-  values: Record<string, unknown>;
-  createdAt: number;
-  attempts: number;
-}
-
-/** Cache applicatif local : données consultées hors ligne + file de synchronisation. */
+/** Base locale : jeu de démonstration et données du mode local (D-10 : la file
+ * de mutations du mode offline a été retirée — `version(2)` supprime le store). */
 export class EnsembleDatabase extends Dexie {
   rows!: Table<StoredRow, string>;
-  mutations!: Table<PendingMutation, number>;
 
   constructor(name = 'ensemble-organises') {
     super(name);
     this.version(1).stores({
       rows: 'key, table, householdId, [table+householdId], updatedAt',
       mutations: '++id, table, createdAt',
+    });
+    // Retrait du mode offline données (D-10) : plus de file, le store
+    // `mutations` est supprimé de la base existante des utilisateurs.
+    this.version(2).stores({
+      rows: 'key, table, householdId, [table+householdId], updatedAt',
+      mutations: null,
     });
   }
 }
@@ -64,8 +55,5 @@ export function resetDatabaseSingleton() {
 
 export async function clearDatabase() {
   const db = getDatabase();
-  await db.transaction('rw', db.rows, db.mutations, async () => {
-    await db.rows.clear();
-    await db.mutations.clear();
-  });
+  await db.rows.clear();
 }

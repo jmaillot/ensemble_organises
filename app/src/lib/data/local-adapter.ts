@@ -7,8 +7,9 @@ import type { Row, RowFilter } from '@/types';
 
 /**
  * Adaptateur local : IndexedDB via Dexie. Il permet à l'application de
- * fonctionner sans backend configuré (démo, hors ligne, tests) et sert de
- * cache de lecture pour le mode Supabase.
+ * fonctionner sans backend configuré (démo, tests). Depuis le retrait du
+ * mode offline données (D-10), le mode Supabase ne lit plus ce cache :
+ * chaque lecture part directement au backend.
  */
 
 export class LocalAdapter implements DataAdapter {

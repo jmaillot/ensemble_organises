@@ -64,7 +64,6 @@ afterEach(async () => {
   cleanup();
   const db = getDatabase();
   await db.rows.clear();
-  await db.mutations.clear();
   // Le cache est vide : l'amorçage du jeu de démonstration doit refaire son
   // contrôle au prochain accès.
   getLocalAdapter().invalidateSeedCache();

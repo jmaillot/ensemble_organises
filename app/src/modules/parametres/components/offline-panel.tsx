@@ -7,114 +7,39 @@ import { useToast } from '@/components/ui/toast';
 import { clearDatabase } from '@/lib/data/dexie';
 import { isLocalMode } from '@/lib/data';
 import { useInstallPrompt } from '@/hooks/use-pwa';
-import { useOfflineSync } from '@/hooks/use-offline-sync';
-import { FULL_SYNC_INTERVAL_MS, useFullSync } from '@/lib/data/use-full-sync';
 import { dataModeLabel } from '../types';
 
 const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '0.1.0';
-
-function formatLastSync(value: number | null): string {
-  if (value === null) return 'Jamais';
-  try {
-    return new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return 'Inconnue';
-  }
-}
 
 export function OfflinePanel() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { canInstall, install } = useInstallPrompt();
-  const { online, pending, syncing, lastSyncedAt, syncNow } = useOfflineSync();
-  const full = useFullSync({ auto: false });
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
   return (
     <div className="grid gap-[18px] max-[920px]:grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
-      <Panel title="Données et mode de fonctionnement" description="L’application fonctionne hors ligne et se resynchronise ensuite.">
+      <Panel title="Données et mode de fonctionnement" description="L’application lit et écrit directement sur le serveur du foyer.">
         <div className="grid gap-0">
           <div className="flex items-center justify-between gap-2.5 py-[13px] text-xs">
             <span className="text-muted">Mode de données</span>
             <strong>{dataModeLabel(isLocalMode)}</strong>
           </div>
           <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
-            <span className="text-muted">Cache local</span>
-            <strong>IndexedDB (Dexie)</strong>
-          </div>
-          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
             <span className="text-muted">Version</span>
             <strong>{appVersion}</strong>
           </div>
-          {!isLocalMode ? (
-            <>
-              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
-                <span className="text-muted">État du réseau</span>
-                <strong>{online ? 'En ligne' : 'Hors ligne'}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
-                <span className="text-muted">Modifications en attente</span>
-                <strong>{pending === 0 ? 'Aucune' : `${pending} en attente`}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
-                <span className="text-muted">Dernière synchronisation</span>
-                <strong>{formatLastSync(lastSyncedAt)}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
-                <span className="text-muted">Dernière synchro du foyer</span>
-                <strong>{formatLastSync(full.lastFullSyncAt)}</strong>
-              </div>
-            </>
-          ) : null}
         </div>
-        {!isLocalMode ? (
-          <>
-            <p className="mt-4 mb-4 text-[11px] text-muted">
-              En cas de panne réseau, les données déjà consultées sont servies depuis le cache local et marquées
-              comme périmées. Toute écriture qui échoue (hors ligne, timeout, erreur serveur) est mise en file et
-              rejouée dans l’ordre à la reconnexion — y compris les retraits de lignes liées. En cas de conflit, le
-              dernier écrivain gagne, sans fusion. Les créations et mises à jour en attente n’apparaissent qu’après
-              synchronisation. Les invitations et la création de foyer exigent une connexion : ils ne sont jamais
-              mis en file.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" icon="refresh" disabled={syncing || pending === 0} onClick={() => void syncNow()}>
-                {syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
-              </Button>
-            </div>
-            <p className="mt-4 mb-4 text-[11px] text-muted">
-              La synchro du foyer rejoue d’abord les modifications en attente, puis télécharge toutes les tables du
-              foyer (courses, calendrier, tâches, routines, ardoise, cadeaux, anniversaires, animaux, prestataires,
-              fidélité, adresses, cercle, voyages, messages, widgets) pour l’usage hors ligne, avec la progression
-              affichée. Tant que l’application est ouverte et en ligne, elle se relance seule toutes les
-              {' '}{Math.round(FULL_SYNC_INTERVAL_MS / 60000)} minutes. Restent en ligne uniquement : le calcul des
-              remboursements, les invitations (foyer, cadeaux, ardoise), la création de foyer et les listes partagées
-              d’autres foyers.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" icon="download" disabled={full.syncing} onClick={() => void full.syncNowFull()}>
-                {full.syncing && full.progress
-                  ? `Synchro du foyer… ${full.progress.done}/${full.progress.total} (${full.progress.table})`
-                  : full.syncing
-                    ? 'Synchro du foyer…'
-                    : 'Synchroniser le foyer'}
-              </Button>
-              {full.report && !full.syncing ? (
-                <span className="text-[11px] text-muted" role="status">
-                  {full.report.synced.length} table(s) à jour
-                  {full.report.replayed > 0 ? `, ${full.report.replayed} modification(s) rejouée(s)` : ''}
-                  {full.report.failed.length > 0
-                    ? ` — ${full.report.failed.length} en échec : ${full.report.failed.map((failure) => failure.table).join(', ')}`
-                    : ''}
-                </span>
-              ) : null}
-            </div>
-          </>
-        ) : (
+        {isLocalMode ? (
           <p className="mt-4 mb-4 text-[11px] text-muted">
             En mode local, les données vivent uniquement dans ce navigateur : rien n’est envoyé sur un serveur. Videz le
             cache pour revenir au jeu de démonstration d’origine.
+          </p>
+        ) : (
+          <p className="mt-4 mb-4 text-[11px] text-muted">
+            Connecté au serveur du foyer : chaque lecture et chaque écriture part directement, et une erreur réseau ou
+            serveur s’affiche telle quelle. Une connexion est nécessaire pour utiliser l’application.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -134,25 +59,10 @@ export function OfflinePanel() {
         </div>
       </Panel>
 
-      <Panel title="Application web" description="Installable, utilisable hors ligne, sans magasin d’applications.">
+      <Panel title="Application web" description="Installable, sans magasin d’applications.">
         <ul className="m-0 grid list-none gap-2.5 p-0 text-[11px] text-muted">
           <li>Application web installable (manifeste + service worker).</li>
-          {isLocalMode ? (
-            <>
-              <li>Utilisable hors ligne : les pages et les données déjà consultées restent accessibles.</li>
-              <li>Les écritures hors ligne sont mises en file et rejouées à la reconnexion.</li>
-            </>
-          ) : (
-            <>
-              <li>Hors ligne : les données déjà consultées restent accessibles, marquées comme périmées.</li>
-              <li>
-                {pending === 0
-                  ? 'Aucune modification en attente de synchronisation.'
-                  : `${pending} modification(s) en attente de synchronisation, rejouées dans l’ordre.`}
-              </li>
-              <li>Les invitations et la création de foyer exigent une connexion.</li>
-            </>
-          )}
+          <li>Les rappels arrivent en notification push, réglables dans le panneau notifications.</li>
         </ul>
         <p className="mt-4 mb-0 text-[11px] text-muted">
           Version {appVersion} · service worker mis à jour automatiquement à chaque déploiement.

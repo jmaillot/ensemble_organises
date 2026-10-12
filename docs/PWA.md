@@ -1,8 +1,18 @@
-# PWA — installation, mises à jour, iOS, push et synchro d’arrière-plan
+# PWA — installation, mises à jour, iOS et push
 
-Références verrouillées : décisions D-03/D-05/D-06 du contexte 09, étapes
+Références verrouillées : décisions D-03 du contexte 09, étapes
 opérateur M-01/M-02 (la preuve push et les clés VAPID restent des actions
 opérateur, pas du code).
+
+> **Mode offline données retiré (D-10, UAT 2026-10-12).** Il n’y a plus de
+> cache Dexie côté Supabase, plus de file de mutations, plus de repli de
+> lecture, plus de synchro foyer ni de minuteur, plus de bannière, de
+> panneau de synchro ou d’états « cache vide » : chaque lecture et chaque
+> écriture part directement au backend, et l’erreur d’origine s’affiche
+> telle quelle. Le service worker ne fait plus que précache des assets +
+> push (plus de cache médias, plus de Background/Periodic Sync). Restent :
+> l’installation, les notifications push et le mode démo local (IndexedDB,
+> inchangé).
 
 ## Installation
 
@@ -15,7 +25,7 @@ opérateur, pas du code).
   (régénérées par `scripts/generate-pwa-icons.py` depuis `icon.svg`,
   fond plein-bord, motif inscrit à ~76 % pour la zone de sécurité maskable ;
   `purpose any` + entrée `maskable` dédiée en 512).
-- Parcours : le bouton « Installer l’application » du panneau hors ligne
+- Parcours : le bouton « Installer l’application » du panneau
   (Paramètres) utilise le `beforeinstallprompt` différé quand le navigateur
   le propose ; sinon, menu du navigateur → « Installer » / « Ajouter à
   l’écran d’accueil ».
@@ -44,43 +54,10 @@ opérateur, pas du code).
   Partager → « Sur l’écran d’accueil ». Le bouton du panneau n’apparaît
   que quand le navigateur propose l’invite (donc jamais sur iOS).
 - `apple-touch-icon` pointe sur `icon-192.png` (iOS ignore le SVG).
-- Background Sync et Periodic Sync **n’existent pas** sur iOS : la file
-  rejouée à la fermeture de l’onglet attend la prochaine ouverture.
-  Safari ne réveille pas le worker sans onglet.
 - Push web iOS : uniquement à partir d’iOS 16.4, **et** uniquement pour une
   application installée sur l’écran d’accueil. En deçà, aucun rappel push
   n’arrive, sans erreur visible — le reçu `EO_VERSION`/push du panneau
   permet de distinguer transport et affichage.
-
-## Synchro d’arrière-plan (D-05)
-
-- Mise en file → `requestQueueSync()` enregistre le tag `eo-mutations`
-  auprès du SyncManager ; le navigateur réveille alors le worker même
-  onglet fermé, là où il le permet (Chrome/Edge desktop et Android).
-- Le worker (`app/src/sw.ts`, `replayViaClients`) **ne rejoue jamais
-  lui-même** : sans session utilisateur, un rejeu direct partirait sans JWT
-  et gonflerait `attempts` pour rien. Il compte la file en attente
-  (lecture brute d’IndexedDB, sans Dexie) et demande aux onglets ouverts
-  de rejouer via le chemin existant `flushWithAdapter` — même ordre, même
-  comptabilité, nouveau déclencheur uniquement.
-- Sans onglet ouvert, le worker ré-enregistre le tag et le rejeu se
-  conclut à la prochaine ouverture. Periodic Sync (`eo-periodic`, ~12 h,
-  Chrome/Edge uniquement) ajoute un déclenchement périodique best-effort.
-- Dégradation : iOS, Firefox, SyncManager absent → aucun appel, aucune
-  erreur ; le rejeu à la reconnexion (`online`), le message `EO_SYNC_NOW`
-  entre onglets et le bouton « Synchroniser maintenant » restent.
-
-## Limites de rejeu et conflits (D-06)
-
-- Dernier-écrivain gagne, sans fusion : une écriture rejouée écrase
-  silencieusement l’état serveur qui aurait bougé entre-temps.
-- Les insertions portent un identifiant client (`randomId`) : un double
-  rejeu ne duplique pas la ligne. `update`/`delete` rejoués sont
-  idempotents par construction. Au-delà, aucune idempotence garantie.
-- Les créations et mises à jour en attente n’apparaissent qu’après
-  synchronisation ; les suppressions retirent le cache en optimiste.
-- Les invitations et la création de foyer exigent une connexion et ne
-  sont jamais mises en file.
 
 ## Exploitation push — checklist opérateur (M-01/M-02)
 
