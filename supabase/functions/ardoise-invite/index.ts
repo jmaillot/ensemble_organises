@@ -36,6 +36,15 @@
  *   guest-view  -> vue invité (ticket) : { ardoise, guest, expenses, settlement }
  *   link-view   -> vue anonyme (code vérifié) : { ardoise, guest: null, expenses, settlement }
  *   add-guest   -> { guest_id, display_name, created }
+ *
+ * REFUS ENFANT (phase 14, D-03) : chaque action `user` résout le rôle du
+ * foyer côté serveur (lookup `household_members` en `service_role` —
+ * jamais un claim client) et refuse `enfant` AVANT tout RPC, avec
+ * l'erreur uniforme de sa famille (`child-guard.ts`, miroir byte-identique
+ * des sorties `translateRpcError` ci-dessous). `add-guest` vérifiait déjà
+ * le rôle en base (admin/membre — l'enfant y est refusé, inchangé).
+ * `redeem-guest`, `guest-view` et `link-view` restent sans identité,
+ * ouverts par construction.
  */
 
 // Spécificateur BARE, comme `household-invite` : le runtime épingle
@@ -43,6 +52,8 @@
 import { withSupabase } from '@supabase/server';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
+import { childRefusal, isChildRole } from './child-guard.ts';
+import type { ChildGuardAction } from './child-guard.ts';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -300,6 +311,62 @@ function checkSecret(): string {
   return secret;
 }
 
+// ---------------------------------------------------------------------------
+// Refus enfant (phase 14, D-03) : rôle résolu côté serveur, jamais fourni.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rôle de l'appelant dans le foyer, lu en `service_role` depuis la session
+ * vérifiée — jamais un claim client. `null` = pas membre : on laisse alors
+ * le RPC trancher (il possède l'oracle de ce cas).
+ */
+async function callerRole(
+  admin: AdminClient,
+  householdId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from('household_members')
+    .select('role')
+    .eq('household_id', householdId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const role = (data as { role?: unknown }).role;
+  return typeof role === 'string' ? role : null;
+}
+
+/** Foyer d'une ardoise, ou `null` si inconnue (le RPC possède cet oracle). */
+async function ardoiseHousehold(admin: AdminClient, ardoiseId: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from('ardoises')
+    .select('household_id')
+    .eq('id', ardoiseId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const householdId = (data as { household_id?: unknown }).household_id;
+  return typeof householdId === 'string' ? householdId : null;
+}
+
+/**
+ * Refuse l'enfant avec l'erreur uniforme de l'action, avant tout RPC.
+ * Foyer inconnu ou non-membre : on laisse passer vers le RPC, seul
+ * détenteur de ces oracles (jamais de 403 qui révélerait une existence).
+ */
+async function refuseEnfant(
+  admin: AdminClient,
+  userId: string,
+  householdId: string | null,
+  action: ChildGuardAction,
+): Promise<void> {
+  if (!householdId) return;
+  if (isChildRole(await callerRole(admin, householdId, userId))) {
+    const refusal = childRefusal(action);
+    throw new ArdoiseInviteError(refusal.status, refusal.message);
+  }
+}
+
 async function handleCreateArdoise(admin: AdminClient, userId: string, body: RequestBody & { action: 'create-ardoise' }) {
   const { data: membership } = await admin
     .from('household_members')
@@ -313,6 +380,10 @@ async function handleCreateArdoise(admin: AdminClient, userId: string, body: Req
   if (!householdId || (body.householdId && !households.includes(body.householdId))) {
     throw new ArdoiseInviteError(403, 'Vous n’appartenez pas à ce foyer.');
   }
+
+  // D-03 : un enfant ne crée pas d'ardoise — même 403 que le refus SQL
+  // d'écriture (le foyer vient des memberships serveur, pas du client).
+  await refuseEnfant(admin, userId, householdId, 'manage');
 
   const { data, error } = await admin.rpc('create_ardoise', {
     p_actor_id: userId,
@@ -329,6 +400,7 @@ async function handleCreateArdoise(admin: AdminClient, userId: string, body: Req
 }
 
 async function handleCreate(admin: AdminClient, userId: string, body: RequestBody & { action: 'create' }) {
+  await refuseEnfant(admin, userId, await ardoiseHousehold(admin, body.ardoiseId), 'manage');
   const secret = checkSecret();
   const code = generateCode();
   const codeHash = await hmacSha256Hex(code, secret);
@@ -353,6 +425,7 @@ async function handleCreate(admin: AdminClient, userId: string, body: RequestBod
 }
 
 async function handleRevoke(admin: AdminClient, userId: string, body: RequestBody & { action: 'revoke' }) {
+  await refuseEnfant(admin, userId, await ardoiseHousehold(admin, body.ardoiseId), 'manage');
   const { data, error } = await admin.rpc('revoke_ardoise_invite', {
     p_actor_id: userId,
     p_ardoise_id: body.ardoiseId,
@@ -363,6 +436,7 @@ async function handleRevoke(admin: AdminClient, userId: string, body: RequestBod
 }
 
 async function handleSummary(admin: AdminClient, userId: string, body: RequestBody & { action: 'summary' }) {
+  await refuseEnfant(admin, userId, await ardoiseHousehold(admin, body.ardoiseId), 'manage');
   const { data, error } = await admin.rpc('ardoise_invite_summary', {
     p_actor_id: userId,
     p_ardoise_id: body.ardoiseId,
@@ -410,6 +484,9 @@ async function handleJoin(admin: AdminClient, user: SupabaseClient, userId: stri
     if (!membership) {
       throw new ArdoiseInviteError(403, 'Vous n’appartenez pas au foyer de cette ardoise : utilisez le lien invité.');
     }
+    // D-03 : un enfant membre ne rejoint pas — même oracle `code invalide`
+    // que tout code inconnu (le foyer vient du code, pas du client).
+    await refuseEnfant(admin, userId, (ardoise as { household_id: string }).household_id, 'code');
   }
 
   const { data, error } = await admin.rpc('redeem_ardoise_invite', {
@@ -462,6 +539,8 @@ async function handleAddGuest(admin: AdminClient, userId: string, body: RequestB
     .limit(1)
     .maybeSingle();
   const role = (membership as { id: string; role: string } | null)?.role ?? null;
+  // D-03 : conforme sans changement — le rôle est résolu en base et seuls
+  // admin/membre passent ; l'enfant est refusé ici même.
   if (role !== 'admin' && role !== 'membre') {
     throw new ArdoiseInviteError(403, 'Écriture réservée aux membres du foyer.');
   }

@@ -71,6 +71,16 @@
  *                               propre, ou propre foyer — jamais d'existence
  *                               révélée (T-06-15).
  *
+ * REFUS ENFANT (phase 14, D-03) : chaque action `user` résout le rôle du
+ * foyer côté serveur (lookup `household_members` en `service_role` —
+ * jamais un claim client) et refuse `enfant` AVANT tout RPC, avec
+ * l'erreur uniforme de sa famille (`child-guard.ts`, miroir byte-identique
+ * des sorties `translateRpcError` ci-dessous). `member-leave` est exclu :
+ * le RPC refuse déjà tout membre du foyer de la liste sous oracle uniforme
+ * et ne supprime que les parts propres sans rien révéler — y ajouter un
+ * pré-contrôle piégerait les données sans rien protéger. `guest-view` et
+ * `guest-reserve` restent sans identité, ouverts par construction.
+ *
  * Ces cinq fonctions SQL sont `SECURITY DEFINER` et leur `EXECUTE` n'est
  * accordé qu'à `service_role` : un client porteur d'un JWT utilisateur est
  * `authenticated` et se voit refuser l'appel direct. Elles revérifient la
@@ -112,6 +122,8 @@
 import { withSupabase } from '@supabase/server';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
+import { childRefusal, isChildRole } from './child-guard.ts';
+import type { ChildGuardAction } from './child-guard.ts';
 // Envoi SMTP (D-01) : paquet béni par l'exemple officiel Supabase
 // `send-email-smtp` (cf. 06-RESEARCH.md, audit de légitimité). Version exacte
 // épinglée, vérifiée au registre le 2026-10-06 (`npm view nodemailer
@@ -446,10 +458,67 @@ function checkSecret(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Refus enfant (phase 14, D-03) : rôle résolu côté serveur, jamais fourni.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rôle de l'appelant dans le foyer, lu en `service_role` depuis la session
+ * vérifiée — jamais un claim client. `null` = pas membre : on laisse alors
+ * le RPC trancher (il possède l'oracle de ce cas).
+ */
+async function callerRole(
+  admin: AdminClient,
+  householdId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from('household_members')
+    .select('role')
+    .eq('household_id', householdId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const role = (data as { role?: unknown }).role;
+  return typeof role === 'string' ? role : null;
+}
+
+/** Foyer d'une liste, ou `null` si inconnue (le RPC possède cet oracle). */
+async function listHousehold(admin: AdminClient, listId: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from('gift_lists')
+    .select('household_id')
+    .eq('id', listId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const householdId = (data as { household_id?: unknown }).household_id;
+  return typeof householdId === 'string' ? householdId : null;
+}
+
+/**
+ * Refuse l'enfant avec l'erreur uniforme de l'action, avant tout RPC.
+ * Foyer inconnu ou non-membre : on laisse passer vers le RPC, seul
+ * détenteur de ces oracles (jamais de 403 qui révélerait une existence).
+ */
+async function refuseEnfant(
+  admin: AdminClient,
+  userId: string,
+  householdId: string | null,
+  action: ChildGuardAction,
+): Promise<void> {
+  if (!householdId) return;
+  if (isChildRole(await callerRole(admin, householdId, userId))) {
+    const refusal = childRefusal(action);
+    throw new GiftListInviteError(refusal.status, refusal.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 
 async function handleCreate(admin: AdminClient, userId: string, body: RequestBody & { action: 'create' }) {
+  await refuseEnfant(admin, userId, await listHousehold(admin, body.listId), 'manage');
   const secret = checkSecret();
   const code = generateCode();
   const codeHash = await hmacSha256Hex(code, secret);
@@ -475,6 +544,7 @@ async function handleCreate(admin: AdminClient, userId: string, body: RequestBod
 }
 
 async function handleRevoke(admin: AdminClient, userId: string, body: RequestBody & { action: 'revoke' }) {
+  await refuseEnfant(admin, userId, await listHousehold(admin, body.listId), 'manage');
   const { data, error } = await admin.rpc('revoke_gift_list_invite', {
     p_actor_id: userId,
     p_list_id: body.listId,
@@ -485,6 +555,7 @@ async function handleRevoke(admin: AdminClient, userId: string, body: RequestBod
 }
 
 async function handleSummary(admin: AdminClient, userId: string, body: RequestBody & { action: 'summary' }) {
+  await refuseEnfant(admin, userId, await listHousehold(admin, body.listId), 'manage');
   const { data, error } = await admin.rpc('gift_list_invite_summary', {
     p_actor_id: userId,
     p_list_id: body.listId,
@@ -517,6 +588,21 @@ async function handleSummary(admin: AdminClient, userId: string, body: RequestBo
 async function handleRedeem(admin: AdminClient, userId: string, body: RequestBody & { action: 'redeem' }) {
   const secret = checkSecret();
   const codeHash = await hmacSha256Hex(body.code, secret);
+
+  // D-03 : un enfant membre n'échange plus — même oracle `code invalide`
+  // que tout code inconnu (le foyer vient du code, pas du client).
+  const { data: redeemInvite } = await admin
+    .from('gift_list_invites')
+    .select('list_id')
+    .eq('token_hash', codeHash)
+    .maybeSingle();
+  const redeemListId = (redeemInvite as { list_id?: unknown } | null)?.list_id;
+  await refuseEnfant(
+    admin,
+    userId,
+    typeof redeemListId === 'string' ? await listHousehold(admin, redeemListId) : null,
+    'code',
+  );
 
   // Membre du foyer : la branche membre est essayée d'abord en base, sans
   // consommer d'e-mail. Externe (OPTION A) : l'e-mail de son compte, saisi à
@@ -609,6 +695,10 @@ async function handleSendEmail(admin: AdminClient, userId: string, body: Request
     throw new GiftListInviteError(404, 'Ce code est invalide.');
   }
   const listId = inviteRow.list_id;
+
+  // D-03 : un enfant ne fait pas envoyer d'invitation — même 403 gestion
+  // que tout non gestionnaire (le foyer vient du code, pas du client).
+  await refuseEnfant(admin, userId, await listHousehold(admin, listId), 'manage');
 
   // 3. Gestion revérifiée EN BASE (T-06-05) : le RPC lève 42501 pour un
   //    non-gestionnaire, traduit en 403 par `translateRpcError`.
@@ -847,6 +937,21 @@ async function handleGuestReserve(admin: AdminClient, body: RequestBody & { acti
  * que `guest-reserve`, sans donnée d'auteur.
  */
 async function handleMemberReserve(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-reserve' }) {
+  // D-03 : un enfant du foyer de l'article ne réserve ni ne libère — même
+  // 403 que toute réserve non autorisée (le foyer vient de l'article).
+  const { data: reservedItem } = await admin
+    .from('gift_items')
+    .select('list_id')
+    .eq('id', body.itemId)
+    .maybeSingle();
+  const reservedListId = (reservedItem as { list_id?: unknown } | null)?.list_id;
+  await refuseEnfant(
+    admin,
+    userId,
+    typeof reservedListId === 'string' ? await listHousehold(admin, reservedListId) : null,
+    'reserve',
+  );
+
   const { data, error } = await admin.rpc('member_reserve_gift_item', {
     p_actor_id: userId,
     p_item_id: body.itemId,
