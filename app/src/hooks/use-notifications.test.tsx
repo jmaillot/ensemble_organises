@@ -5,7 +5,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/toast';
 import { createTestQueryClient, seedHouseholdStore } from '@/test/render';
 import { data } from '@/lib/data';
-import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, DEMO_USER_ID } from '@/lib/data/seed';
+import { useSessionStore } from '@/stores/session-store';
+import { demoUser } from '@/hooks/use-auth';
 import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
 import { useNotifications } from './use-notifications';
 
@@ -165,5 +167,50 @@ describe('centre de notifications', () => {
       expect(raised?.href).toBe('/messages');
     });
     expect(result.current.messagesUnread).toBeGreaterThan(0);
+  });
+
+  it('ouvrir le fil solde sa ligne (marquage à l’ouverture, D-02)', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+
+    // Ouvrir = marquer : la ligne du fil quitte la cloche et rejoint les lus
+    // récents, sans masquage (elle reste visible dans « Toutes »).
+    const row = result.current.items.find((item) => item.id === 'message:conversation-1');
+    expect(row).toBeDefined();
+    await act(async () => {
+      result.current.markItem(row!);
+    });
+    await waitFor(() => expect(result.current.items.some((item) => item.id === 'message:conversation-1')).toBe(false));
+    const read = result.current.recentRead.find((item) => item.id === 'message:conversation-1');
+    expect(read).toBeDefined();
+    expect(read?.unread).toBe(false);
+  });
+
+  it('masque les lignes messages quand la préférence est coupée', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    // Sans utilisateur de session, la requête profils est désactivée et les
+    // défauts (tout affiché) s'appliquent : on connecte le démo-utilisateur
+    // pour que la préférence stockée soit lue.
+    useSessionStore.setState({ user: demoUser, status: 'authenticated' });
+    try {
+      // Avant tout rendu : la requête profils lira la préférence coupée.
+      await data.update('profiles', DEMO_USER_ID, { message_notifications_enabled: false });
+      const { result } = renderHook(() => useNotifications(), { wrapper });
+
+      // Les rappels calculés subsistent : seule la source messages est coupée.
+      await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+      expect(result.current.items.some((item) => item.kind === 'message')).toBe(false);
+      expect(result.current.recentRead.some((item) => item.kind === 'message')).toBe(false);
+    } finally {
+      useSessionStore.setState({ user: null, status: 'guest' });
+    }
   });
 });
