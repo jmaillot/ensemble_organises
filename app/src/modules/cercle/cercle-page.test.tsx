@@ -229,23 +229,16 @@ describe('Cercle', () => {
     expect(within(dialog).getByText('Je suis partant pour 16 h.')).toBeInTheDocument();
   });
 
-  it('l’admin supprime la publication d’autrui après confirmation', async () => {
-    const user = userEvent.setup();
-    const { container } = renderWithProviders(<CerclePage />);
+  it('l’admin ne peut plus supprimer la publication d’autrui (D-07)', async () => {
+    renderWithProviders(<CerclePage />);
 
-    // post-1 appartient à Lina ; Camille, admin de démonstration, peut la modérer.
+    // post-1 appartient à Lina ; Camille, admin de démonstration, ne voit
+    // plus aucune affordance de retrait dessus — ni Modifier, ni Supprimer.
+    // La publication survit et le fil garde ses deux cartes.
     const card = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest('article') as HTMLElement;
     expect(within(card).queryByRole('button', { name: /Modifier la publication/ })).not.toBeInTheDocument();
-    await user.click(within(card).getByRole('button', { name: /Supprimer la publication/ }));
-    const confirm = await screen.findByRole('alertdialog');
-    expect(within(confirm).getByText('Supprimer cette publication ?')).toBeInTheDocument();
-    await user.click(within(confirm).getByRole('button', { name: 'Supprimer' }));
-
-    await waitFor(() =>
-      expect(screen.queryByText(/Le soleil est enfin revenu/)).not.toBeInTheDocument(),
-    );
-    expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
-    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(1);
+    expect(within(card).queryByRole('button', { name: /Supprimer la publication/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Le soleil est enfin revenu/)).toBeInTheDocument();
   });
 
   it('n’offre aucune affordance d’écriture sur le contenu d’autrui (non-admin)', () => {
@@ -298,7 +291,6 @@ describe('Cercle', () => {
         post={foreignPost}
         open
         currentMemberId={DEMO_MEMBERS.thomas}
-        isAdmin={false}
         onOpenChange={noop}
         onSubmit={async () => true}
         onUpdateComment={async () => true}
@@ -314,7 +306,7 @@ describe('Cercle', () => {
     expect(within(otherRow).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
   });
 
-  it('l’admin supprime mais ne retouche pas le commentaire d’autrui', () => {
+  it('l’admin ne supprime ni ne retouche le commentaire d’autrui (D-07)', () => {
     const thomas = demoMembers.find((member) => member.id === DEMO_MEMBERS.thomas) ?? null;
     const camille = demoMembers.find((member) => member.id === DEMO_MEMBERS.camille) ?? null;
     const now = new Date().toISOString();
@@ -340,7 +332,6 @@ describe('Cercle', () => {
         }}
         open
         currentMemberId={DEMO_MEMBERS.thomas}
-        isAdmin
         onOpenChange={noop}
         onSubmit={async () => true}
         onUpdateComment={async () => true}
@@ -349,7 +340,36 @@ describe('Cercle', () => {
     );
     const row = within(screen.getByRole('dialog')).getByText('À modérer.').closest('li') as HTMLElement;
     expect(within(row).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
+  });
+
+  it('l’admin ne voit aucune suppression sur le contenu d’autrui, la sienne reste (D-07)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CerclePage />);
+
+    // Camille, connectée et admin du foyer de démo : les deux publications
+    // grainées sont celles de Lina et Thomas — aucune affordance de retrait.
+    const cardLina = (await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).closest(
+      'article',
+    ) as HTMLElement;
+    const cardThomas = (await screen.findByText(/J’ai retrouvé le numéro de la bibliothèque/, {}, { timeout: 5000 })).closest(
+      'article',
+    ) as HTMLElement;
+    expect(within(cardLina).queryByRole('button', { name: /Supprimer la publication/ })).not.toBeInTheDocument();
+    expect(within(cardThomas).queryByRole('button', { name: /Supprimer la publication/ })).not.toBeInTheDocument();
+
+    // Dans la modale : le commentaire de Thomas n’offre rien à Camille (ni
+    // Modifier ni Supprimer), le sien garde les deux — dont la suppression
+    // confirmée par modale. Le levier admin restant vit dans Messages
+    // (archivage du fil, figé sans détruire — prouvé intact côté base).
+    await user.click(within(cardLina).getByRole('button', { name: 'Ouvrir les commentaires' }));
+    const dialog = await screen.findByRole('dialog');
+    const rowThomas = within(dialog).getByText('Je suis partant pour 16 h.').closest('li') as HTMLElement;
+    const rowCamille = within(dialog).getByText('Parfait, je prépare le sac.').closest('li') as HTMLElement;
+    expect(within(rowThomas).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
+    expect(within(rowThomas).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
+    expect(within(rowCamille).getByRole('button', { name: 'Modifier ce commentaire' })).toBeInTheDocument();
+    expect(within(rowCamille).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
   });
 
   it('publie un texte long sous le plafond base et refuse au-delà', async () => {
@@ -464,7 +484,6 @@ describe('Cercle', () => {
         canDelete={false}
         canEdit={false}
         currentMemberId={DEMO_MEMBERS.camille}
-        isAdmin={false}
         onSubmitComment={async (input) => {
           sent.push(input);
           return true;
