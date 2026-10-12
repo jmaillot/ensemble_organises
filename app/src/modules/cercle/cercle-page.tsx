@@ -77,6 +77,11 @@ export default function CerclePage() {
                   active={activePostId === post.id}
                   canDelete={canDelete(post)}
                   canEdit={canEditPost(post)}
+                  currentMemberId={currentMemberId}
+                  isAdmin={isAdmin}
+                  onSubmitComment={addComment}
+                  onUpdateComment={(commentId, content) => updateComment(commentId, content)}
+                  onDeleteComment={(commentId) => deleteComment(commentId)}
                   onSelect={() => setActivePostId(post.id)}
                   onToggleReaction={() => void toggleReaction(post.id)}
                   onOpenComments={() => {
