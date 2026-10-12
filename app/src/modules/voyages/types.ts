@@ -59,6 +59,12 @@ export interface TripInput {
   startDate: IsoDate;
   endDate: IsoDate;
   coverPhoto: string;
+  /**
+   * Fichier téléversé à l'enregistrement (D-11) : déposé sous
+   * `trips/<id>/` via le helper partagé, il GAGNE sur `coverPhoto` quand les
+   * deux sont fournis (précédence documentée côté dialogue).
+   */
+  coverFile?: File | null;
   notes: string;
 }
 

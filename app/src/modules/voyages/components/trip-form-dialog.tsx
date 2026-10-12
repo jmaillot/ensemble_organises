@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,6 +36,8 @@ export interface TripFormDialogProps {
 
 export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: TripFormDialogProps) {
   const toast = useToast();
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const defaults = useMemo<FormValues>(
     () =>
       trip
@@ -63,7 +65,25 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
 
   useEffect(() => {
     if (open) reset(defaults);
+    setCoverFile(null);
   }, [open, defaults, reset]);
+
+  // Aperçu local du fichier choisi (motif idées cadeaux) : le dépôt réel a
+  // lieu à l'enregistrement, jamais à la sélection. La garde jsdom n'expose
+  // pas `createObjectURL` — sans elle les tests planteraient ici.
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+    if (typeof URL.createObjectURL !== 'function') {
+      setCoverPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(coverFile);
+    setCoverPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [coverFile]);
 
   const onSubmitForm = handleSubmit(async (values) => {
     const saved = await onSubmit(
@@ -73,6 +93,9 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
         startDate: values.startDate,
         endDate: values.endDate,
         coverPhoto: values.coverPhoto,
+        // Fichier prioritaire sur l'URL (précédence D-11) : le dépôt et le
+        // nettoyage en cas d'échec vivent dans le hook d'enregistrement.
+        coverFile,
         notes: values.notes,
       },
       trip?.id ?? null,
@@ -114,7 +137,7 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
           <Field
             label="Photo de couverture"
             error={errors.coverPhoto?.message}
-            hint="Choisir une photo de la galerie, ou coller l’URL d’une image."
+            hint="Choisir une photo de la galerie, coller l’URL d’une image, ou téléverser un fichier — le fichier gagne sur l’URL."
           >
             {(props) => (
               <div className="grid gap-2.5">
@@ -133,6 +156,29 @@ export function TripFormDialog({ open, onOpenChange, trip, onSubmit, busy }: Tri
                       <span className="block py-0.5">{preset.label}</span>
                     </button>
                   ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt="Aperçu de la couverture téléversée"
+                      className="h-14 w-20 rounded-[11px] object-cover"
+                    />
+                  ) : null}
+                  <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-border bg-bg px-3.5 text-xs font-extrabold text-fg">
+                    {coverFile ? 'Changer de fichier' : 'Téléverser une photo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  {coverFile ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setCoverFile(null)}>
+                      Retirer le fichier
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             )}

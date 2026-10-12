@@ -14,15 +14,19 @@ import { memberStack, type Trip } from './types';
 const MAX_STACK = 3;
 
 /**
- * Garde de rendu de la couverture (D-06) : seules les URL http(s) et les
- * chemins racine du site atteignent le héros. Toute autre forme (schéma
- * exotique, donnée corrompue) ne rend aucune image : échec fermé côté
- * client, jamais d'erreur. Les chemins racine restent admis car les
- * couvertures de l'export et le repli `DEFAULT_TRIP_COVER` sont des actifs
- * premier parti (`/assets/…`), pas des URL arbitraires.
+ * Garde de rendu de la couverture (D-06) : seules les URL http(s), les
+ * chemins racine du site et les aperçus locaux `blob:` atteignent le héros.
+ * Toute autre forme (schéma exotique, donnée corrompue) ne rend aucune
+ * image : échec fermé côté client, jamais d'erreur. Les chemins racine
+ * restent admis car les couvertures de l'export et le repli
+ * `DEFAULT_TRIP_COVER` sont des actifs premier parti (`/assets/…`), pas des
+ * URL arbitraires ; les `blob:` couvrent les aperçus démo des couvertures
+ * téléversées (D-11, même régime que les photos de contacts).
  */
 export function isServableCoverUrl(value: string | null | undefined): value is string {
-  return typeof value === 'string' && (/^https?:\/\//i.test(value) || value.startsWith('/'));
+  return (
+    typeof value === 'string' && (/^https?:\/\//i.test(value) || value.startsWith('/') || value.startsWith('blob:'))
+  );
 }
 
 export default function VoyagesPage() {
