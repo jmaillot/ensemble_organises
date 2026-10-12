@@ -35,9 +35,9 @@ export default function LandingPage() {
             <div className="text-[11px] text-muted">Votre foyer, en mouvement</div>
           </div>
         </div>
-        <Link to="/connexion">
-          <Button size="sm">Se connecter</Button>
-        </Link>
+        <Button asChild size="sm">
+          <Link to="/connexion">Se connecter</Link>
+        </Button>
       </header>
 
       <main id="contenu" className="mx-auto max-w-[1180px] px-5 max-[650px]:px-[15px]">
@@ -52,17 +52,21 @@ export default function LandingPage() {
               sache ce qu’il a à faire, ce qu’il a promis, et ce qu’il partage.
             </p>
             <div className="flex flex-wrap gap-2.5">
-              <Link to="/connexion">
-                <Button icon="arrow">Commencer avec Google</Button>
-              </Link>
-              <Link to="/connexion">
-                <Button variant="secondary">Continuer avec Facebook</Button>
-              </Link>
-              <Link to="/connexion" className="w-full max-[650px]:w-auto">
-                <Button variant="quiet" className="w-full max-[650px]:w-auto" iconEnd="chevronRight">
+              <Button asChild>
+                <Link to="/connexion">
+                  <Icon name="arrow" size="sm" />
+                  Commencer avec Google
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to="/connexion">Continuer avec Facebook</Link>
+              </Button>
+              <Button asChild variant="quiet" className="w-full max-[650px]:w-auto">
+                <Link to="/connexion">
                   Continuer avec un email
-                </Button>
-              </Link>
+                  <Icon name="chevronRight" size="sm" />
+                </Link>
+              </Button>
             </div>
             <div className="mt-7 flex items-center gap-3">
               <span className="flex -space-x-2">
@@ -191,9 +195,12 @@ export default function LandingPage() {
           <p className="mx-auto mb-6 max-w-[520px] text-[13px] text-on-dark">
             Un nom, une couleur, et votre foyer est prêt. Vous pourrez inviter les autres membres quand vous voulez.
           </p>
-          <Link to="/connexion">
-            <Button icon="arrow">Commencer</Button>
-          </Link>
+          <Button asChild>
+            <Link to="/connexion">
+              <Icon name="arrow" size="sm" />
+              Commencer
+            </Link>
+          </Button>
         </section>
       </main>
 

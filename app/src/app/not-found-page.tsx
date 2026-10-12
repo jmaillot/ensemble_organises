@@ -13,9 +13,12 @@ export default function NotFoundPage() {
         <p className="lede mx-auto mb-6 text-[14px]">
           Le lien est peut-être obsolète. Revenez au tableau de bord pour retrouver votre foyer.
         </p>
-        <Link to="/accueil">
-          <Button icon="arrow">Retour au tableau de bord</Button>
-        </Link>
+        <Button asChild>
+          <Link to="/accueil">
+            <Icon name="arrow" size="sm" />
+            Retour au tableau de bord
+          </Link>
+        </Button>
       </div>
     </div>
   );
