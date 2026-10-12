@@ -27,7 +27,7 @@ begin
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('invitations', ARRAY['id', 'household_id', 'email', 'phone', 'role', 'status', 'created_at']::text[]),
-          ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at']::text[]),
+          ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at', 'trip_id']::text[]),
           ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'product_id', 'created_at']::text[]),
           ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'category_id', 'calendar_id', 'created_by', 'created_at']::text[]),
           ('event_categories', ARRAY['id', 'household_id', 'name', 'color', 'icon', 'is_default', 'created_by', 'created_at']::text[]),
@@ -35,9 +35,9 @@ begin
           ('public_holidays', ARRAY['holiday_date', 'name', 'year']::text[]),
           ('school_holidays', ARRAY['id', 'zone', 'school_year', 'name', 'start_date', 'end_date']::text[]),
           ('event_reminders', ARRAY['id', 'event_id', 'remind_at']::text[]),
-          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at', 'trip_id']::text[]),
           ('note_attachments', ARRAY['id', 'note_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
-          ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'folder_id', 'created_by', 'created_at']::text[]),
+          ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'folder_id', 'created_by', 'created_at', 'trip_id']::text[]),
           ('task_assignees', ARRAY['task_id', 'member_id']::text[]),
           ('task_reminders', ARRAY['id', 'task_id', 'remind_at']::text[]),
           ('routines', ARRAY['id', 'household_id', 'name', 'description', 'recurrence_rule', 'folder_id', 'created_by', 'created_at']::text[]),
@@ -45,7 +45,7 @@ begin
           ('routine_reminders', ARRAY['id', 'routine_id', 'remind_at']::text[]),
           ('routine_completions', ARRAY['id', 'routine_id', 'household_id', 'occurrence_date', 'completed_by', 'completed_at', 'status']::text[]),
           ('recipes', ARRAY['id', 'household_id', 'title', 'created_at']::text[]),
-          ('ardoises', ARRAY['id', 'household_id', 'name', 'description', 'cover_url', 'invite_hash', 'is_active', 'max_uses', 'use_count', 'expires_at', 'created_by', 'created_at']::text[]),
+          ('ardoises', ARRAY['id', 'household_id', 'name', 'description', 'cover_url', 'invite_hash', 'is_active', 'max_uses', 'use_count', 'expires_at', 'created_by', 'created_at', 'trip_id']::text[]),
           ('ardoise_members', ARRAY['ardoise_id', 'member_id']::text[]),
           ('ardoise_guests', ARRAY['id', 'ardoise_id', 'display_name', 'ticket_hash', 'created_at']::text[]),
           ('task_lists', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
@@ -65,12 +65,15 @@ begin
           ('providers', ARRAY['id', 'household_id', 'provider_type_id', 'name', 'email', 'phone', 'address', 'postal_code', 'city', 'notes', 'created_at']::text[]),
           ('provider_attachments', ARRAY['id', 'provider_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('loyalty_cards', ARRAY['id', 'household_id', 'member_id', 'name', 'code_type', 'code_value', 'brand_color', 'category', 'created_at']::text[]),
-          ('places', ARRAY['id', 'household_id', 'type', 'photo_url', 'name', 'street', 'postal_code', 'city', 'phone', 'rating', 'visited', 'note', 'created_at']::text[]),
+          ('places', ARRAY['id', 'household_id', 'type', 'photo_url', 'name', 'street', 'postal_code', 'city', 'phone', 'rating', 'visited', 'note', 'created_at', 'trip_id']::text[]),
           ('posts', ARRAY['id', 'household_id', 'author_id', 'text', 'created_at']::text[]),
           ('post_media', ARRAY['id', 'post_id', 'household_id', 'media_type', 'url']::text[]),
           ('post_comments', ARRAY['id', 'post_id', 'household_id', 'author_id', 'content', 'created_at']::text[]),
           ('post_reactions', ARRAY['id', 'post_id', 'household_id', 'author_id', 'reaction_type', 'created_at']::text[]),
-          ('trips', ARRAY['id', 'household_id', 'name', 'destination', 'start_date', 'end_date', 'cover_photo', 'notes', 'created_at']::text[]),
+          ('trips', ARRAY['id', 'household_id', 'name', 'destination', 'start_date', 'end_date', 'cover_photo', 'notes', 'created_at', 'created_by', 'tab_state', 'is_closed']::text[]),
+          ('trip_members', ARRAY['trip_id', 'member_id', 'created_at']::text[]),
+          ('trip_guests', ARRAY['id', 'trip_id', 'display_name', 'ticket_hash', 'created_at']::text[]),
+          ('trip_invites', ARRAY['id', 'trip_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('conversations', ARRAY['id', 'household_id', 'type', 'title', 'created_at']::text[]),
           ('conversation_members', ARRAY['conversation_id', 'member_id', 'left_at']::text[]),
           ('conversation_membership_periods', ARRAY['id', 'conversation_id', 'member_id', 'joined_at', 'left_at']::text[]),
@@ -176,7 +179,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -194,6 +197,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''gift_list_invites'''),
     0::bigint,
     'gift_list_invites reste sans politique, donc inatteignable'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''trip_invites'''),
+    0::bigint,
+    'trip_invites reste sans politique, donc inatteignable'
   );
   perform testkit.eq(
     testkit.count('select 1 from pg_policies where tablename = ''push_subscriptions'''),
@@ -310,7 +318,7 @@ declare
   v_privilege text;
   v_table text;
 begin
-  foreach v_table in array array['household_invite_tokens', 'gift_list_invites', 'push_subscriptions'] loop
+  foreach v_table in array array['household_invite_tokens', 'gift_list_invites', 'trip_invites', 'push_subscriptions'] loop
     perform testkit.eq(
       testkit.count(format('select 1 from pg_policies where schemaname = ''public'' and tablename = %L', v_table)),
       0::bigint,
@@ -351,6 +359,16 @@ declare
     'public.revoke_gift_list_invite(uuid,text)',
     'public.gift_list_invite_summary(uuid,text)',
     'public.redeem_gift_list_invite(text,uuid,text)',
+    'public.create_trip_atomic(uuid,text,text,text,date,date,text,text[],jsonb)',
+    'public.trip_leave(uuid,text)',
+    'public.trip_close(uuid,text)',
+    'public.trip_reopen(uuid,text)',
+    'public.create_trip_invite(uuid,text,text,timestamptz,integer)',
+    'public.revoke_trip_invite(uuid,text)',
+    'public.trip_invite_summary(uuid,text)',
+    'public.redeem_trip_invite(text,uuid,text)',
+    'public.verify_trip_ticket(text)',
+    'public.create_trip_guest_expense(text,text,numeric,date,text,jsonb)',
     'public.register_push_subscription(uuid,text,text,text,timestamptz,text,text)',
     'public.rename_push_subscription(uuid,text,text)',
     'public.remove_push_subscription(uuid,text)',

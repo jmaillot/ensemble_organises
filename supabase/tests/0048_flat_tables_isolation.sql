@@ -172,22 +172,30 @@ reset role;
 select testkit.as_user(user_id, 'plate-bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
--- Ancre : Bob voit son foyer, donc les refus qui suivent sont significatifs.
+-- Ancre : Bob voit son foyer (ici les animaux, restes foyer), donc les
+-- refus qui suivent sont significatifs. Les voyages ne sont PLUS visibles
+-- au foyer depuis la phase 15 (conteneur collaboratif : participants +
+-- admins seuls, suite 0053) — trip_a est donc invisible a Bob, non membre.
 select testkit.eq(testkit.count(format(
-  'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 1::bigint,
+  'select 1 from public.pets where id = %L', (select row_id from testkit.fx where key = 'pet_a'))), 1::bigint,
   'Bob est bien membre lisant du foyer A au moment de ces verifications');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 0::bigint,
+  'Bob, non participant, ne voit pas le voyage (phase 15)');
 
--- --- Voyages : insert/update autorises, delete admin-only --------------------
-select testkit.eq(testkit.affected(format(
+-- --- Voyages : creation directe admin-only (les membres passent par
+-- --- create_trip_atomic, prouve en 0053), ni modification ni suppression
+-- --- pour un non-participant -----------------------------------------------
+select testkit.expect_denied(format(
   'insert into public.trips (id, household_id, name, destination, start_date, end_date)'
   ' values (%L, %L, %L, %L, current_date, current_date + 3)',
-  'trip_bob', (select household_id from testkit.fx where key = 'bob'), 'Week-end', 'Lyon')), 1::bigint,
-  'un membre cree un voyage dans son foyer');
+  'trip_bob', (select household_id from testkit.fx where key = 'bob'), 'Week-end', 'Lyon'),
+  'un membre ne cree pas un voyage en direct (RPC atomique seul)');
 select testkit.eq(testkit.affected(format(
-  'update public.trips set name = %L where id = %L', 'Bretagne bis', (select row_id from testkit.fx where key = 'trip_a'))), 1::bigint,
-  'un membre modifie un voyage de son foyer');
-select testkit.eq(testkit.affected(
-  'delete from public.trips where id = ''trip_bob'''), 0::bigint,
+  'update public.trips set name = %L where id = %L', 'Bretagne bis', (select row_id from testkit.fx where key = 'trip_a'))), 0::bigint,
+  'un non-participant ne modifie pas un voyage');
+select testkit.eq(testkit.affected(format(
+  'delete from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 0::bigint,
   'la suppression d''un voyage est reservee aux administrateurs');
 
 -- --- Animaux : meme motif -----------------------------------------------------
@@ -236,8 +244,8 @@ select testkit.as_user(user_id, 'plate-enfant@example.fr') from testkit.fx where
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
-  'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 1::bigint,
-  'un enfant lit les voyages de son foyer');
+  'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_a'))), 0::bigint,
+  'un enfant ne voit aucun voyage (phase 15, D-01)');
 select testkit.eq(testkit.count(format(
   'select 1 from public.pets where id = %L', (select row_id from testkit.fx where key = 'pet_a'))), 0::bigint,
   'un enfant ne lit plus les animaux de son foyer (0113, phase 14)');
@@ -343,9 +351,11 @@ select testkit.expect_denied(format(
   ' values (%L, %L, %L, %L, current_date, current_date + 1)',
   'trip_escal', (select household_id from testkit.fx where key = 'carol'), 'Transfert', 'Ailleurs'),
   'un membre ne cree pas un voyage dans un autre foyer');
-select testkit.expect_denied(format(
+-- Non-participant : la RLS filtre (0 ligne, pas d'erreur) — le trigger
+-- anti-deplacement est prouve cote admin en 0053 (phase 15).
+select testkit.eq(testkit.affected(format(
   'update public.trips set household_id = %L where id = %L',
-  (select household_id from testkit.fx where key = 'carol'), (select row_id from testkit.fx where key = 'trip_a')),
+  (select household_id from testkit.fx where key = 'carol'), (select row_id from testkit.fx where key = 'trip_a'))), 0::bigint,
   'un membre ne deplace pas un voyage vers un autre foyer');
 select testkit.expect_denied(format(
   'insert into public.pet_records (id, pet_id, household_id, type, name) values (%L, %L, %L, %L, %L)',

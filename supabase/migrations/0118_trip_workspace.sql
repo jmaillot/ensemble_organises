@@ -13,10 +13,10 @@
 -- Anciens voyages : table rase (DELETE, seed demo intacte).
 -- Admins : voient tous les voyages (moderation) sans y participer.
 --
--- Etape 1 (tracer, ce bloc) : colonnes, tables neuves, helpers, politiques
--- RLS reconjointes, triggers d'alignement, publication Realtime, DELETE
--- table rase. Etape 2 (bloc suivant, meme fichier, vers l'avant uniquement) :
--- RPC atomiques + invites.
+-- Etape 1 (tracer) : sections A a I — colonnes, tables neuves, helpers,
+-- politiques RLS reconjointes, triggers d'alignement, publication Realtime,
+-- DELETE table rase. Etape 2 (section J, meme transaction ci-dessous) : RPC
+-- atomiques + invites.
 --
 -- Vers l'avant uniquement, aucune migration appliquee retouchee (AGENTS.md
 -- §2.7A). Les politiques sont recoupees sous leurs NOMS existants (pas de
@@ -149,7 +149,9 @@ as $$
 $$;
 
 -- Membre OU participant du voyage, OU admin du foyer (D-07 : les admins
--- voient tous les voyages sans y participer). NULL = jamais membre.
+-- voient tous les voyages sans y participer — la branche admin ne depend
+-- d'aucune ligne de participants, sinon un voyage sans membres serait
+-- invisible meme a l'admin). NULL = jamais membre.
 create or replace function private.is_trip_member(p_trip_id text)
 returns boolean
 language sql
@@ -161,13 +163,15 @@ as $$
     when p_trip_id is null then false
     else exists (
       select 1
+        from public.trips t
+       where t.id = p_trip_id
+         and private.is_household_admin(t.household_id)
+    ) or exists (
+      select 1
         from public.trip_members tm
         join public.trips t on t.id = tm.trip_id
        where tm.trip_id = p_trip_id
-         and (
-           tm.member_id = private.current_member_id(t.household_id)
-           or private.is_household_admin(t.household_id)
-         )
+         and tm.member_id = private.current_member_id(t.household_id)
     )
   end;
 $$;
@@ -579,6 +583,697 @@ revoke all on function private.check_trip_task_assignee() from public, anon, aut
 revoke all on function private.check_ardoise_trip_link() from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- J. RPC atomiques + invites (etape 2, meme transaction : un defaut de
+--    RPC annule aussi le schema — le journal ne retient que le tout-vert).
+--    USAGE SERVEUR UNIQUEMENT : EXECUTE au seul `service_role` (motif 0009/0058/0079) — un client `authenticated`
+--    se voit refuser l'appel direct, ce que la suite 0053 verifie. L'Edge
+--    trip-invite les appelle sous l'identite de l'appelant (p_actor_id).
+-- ---------------------------------------------------------------------------
+
+-- Gestion d'un voyage : admin du foyer OU participant (le createur non
+-- participant et non admin ne gere pas — documente, pas d'oracle).
+create or replace function private.assert_trip_manager(
+  p_trip_id text,
+  p_actor_id uuid
+)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_household_id text;
+  v_member_id text;
+  v_role text;
+begin
+  select t.household_id into v_household_id
+    from public.trips t
+   where t.id = p_trip_id;
+  if v_household_id is null then
+    raise exception 'voyage introuvable' using errcode = 'P0002';
+  end if;
+  select m.id, m.role into v_member_id, v_role
+    from public.household_members m
+   where m.household_id = v_household_id and m.user_id = p_actor_id
+   limit 1;
+  if v_role = 'admin' then
+    return v_household_id;
+  end if;
+  if v_member_id is not null and exists (
+    select 1
+      from public.trip_members tm
+     where tm.trip_id = p_trip_id and tm.member_id = v_member_id
+  ) then
+    return v_household_id;
+  end if;
+  raise exception 'gestion du voyage réservée' using errcode = '42501';
+end;
+$$;
+
+revoke all on function private.assert_trip_manager(text, uuid) from public, anon, authenticated;
+grant execute on function private.assert_trip_manager(text, uuid) to service_role;
+
+-- Creation atomique : voyage + participants + ardoise liee + inscriptions
+-- ardoise, en UNE transaction (tout echec annule tout — D-01/D-02/D-03).
+-- p_member_ids NULL = tous les admin/membre (motif 0066) ; sinon restreint
+-- aux admin/membre du foyer (enfants, inconnus et autres foyers ignores).
+create or replace function public.create_trip_atomic(
+  p_actor_id uuid,
+  p_household_id text,
+  p_name text,
+  p_destination text,
+  p_start_date date,
+  p_end_date date,
+  p_notes text default null,
+  p_member_ids text[] default null,
+  p_tab_state jsonb default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_member_id text;
+  v_trip_id text := private.new_id('trip');
+  v_ardoise_id text := private.new_id('ardoise');
+  v_out jsonb;
+begin
+  if p_actor_id is null or p_household_id is null then
+    raise exception 'acteur et foyer obligatoires' using errcode = '22023';
+  end if;
+  perform private.assert_household_writer(p_household_id, p_actor_id);
+  if p_name is null or char_length(btrim(p_name)) not between 1 and 200 then
+    raise exception 'nom de voyage invalide' using errcode = '22023';
+  end if;
+  if p_destination is null or char_length(btrim(p_destination)) = 0 then
+    raise exception 'destination obligatoire' using errcode = '22023';
+  end if;
+  if p_start_date is null or p_end_date is null or p_end_date < p_start_date then
+    raise exception 'dates de voyage invalides' using errcode = '22023';
+  end if;
+
+  select m.id into v_member_id
+    from public.household_members m
+   where m.household_id = p_household_id and m.user_id = p_actor_id
+   limit 1;
+
+  insert into public.trips (
+    id, household_id, name, destination, start_date, end_date,
+    notes, created_by, tab_state
+  ) values (
+    v_trip_id, p_household_id, btrim(p_name), btrim(p_destination),
+    p_start_date, p_end_date, p_notes, v_member_id,
+    coalesce(
+      p_tab_state,
+      '{"infos": true, "courses": true, "notes": true, "taches": true, "adresses": true, "budget": true, "parametres": true}'::jsonb
+    )
+  );
+
+  if p_member_ids is null then
+    insert into public.trip_members (trip_id, member_id)
+    select v_trip_id, m.id
+      from public.household_members m
+     where m.household_id = p_household_id
+       and m.role in ('admin', 'membre');
+  else
+    insert into public.trip_members (trip_id, member_id)
+    select v_trip_id, m.id
+      from public.household_members m
+     where m.household_id = p_household_id
+       and m.role in ('admin', 'membre')
+       and m.id = any (p_member_ids)
+    on conflict do nothing;
+  end if;
+
+  -- Ardoise liee (nom du voyage) + inscriptions miroirs : un voyage = une
+  -- ardoise = un foyer, participants synchronises (D-03).
+  insert into public.ardoises (id, household_id, name, created_by, trip_id)
+  values (v_ardoise_id, p_household_id, btrim(p_name), v_member_id, v_trip_id);
+
+  insert into public.ardoise_members (ardoise_id, member_id)
+  select v_ardoise_id, tm.member_id
+    from public.trip_members tm
+   where tm.trip_id = v_trip_id
+  on conflict do nothing;
+
+  return jsonb_build_object('trip_id', v_trip_id, 'ardoise_id', v_ardoise_id);
+end;
+$$;
+
+comment on function public.create_trip_atomic(uuid, text, text, text, date, date, text, text[], jsonb) is
+  'USAGE SERVEUR UNIQUEMENT (Edge trip-invite). Cree voyage + participants + ardoise liee en une transaction.';
+
+-- Depart volontaire : retire des participants ET de l'ardoise liee, histoire
+-- intacte. Soi-meme uniquement (l'identite vient de la session).
+create or replace function public.trip_leave(
+  p_actor_id uuid,
+  p_trip_id text
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_household_id text;
+  v_member_id text;
+  v_ardoise_id text;
+begin
+  if p_actor_id is null or p_trip_id is null then
+    raise exception 'quitter impossible' using errcode = 'P0002';
+  end if;
+  select t.household_id into v_household_id
+    from public.trips t
+   where t.id = p_trip_id;
+  if v_household_id is null then
+    raise exception 'quitter impossible' using errcode = 'P0002';
+  end if;
+  select m.id into v_member_id
+    from public.household_members m
+   where m.household_id = v_household_id and m.user_id = p_actor_id
+   limit 1;
+  if v_member_id is null then
+    raise exception 'quitter impossible' using errcode = 'P0002';
+  end if;
+
+  delete from public.trip_members tm
+   where tm.trip_id = p_trip_id and tm.member_id = v_member_id;
+  if not found then
+    raise exception 'quitter impossible' using errcode = 'P0002';
+  end if;
+
+  select a.id into v_ardoise_id
+    from public.ardoises a
+   where a.trip_id = p_trip_id;
+  if v_ardoise_id is not null then
+    delete from public.ardoise_members am
+     where am.ardoise_id = v_ardoise_id and am.member_id = v_member_id;
+  end if;
+
+  return jsonb_build_object('trip_id', p_trip_id, 'left', true);
+end;
+$$;
+
+comment on function public.trip_leave(uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Depart volontaire : retire du voyage ET de l''ardoise liee. Oracle uniforme `quitter impossible`.';
+
+-- Fermeture douce : fige sans detruire (D-08). Participant ecrivain OU admin.
+create or replace function public.trip_close(
+  p_actor_id uuid,
+  p_trip_id text
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_household_id text;
+begin
+  v_household_id := private.assert_trip_manager(p_trip_id, p_actor_id);
+  perform private.assert_household_writer(v_household_id, p_actor_id);
+
+  update public.trips t
+     set is_closed = true
+   where t.id = p_trip_id;
+
+  return jsonb_build_object('trip_id', p_trip_id, 'is_closed', true);
+end;
+$$;
+
+comment on function public.trip_close(uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Fige le voyage (ecritures refusees, lignes conservees).';
+
+-- Reouverture : admin du foyer seul (D-08).
+create or replace function public.trip_reopen(
+  p_actor_id uuid,
+  p_trip_id text
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_household_id text;
+begin
+  if p_actor_id is null or p_trip_id is null then
+    raise exception 'acteur et voyage obligatoires' using errcode = '22023';
+  end if;
+  select t.household_id into v_household_id
+    from public.trips t
+   where t.id = p_trip_id;
+  if v_household_id is null then
+    raise exception 'voyage introuvable' using errcode = 'P0002';
+  end if;
+  perform private.assert_household_admin(v_household_id, p_actor_id);
+
+  update public.trips t
+     set is_closed = false
+   where t.id = p_trip_id;
+
+  return jsonb_build_object('trip_id', p_trip_id, 'is_closed', false);
+end;
+$$;
+
+comment on function public.trip_reopen(uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Reouvre un voyage fige (admin du foyer seul).';
+
+-- ---------------------------------------------------------------------------
+-- Invitations a code (miroir 0079 : bornes, oracle uniforme, idempotence).
+-- Secret HMAC `TRIP_INVITE_HMAC_SECRET` : comme en 0079, cette migration n'en
+-- stocke que le NOM — l'empreinte arrive calculee par l'Edge (Vault).
+-- ---------------------------------------------------------------------------
+create or replace function public.create_trip_invite(
+  p_actor_id uuid,
+  p_trip_id text,
+  p_token_hash text,
+  p_expires_at timestamptz default null,
+  p_max_uses integer default 20
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_max_uses integer;
+  v_expires_at timestamptz;
+  v_invite_id text;
+begin
+  if p_actor_id is null or p_trip_id is null then
+    raise exception 'acteur et voyage obligatoires' using errcode = '22023';
+  end if;
+  perform private.assert_trip_manager(p_trip_id, p_actor_id);
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'empreinte d''invitation invalide' using errcode = '22023';
+  end if;
+
+  v_max_uses := coalesce(p_max_uses, 20);
+  if v_max_uses < 1 or v_max_uses > 100 then
+    raise exception 'nombre d''utilisations invalide' using errcode = '22023';
+  end if;
+
+  if p_expires_at is null then
+    v_expires_at := now() + interval '90 days';
+  else
+    if p_expires_at <= now() or p_expires_at > now() + interval '90 days' then
+      raise exception 'expiration invalide' using errcode = '22023';
+    end if;
+    v_expires_at := p_expires_at;
+  end if;
+
+  -- Regeneration : le code precedent DE CE VOYAGE est desactive aussitot.
+  update public.trip_invites
+     set is_active = false
+   where trip_id = p_trip_id
+     and is_active;
+
+  insert into public.trip_invites (
+    trip_id, token_hash, created_by, expires_at, max_uses, use_count, is_active
+  ) values (
+    p_trip_id, p_token_hash, p_actor_id, v_expires_at, v_max_uses, 0, true
+  )
+  returning id into v_invite_id;
+
+  return jsonb_build_object(
+    'invite_id', v_invite_id,
+    'trip_id', p_trip_id,
+    'expires_at', v_expires_at,
+    'max_uses', v_max_uses
+  );
+end;
+$$;
+
+comment on function public.create_trip_invite(uuid, text, text, timestamptz, integer) is
+  'USAGE SERVEUR UNIQUEMENT. Cree un code de partage (HMAC TRIP_INVITE_HMAC_SECRET calcule par l''Edge) et desactive le precedent du voyage. Gestion : admin ou participant.';
+
+create or replace function public.revoke_trip_invite(
+  p_actor_id uuid,
+  p_trip_id text
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_revoked integer;
+begin
+  if p_actor_id is null or p_trip_id is null then
+    raise exception 'acteur et voyage obligatoires' using errcode = '22023';
+  end if;
+  perform private.assert_trip_manager(p_trip_id, p_actor_id);
+
+  update public.trip_invites
+     set is_active = false
+   where trip_id = p_trip_id
+     and is_active;
+
+  get diagnostics v_revoked = row_count;
+
+  return jsonb_build_object('trip_id', p_trip_id, 'revoked', v_revoked);
+end;
+$$;
+
+comment on function public.revoke_trip_invite(uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Revoque tous les codes actifs du voyage. Gestion : admin ou participant.';
+
+-- Resume sans jamais rendre l'empreinte.
+create or replace function public.trip_invite_summary(
+  p_actor_id uuid,
+  p_trip_id text
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_out jsonb;
+begin
+  if p_actor_id is null or p_trip_id is null then
+    raise exception 'acteur et voyage obligatoires' using errcode = '22023';
+  end if;
+  -- Gestion revérifiée ici : appelée en service_role, l'acteur est le
+  -- paramètre, jamais auth.uid() qui serait NULL (motif 0079).
+  perform private.assert_trip_manager(p_trip_id, p_actor_id);
+
+  select jsonb_build_object(
+           'invite_id', t.id,
+           'trip_id', t.trip_id,
+           'is_active', t.is_active,
+           'expires_at', t.expires_at,
+           'max_uses', t.max_uses,
+           'use_count', t.use_count,
+           'created_at', t.created_at
+         )
+    into v_out
+    from public.trip_invites t
+   where t.trip_id = p_trip_id
+   order by t.created_at desc
+   limit 1;
+
+  return v_out;
+end;
+$$;
+
+comment on function public.trip_invite_summary(uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Resume du dernier code du voyage, sans son empreinte.';
+
+-- Echange : membre → inscription idempotente (+ ardoise liee) ; externe →
+-- invite + ticket (rendu une fois). Oracle unique `code invalide`.
+create or replace function public.redeem_trip_invite(
+  p_token_hash text,
+  p_actor_id uuid default null,
+  p_display_name text default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_invite public.trip_invites%rowtype;
+  v_household_id text;
+  v_member_id text;
+  v_role text;
+  v_ticket text := encode(extensions.gen_random_bytes(24), 'base64');
+  v_guest_id text := private.new_id('trip-guest');
+  v_ardoise_id text;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'code invalide' using errcode = '22023';
+  end if;
+
+  -- Verrou pessimiste : deux echanges simultanes ne franchissent pas
+  -- `use_count < max_uses` (motif 0017/0079).
+  select t.* into v_invite
+    from public.trip_invites t
+   where t.token_hash = p_token_hash
+     and private.token_hash_matches(t.token_hash, p_token_hash)
+   for update;
+  if not found then
+    raise exception 'code invalide' using errcode = 'P0002';
+  end if;
+  if not v_invite.is_active
+     or (v_invite.expires_at is not null and v_invite.expires_at <= now())
+     or v_invite.use_count >= v_invite.max_uses then
+    raise exception 'code invalide' using errcode = 'P0002';
+  end if;
+
+  select t.household_id into v_household_id
+    from public.trips t where t.id = v_invite.trip_id;
+  -- Le voyage a pu disparaitre entre-temps : oracle uniforme.
+  if v_household_id is null then
+    raise exception 'code invalide' using errcode = 'P0002';
+  end if;
+
+  -- Membre du foyer : inscription idempotente, sans consommer le compteur.
+  if p_actor_id is not null then
+    select m.id, m.role into v_member_id, v_role
+      from public.household_members m
+     where m.household_id = v_household_id and m.user_id = p_actor_id
+     limit 1;
+    if v_member_id is not null then
+      -- D-01 : un enfant n'entre pas dans un voyage — meme oracle que tout
+      -- code inconnu (le foyer vient du code, pas du client).
+      if v_role = 'enfant' then
+        raise exception 'code invalide' using errcode = 'P0002';
+      end if;
+      if exists (
+        select 1
+          from public.trip_members tm
+         where tm.trip_id = v_invite.trip_id and tm.member_id = v_member_id
+      ) then
+        return jsonb_build_object('trip_id', v_invite.trip_id, 'already_member', true);
+      end if;
+
+      insert into public.trip_members (trip_id, member_id)
+      values (v_invite.trip_id, v_member_id)
+      on conflict do nothing;
+
+      select a.id into v_ardoise_id
+        from public.ardoises a
+       where a.trip_id = v_invite.trip_id;
+      if v_ardoise_id is not null then
+        insert into public.ardoise_members (ardoise_id, member_id)
+        values (v_ardoise_id, v_member_id)
+        on conflict do nothing;
+      end if;
+
+      update public.trip_invites
+         set use_count = use_count + 1,
+             is_active = (use_count + 1 < max_uses)
+       where id = v_invite.id;
+
+      return jsonb_build_object('trip_id', v_invite.trip_id, 'already_member', false);
+    end if;
+  end if;
+
+  -- Invite externe : ticket brut rendu une seule fois, HMAC stocke.
+  if p_display_name is null or char_length(btrim(p_display_name)) not between 1 and 120 then
+    raise exception 'pseudonyme invalide' using errcode = '22023';
+  end if;
+  insert into public.trip_guests (id, trip_id, display_name, ticket_hash)
+  values (v_guest_id, v_invite.trip_id, btrim(p_display_name),
+          encode(extensions.digest(v_ticket, 'sha256'), 'hex'));
+
+  -- Miroir payeur nomme sur l'ardoise liee (motif 0067, ticket NULL : le
+  -- ticket du voyage reste la SEULE credence, utilisable via l'Edge seule).
+  -- Meme identifiant des deux cotes : la depense invite s'y rattache sans
+  -- resolution fragile par nom.
+  select a.id into v_ardoise_id
+    from public.ardoises a
+   where a.trip_id = v_invite.trip_id;
+  if v_ardoise_id is not null then
+    insert into public.ardoise_guests (id, ardoise_id, display_name, ticket_hash)
+    values (v_guest_id, v_ardoise_id, btrim(p_display_name), null)
+    on conflict (id) do nothing;
+  end if;
+
+  update public.trip_invites
+     set use_count = use_count + 1,
+         is_active = (use_count + 1 < max_uses)
+   where id = v_invite.id;
+
+  return jsonb_build_object('trip_id', v_invite.trip_id, 'guest_ticket', v_ticket);
+end;
+$$;
+
+comment on function public.redeem_trip_invite(text, uuid, text) is
+  'USAGE SERVEUR UNIQUEMENT. Echange un code contre une inscription membre (idempotente, + ardoise) ou un ticket invite, oracle `code invalide` unique.';
+
+-- Verification d'un ticket invite (chemin guest de l'Edge).
+create or replace function public.verify_trip_ticket(p_ticket_hash text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_guest_id text;
+  v_trip_id text;
+  v_display_name text;
+begin
+  if p_ticket_hash is null or p_ticket_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'ticket invalide' using errcode = '22023';
+  end if;
+  select g.id, g.trip_id, g.display_name into v_guest_id, v_trip_id, v_display_name
+    from public.trip_guests g
+   where g.ticket_hash = p_ticket_hash;
+  if v_guest_id is null then
+    raise exception 'ticket invalide' using errcode = 'P0002';
+  end if;
+  return jsonb_build_object(
+    'guest_id', v_guest_id,
+    'trip_id', v_trip_id,
+    'display_name', v_display_name
+  );
+end;
+$$;
+
+comment on function public.verify_trip_ticket(text) is
+  'USAGE SERVEUR UNIQUEMENT. Resout un ticket invite en (guest, voyage).';
+
+-- Depense d'un invite sur l'ardoise liee, sous ticket verifie (D-03/D-04 :
+-- les invites creent leurs depenses via l'Edge dediee, jamais en PostgREST).
+-- Les parts sont validees par private.insert_expense_parts (perimetre
+-- ardoise : membres inscrits + invites de l'ardoise).
+create or replace function public.create_trip_guest_expense(
+  p_ticket_hash text,
+  p_title text,
+  p_amount numeric,
+  p_expense_date date default null,
+  p_split_type text default 'egal',
+  p_parts jsonb default '[]'::jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_guest_id text;
+  v_trip_id text;
+  v_household_id text;
+  v_ardoise_id text;
+  v_is_closed boolean;
+  v_expense_id text := private.new_id('expense');
+  v_out jsonb;
+begin
+  if p_ticket_hash is null or p_ticket_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'ticket invalide' using errcode = '22023';
+  end if;
+  select g.id, g.trip_id into v_guest_id, v_trip_id
+    from public.trip_guests g
+   where g.ticket_hash = p_ticket_hash;
+  if v_guest_id is null then
+    raise exception 'ticket invalide' using errcode = 'P0002';
+  end if;
+
+  select t.household_id, t.is_closed into v_household_id, v_is_closed
+    from public.trips t
+   where t.id = v_trip_id;
+  if v_household_id is null then
+    raise exception 'ticket invalide' using errcode = 'P0002';
+  end if;
+  if v_is_closed then
+    raise exception 'voyage figé, dépense impossible' using errcode = '22023';
+  end if;
+
+  select a.id into v_ardoise_id
+    from public.ardoises a
+   where a.trip_id = v_trip_id;
+  if v_ardoise_id is null then
+    raise exception 'ardoise du voyage introuvable' using errcode = 'P0002';
+  end if;
+
+  if p_title is null or char_length(btrim(p_title)) not between 1 and 200 then
+    raise exception 'libellé de dépense invalide' using errcode = '22023';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'le montant doit être supérieur à zéro' using errcode = '22023';
+  end if;
+  if p_split_type not in ('egal', 'personnalise') then
+    raise exception 'type de partage invalide' using errcode = '22023';
+  end if;
+
+  insert into public.expenses (
+    id, household_id, ardoise_id, title, amount,
+    paid_by, paid_by_guest, expense_date, split_type
+  ) values (
+    v_expense_id, v_household_id, v_ardoise_id, btrim(p_title), round(p_amount, 2),
+    null, v_guest_id, coalesce(p_expense_date, current_date), p_split_type
+  );
+
+  perform private.insert_expense_parts(v_expense_id, v_household_id, round(p_amount, 2), p_parts);
+
+  select to_jsonb(e) into v_out from public.expenses e where e.id = v_expense_id;
+  return v_out;
+end;
+$$;
+
+comment on function public.create_trip_guest_expense(text, text, numeric, date, text, jsonb) is
+  'USAGE SERVEUR UNIQUEMENT. Depense payee par un invite (ticket verifie) sur l''ardoise liee au voyage.';
+
+-- ---------------------------------------------------------------------------
+-- Privileges : RPC serveur au seul `service_role` (motif 0009/0058/0079).
+-- ---------------------------------------------------------------------------
+revoke all on function public.create_trip_atomic(uuid, text, text, text, date, date, text, text[], jsonb) from public, anon, authenticated;
+revoke all on function public.trip_leave(uuid, text) from public, anon, authenticated;
+revoke all on function public.trip_close(uuid, text) from public, anon, authenticated;
+revoke all on function public.trip_reopen(uuid, text) from public, anon, authenticated;
+revoke all on function public.create_trip_invite(uuid, text, text, timestamptz, integer) from public, anon, authenticated;
+revoke all on function public.revoke_trip_invite(uuid, text) from public, anon, authenticated;
+revoke all on function public.trip_invite_summary(uuid, text) from public, anon, authenticated;
+revoke all on function public.redeem_trip_invite(text, uuid, text) from public, anon, authenticated;
+revoke all on function public.verify_trip_ticket(text) from public, anon, authenticated;
+revoke all on function public.create_trip_guest_expense(text, text, numeric, date, text, jsonb) from public, anon, authenticated;
+grant execute on function public.create_trip_atomic(uuid, text, text, text, date, date, text, text[], jsonb) to service_role;
+grant execute on function public.trip_leave(uuid, text) to service_role;
+grant execute on function public.trip_close(uuid, text) to service_role;
+grant execute on function public.trip_reopen(uuid, text) to service_role;
+grant execute on function public.create_trip_invite(uuid, text, text, timestamptz, integer) to service_role;
+grant execute on function public.revoke_trip_invite(uuid, text) to service_role;
+grant execute on function public.trip_invite_summary(uuid, text) to service_role;
+grant execute on function public.redeem_trip_invite(text, uuid, text) to service_role;
+grant execute on function public.verify_trip_ticket(text) to service_role;
+grant execute on function public.create_trip_guest_expense(text, text, numeric, date, text, jsonb) to service_role;
+
+do $$
+begin
+  if has_function_privilege('authenticated', 'public.create_trip_atomic(uuid,text,text,text,date,date,text,text[],jsonb)', 'EXECUTE') then
+    raise exception 'authenticated ne doit pas pouvoir creer un voyage atomique';
+  end if;
+  if has_function_privilege('authenticated', 'public.redeem_trip_invite(text,uuid,text)', 'EXECUTE') then
+    raise exception 'authenticated ne doit pas pouvoir echanger un code de voyage';
+  end if;
+  if has_function_privilege('authenticated', 'public.create_trip_guest_expense(text,text,numeric,date,text,jsonb)', 'EXECUTE') then
+    raise exception 'authenticated ne doit pas pouvoir depenser en invite';
+  end if;
+  if not has_function_privilege('service_role', 'public.redeem_trip_invite(text,uuid,text)', 'EXECUTE') then
+    raise exception 'service_role doit pouvoir echanger un code de voyage';
+  end if;
+end;
+$$;
+
+commit;
+begin;
+
+-- ---------------------------------------------------------------------------
 -- H. Realtime : publication additive uniquement (motif 0110) — jamais
 --    reconstruite. trip_invites RESTE hors publication (empreintes HMAC).
 -- ---------------------------------------------------------------------------
@@ -609,5 +1304,47 @@ $$;
 --    preservee defensivement si elle y apparaissait un jour.
 -- ---------------------------------------------------------------------------
 delete from public.trips where id <> 'trip-1';
+
+commit;
+
+begin;
+
+-- ---------------------------------------------------------------------------
+-- K. Garde-fou flags serveur (durcissement 15-01, revue d'etape 2) : sans
+--    lui, tout ecrivain du voyage basculait `is_closed` en PostgREST direct
+--    et contournait la reouverture admin (trip_reopen). Comme
+--    guard_author_immutable (0081), le trigger ne frappe que le chemin
+--    client (`current_user` anon/authenticated) : les RPC SECURITY DEFINER
+--    (current_user service_role/postgres) gardent la main.
+-- ---------------------------------------------------------------------------
+create or replace function private.guard_trip_server_flags()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    if new.is_closed is distinct from old.is_closed then
+      raise exception 'la fermeture d''un voyage passe par le serveur'
+        using errcode = '42501';
+    end if;
+    if new.created_by is distinct from old.created_by then
+      raise exception 'la colonne created_by n''est pas modifiable par le client'
+        using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+comment on function private.guard_trip_server_flags() is
+  'Flags serveur des voyages (is_closed, created_by) : immuables en UPDATE client ; seuls les RPC les font bouger.';
+
+drop trigger if exists guard_trip_server_flags on public.trips;
+create trigger guard_trip_server_flags
+  before update of is_closed, created_by on public.trips
+  for each row execute function private.guard_trip_server_flags();
+
+revoke all on function private.guard_trip_server_flags() from public, anon, authenticated;
 
 commit;
