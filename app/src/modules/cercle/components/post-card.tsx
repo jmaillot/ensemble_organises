@@ -1,32 +1,59 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Badge } from '@/components/ui/primitives';
 import { pluralize } from '@/lib/utils';
 import type { FeedPost } from '../types';
 
+/** Plafond du contenu des publications, miroir du CHECK base (0004). */
+export const POST_TEXT_MAX = 4000;
+
 export interface PostCardProps {
   post: FeedPost;
   active: boolean;
   canDelete: boolean;
+  canEdit: boolean;
   onSelect: () => void;
   onToggleReaction: () => void;
   onOpenComments: () => void;
   onRequestDelete: () => void;
+  onSaveEdit: (postId: string, text: string) => Promise<boolean>;
 }
 
 function PostCardComponent({
   post,
   active,
   canDelete,
+  canEdit,
   onSelect,
   onToggleReaction,
   onOpenComments,
   onRequestDelete,
+  onSaveEdit,
 }: PostCardProps) {
   const authorName = post.author?.display_name ?? 'Membre du foyer';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.text);
+  const [saving, setSaving] = useState(false);
+  const trimmed = draft.trim();
+  const canSave = trimmed.length > 0 && trimmed.length <= POST_TEXT_MAX && trimmed !== post.text;
+
+  const startEdit = () => {
+    setDraft(post.text);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    const done = await onSaveEdit(post.id, trimmed);
+    setSaving(false);
+    if (done) setEditing(false);
+  };
+
   return (
     <article
       data-post-id={post.id}
@@ -49,7 +76,22 @@ function PostCardComponent({
             {post.unreadComments > 1 ? `${post.unreadComments} nouveaux commentaires` : '1 nouveau commentaire'}
           </Badge>
         ) : null}
-        {canDelete ? (
+        {canEdit && !editing ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="edit"
+            onClick={(event) => {
+              event.stopPropagation();
+              startEdit();
+            }}
+            aria-label={`Modifier la publication de ${authorName}`}
+            className="text-muted hover:bg-accent-faint hover:text-fg"
+          >
+            <span className="sr-only">Modifier</span>
+          </Button>
+        ) : null}
+        {canDelete && !editing ? (
           <Button
             variant="ghost"
             size="sm"
@@ -66,7 +108,38 @@ function PostCardComponent({
         ) : null}
       </div>
 
-      {post.text ? <p className="mb-[13px] text-[13px] leading-[1.6]">{post.text}</p> : null}
+      {editing ? (
+        <form
+          className="mb-[13px] grid gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveEdit();
+          }}
+        >
+          <Textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            aria-label="Modifier votre publication"
+            autoFocus
+          />
+          <div className="flex items-center justify-between gap-2">
+            <small className="text-[10px] text-muted">
+              {trimmed.length} / {POST_TEXT_MAX} caractères
+            </small>
+            <div className="flex justify-end gap-1.5">
+              <Button type="button" variant="quiet" size="sm" onClick={() => setEditing(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" variant="secondary" size="sm" disabled={!canSave || saving}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      ) : post.text ? (
+        <p className="mb-[13px] text-[13px] leading-[1.6]">{post.text}</p>
+      ) : null}
 
       {post.media.map((media) =>
         media.kind === 'video' ? (

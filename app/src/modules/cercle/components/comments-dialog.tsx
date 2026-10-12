@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMomentLabel } from '../types';
-import type { FeedPost } from '../types';
+import type { FeedComment, FeedPost } from '../types';
 
 const schema = z.object({
   content: z.string().trim().min(1, 'Écrivez un commentaire.').max(400, 'Le commentaire est limité à 400 caractères.'),
@@ -20,21 +21,43 @@ type CommentValues = z.infer<typeof schema>;
 export interface CommentsDialogProps {
   post: FeedPost | null;
   open: boolean;
+  currentMemberId: string;
+  isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: { postId: string; content: string }) => Promise<boolean>;
+  onUpdateComment: (commentId: string, content: string) => Promise<boolean>;
+  onDeleteComment: (commentId: string) => Promise<void>;
 }
 
 /** Fil de discussion d'une publication, dans une modale accessible. */
-export function CommentsDialog({ post, open, onOpenChange, onSubmit }: CommentsDialogProps) {
+export function CommentsDialog({
+  post,
+  open,
+  currentMemberId,
+  isAdmin,
+  onOpenChange,
+  onSubmit,
+  onUpdateComment,
+  onDeleteComment,
+}: CommentsDialogProps) {
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<CommentValues>({ resolver: zodResolver(schema), defaultValues: { content: '' } });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<FeedComment | null>(null);
 
   useEffect(() => {
-    if (!open) reset({ content: '' });
+    if (!open) {
+      reset({ content: '' });
+      setEditingId(null);
+      setEditDraft('');
+      setPendingDelete(null);
+    }
   }, [open, reset]);
 
   if (!post) return null;
@@ -44,7 +67,30 @@ export function CommentsDialog({ post, open, onOpenChange, onSubmit }: CommentsD
     if (done) reset({ content: '' });
   });
 
+  const startEdit = (comment: FeedComment) => {
+    setEditingId(comment.id);
+    setEditDraft(comment.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const saveEdit = async (comment: FeedComment) => {
+    const message = editDraft.trim();
+    if (message === '' || message === comment.content || savingEdit) return;
+    setSavingEdit(true);
+    const done = await onUpdateComment(comment.id, message);
+    setSavingEdit(false);
+    if (done) cancelEdit();
+  };
+
+  const canDeleteComment = (comment: FeedComment) =>
+    comment.authorId === currentMemberId || isAdmin;
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
@@ -58,18 +104,77 @@ export function CommentsDialog({ post, open, onOpenChange, onSubmit }: CommentsD
 
         {post.comments.length > 0 ? (
           <ul className="mb-4 grid gap-3">
-            {post.comments.map((comment) => (
-              <li key={comment.id} className="flex items-start gap-2.5 border-t border-border pt-3 first:border-0 first:pt-0">
-                <MemberAvatar member={comment.author} name={comment.author?.display_name ?? 'Membre'} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-0.5 flex items-baseline gap-2">
-                    <strong className="text-[12px] font-bold">{comment.author?.display_name ?? 'Membre du foyer'}</strong>
-                    <small className="text-[10px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
+            {post.comments.map((comment) => {
+              const mine = comment.authorId === currentMemberId;
+              const editing = editingId === comment.id;
+              const editTrimmed = editDraft.trim();
+              const canSaveEdit =
+                editTrimmed !== '' && editTrimmed !== comment.content;
+              return (
+                <li key={comment.id} className="flex items-start gap-2.5 border-t border-border pt-3 first:border-0 first:pt-0">
+                  <MemberAvatar member={comment.author} name={comment.author?.display_name ?? 'Membre'} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-0.5 flex items-baseline gap-2">
+                      <strong className="text-[12px] font-bold">{comment.author?.display_name ?? 'Membre du foyer'}</strong>
+                      <small className="text-[10px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
+                    </div>
+                    {editing ? (
+                      <form
+                        className="grid gap-1.5"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void saveEdit(comment);
+                        }}
+                      >
+                        <Textarea
+                          value={editDraft}
+                          onChange={(event) => setEditDraft(event.target.value)}
+                          aria-label="Modifier votre commentaire"
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-1.5">
+                          <Button type="button" variant="quiet" size="sm" onClick={cancelEdit}>
+                            Annuler
+                          </Button>
+                          <Button type="submit" variant="secondary" size="sm" disabled={!canSaveEdit || savingEdit}>
+                            {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <p className="m-0 text-[12px] leading-[1.55] text-ink-soft">{comment.content}</p>
+                    )}
+                    {!editing && (mine || canDeleteComment(comment)) ? (
+                      <div className="mt-1 flex justify-end gap-1">
+                        {mine ? (
+                          <Button
+                            type="button"
+                            variant="quiet"
+                            size="sm"
+                            icon="edit"
+                            onClick={() => startEdit(comment)}
+                            aria-label="Modifier ce commentaire"
+                          >
+                            <span className="sr-only">Modifier</span>
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          icon="trash"
+                          onClick={() => setPendingDelete(comment)}
+                          aria-label="Supprimer ce commentaire"
+                          className="text-coral hover:bg-coral-soft hover:text-coral"
+                        >
+                          <span className="sr-only">Supprimer</span>
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
-                  <p className="m-0 text-[12px] leading-[1.55] text-ink-soft">{comment.content}</p>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <EmptyState
@@ -101,7 +206,23 @@ export function CommentsDialog({ post, open, onOpenChange, onSubmit }: CommentsD
             </Button>
           </div>
         </form>
+
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) setPendingDelete(null);
+      }}
+      title="Supprimer ce commentaire ?"
+      description="Le commentaire sera retiré du fil pour tout le foyer."
+      confirmLabel="Supprimer"
+      onConfirm={() => {
+        if (pendingDelete) void onDeleteComment(pendingDelete.id);
+        setPendingDelete(null);
+      }}
+    />
+    </>
   );
 }

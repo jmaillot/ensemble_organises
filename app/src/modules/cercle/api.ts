@@ -145,6 +145,26 @@ export async function createComment(input: {
   } as Partial<PostCommentRow>);
 }
 
+/**
+ * Retouche du contenu : seul l'auteur (ou l'admin via la modération) y a
+ * droit — le garde-fou `guard_cercle_content_author` (0109) refuse le reste
+ * côté serveur, l'UI n'offre l'affordance qu'à l'auteur.
+ */
+export function updatePostText(postId: string, text: string): Promise<PostRow> {
+  return data.update<PostRow>(cercleTables.posts, postId, { text } as Partial<PostRow>);
+}
+
+/** Même règle auteur-seul que les publications (garde 0109). */
+export function updateCommentContent(commentId: string, content: string): Promise<PostCommentRow> {
+  return data.update<PostCommentRow>(cercleTables.comments, commentId, {
+    content,
+  } as Partial<PostCommentRow>);
+}
+
+export function removeComment(commentId: string): Promise<void> {
+  return data.remove(cercleTables.comments, commentId);
+}
+
 export async function createReaction(input: {
   householdId: string;
   postId: string;

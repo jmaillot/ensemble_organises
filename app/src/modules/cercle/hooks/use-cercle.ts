@@ -20,10 +20,13 @@ import {
   listPostMedia,
   listPostReactions,
   listPosts,
+  removeComment,
   removePostCascade,
   removeReaction,
+  updateCommentContent,
+  updatePostText,
 } from '../api';
-import { composeFeed, type FeedPost, type PublishInput } from '../types';
+import { composeFeed, type FeedComment, type FeedPost, type PublishInput } from '../types';
 import { useSyncedReads } from '@/lib/notification-reads';
 
 export const cercleKeys = {
@@ -49,8 +52,14 @@ export interface CercleFeed {
   publish: (input: PublishInput) => Promise<boolean>;
   addComment: (input: { postId: string; content: string }) => Promise<boolean>;
   toggleReaction: (postId: string) => Promise<void>;
+  updatePost: (postId: string, text: string) => Promise<boolean>;
+  updateComment: (commentId: string, content: string) => Promise<boolean>;
   deletePost: (postId: string) => Promise<void>;
+  deleteComment: (commentId: string) => Promise<void>;
   canDelete: (post: FeedPost) => boolean;
+  canEditPost: (post: FeedPost) => boolean;
+  canDeleteComment: (comment: FeedComment) => boolean;
+  canEditComment: (comment: FeedComment) => boolean;
   /** Marque les commentaires d'une publication comme lus, sur tous les appareils. */
   markPostRead: (postId: string) => void;
 }
@@ -308,9 +317,79 @@ export function useCercleFeed(): CercleFeed {
     [householdId, invalidate, toast],
   );
 
+  const updatePost = useCallback(
+    async (postId: string, text: string) => {
+      if (!householdId) return false;
+      const message = text.trim();
+      const previous = queryClient.getQueryData<PostRow[]>(cercleKeys.posts(householdId)) ?? [];
+      queryClient.setQueryData<PostRow[]>(cercleKeys.posts(householdId), (rows) =>
+        (rows ?? []).map((row) => (row.id === postId ? { ...row, text: message } : row)),
+      );
+      try {
+        await updatePostText(postId, message);
+        await invalidate();
+        toast('Publication modifiée.');
+        return true;
+      } catch (error) {
+        queryClient.setQueryData<PostRow[]>(cercleKeys.posts(householdId), previous);
+        toast(error instanceof Error ? error.message : 'Modification impossible.', 'error');
+        return false;
+      }
+    },
+    [householdId, invalidate, queryClient, toast],
+  );
+
+  const updateComment = useCallback(
+    async (commentId: string, content: string) => {
+      if (!householdId) return false;
+      const message = content.trim();
+      const previous = queryClient.getQueryData<PostCommentRow[]>(cercleKeys.comments(householdId)) ?? [];
+      queryClient.setQueryData<PostCommentRow[]>(cercleKeys.comments(householdId), (rows) =>
+        (rows ?? []).map((row) => (row.id === commentId ? { ...row, content: message } : row)),
+      );
+      try {
+        await updateCommentContent(commentId, message);
+        await invalidate();
+        toast('Commentaire modifié.');
+        return true;
+      } catch (error) {
+        queryClient.setQueryData<PostCommentRow[]>(cercleKeys.comments(householdId), previous);
+        toast(error instanceof Error ? error.message : 'Modification impossible.', 'error');
+        return false;
+      }
+    },
+    [householdId, invalidate, queryClient, toast],
+  );
+
+  const deleteComment = useCallback(
+    async (commentId: string) => {
+      if (!householdId) return;
+      try {
+        await removeComment(commentId);
+        await invalidate();
+        toast('Commentaire supprimé.');
+      } catch (error) {
+        toast(error instanceof Error ? error.message : 'Suppression impossible.', 'error');
+      }
+    },
+    [householdId, invalidate, toast],
+  );
+
   const canDelete = useCallback(
     (post: FeedPost) => post.mine || isAdmin,
     [isAdmin],
+  );
+
+  const canEditPost = useCallback((post: FeedPost) => post.mine, []);
+
+  const canDeleteComment = useCallback(
+    (comment: FeedComment) => comment.authorId === currentMemberId || isAdmin,
+    [currentMemberId, isAdmin],
+  );
+
+  const canEditComment = useCallback(
+    (comment: FeedComment) => comment.authorId === currentMemberId,
+    [currentMemberId],
   );
 
   const isLoading = posts.isLoading || media.isLoading || comments.isLoading || reactions.isLoading;
@@ -331,8 +410,14 @@ export function useCercleFeed(): CercleFeed {
     publish,
     addComment,
     toggleReaction,
+    updatePost,
+    updateComment,
     deletePost,
+    deleteComment,
     canDelete,
+    canEditPost,
+    canDeleteComment,
+    canEditComment,
     markPostRead,
   };
 }

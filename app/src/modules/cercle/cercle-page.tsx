@@ -14,7 +14,7 @@ import { ROLE_LABELS } from './types';
 const MAX_STACK = 3;
 
 export default function CerclePage() {
-  const { feed, members, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, deletePost, canDelete, markPostRead } =
+  const { feed, members, currentMemberId, isAdmin, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead } =
     useCercleFeed();
   const [focusSignal, setFocusSignal] = useState(0);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -76,6 +76,7 @@ export default function CerclePage() {
                   post={post}
                   active={activePostId === post.id}
                   canDelete={canDelete(post)}
+                  canEdit={canEditPost(post)}
                   onSelect={() => setActivePostId(post.id)}
                   onToggleReaction={() => void toggleReaction(post.id)}
                   onOpenComments={() => {
@@ -84,6 +85,7 @@ export default function CerclePage() {
                     markPostRead(post.id);
                   }}
                   onRequestDelete={() => setPendingDeleteId(post.id)}
+                  onSaveEdit={(postId, text) => updatePost(postId, text)}
                 />
               ))}
             </div>
@@ -139,10 +141,14 @@ export default function CerclePage() {
       <CommentsDialog
         post={commentsPost}
         open={commentsPostId !== null}
+        currentMemberId={currentMemberId}
+        isAdmin={isAdmin}
         onOpenChange={(open) => {
           if (!open) setCommentsPostId(null);
         }}
         onSubmit={addComment}
+        onUpdateComment={(commentId, content) => updateComment(commentId, content)}
+        onDeleteComment={(commentId) => deleteComment(commentId)}
       />
 
       <ConfirmDialog
