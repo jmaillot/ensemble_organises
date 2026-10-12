@@ -1,9 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
-import { DataError, type DataAdapter, type ListResult } from './adapter';
-import { getDatabase } from './dexie';
-import { enqueueMutation, isReplayingQueue, readCached } from './sync-queue';
-import { isKeylessTable, rowKey } from './keys';
+import { DataError, type DataAdapter } from './adapter';
+import { isKeylessTable } from './keys';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
@@ -69,18 +67,13 @@ export class SupabaseAdapter implements DataAdapter {
     return supabase;
   }
 
-  async list<T = Row>(table: string, filter: RowFilter = {}): Promise<T[]> {
-    return (await this.listWithMeta<T>(table, filter)).rows;
-  }
-
   /**
-   * Lecture avec repli hors ligne (D-01) : tout échec réseau (exception
-   * levée, timeout, portail captif, 5xx) sert les lignes Dexie mises en cache
-   * par les lectures précédentes, avec `fromCache: true` pour que l'UI les
-   * marque comme périmées. Cache vide = rien à servir : l'erreur d'origine
-   * remonte telle quelle, comme avant.
+   * Lecture directe : toute erreur (réseau, droits, validation) remonte
+   * telle quelle à l'appelant — aucun repli, aucun cache, aucune file
+   * (retrait du mode offline D-10 : le backend répond ou l'erreur d'origine
+   * s'affiche).
    */
-  async listWithMeta<T = Row>(table: string, filter: RowFilter = {}): Promise<ListResult<T>> {
+  async list<T = Row>(table: string, filter: RowFilter = {}): Promise<T[]> {
     const client = this.client();
     let query = client.from(table).select('*');
     for (const [key, value] of Object.entries(filter)) {
@@ -89,35 +82,9 @@ export class SupabaseAdapter implements DataAdapter {
       else if (Array.isArray(value)) query = query.in(key, value as string[]);
       else query = query.eq(key, value);
     }
-    let rows: T[] | null = null;
-    let failure: unknown = null;
-    try {
-      const { data, error } = await query;
-      if (error) failure = error;
-      else rows = (data ?? []) as T[];
-    } catch (networkError) {
-      failure = networkError;
-    }
-    if (failure !== null) return this.serveCached<T>(table, filter, failure);
-    await this.cacheRows(table, (rows ?? []) as Row[]);
-    return { rows: rows ?? [], fromCache: false };
-  }
-
-  /**
-   * Sert le cache local après un échec de lecture. Le filtre `household_id`
-   * passe par l'index composite, les autres clés sont appliquées en mémoire :
-   * le repli respecte le même filtre que la lecture en direct.
-   */
-  private async serveCached<T>(table: string, filter: RowFilter, failure: unknown): Promise<ListResult<T>> {
-    const householdId = typeof filter.household_id === 'string' ? filter.household_id : undefined;
-    const cached = await readCached<Row>(table, householdId);
-    const rows = cached.filter((row) => matchesRow(row, filter)) as T[];
-    if (rows.length === 0) {
-      if (failure instanceof DataError) throw failure;
-      const message = failure instanceof Error ? failure.message : 'Lecture impossible.';
-      throw new DataError(message, failure);
-    }
-    return { rows, fromCache: true };
+    const { data: rows, error } = await query;
+    if (error) throw new DataError(error.message, error);
+    return (rows ?? []) as T[];
   }
 
   async create<T = Row>(table: string, values: Partial<T>): Promise<T> {
@@ -125,8 +92,7 @@ export class SupabaseAdapter implements DataAdapter {
     const givenId = (values as { id?: string }).id;
     const payload = isKeylessTable(table) ? { ...values } : { ...values, id: givenId ?? randomId(table) };
     const { data: row, error } = await client.from(table).insert(payload as never).select('*').single();
-    const insertedId = String((payload as { id?: string }).id ?? '');
-    if (error) throw this.queueOrFail(table, 'insert', insertedId, payload as Record<string, unknown>, error);
+    if (error) throw new DataError(error.message, error);
     return row as T;
   }
 
@@ -156,68 +122,23 @@ export class SupabaseAdapter implements DataAdapter {
     if (!household || !member) {
       throw new DataError('Le foyer créé est incomplet.');
     }
-    // Le cache local est renseigné comme le fait `list` : sinon une lecture
-    // hors ligne faite juste après la création ne trouverait rien.
-    await this.cacheRows('households', [household]);
-    await this.cacheRows('household_members', [member]);
     return { household, member };
   }
 
   async update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T> {
     const client = this.client();
     const { data: row, error } = await client.from(table).update(values as never).eq('id', id).select('*').single();
-    if (error) throw this.queueOrFail(table, 'update', id, values as Record<string, unknown>, error);
+    if (error) throw new DataError(error.message, error);
     return row as T;
   }
 
   async remove(table: string, id: string) {
     const client = this.client();
     const { error } = await client.from(table).delete().eq('id', id);
-    if (error) {
-      const queued = this.queueOrFail(table, 'delete', id, {}, error);
-      // Éviction optimiste : une ligne supprimée ne doit pas ressurgir des
-      // lectures périmées avant son rejeu.
-      await getDatabase().rows.delete(rowKey(table, { id }));
-      throw queued;
-    }
-    await getDatabase().rows.delete(rowKey(table, { id }));
+    if (error) throw new DataError(error.message, error);
   }
 
-  /**
-   * Mise en file sur échec constaté (D-02) : toute erreur d'écriture est
-   * mise en file pour rejeu, que le navigateur se dise hors ligne ou non —
-   * un timeout, une 5xx ou un portail captif ne font plus perdre une
-   * mutation. Politique volontairement « transitoire d'abord » : une erreur
-   * durable (droits, validation) restera en file avec `attempts` incrémenté
-   * au lieu d'être perdue, et remontera au rejeu. Le `DataError` porte
-   * `queuedForSync` pour que l'UI garde son état optimiste.
-   */
-  private queueOrFail(
-    table: string,
-    operation: 'insert' | 'update' | 'delete' | 'deleteWhere',
-    rowId: string,
-    values: Record<string, unknown>,
-    error: { message: string } | null,
-  ) {
-    // Pendant un rejeu, l'écriture rejouée est déjà en file : l'y remettre
-    // dupliquerait la file à chaque échec. L'erreur remonte sans file et le
-    // compteur d'essais est incrémenté par `flushMutations`.
-    if (isReplayingQueue()) return new DataError(error?.message ?? 'Écriture refusée.', error);
-    void enqueueMutation({ table, operation, rowId, values });
-    const offline = typeof navigator !== 'undefined' && !navigator.onLine;
-    return new DataError(
-      offline
-        ? 'Hors ligne : la modification sera synchronisée au retour du réseau.'
-        : 'Écriture non confirmée (réseau ou serveur) : elle est conservée et sera rejouée automatiquement.',
-      error,
-      true,
-    );
-  }
-
-  /**
-   * Jointures (lignes sans `id`) : l'échec est mis en file comme les autres
-   * verbes (D-02), avec le filtre dans `values` pour un rejeu à l'identique.
-   */
+  /** Jointures (lignes sans `id`) : suppression par filtre, erreur directe. */
   async removeWhere(table: string, filter: RowFilter) {
     const client = this.client();
     let query = client.from(table).delete();
@@ -228,19 +149,7 @@ export class SupabaseAdapter implements DataAdapter {
       else query = query.eq(key, value);
     }
     const { error } = await query;
-    if (error) {
-      const queued = this.queueOrFail(table, 'deleteWhere', '*', filter as Record<string, unknown>, error);
-      await this.evictCachedWhere(table, filter);
-      throw queued;
-    }
-  }
-
-  /** Éviction optimiste des lignes du cache correspondant à un filtre. */
-  private async evictCachedWhere(table: string, filter: RowFilter) {
-    const db = getDatabase();
-    const entries = await db.rows.where('table').equals(table).toArray();
-    const targets = entries.filter((entry) => matchesRow(entry.data, filter));
-    if (targets.length > 0) await db.rows.bulkDelete(targets.map((entry) => entry.key));
+    if (error) throw new DataError(error.message, error);
   }
 
   subscribe(table: string, onChange: () => void) {
@@ -264,31 +173,6 @@ export class SupabaseAdapter implements DataAdapter {
       }
     };
   }
-
-  /** Alimente le cache IndexedDB pour la lecture hors ligne. */
-  private async cacheRows(table: string, rows: Row[]) {
-    if (rows.length === 0) return;
-    const db = getDatabase();
-    await db.rows.bulkPut(
-      rows.map((data) => ({
-        key: rowKey(table, data),
-        table,
-        householdId: String(data.household_id ?? ''),
-        data,
-        updatedAt: Date.now(),
-      })),
-    );
-  }
 }
 
 export const householdScopedTables = HOUSEHOLD_SCOPED;
-
-/** Applique un `RowFilter` en mémoire sur une ligne du cache (repli D-01). */
-function matchesRow(row: Row, filter: RowFilter): boolean {
-  return Object.entries(filter).every(([key, value]) => {
-    if (value === undefined) return true;
-    if (value === null) return row[key] === null;
-    if (Array.isArray(value)) return (value as readonly unknown[]).includes(row[key]);
-    return row[key] === value;
-  });
-}

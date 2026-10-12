@@ -2,9 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ModuleShell, MetricRow, Panel, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
-import { useOnline } from '@/hooks/use-online';
-import { DataError } from '@/lib/data';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { SearchInput, Select } from '@/components/ui/input';
 import { Badge } from '@/components/ui/primitives';
 import { Checkbox } from '@/components/ui/primitives';
@@ -75,10 +73,6 @@ export default function RoutinesPage() {
   const openCreate = () => setDialog({ open: true, routine: null });
   const openEdit = (routine: Routine) => setDialog({ open: true, routine });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
-  const online = useOnline();
-  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
-  // adopté au niveau de la page.
-  const isEmptyCacheOffline = !online && routines.length === 0 && (isLoading || isError);
 
   const report = (error: unknown, fallback: string) => {
     toast(error instanceof Error ? error.message : fallback, 'error');
@@ -140,9 +134,7 @@ export default function RoutinesPage() {
         />
       </div>
 
-      {isEmptyCacheOffline ? (
-        <OfflineEmptyState onRetry={refetch} />
-      ) : isError ? (
+      {isError ? (
         <ErrorState
           message={error?.message ?? 'Les routines du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
@@ -356,12 +348,6 @@ export default function RoutinesPage() {
             closeDialog();
             toast(editing ? 'Routine mise à jour.' : 'Routine ajoutée au rythme du foyer.');
           } catch (submissionError) {
-            // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
-            if (submissionError instanceof DataError && submissionError.queuedForSync) {
-              closeDialog();
-              toast('Routine ajoutée — elle sera synchronisée au retour du réseau.');
-              return;
-            }
             report(submissionError, 'La routine n’a pas pu être enregistrée.');
           }
         }}

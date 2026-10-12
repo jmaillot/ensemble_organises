@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
-import { useOnline } from '@/hooks/use-online';
-import { DataError } from '@/lib/data';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
@@ -29,10 +27,6 @@ export default function ArdoisePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const online = useOnline();
-  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
-  // adopté au niveau de la page.
-  const isEmptyCacheOffline = !online && ardoises.length === 0 && (isLoading || isError);
 
   return (
     <ModuleShell
@@ -55,9 +49,7 @@ export default function ArdoisePage() {
         ]}
       />
 
-      {isEmptyCacheOffline ? (
-        <OfflineEmptyState onRetry={refetch} />
-      ) : isError ? (
+      {isError ? (
         <ErrorState
           message={error?.message ?? 'Les ardoises du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
@@ -154,12 +146,6 @@ export default function ArdoisePage() {
             toast(`Ardoise « ${created.name} » créée.`);
             navigate(`/ardoise/${created.id}`);
           } catch (creationError) {
-            // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
-            if (creationError instanceof DataError && creationError.queuedForSync) {
-              setCreateOpen(false);
-              toast(`Ardoise « ${values.name} » créée — elle sera synchronisée au retour du réseau.`);
-              return;
-            }
             toast(creationError instanceof Error ? creationError.message : 'Création impossible.', 'error');
           }
         }}

@@ -3,9 +3,7 @@ import { MetricRow, ModuleShell, SectionHeading } from '@/components/shared/modu
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
-import { useOnline } from '@/hooks/use-online';
-import { DataError } from '@/lib/data';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { QrCode } from '@/components/shared/qr-code';
@@ -32,10 +30,6 @@ export default function FidelitePage() {
   const [formKey, setFormKey] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState('');
   const visibleCards = categoryFilter === '' ? cards : cards.filter((card) => card.category === categoryFilter);
-  const online = useOnline();
-  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
-  // adopté au niveau de la page.
-  const isEmptyCacheOffline = !online && cards.length === 0 && (isLoading || isError);
 
   const openCreate = useCallback((values?: Partial<LoyaltyCardInput>) => {
     setEditing(null);
@@ -63,11 +57,6 @@ export default function FidelitePage() {
           toast('Carte de fidélité enregistrée.', 'success');
         }
       } catch (caught) {
-        // Mise en file hors ligne (D-07) : promesse de rejeu, jamais d'erreur.
-        if (caught instanceof DataError && caught.queuedForSync) {
-          toast('Carte enregistrée — elle sera synchronisée au retour du réseau.');
-          return;
-        }
         toast(caught instanceof Error ? caught.message : 'Enregistrement impossible.', 'error');
       }
     },
@@ -153,9 +142,7 @@ export default function FidelitePage() {
         </div>
       ) : null}
 
-      {isEmptyCacheOffline ? (
-        <OfflineEmptyState onRetry={refetch} />
-      ) : isLoading ? (
+      {isLoading ? (
         <LoadingRows rows={4} />
       ) : isError ? (
         <ErrorState message={error?.message ?? 'Les cartes de fidélité n’ont pas pu être chargées.'} onRetry={refetch} />

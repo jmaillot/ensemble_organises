@@ -3,8 +3,7 @@ import { ModuleShell, MetricRow, Panel, SectionHeading } from '@/components/shar
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
-import { useOnline } from '@/hooks/use-online';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useCercleFeed } from './hooks/use-cercle';
 import { PostCard } from './components/post-card';
@@ -21,11 +20,6 @@ export default function CerclePage() {
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const online = useOnline();
-  // Cache vide hors ligne (D-07, 09-05) : même prédicat que le motif 09-03,
-  // adopté au niveau de la page. Les confirmations de création (publication,
-  // commentaire) restent dans le crochet, hors périmètre de ce plan.
-  const isEmptyCacheOffline = !online && feed.length === 0 && (isLoading || isError);
 
   const commentsPost = feed.find((post) => post.id === commentsPostId) ?? null;
   const pendingDeletePost = feed.find((post) => post.id === pendingDeleteId) ?? null;
@@ -62,9 +56,7 @@ export default function CerclePage() {
 
           <PostComposer onPublish={publish} focusSignal={focusSignal} />
 
-          {isEmptyCacheOffline ? (
-            <OfflineEmptyState onRetry={refetch} />
-          ) : isError ? (
+          {isError ? (
             <ErrorState message={error?.message ?? 'Le fil n’a pas pu être chargé.'} onRetry={refetch} />
           ) : isLoading ? (
             <LoadingRows rows={3} />

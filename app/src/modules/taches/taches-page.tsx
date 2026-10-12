@@ -15,10 +15,9 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import { DataError } from '@/lib/data';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
 import { memberFirstName, taskFilters, type Task } from './types';
@@ -58,8 +57,6 @@ export default function TachesPage() {
     isLoading,
     isError,
     error,
-    isEmptyCacheOffline,
-    pendingIds,
     isMutating,
     refetch,
     toggleStatus,
@@ -191,9 +188,7 @@ export default function TachesPage() {
         />
       </div>
 
-      {isEmptyCacheOffline ? (
-        <OfflineEmptyState onRetry={refetch} />
-      ) : isError ? (
+      {isError ? (
         <ErrorState
           message={error?.message ?? 'Les tâches du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
@@ -256,7 +251,6 @@ export default function TachesPage() {
                     key={task.id}
                     task={task}
                     readOnly
-                    pending={pendingIds.includes(task.id)}
                     onToggle={(target) => {
                       void toggleStatus(target).catch((toggleError: unknown) =>
                         toast(
@@ -288,7 +282,6 @@ export default function TachesPage() {
                         key={task.id}
                         task={task}
                         readOnly={!canWrite}
-                        pending={pendingIds.includes(task.id)}
                         onToggle={(target) => {
                           void toggleStatus(target).catch((toggleError: unknown) =>
                             toast(
@@ -371,13 +364,6 @@ export default function TachesPage() {
             closeDialog();
             toast(editing ? 'Tâche mise à jour.' : 'Tâche ajoutée à la liste du foyer.');
           } catch (submissionError) {
-            // Mise en file hors ligne (D-07) : ce n'est pas un échec, c'est
-            // une promesse de rejeu — confirmation, jamais un toast d'erreur.
-            if (submissionError instanceof DataError && submissionError.queuedForSync) {
-              closeDialog();
-              toast('Tâche ajoutée — elle sera synchronisée au retour du réseau.');
-              return;
-            }
             toast(
               submissionError instanceof Error ? submissionError.message : 'La tâche n’a pas pu être enregistrée.',
               'error',

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
-import { EmptyState, ErrorState, LoadingRows, OfflineEmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
 import { useResource } from '@/lib/data/useResource';
@@ -14,9 +14,7 @@ const NOTIFY_MESSAGE = 'C’est noté, nous vous préviendrons dès l’ouvertur
 
 export default function RecettesPage() {
   const toast = useToast();
-  // Cette page lit `useResource` en direct : le drapeau partagé 09-03 est
-  // disponible sans intermédiaire. Pas de création (module jalonné).
-  const { rows, isLoading, isError, error, refetch, isEmptyCacheOffline } = useResource<RecipeRow>('recipes');
+  const { rows, isLoading, isError, error, refetch } = useResource<RecipeRow>('recipes');
 
   const recipes = useMemo(
     () => rows.map(toRecipe).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -48,9 +46,7 @@ export default function RecettesPage() {
           description="Le schéma détaillé (ingrédients, étapes, temps) sera défini plus tard."
         >
           {isLoading ? <LoadingRows rows={2} /> : null}
-          {isEmptyCacheOffline ? (
-            <OfflineEmptyState onRetry={refetch} />
-          ) : !isLoading && isError ? (
+          {!isLoading && isError ? (
             <ErrorState message={error?.message ?? 'Les recettes sont inaccessibles.'} onRetry={refetch} />
           ) : null}
           {!isLoading && !isError && recipes.length === 0 ? (

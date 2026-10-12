@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from './index';
-import { DataError, type ListResult } from './adapter';
-import { isKeylessTable } from './keys';
 import { useHouseholdStore } from '@/stores/household-store';
-import { useOnline } from '@/hooks/use-online';
-import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
 export const queryKeys = {
@@ -19,23 +15,6 @@ export interface ResourceResult<T> {
   isFetching: boolean;
   isError: boolean;
   error: Error | null;
-  /**
-   * Vrai quand `rows` vient du cache local après un échec réseau (D-01) :
-   * à afficher comme données périmées, jamais comme du direct.
-   */
-  isStale: boolean;
-  /** Alias de `isStale`, conservé pour l'honnêteté d'affichage. */
-  dataFromCache: boolean;
-  /**
-   * Vrai quand il n'y a rien à afficher faute de réseau et de cache (D-07) :
-   * premier lancement hors ligne ou lecture en échec sans repli. L'UI rend
-   * alors l'état de cache vide explicite — jamais une liste muette, jamais
-   * une erreur brute. Faux dès qu'une ligne existe (direct, périmée ou en
-   * attente) et faux quand la dernière lecture a réussi (vraie liste vide).
-   */
-  isEmptyCacheOffline: boolean;
-  /** Identifiants des créations en file, en attente de confirmation serveur. */
-  pendingIds: string[];
   refetch: () => void;
   create: (values: Partial<T>) => Promise<T>;
   update: (id: string, values: Partial<T>) => Promise<T>;
@@ -73,17 +52,6 @@ export function useResource<T = Row>(
     [filter, householdId, scoped],
   );
   const key = queryKeys.table(table, householdId, effectiveFilter);
-  // Positionné par `queryFn` ci-dessous : vrai quand la dernière lecture a
-  // servi le cache local (repli D-01). État local au hook, pas de course
-  // entre tables : chaque instance ne suit que sa propre requête.
-  const [dataFromCache, setDataFromCache] = useState(false);
-  const online = useOnline();
-  /**
-   * Créations mises en file (D-07) : conservées hors du cache React Query —
-   * un réessai qui écrase le cache ne doit pas les faire disparaître avant
-   * leur rejeu — et fusionnées à `rows` ci-dessous jusqu'à confirmation.
-   */
-  const [pendingRows, setPendingRows] = useState<T[]>([]);
 
   const query = useQuery({
     queryKey: key,
@@ -91,15 +59,6 @@ export function useResource<T = Row>(
     placeholderData: keepPreviousData,
     refetchInterval,
     queryFn: async () => {
-      const withMeta = data as typeof data & {
-        listWithMeta?: <T>(table: string, filter?: RowFilter) => Promise<ListResult<T>>;
-      };
-      if (typeof withMeta.listWithMeta === 'function') {
-        const result = await withMeta.listWithMeta<T>(table, effectiveFilter);
-        setDataFromCache(result.fromCache);
-        return (select ? select(result.rows as unknown as Row[]) : (result.rows as unknown as Row[])) as T[];
-      }
-      setDataFromCache(false);
       const rows = await data.list<T>(table, effectiveFilter);
       return (select ? select(rows as unknown as Row[]) : (rows as unknown as Row[])) as T[];
     },
@@ -134,11 +93,7 @@ export function useResource<T = Row>(
         await invalidate();
         return result;
       } catch (error) {
-        // Écriture mise en file (D-02) : l'état optimiste est conservé, il
-        // sera confirmé au rejeu. Seule une vraie erreur retourne en arrière.
-        if (!(error instanceof DataError) || !error.queuedForSync) {
-          queryClient.setQueryData<T[]>(key, snapshot);
-        }
+        queryClient.setQueryData<T[]>(key, snapshot);
         throw error;
       }
     },
@@ -147,37 +102,11 @@ export function useResource<T = Row>(
 
   const create = useCallback(
     async (values: Partial<T>) => {
-      // Identifiant stable généré côté appelant : en cas de mise en file, la
-      // ligne optimiste, l'entrée de file et la future ligne serveur portent
-      // le même `id` — le rejeu confirme sans dupliquer.
-      const ensured =
-        isKeylessTable(table) || typeof (values as { id?: unknown }).id === 'string'
-          ? values
-          : { ...values, id: randomId(table) };
-      try {
-        const result = await createMutation.mutateAsync(ensured);
-        await invalidate();
-        return result;
-      } catch (error) {
-        // Écriture mise en file (D-02/D-07) : la ligne reste visible, marquée
-        // en attente, jusqu'à ce que le rejeu la confirme. Seule une vraie
-        // erreur remonte à l'appelant.
-        if (error instanceof DataError && error.queuedForSync) {
-          const optimistic = ensured as unknown as T;
-          const optimisticId = (ensured as { id?: unknown }).id;
-          if (typeof optimisticId === 'string') {
-            setPendingRows((previous) =>
-              previous.some((row) => (row as unknown as Row).id === optimisticId)
-                ? previous
-                : [...previous, optimistic],
-            );
-          }
-          return optimistic;
-        }
-        throw error;
-      }
+      const result = await createMutation.mutateAsync(values);
+      await invalidate();
+      return result;
     },
-    [createMutation, invalidate, table],
+    [createMutation, invalidate],
   );
 
   const update = useCallback(async (id: string, values: Partial<T>) => mutate(id, values), [mutate]);
@@ -190,51 +119,12 @@ export function useResource<T = Row>(
     [invalidate, removeMutation],
   );
 
-  const serverRows = query.data ?? [];
-  const pendingIds = useMemo(
-    () =>
-      pendingRows
-        .map((row) => (row as unknown as Row).id)
-        .filter((id): id is string => typeof id === 'string'),
-    [pendingRows],
-  );
-  // Les lignes en attente survivent aux réessais : elles ne sont dans aucun
-  // cache serveur, un `refetch` seul les effacerait de l'écran avant le rejeu.
-  const rows = useMemo<T[]>(() => {
-    if (pendingRows.length === 0) return serverRows;
-    const serverIds = new Set(serverRows.map((row) => (row as unknown as Row).id));
-    return [...serverRows, ...pendingRows.filter((row) => !serverIds.has((row as unknown as Row).id))];
-  }, [serverRows, pendingRows]);
-
-  // Confirmation : une ligne en attente retrouvée dans des données serveur a
-  // été rejouée — la marque disparaît, sans doublon (même identifiant).
-  useEffect(() => {
-    if (pendingRows.length === 0 || !query.data) return;
-    const serverIds = new Set(query.data.map((row) => (row as unknown as Row).id));
-    setPendingRows((previous) => {
-      const next = previous.filter((row) => !serverIds.has((row as unknown as Row).id));
-      return next.length === previous.length ? previous : next;
-    });
-  }, [query.data, pendingRows.length]);
-
-  // Cache vide hors ligne (D-07) : ni ligne en direct, ni repli périmé, ni
-  // création en attente — et la dernière lecture n'a pas réussi (sinon c'est
-  // une vraie liste vide). La requête doit être active : sans foyer, l'absence
-  // de lignes n'est pas un état de cache.
-  const queryEnabled = enabled && (scoped ? Boolean(householdId) : true);
-  const isEmptyCacheOffline =
-    queryEnabled && !online && rows.length === 0 && query.status !== 'success';
-
   return {
-    rows,
+    rows: query.data ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
     error: (query.error as Error | null) ?? null,
-    isStale: dataFromCache,
-    dataFromCache,
-    isEmptyCacheOffline,
-    pendingIds,
     refetch: () => void query.refetch(),
     create,
     update,
@@ -247,10 +137,6 @@ export function useResource<T = Row>(
 export interface LinkedResult<T> {
   rows: T[];
   isLoading: boolean;
-  /** Vrai quand `rows` vient du cache local après un échec réseau (D-01). */
-  isStale: boolean;
-  /** Alias de `isStale`. */
-  dataFromCache: boolean;
   add: (values: Partial<T>) => Promise<T>;
   remove: (filter: RowFilter) => Promise<void>;
   isMutating: boolean;
@@ -260,22 +146,10 @@ export interface LinkedResult<T> {
 export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): LinkedResult<T> {
   const queryClient = useQueryClient();
   const key = queryKeys.table(table, null, filter);
-  const [dataFromCache, setDataFromCache] = useState(false);
 
   const query = useQuery({
     queryKey: key,
-    queryFn: async () => {
-      const withMeta = data as typeof data & {
-        listWithMeta?: <T>(table: string, filter?: RowFilter) => Promise<ListResult<T>>;
-      };
-      if (typeof withMeta.listWithMeta === 'function') {
-        const result = await withMeta.listWithMeta<T>(table, filter);
-        setDataFromCache(result.fromCache);
-        return result.rows;
-      }
-      setDataFromCache(false);
-      return data.list<T>(table, filter);
-    },
+    queryFn: async () => data.list<T>(table, filter),
   });
 
   const addMutation = useMutation({ mutationFn: (values: Partial<T>) => data.create<T>(table, values) });
@@ -305,8 +179,6 @@ export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): L
   return {
     rows: query.data ?? [],
     isLoading: query.isLoading,
-    isStale: dataFromCache,
-    dataFromCache,
     add,
     remove,
     isMutating: addMutation.isPending || removeMutation.isPending,
