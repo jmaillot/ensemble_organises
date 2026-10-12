@@ -4,7 +4,8 @@
  * Point d'entrée : `POST /functions/v1/trip-invite`
  * Corps : `{ action: 'create-trip' | 'create' | 'revoke' | 'summary' |
  *           'join' | 'redeem-guest' | 'guest-view' | 'link-view' |
- *           'member-leave' | 'guest-expense-create', ... }`
+ *           'member-leave' | 'close' | 'reopen' |
+ *           'guest-expense-create', ... }`
  *
  * Copie le byte-motif de `ardoise-invite` / `gift-list-invite` (jamais un
  * design d'invitation main-levée) : même entropie, même HMAC, même oracle,
@@ -13,8 +14,8 @@
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user', 'publishable']`
  *   * `user`        → session utilisateur. Seul mode qui exécute
- *                     `create-trip`, `create`, `revoke`, `summary`, `join`
- *                     et `member-leave`.
+ *                     `create-trip`, `create`, `revoke`, `summary`, `join`,
+ *                     `member-leave`, `close` et `reopen`.
  *   * `publishable` → accepté par la passerelle, mais REFUSÉ ici avec 401
  *                     SANS valider le code, SAUF pour `redeem-guest`,
  *                     `guest-view`, `link-view` et `guest-expense-create` :
@@ -52,6 +53,8 @@
  *   guest-view  -> { trip, guest } (ticket vérifié, sans conso use_count)
  *   link-view   -> { trip, guest: null } (code vérifié, sans conso use_count)
  *   member-leave -> { trip_id, left }
+ *   close        -> { trip_id, is_closed: true } (fige, D-08)
+ *   reopen       -> { trip_id, is_closed: false } (admin du foyer seul, D-08)
  *   guest-expense-create -> dépense (ligne `expenses` de l'ardoise liée)
  *
  * TICKET CÔTÉ CLIENT : `localStorage["eo:trip:ticket:<tripId>"]` (le plan
@@ -194,6 +197,16 @@ const requestSchema = z.discriminatedUnion('action', [
     tripId: tripField,
   }),
   z.object({
+    action: z.literal('close'),
+    /** Voyage à figer (D-08) : participant écrivain OU admin, RPC `trip_close`. */
+    tripId: tripField,
+  }),
+  z.object({
+    action: z.literal('reopen'),
+    /** Voyage à rouvrir (D-08) : admin du foyer seul, RPC `trip_reopen`. */
+    tripId: tripField,
+  }),
+  z.object({
     action: z.literal('guest-expense-create'),
     /** Ticket brut : seule credence, vérifiée en base par le RPC. */
     ticket: z.string().trim().min(20).max(256),
@@ -281,6 +294,8 @@ const LIMITS: Record<string, number> = {
   'guest-view': 30,
   'link-view': 30,
   'member-leave': 10,
+  close: 10,
+  reopen: 10,
   'guest-expense-create': 20,
 };
 const MAX_TRACKED_CLIENTS = 5_000;
@@ -595,6 +610,36 @@ async function handleMemberLeave(admin: AdminClient, userId: string, body: Reque
   return json((data ?? {}) as { trip_id?: string; left?: boolean });
 }
 
+/**
+ * Fermeture douce (D-08, 15-02) : fige sans détruire, rouvrable admin.
+ * Même régime que `member-leave` (refus enfant `manage`, RPC serveur seul,
+ * erreurs déjà traduites : `voyage introuvable` → 404, `gestion du voyage
+ * réservée` → 403). Le client ne touche jamais `is_closed` en direct (le
+ * trigger `guard_trip_server_flags` le refuse avec le même 403).
+ */
+async function handleClose(admin: AdminClient, userId: string, body: RequestBody & { action: 'close' }) {
+  await refuseEnfant(admin, userId, await tripHousehold(admin, body.tripId), 'manage');
+  const { data, error } = await admin.rpc('trip_close', {
+    p_actor_id: userId,
+    p_trip_id: body.tripId,
+  });
+
+  if (error) throw translateRpcError(error);
+  return json((data ?? {}) as { trip_id?: string; is_closed?: boolean });
+}
+
+/** Réouverture (D-08, 15-02) : admin du foyer seul (`trip_reopen`). */
+async function handleReopen(admin: AdminClient, userId: string, body: RequestBody & { action: 'reopen' }) {
+  await refuseEnfant(admin, userId, await tripHousehold(admin, body.tripId), 'manage');
+  const { data, error } = await admin.rpc('trip_reopen', {
+    p_actor_id: userId,
+    p_trip_id: body.tripId,
+  });
+
+  if (error) throw translateRpcError(error);
+  return json((data ?? {}) as { trip_id?: string; is_closed?: boolean });
+}
+
 // ---------------------------------------------------------------------------
 // Chemins sans session (publishable) : invités externes uniquement.
 // ---------------------------------------------------------------------------
@@ -757,6 +802,8 @@ Deno.serve(
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);
       if (body.action === 'summary') return await handleSummary(admin, userId, body);
       if (body.action === 'member-leave') return await handleMemberLeave(admin, userId, body);
+      if (body.action === 'close') return await handleClose(admin, userId, body);
+      if (body.action === 'reopen') return await handleReopen(admin, userId, body);
       return await handleJoin(admin, ctx.supabase, userId, body);
     } catch (error) {
       if (error instanceof TripInviteError) return json({ error: error.message }, error.status);

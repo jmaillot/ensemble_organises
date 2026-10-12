@@ -8,14 +8,14 @@
  * appliqué côté client (D-01 : pas de visibilité foyer automatique).
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
 import { useCurrentMember, useIsAdmin, useMembers } from '@/stores/household-store';
 import { todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, TripGuestRow } from '@/types';
-import { fetchTripGuests, fetchTripMembers, fetchTripRow } from '../api';
+import { fetchTripCounts, fetchTripGuests, fetchTripMembers, fetchTripRow, isTripCoverPath, resolveTripCoverUrl, type TripCounts } from '../api';
 import { toTrip, type TabState, type Trip } from '../types';
 
 export const tripDetailKeys = {
@@ -23,6 +23,7 @@ export const tripDetailKeys = {
   trip: (tripId: string | null) => ['voyages', 'detail', tripId, 'trip'] as const,
   members: (tripId: string | null) => ['voyages', 'detail', tripId, 'members'] as const,
   guests: (tripId: string | null) => ['voyages', 'detail', tripId, 'guests'] as const,
+  counts: (tripId: string | null) => ['voyages', 'detail', tripId, 'counts'] as const,
 };
 
 const REALTIME_TABLES = ['trips', 'trip_members', 'trip_guests'] as const;
@@ -30,6 +31,8 @@ const REALTIME_TABLES = ['trips', 'trip_members', 'trip_guests'] as const;
 export interface TripDetailState {
   tripId: string | null;
   trip: Trip | null;
+  /** Valeur stockée de la couverture (chemin bucket ou forme directe) : sert au nettoyage à l’édition. */
+  storedCover: string | null;
   tabState: TabState | null;
   isLoading: boolean;
   isError: boolean;
@@ -48,6 +51,9 @@ export interface TripDetailState {
   readOnly: boolean;
   participantMembers: HouseholdMemberRow[];
   guests: TripGuestRow[];
+  /** Compteurs Infos (lignes tripées + ardoise liée) ; `null` avant autorisation. */
+  counts: TripCounts | null;
+  countsLoading: boolean;
   refetch: () => void;
 }
 
@@ -83,6 +89,7 @@ export function useTripDetail(tripId: string | null): TripDetailState {
     void queryClient.invalidateQueries({ queryKey: tripDetailKeys.trip(tripId) });
     void queryClient.invalidateQueries({ queryKey: tripDetailKeys.members(tripId) });
     void queryClient.invalidateQueries({ queryKey: tripDetailKeys.guests(tripId) });
+    void queryClient.invalidateQueries({ queryKey: tripDetailKeys.counts(tripId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.tableAll('trips') });
   }, [queryClient, tripId]);
 
@@ -100,6 +107,29 @@ export function useTripDetail(tripId: string | null): TripDetailState {
     const row = tripQuery.data ?? null;
     return row ? toTrip(row, today) : null;
   }, [tripQuery.data, today]);
+
+  // D-11 : comme le héros de la liste, les chemins bucket sont forgés en URL
+  // courte, en échec fermé (pas de héros) en attendant ou en erreur.
+  const storedCover = tripQuery.data?.cover_photo ?? null;
+  const [forgedCover, setForgedCover] = useState<string | null>(null);
+  useEffect(() => {
+    if (!storedCover || !isTripCoverPath(storedCover)) {
+      setForgedCover(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveTripCoverUrl(storedCover).then((url) => {
+      if (!cancelled) setForgedCover(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storedCover]);
+  const displayTrip = useMemo(() => {
+    if (!trip) return null;
+    if (!storedCover || !isTripCoverPath(storedCover)) return trip;
+    return { ...trip, coverPhoto: forgedCover ?? '' };
+  }, [trip, storedCover, forgedCover]);
 
   const participantIds = useMemo(
     () => new Set((membersQuery.data ?? []).map((entry) => entry.member_id)),
@@ -120,19 +150,31 @@ export function useTripDetail(tripId: string | null): TripDetailState {
   const notAuthorized =
     enabled && !isLoading && !isError && (!trip || (!isParticipant && !isAdmin));
 
+  // Compteurs après autorisation : un non-membre ne déclenche aucune lecture
+  // de lignes (T-15-07, pas de pré-chargement avant appartenance prouvée).
+  const countsQuery = useQuery({
+    queryKey: tripDetailKeys.counts(tripId),
+    enabled: enabled && !isLoading && !isError && !notAuthorized,
+    retry: false,
+    queryFn: () => fetchTripCounts(tripId as string),
+  });
+
   return {
     tripId,
-    trip: notAuthorized ? null : trip,
-    tabState: trip && !notAuthorized ? trip.tabState : null,
+    trip: notAuthorized ? null : displayTrip,
+    storedCover,
+    tabState: displayTrip && !notAuthorized ? displayTrip.tabState : null,
     isLoading,
     isError,
     error,
     notAuthorized,
     isParticipant,
     isAdmin,
-    readOnly: Boolean(trip) && !notAuthorized && isAdmin && !isParticipant,
+    readOnly: Boolean(displayTrip) && !notAuthorized && isAdmin && !isParticipant,
     participantMembers,
     guests: guestsQuery.data ?? [],
+    counts: notAuthorized ? null : (countsQuery.data ?? null),
+    countsLoading: countsQuery.isLoading,
     refetch: invalidate,
   };
 }

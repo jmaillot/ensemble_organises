@@ -1,22 +1,43 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
-import { useTripDetail } from './hooks/use-trip-detail';
+import { MemberAvatar } from '@/components/shared/member-avatar';
+import { useToast } from '@/components/ui/toast';
+import { useHouseholdStore } from '@/stores/household-store';
+import { formatEuro } from '@/lib/utils';
+import { useTripDetail, type TripDetailState } from './hooks/use-trip-detail';
+import { TripFormDialog } from './components/trip-form-dialog';
 import { isServableCoverUrl } from './voyages-page';
-import { visibleTripTabs, type TripTabKey } from './types';
+import {
+  closeTrip,
+  leaveTrip,
+  reopenTrip,
+  saveTripMeta,
+  updateTripMeta,
+  type TripCounts,
+} from './api';
+import {
+  TRIP_TOGGLABLE_TABS,
+  TRIP_TABS,
+  visibleTripTabs,
+  type Trip,
+  type TripInput,
+  type TripTabKey,
+} from './types';
 
 /**
  * Fiche d'un voyage (phase 15) : héros + barre d'onglets (Infos, Courses,
  * Notes, Tâches, Adresses, Budget, Paramètres). Les onglets désactivés sont
- * masqués, jamais supprimés (D-05). 15-02 tâche 2 remplit Infos et
- * Paramètres ; 15-03 remplit les cinq rubriques.
+ * masqués, jamais supprimés (D-05). 15-02 remplit Infos et Paramètres ;
+ * 15-03 remplit les cinq rubriques.
  */
 export default function TripDetailPage() {
   const { tripId } = useParams();
   const detail = useTripDetail(tripId ?? null);
-  const { trip, tabState, isLoading, isError, error, notAuthorized, readOnly, participantMembers } = detail;
+  const { trip, tabState, isLoading, isError, error, notAuthorized, readOnly } = detail;
   const [activeTab, setActiveTab] = useState<TripTabKey>('infos');
 
   const visible = tabState ? visibleTripTabs(tabState) : [];
@@ -111,13 +132,12 @@ export default function TripDetailPage() {
 
           <div role="tabpanel" aria-label={visible.find((tab) => tab.key === activeTab)?.label ?? 'Rubrique'}>
             {activeTab === 'infos' ? (
-              <TripInfosPlaceholder participantCount={participantMembers.length} />
+              <TripInfosTab detail={detail} />
             ) : activeTab === 'parametres' ? (
-              <TripParametresPlaceholder />
+              <TripParametresTab detail={detail} trip={trip} />
             ) : (
               <TripTabPlaceholder
                 label={visible.find((tab) => tab.key === activeTab)?.label ?? ''}
-                participantNames={participantMembers.map((member) => member.display_name)}
               />
             )}
           </div>
@@ -127,50 +147,316 @@ export default function TripDetailPage() {
   );
 }
 
-function TripInfosPlaceholder({ participantCount }: { participantCount: number }) {
+/* ------------------------------------------------------------------ */
+/* Onglet Infos : participants, invités, compteurs réels, budget lié   */
+/* ------------------------------------------------------------------ */
+
+function CountCard({ label, value }: { label: string; value: number | null }) {
   return (
-    <Panel
-      id="trip-infos"
-      title="Infos"
-      description="Les compteurs réels arrivent avec la suite de la fiche (membres, lignes, budget)."
-    >
-      <p className="m-0 text-[13px]" role="status">
-        {participantCount} participant{participantCount > 1 ? 's' : ''} pour le moment.
-      </p>
-    </Panel>
+    <div className="rounded-[16px] border border-border bg-surface p-[17px]">
+      <strong className="block font-display text-[25px] tracking-[-0.05em]">
+        {value === null ? '—' : value}
+      </strong>
+      <span className="text-[11px] text-muted">{label}</span>
+      {value === null ? (
+        <p className="mt-1 mb-0 text-[11px] text-muted">Illisible pour le moment.</p>
+      ) : null}
+    </div>
   );
 }
 
-function TripParametresPlaceholder() {
+function TripInfosTab({ detail }: { detail: TripDetailState }) {
+  const { participantMembers, guests, counts, countsLoading } = detail;
+  const budget: TripCounts | null = counts;
   return (
-    <Panel
-      id="trip-parametres"
-      title="Paramètres"
-      description="Édition, rubriques, code d’invitation et cycle de vie arrivent avec la suite de la fiche."
-    >
-      <EmptyState
-        icon="settings"
-        title="Paramètres en préparation"
-        description="La gestion du voyage (édition, code, fermeture douce) arrive juste après."
+    <div className="grid gap-3.5">
+      <Panel id="trip-infos-people" title="Participants" description="Membres du voyage et invités externes.">
+        <div className="flex flex-wrap items-center gap-2">
+          {participantMembers.map((member) => (
+            <span key={member.id} className="inline-flex items-center gap-1.5 rounded-[10px] bg-bg px-2 py-1 text-[12px] font-semibold">
+              <MemberAvatar member={member} size="sm" />
+              {member.display_name}
+            </span>
+          ))}
+        </div>
+        {guests.length > 0 ? (
+          <p className="mt-2.5 mb-0 text-[12px] text-muted">
+            Invités : {guests.map((guest) => guest.display_name).join(', ')}.
+          </p>
+        ) : (
+          <p className="mt-2.5 mb-0 text-[12px] text-muted" role="status">
+            Aucun invité pour le moment — le partage par code arrive avec la tâche suivante.
+          </p>
+        )}
+      </Panel>
+
+      {countsLoading ? (
+        <LoadingRows rows={2} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3.5 max-[650px]:grid-cols-1">
+            <CountCard label="listes de courses du voyage" value={budget?.lists ?? null} />
+            <CountCard label="notes du voyage" value={budget?.notes ?? null} />
+            <CountCard label="tâches du voyage" value={budget?.tasks ?? null} />
+            <CountCard label="adresses du voyage" value={budget?.places ?? null} />
+          </div>
+          <Panel id="trip-infos-budget" title="Budget" description="Ardoise liée au voyage (répartition complète dans l’onglet Budget).">
+            {budget?.ardoiseId ? (
+              <p className="m-0 text-[13px]" role="status">
+                {budget.expenseCount ?? '—'} dépense{(budget.expenseCount ?? 0) > 1 ? 's' : ''}
+                {' · '}
+                total {budget.expenseTotal === null ? '—' : formatEuro(budget.expenseTotal)}.
+              </p>
+            ) : (
+              <p className="m-0 text-[13px] text-muted" role="status">
+                Aucune ardoise liée pour le moment.
+              </p>
+            )}
+          </Panel>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Onglet Paramètres : édition, rubriques, fermeture douce, départ      */
+/*                                                                     */
+/* Pas de suppression en cascade, nulle part (D-08) : fermer fige,      */
+/* rouvrir répare, partir retire — détruire n’existe pas.              */
+/* ------------------------------------------------------------------ */
+
+function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Trip }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const { tabState, isParticipant, isAdmin, readOnly, storedCover } = detail;
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState<TripTabKey | null>(null);
+  const [pendingClose, setPendingClose] = useState(false);
+  const [pendingLeave, setPendingLeave] = useState(false);
+  const [acting, setActing] = useState(false);
+  const tabLabels = new Map(TRIP_TABS.map((tab) => [tab.key, tab.label]));
+  const frozen = trip.closed;
+
+  if (readOnly) {
+    return (
+      <Panel
+        id="trip-parametres"
+        title="Paramètres"
+        description="Vue de modération : ce voyage ne vous attend pas comme participant."
+      >
+        <p className="m-0 text-[13px] text-muted">
+          Édition, rubriques, fermeture et départ sont réservés aux participants ; la réouverture d’un voyage
+          figé reste possible ci-dessous pour les administrateurs.
+        </p>
+        {frozen && isAdmin ? (
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              icon="check"
+              disabled={acting}
+              onClick={() => {
+                setActing(true);
+                reopenTrip(detail.tripId as string)
+                  .then(() => {
+                    toast('Voyage rouvert.', 'success');
+                    detail.refetch();
+                  })
+                  .catch((reopenError: unknown) =>
+                    toast(reopenError instanceof Error ? reopenError.message : 'Réouverture impossible.', 'error'),
+                  )
+                  .finally(() => setActing(false));
+              }}
+            >
+              {acting ? 'Réouverture…' : 'Rouvrir le voyage'}
+            </Button>
+          </div>
+        ) : null}
+      </Panel>
+    );
+  }
+
+  const saveEdit = async (input: TripInput, id: string | null): Promise<boolean> => {
+    if (!householdId || !id || frozen) return false;
+    setSaving(true);
+    try {
+      await saveTripMeta({ tripId: id, householdId, input, previousCover: storedCover });
+      detail.refetch();
+      toast('Voyage mis à jour.', 'success');
+      return true;
+    } catch (saveError) {
+      toast(saveError instanceof Error ? saveError.message : 'Mise à jour impossible.', 'error');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setTab = (key: TripTabKey, on: boolean) => {
+    if (!tabState || frozen || toggling) return;
+    setToggling(key);
+    updateTripMeta(detail.tripId as string, { tab_state: { ...tabState, [key]: on } })
+      .then(() => {
+        detail.refetch();
+        toast(on ? `Rubrique « ${tabLabels.get(key)} » affichée.` : `Rubrique « ${tabLabels.get(key)} » masquée (contenu conservé).`);
+      })
+      .catch((toggleError: unknown) =>
+        toast(toggleError instanceof Error ? toggleError.message : 'Rubrique impossible.', 'error'),
+      )
+      .finally(() => setToggling(null));
+  };
+
+  const confirmClose = () => {
+    setPendingClose(false);
+    setActing(true);
+    closeTrip(detail.tripId as string)
+      .then(() => {
+        toast('Voyage figé.', 'success');
+        detail.refetch();
+      })
+      .catch((closeError: unknown) =>
+        toast(closeError instanceof Error ? closeError.message : 'Fermeture impossible.', 'error'),
+      )
+      .finally(() => setActing(false));
+  };
+
+  const confirmLeave = () => {
+    setPendingLeave(false);
+    setActing(true);
+    leaveTrip(detail.tripId as string)
+      .then(() => {
+        toast('Vous avez quitté ce voyage.');
+        navigate('/voyages');
+      })
+      .catch((leaveError: unknown) => {
+        toast(leaveError instanceof Error ? leaveError.message : 'Départ impossible.', 'error');
+        setActing(false);
+      });
+  };
+
+  return (
+    <div className="grid gap-3.5">
+      <Panel id="trip-parametres-edit" title="Infos du voyage" description="Nom, destination, dates, couverture, notes.">
+        {frozen ? (
+          <p className="m-0 text-[12px] text-muted" role="status">
+            Voyage figé : l’édition reprendra à la réouverture.
+          </p>
+        ) : (
+          <div>
+            <Button variant="secondary" icon="edit" onClick={() => setEditOpen(true)}>
+              Modifier les infos
+            </Button>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        id="trip-parametres-tabs"
+        title="Rubriques affichées"
+        description="Masquer retire l’onglet de la barre — le contenu est conservé, jamais supprimé."
+      >
+        <div className="grid gap-2">
+          {TRIP_TOGGLABLE_TABS.map((key) => {
+            const checked = tabState?.[key] !== false;
+            return (
+              <label
+                key={key}
+                className="inline-flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[12px] font-semibold text-muted has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={frozen || toggling !== null}
+                  onChange={() => setTab(key, !checked)}
+                  className="accent-accent"
+                  aria-label={`Afficher la rubrique ${tabLabels.get(key)}`}
+                />
+                {tabLabels.get(key)}
+                {toggling === key ? '…' : ''}
+              </label>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <Panel
+        id="trip-parametres-lifecycle"
+        title="Cycle de vie"
+        description="Fermer fige sans détruire ; partir retire sans effacer ; rouvrir répare (admin seul)."
+      >
+        <div className="flex flex-wrap gap-2">
+          {!frozen ? (
+            <Button variant="secondary" icon="check" disabled={acting} onClick={() => setPendingClose(true)}>
+              Figer le voyage
+            </Button>
+          ) : isAdmin ? (
+            <Button
+              variant="secondary"
+              icon="check"
+              disabled={acting}
+              onClick={() => {
+                setActing(true);
+                reopenTrip(detail.tripId as string)
+                  .then(() => {
+                    toast('Voyage rouvert.', 'success');
+                    detail.refetch();
+                  })
+                  .catch((reopenError: unknown) =>
+                    toast(reopenError instanceof Error ? reopenError.message : 'Réouverture impossible.', 'error'),
+                  )
+                  .finally(() => setActing(false));
+              }}
+            >
+              {acting ? 'Réouverture…' : 'Rouvrir le voyage'}
+            </Button>
+          ) : null}
+          {isParticipant ? (
+            <Button variant="danger" icon="arrow" disabled={acting} onClick={() => setPendingLeave(true)}>
+              Quitter ce voyage
+            </Button>
+          ) : null}
+        </div>
+        {!frozen ? (
+          <p className="mt-2.5 mb-0 text-[11px] text-muted">
+            Figer rend toutes les rubriques en lecture seule ; le contenu reste intact.
+          </p>
+        ) : null}
+      </Panel>
+
+      <TripFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        trip={trip}
+        busy={saving}
+        onSubmit={saveEdit}
       />
-    </Panel>
+
+      <ConfirmDialog
+        open={pendingClose}
+        onOpenChange={setPendingClose}
+        title="Figer ce voyage ?"
+        description={`${trip.destination} · ${trip.dateLabel} — les rubriques passeront en lecture seule, sans rien supprimer.`}
+        confirmLabel="Figer le voyage"
+        onConfirm={confirmClose}
+      />
+
+      <ConfirmDialog
+        open={pendingLeave}
+        onOpenChange={setPendingLeave}
+        title="Quitter ce voyage ?"
+        description="Vous ne verrez plus sa fiche ; vos lignes déjà écrites restent pour le foyer."
+        confirmLabel="Quitter"
+        onConfirm={confirmLeave}
+      />
+    </div>
   );
 }
 
-function TripTabPlaceholder({ label, participantNames }: { label: string; participantNames: string[] }) {
+function TripTabPlaceholder({ label }: { label: string }) {
   return (
     <Panel id={`trip-tab-${label}`} title={label} description="Cette rubrique s’ouvre avec la suite de l’espace voyage.">
-      <div className="mb-3 flex items-center">
-        {participantNames.slice(0, 3).map((name) => (
-          <span
-            key={name}
-            className="-ml-[7px] grid size-[23px] place-items-center rounded-[8px] border-2 border-surface bg-fg text-[9px] font-extrabold text-surface first:ml-0"
-            title={name}
-          >
-            {name.slice(0, 1).toUpperCase()}
-          </span>
-        ))}
-      </div>
       <EmptyState
         icon="map"
         title={`${label} : bientôt relié au voyage`}

@@ -343,6 +343,110 @@ export async function leaveTrip(tripId: string): Promise<void> {
   await callTripInvite('member-leave', { tripId });
 }
 
+/**
+ * Fermeture douce (D-08) : fige sans détruire, via l'Edge `close` (jamais en
+ * PostgREST direct — le trigger serveur refuse `is_closed` au client).
+ */
+export async function closeTrip(tripId: string): Promise<void> {
+  await callTripInvite('close', { tripId });
+}
+
+/** Réouverture (D-08) : admin du foyer seul, via l'Edge `reopen`. */
+export async function reopenTrip(tripId: string): Promise<void> {
+  await callTripInvite('reopen', { tripId });
+}
+
+export interface SaveTripMetaArgs {
+  tripId: string;
+  householdId: string;
+  input: TripInput;
+  previousCover: string | null;
+}
+
+/**
+ * Enregistrement méta (Paramètres) : dépôt-puis-écriture comme `save`, sans
+ * optimisme (la fiche relit après). Ne touche jamais `is_closed` ni
+ * `created_by` (bandeau figé + trigger serveur).
+ */
+export async function saveTripMeta({ tripId, householdId, input, previousCover }: SaveTripMetaArgs): Promise<TripRow> {
+  let coverPhoto = input.coverPhoto;
+  let depositedPath: string | null = null;
+  if (input.coverFile) {
+    coverPhoto = await uploadTripCover(householdId, tripId, input.coverFile);
+    depositedPath = tripCoverPathOf(coverPhoto);
+  }
+  try {
+    const updated = await updateTripMeta(tripId, {
+      name: input.name.trim(),
+      destination: input.destination.trim() || input.name.trim(),
+      start_date: input.startDate,
+      end_date: input.endDate,
+      cover_photo: coverPhoto,
+      notes: input.notes.trim() || null,
+    });
+    if (previousCover && previousCover !== coverPhoto) await deleteTripCover(previousCover);
+    return updated;
+  } catch (error) {
+    if (depositedPath) await deleteTripCover(depositedPath);
+    throw error instanceof Error ? error : new Error('Enregistrement impossible.');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Compteurs Infos (phase 15, tâche 2) : chaque chiffre vient d'une     */
+/* lecture réelle, jamais d'une valeur décorative. `null` = illisible   */
+/* (RLS) : la fiche l'avoue au lieu d'inventer un zéro.                */
+/* ------------------------------------------------------------------ */
+
+export interface TripCounts {
+  lists: number | null;
+  notes: number | null;
+  tasks: number | null;
+  places: number | null;
+  ardoiseId: string | null;
+  expenseCount: number | null;
+  /** Total des dépenses de l'ardoise liée, en euros. */
+  expenseTotal: number | null;
+}
+
+async function countOrNull(table: string, filter: Record<string, string>): Promise<number | null> {
+  try {
+    return (await data.list(table, filter)).length;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compteurs d'un voyage : lignes tripées + ardoise liée (dépenses via leur
+ * ardoise, jamais de `trip_id` direct sur expenses — D-02).
+ */
+export async function fetchTripCounts(tripId: string): Promise<TripCounts> {
+  const [lists, notes, tasks, places] = await Promise.all([
+    countOrNull('shopping_lists', { trip_id: tripId }),
+    countOrNull('notes', { trip_id: tripId }),
+    countOrNull('tasks', { trip_id: tripId }),
+    countOrNull('places', { trip_id: tripId }),
+  ]);
+  try {
+    const ardoises = await data.list<{ id: string }>('ardoises', { trip_id: tripId });
+    const ardoiseId = ardoises[0]?.id ?? null;
+    if (!ardoiseId) return { lists, notes, tasks, places, ardoiseId: null, expenseCount: null, expenseTotal: null };
+    const expenses = await data.list<{ amount: number | string }>('expenses', { ardoise_id: ardoiseId });
+    return {
+      lists,
+      notes,
+      tasks,
+      places,
+      ardoiseId,
+      expenseCount: expenses.length,
+      expenseTotal: expenses.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0),
+    };
+  } catch {
+    return { lists, notes, tasks, places, ardoiseId: null, expenseCount: null, expenseTotal: null };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Partage par code (miroir gift-share-dialog, D-09)                    */
 /* ------------------------------------------------------------------ */

@@ -5,11 +5,10 @@ import { cn } from '@/lib/utils';
 import { ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { Badge, Progress } from '@/components/ui/primitives';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
-import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useVoyages, voyagesKeys } from './hooks/use-voyages';
 import { TripFormDialog } from './components/trip-form-dialog';
 import { TripCreateDialog, type TripCreateValues } from './components/trip-create-dialog';
@@ -47,16 +46,13 @@ export default function VoyagesPage() {
     refetch,
     isMutating,
     save,
-    remove,
   } = useVoyages();
-  const isAdmin = useIsAdmin();
   const stack = memberStack(members, MAX_STACK);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Trip | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<Trip | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -232,17 +228,6 @@ export default function VoyagesPage() {
                         <Button variant="secondary" size="sm" icon="edit" onClick={() => openEdit(other)}>
                           Modifier
                         </Button>
-                        {isAdmin ? (
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            icon="trash"
-                            onClick={() => setPendingDelete(other)}
-                            aria-label={`Supprimer le voyage vers ${other.destination}`}
-                          >
-                            <span className="sr-only">Supprimer</span>
-                          </Button>
-                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -255,11 +240,6 @@ export default function VoyagesPage() {
             <Button variant="secondary" icon="edit" onClick={() => openEdit(trip)}>
               Modifier ce voyage
             </Button>
-            {isAdmin ? (
-              <Button variant="danger" icon="trash" onClick={() => setPendingDelete(trip)}>
-                Supprimer ce voyage
-              </Button>
-            ) : null}
           </div>
         </>
       )}
@@ -273,23 +253,6 @@ export default function VoyagesPage() {
       />
 
       <TripCreateDialog open={createOpen} onOpenChange={setCreateOpen} busy={isCreating} onSubmit={createAndGo} />
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingDelete(null);
-        }}
-        title="Supprimer ce voyage ?"
-        description={pendingDelete ? `${pendingDelete.destination} · ${pendingDelete.dateLabel}` : undefined}
-        confirmLabel="Supprimer"
-        onConfirm={() => {
-          if (pendingDelete) {
-            void remove(pendingDelete.id);
-            if (selectedId === pendingDelete.id) setSelectedId(null);
-          }
-          setPendingDelete(null);
-        }}
-      />
     </ModuleShell>
   );
 }
