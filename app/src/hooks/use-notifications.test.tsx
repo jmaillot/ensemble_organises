@@ -9,6 +9,7 @@ import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, DEMO_USER_ID } from '@/lib/data/seed';
 import { useSessionStore } from '@/stores/session-store';
 import { demoUser } from '@/hooks/use-auth';
 import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
+import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { useNotifications } from './use-notifications';
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -90,12 +91,30 @@ describe('centre de notifications', () => {
       unreadMessage!.id,
     );
 
-    // Tout marquer comme lu fait basculer conversations et publications en lus récents.
+    // Un commentaire frais rend post-1 non lu de façon déterministe : les
+    // commentaires seed précèdent le montage et sont lus par défaut
+    // (référence mountAt du fil Cercle).
+    await data.create('post_comments', {
+      post_id: 'post-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      author_id: DEMO_MEMBERS.thomas,
+      content: `À solder à ${new Date().toISOString()}`,
+      created_at: new Date().toISOString(),
+    });
+    await waitFor(() => expect(result.current.items.some((item) => item.id === 'cercle:post-1')).toBe(true));
+
+    // Tout marquer comme lu cache les lignes marquables partout : ni pastille,
+    // ni lus récents (auto-masquage dérivé des transitions — même magasin et
+    // même horizon que la croix). Seule conversation-3 peut survivre : son
+    // message seed est daté de 18h10, après le marquage.
     await act(async () => {
       result.current.markAllRead();
     });
-    await waitFor(() => expect(result.current.recentRead.length).toBeGreaterThan(0));
-    expect(result.current.recentRead.every((item) => item.unread === false)).toBe(true);
+    for (const id of ['message:conversation-1', 'message:conversation-2', 'cercle:post-1']) {
+      await waitFor(() => expect(result.current.items.some((item) => item.id === id)).toBe(false));
+      // L'auto-masquage suit dans un rendu ultérieur : attendre sa retombée.
+      await waitFor(() => expect(result.current.recentRead.some((item) => item.id === id)).toBe(false));
+    }
 
     // Retirer un rappel calculé le masque (sursis local), sans toucher la donnée.
     const computed = result.current.items.find((item) => !item.markable);
@@ -169,7 +188,7 @@ describe('centre de notifications', () => {
     expect(result.current.messagesUnread).toBeGreaterThan(0);
   });
 
-  it('ouvrir le fil solde sa ligne (marquage à l’ouverture, D-02)', async () => {
+  it('ouvrir le fil cache sa ligne partout (auto-masquage à la lecture)', async () => {
     localStorage.removeItem('ensemble-organises-messages-read');
     localStorage.removeItem('ensemble-organises-cercle-read');
     localStorage.removeItem('eo-notifications-masquees-v1');
@@ -178,17 +197,19 @@ describe('centre de notifications', () => {
 
     await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
 
-    // Ouvrir = marquer : la ligne du fil quitte la cloche et rejoint les lus
-    // récents, sans masquage (elle reste visible dans « Toutes »).
+    // Lire = cacher : la ligne du fil quitte la cloche ET les lus récents,
+    // quel que soit le chemin de marquage (ici via markItem, comme au clic).
     const row = result.current.items.find((item) => item.id === 'message:conversation-1');
     expect(row).toBeDefined();
     await act(async () => {
       result.current.markItem(row!);
     });
     await waitFor(() => expect(result.current.items.some((item) => item.id === 'message:conversation-1')).toBe(false));
-    const read = result.current.recentRead.find((item) => item.id === 'message:conversation-1');
-    expect(read).toBeDefined();
-    expect(read?.unread).toBe(false);
+    await waitFor(() =>
+      expect(result.current.recentRead.some((item) => item.id === 'message:conversation-1')).toBe(false),
+    );
+    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    expect(Object.keys(masked)).toContain('message:conversation-1');
   });
 
   it('masque les lignes messages quand la préférence est coupée', async () => {
@@ -212,5 +233,140 @@ describe('centre de notifications', () => {
     } finally {
       useSessionStore.setState({ user: null, status: 'guest' });
     }
+  });
+
+  it('le marquage au niveau du fil ouvert cache aussi la ligne (sans markItem)', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    // Deux crochets sur le même client : la page Messages marque au niveau du
+    // feed (messages-page.tsx), sans passer par markItem — la cloche suit par
+    // transition d'état, pas par appel. Session connectée : la marque
+    // transite par le même chemin serveur que en production.
+    useSessionStore.setState({ user: demoUser, status: 'authenticated' });
+    try {
+      const { result } = renderHook(() => ({ notifs: useNotifications(), feed: useMessagesFeed() }), { wrapper });
+
+      await waitFor(() =>
+        expect(result.current.notifs.items.some((item) => item.id === 'message:conversation-2')).toBe(true),
+      );
+      await act(async () => {
+        result.current.feed.markRead('conversation-2');
+      });
+      await waitFor(() =>
+        expect(result.current.notifs.items.some((item) => item.id === 'message:conversation-2')).toBe(false),
+      );
+      await waitFor(() =>
+        expect(result.current.notifs.recentRead.some((item) => item.id === 'message:conversation-2')).toBe(false),
+      );
+      const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+      expect(Object.keys(masked)).toContain('message:conversation-2');
+    } finally {
+      useSessionStore.setState({ user: null, status: 'guest' });
+    }
+  });
+
+  it('le marquage d’un post au niveau du Cercle cache aussi sa ligne', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    // Session connectée : comme cercle-page.tsx, marquage direct au feed via
+    // le même chemin serveur que en production, sans markItem.
+    useSessionStore.setState({ user: demoUser, status: 'authenticated' });
+    try {
+      const { result } = renderHook(() => ({ notifs: useNotifications(), cercle: useCercleFeed() }), { wrapper });
+
+      // Commentaire frais => non-lu déterministe, quelle que soit l'heure.
+      await data.create('post_comments', {
+        post_id: 'post-1',
+        household_id: DEMO_HOUSEHOLD_ID,
+        author_id: DEMO_MEMBERS.thomas,
+        content: `Lu à l'ouverture à ${new Date().toISOString()}`,
+        created_at: new Date().toISOString(),
+      });
+      await waitFor(() =>
+        expect(result.current.notifs.items.some((item) => item.id === 'cercle:post-1')).toBe(true),
+      );
+      // Comme cercle-page.tsx : marquage direct au feed, sans markItem.
+      await act(async () => {
+        result.current.cercle.markPostRead('post-1');
+      });
+      await waitFor(() =>
+        expect(result.current.notifs.items.some((item) => item.id === 'cercle:post-1')).toBe(false),
+      );
+      await waitFor(() =>
+        expect(result.current.notifs.recentRead.some((item) => item.id === 'cercle:post-1')).toBe(false),
+      );
+      const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+      expect(Object.keys(masked)).toContain('cercle:post-1');
+    } finally {
+      useSessionStore.setState({ user: null, status: 'guest' });
+    }
+  });
+
+  it('une activité fraîche sur un fil masqué le réaffiche avec pastille', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() =>
+      expect(result.current.items.some((item) => item.id === 'message:conversation-2')).toBe(true),
+    );
+    const row = result.current.items.find((item) => item.id === 'message:conversation-2');
+    await act(async () => {
+      result.current.markItem(row!);
+    });
+    await waitFor(() =>
+      expect(result.current.items.some((item) => item.id === 'message:conversation-2')).toBe(false),
+    );
+    await waitFor(() =>
+      expect(result.current.recentRead.some((item) => item.id === 'message:conversation-2')).toBe(false),
+    );
+
+    // Nouveau message dans le fil masqué : démasquage, pastille, extrait.
+    const body = `Le pain est chaud à ${new Date().toISOString()}`;
+    await data.create('messages', {
+      conversation_id: 'conversation-2',
+      household_id: DEMO_HOUSEHOLD_ID,
+      sender_id: DEMO_MEMBERS.thomas,
+      content: body,
+      created_at: new Date().toISOString(),
+    });
+    await waitFor(() => {
+      const raised = result.current.items.find((item) => item.id === 'message:conversation-2');
+      expect(raised).toBeDefined();
+      expect(raised?.detail).toBe(body);
+    });
+    expect(result.current.messagesUnread).toBeGreaterThan(0);
+    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    expect(Object.keys(masked)).not.toContain('message:conversation-2');
+  });
+
+  it('un masque expiré réaffiche le rappel (horizon jusqu’à demain)', async () => {
+    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem('ensemble-organises-cercle-read');
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const first = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(first.result.current.total).toBeGreaterThan(0));
+    const computed = first.result.current.items.find((item) => !item.markable);
+    expect(computed).toBeDefined();
+    await act(async () => {
+      first.result.current.dismissItem(computed!);
+    });
+    await waitFor(() => expect(first.result.current.items.some((item) => item.id === computed!.id)).toBe(false));
+    first.unmount();
+
+    // Le sursis expire : échéance antidatée, le prochain chargement nettoie.
+    const stored = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    stored[computed!.id] = new Date(Date.now() - 1000).toISOString();
+    localStorage.setItem('eo-notifications-masquees-v1', JSON.stringify(stored));
+    const second = renderHook(() => useNotifications(), { wrapper });
+    await waitFor(() => expect(second.result.current.items.some((item) => item.id === computed!.id)).toBe(true));
   });
 });
