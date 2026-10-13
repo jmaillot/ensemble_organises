@@ -81,7 +81,7 @@ describe('buildTodayItems', () => {
 });
 
 describe('buildTodayItems — régime voyage (15-01)', () => {
-  it('exclut les tâches propres à un voyage, même dues aujourd’hui', () => {
+  it('les tâches de voyage paraissent dans le point du jour (sans être comptées « À faire »)', () => {
     const items = buildTodayItems(
       [
         task({ id: 'foyer', name: 'Foyer', due_date: TODAY }),
@@ -91,6 +91,6 @@ describe('buildTodayItems — régime voyage (15-01)', () => {
       [],
       TODAY,
     );
-    expect(items.map((item) => item.title)).toEqual(['Foyer']);
+    expect(items.map((item) => item.title)).toEqual(['Vol', 'Foyer', 'Valise']);
   });
 });

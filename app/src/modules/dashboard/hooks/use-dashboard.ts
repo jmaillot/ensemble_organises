@@ -351,13 +351,13 @@ function relativeWhen(iso: string) {
  * L'heure et la date des événements sont lues en heure murale (`slice`),
  * comme le calendrier : un `timestamptz` renvoyé avec offset ne doit pas
  * subir une seconde conversion locale (+2h à Paris).
- * Régime 15-01 : les tâches propres à un voyage (`trip_id` renseigné) sont
- * exclues — elles vivent dans la fiche du voyage, pas dans le point du jour.
+ * Les tâches propres à un voyage (`trip_id` renseigné) y PARAISSENT (simple
+ * rappel visuel) : seuls les COMPTEURS « À faire » les excluent (régime
+ * 15-01, module Tâches et widget).
  */
 export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], today: string = todayIso()): TodayItem[] {
   const items: TodayItem[] = [];
   for (const task of taskRows) {
-    if (task.trip_id != null) continue;
     if (task.status === 'fait' || !task.due_date) continue;
     if (task.due_date < today) {
       items.push({
