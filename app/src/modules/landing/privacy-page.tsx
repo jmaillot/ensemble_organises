@@ -1,11 +1,11 @@
 import { Link } from 'react-router';
 
-const EFFECTIVE_DATE = '5 octobre 2026';
+const EFFECTIVE_DATE = '13 octobre 2026';
 const CONTACT_EMAIL = 'jeremymaillot@gmail.com';
 
 /**
  * Politique de confidentialité (RGPD), page publique.
- * Source du texte : version « Dernière mise à jour : 5 octobre 2026 ».
+ * Source du texte : version « Dernière mise à jour : 13 octobre 2026 ».
  * Le même texte est servi sans JavaScript par
  * `app/public/confidentialite/index.html` (vérification OAuth Google) :
  * toute modification ici DOIT être répercutée là-bas, et inversement.
@@ -46,10 +46,28 @@ export default function PrivacyPage() {
             2. Données collectées
           </h2>
           <p className="mt-0 mb-2">
-            <strong>Données de compte.</strong> Lorsque vous vous connectez avec Google ou Facebook, nous
-            recevons uniquement votre adresse e-mail, votre nom et votre photo de profil. Nous n’accédons à aucune
-            autre donnée de vos comptes (contacts, agenda, Drive, Gmail, etc.). Si vous créez un compte avec votre
-            adresse e-mail, nous recevons uniquement cette adresse.
+            <strong>Données de compte.</strong> Lorsque vous choisissez « Continuer avec Google », l’application
+            demande uniquement les trois autorisations d’identification suivantes, et aucune autre :
+          </p>
+          <ul className="mt-0 mb-2 pl-5">
+            <li>
+              <strong>openid</strong> : prouver que la connexion a réussi, sans donnée personnelle ;
+            </li>
+            <li>
+              <strong>email</strong> : recevoir votre adresse e-mail, qui sert d’identifiant unique de votre
+              compte et de moyen de contact (confirmations, réinitialisation du mot de passe) ;
+            </li>
+            <li>
+              <strong>profile</strong> : recevoir votre nom et votre photo de profil, affichés comme avatar
+              dans votre foyer.
+            </li>
+          </ul>
+          <p className="mt-0 mb-2">
+            Nous ne demandons ni n’utilisons aucun autre accès Google : ni Gmail, ni Drive, ni Agenda, ni
+            Contacts, ni YouTube. Nous ne lisons jamais le contenu de vos e-mails, fichiers ou calendriers, et
+            nous n’y accédons tout simplement pas. Avec Facebook, nous recevons uniquement votre nom, votre
+            adresse e-mail et votre photo de profil (autorisations <em>public_profile</em> et <em>email</em>).
+            Si vous créez un compte avec votre adresse e-mail, nous recevons uniquement cette adresse.
           </p>
           <p className="mt-0 mb-2">
             <strong>Contenus que vous ajoutez.</strong> Tâches, listes de courses, événements de calendrier, dépenses
@@ -118,12 +136,21 @@ export default function PrivacyPage() {
           <h2 id="prive-google" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             4. Utilisation des données Google
           </h2>
-          <p className="m-0">
+          <p className="mt-0 mb-2">
             L’utilisation des informations reçues des API Google respecte la Politique relative aux données
-            utilisateur des services d’API Google, y compris les exigences d’utilisation limitée (Limited Use). Les
-            données issues de votre connexion Google (adresse e-mail, nom, photo) servent uniquement à vous identifier
-            et à faire fonctionner l’application. Elles ne sont ni transférées à des tiers, ni utilisées à des fins
-            publicitaires.
+            utilisateur des services d’API Google, y compris les exigences d’utilisation limitée (Limited Use).
+            Concrètement, pour les données issues de votre connexion Google (adresse e-mail, nom, photo) :
+          </p>
+          <ul className="mt-0 mb-2 pl-5">
+            <li>elles servent uniquement à vous identifier et à faire fonctionner l’application ;</li>
+            <li>elles ne sont ni vendues, ni louées, ni transférées à des tiers ;</li>
+            <li>elles ne servent ni à la publicité, ni au profilage, ni à l’entraînement de modèles ;</li>
+            <li>aucune personne ne lit ces données, sauf à votre demande expresse (assistance) ou pour la
+              sécurité du service et le respect de la loi.</li>
+          </ul>
+          <p className="m-0">
+            Lorsque vous supprimez votre compte, ces données sont effacées avec le reste de vos données
+            (voir section 6).
           </p>
         </section>
 
