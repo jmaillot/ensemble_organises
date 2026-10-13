@@ -166,12 +166,17 @@ export function useDashboard(): DashboardData {
     return counts;
   }, [birthdays.rows, events.rows, year]);
 
+  // Phase 15 (régime 15-01, comme le module Tâches) : les lignes propres à
+  // un voyage (`trip_id` renseigné) ne comptent ni dans les tâches ouvertes
+  // ni dans le point du jour — elles vivent dans la fiche du voyage.
+  const householdTasks = useMemo(() => tasks.rows.filter((task) => task.trip_id == null), [tasks.rows]);
+
   const openTasks = useMemo(
     () =>
-      tasks.rows
+      householdTasks
         .filter((task) => task.status !== 'fait')
         .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')),
-    [tasks.rows],
+    [householdTasks],
   );
 
   const todayItems = useMemo(() => buildTodayItems(tasks.rows, events.rows), [tasks.rows, events.rows]);
@@ -346,10 +351,13 @@ function relativeWhen(iso: string) {
  * L'heure et la date des événements sont lues en heure murale (`slice`),
  * comme le calendrier : un `timestamptz` renvoyé avec offset ne doit pas
  * subir une seconde conversion locale (+2h à Paris).
+ * Régime 15-01 : les tâches propres à un voyage (`trip_id` renseigné) sont
+ * exclues — elles vivent dans la fiche du voyage, pas dans le point du jour.
  */
 export function buildTodayItems(taskRows: TaskRow[], eventRows: EventRow[], today: string = todayIso()): TodayItem[] {
   const items: TodayItem[] = [];
   for (const task of taskRows) {
+    if (task.trip_id != null) continue;
     if (task.status === 'fait' || !task.due_date) continue;
     if (task.due_date < today) {
       items.push({

@@ -370,3 +370,32 @@ describe('centre de notifications', () => {
     await waitFor(() => expect(second.result.current.items.some((item) => item.id === computed!.id)).toBe(true));
   });
 });
+
+describe('centre de notifications — régime voyage (15-01)', () => {
+  it('les tâches d’un voyage ne remontent pas dans les restes', async () => {
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    await data.create('tasks', {
+      id: 'task-voyage-notif',
+      household_id: DEMO_HOUSEHOLD_ID,
+      trip_id: 'trip-1',
+      name: 'Valise du voyage lointain',
+      description: null,
+      due_date: '2027-04-10',
+      priority_order: 99,
+      status: 'a_faire',
+      folder_id: null,
+      created_by: DEMO_MEMBERS.camille,
+      created_at: new Date().toISOString(),
+    } as never);
+    try {
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      const titles = result.current.items.map((item) => item.title);
+      expect(titles).not.toContain('Valise du voyage lointain');
+    } finally {
+      await data.remove('tasks', 'task-voyage-notif').catch(() => undefined);
+    }
+  });
+});

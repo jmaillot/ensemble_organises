@@ -79,3 +79,18 @@ describe('buildTodayItems', () => {
     expect(buildTodayItems([], [event({ start_at: '2026-10-01T10:00:00' })], TODAY)).toEqual([]);
   });
 });
+
+describe('buildTodayItems — régime voyage (15-01)', () => {
+  it('exclut les tâches propres à un voyage, même dues aujourd’hui', () => {
+    const items = buildTodayItems(
+      [
+        task({ id: 'foyer', name: 'Foyer', due_date: TODAY }),
+        task({ id: 'voyage', name: 'Valise', due_date: TODAY, trip_id: 'trip-1' }),
+        task({ id: 'retard-voyage', name: 'Vol', due_date: '2026-09-29', trip_id: 'trip-1' }),
+      ],
+      [],
+      TODAY,
+    );
+    expect(items.map((item) => item.title)).toEqual(['Foyer']);
+  });
+});

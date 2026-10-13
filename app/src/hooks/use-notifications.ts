@@ -247,7 +247,10 @@ export function useNotifications(): NotificationsSummary {
     }
 
     if (showTasks) {
+      // Régime 15-01 (comme le module Tâches et le tableau de bord) : les
+      // tâches propres à un voyage vivent dans sa fiche, pas dans les restes.
       const open = tasksResource.rows
+        .filter((row) => row.trip_id == null)
         .map((row) => toTask(row))
         .filter((task) => task.status !== 'fait' && task.dueDate !== null)
         .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
