@@ -58,11 +58,8 @@ export default function LandingPage() {
                   Commencer avec Google
                 </Link>
               </Button>
-              <Button asChild variant="quiet" className="w-full max-[650px]:w-auto">
-                <Link to="/connexion">
-                  Continuer avec un email
-                  <Icon name="chevronRight" size="sm" />
-                </Link>
+              <Button asChild variant="secondary">
+                <Link to="/connexion">Continuer avec un email</Link>
               </Button>
             </div>
             <div className="mt-7 flex items-center gap-3">
