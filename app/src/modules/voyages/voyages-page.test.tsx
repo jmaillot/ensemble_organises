@@ -90,9 +90,12 @@ describe('Voyages', () => {
       expect(screen.getByText('tâches du voyage à préparer').previousSibling).toHaveTextContent('2');
     });
     expect(screen.getByText('membres du foyer').previousSibling).toHaveTextContent('5');
-    // Chaque voyage de la liste ordonnée par départ ouvre sa fiche.
+    // Chaque voyage de la liste ordonnée par départ ouvre sa fiche (boutons
+    // par carte, sans rangée redondante sous la liste).
     expect(screen.getAllByRole('link', { name: 'Ouvrir' }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('link', { name: 'Ouvrir la fiche du voyage' })).toHaveAttribute('href', '/voyages/trip-1');
+    expect(screen.getAllByRole('link', { name: 'Ouvrir' })[0]).toHaveAttribute('href', '/voyages/trip-1');
+    expect(screen.queryByRole('link', { name: 'Ouvrir la fiche du voyage' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modifier ce voyage' })).not.toBeInTheDocument();
   });
 
   it('crée un voyage depuis le dialogue et le fait apparaître', async () => {
@@ -126,8 +129,8 @@ describe('Voyages', () => {
     // Aucun affordance de suppression : ni sur le héros, ni ailleurs.
     expect(screen.queryByRole('button', { name: 'Supprimer ce voyage' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Supprimer le voyage/ })).not.toBeInTheDocument();
-    // La modification reste offerte : seul le delete est admin-only.
-    expect(screen.getByRole('button', { name: 'Modifier ce voyage' })).toBeInTheDocument();
+    // La modification reste offerte sur chaque carte : seul le delete est admin-only.
+    expect(screen.getAllByRole('button', { name: 'Modifier' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('ne propose plus de statut et exige les dates comme la base', async () => {

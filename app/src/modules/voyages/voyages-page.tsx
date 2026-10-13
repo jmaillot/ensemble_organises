@@ -227,15 +227,6 @@ export default function VoyagesPage() {
               </div>
             </section>
           ) : null}
-
-          <div className="mt-[18px] flex flex-wrap gap-2">
-            <Button asChild variant="secondary" icon="arrow">
-              <Link to={`/voyages/${trip.id}`}>Ouvrir la fiche du voyage</Link>
-            </Button>
-            <Button variant="secondary" icon="edit" onClick={() => openEdit(trip)}>
-              Modifier ce voyage
-            </Button>
-          </div>
         </>
       )}
 
