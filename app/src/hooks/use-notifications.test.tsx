@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { act, configure, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/toast';
@@ -12,6 +12,11 @@ import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { useNotifications } from './use-notifications';
 
+// Fichier temps réel (émission → invalidation → relecture Dexie) : sur
+// machine chargée (suite complète), le délai d'1s des `waitFor` est trop
+// court et fait flaker. 8s absorbe les pics sans masquer un vrai blocage.
+configure({ asyncUtilTimeout: 8000 });
+
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={createTestQueryClient()}>
@@ -21,6 +26,20 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe('centre de notifications', () => {
+  // Horloge relative (anti-flake heure-du-jour) : les graines à heures fixes
+  // (09:18, 18:10) inversaient les assertions le soir. message-4 reste un
+  // vieux non-lu soldable, message-5 reste postérieur à tout marquage.
+  beforeEach(async () => {
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    await adapter
+      .update('messages', 'message-4', { created_at: new Date(Date.now() - 2 * 3600_000).toISOString() } as never)
+      .catch(() => undefined);
+    await adapter
+      .update('messages', 'message-5', { created_at: new Date(Date.now() + 2 * 3600_000).toISOString() } as never)
+      .catch(() => undefined);
+  });
+
   it('agrège non lus et restes à faire, puis solde les marquables', async () => {
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
