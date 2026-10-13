@@ -81,7 +81,10 @@ export default function CerclePage() {
                   onSubmitComment={addComment}
                   onUpdateComment={(commentId, content) => updateComment(commentId, content)}
                   onDeleteComment={(commentId) => deleteComment(commentId)}
-                  onSelect={() => setActivePostId(post.id)}
+                  onSelect={() => {
+                    setActivePostId(post.id);
+                    markPostRead(post.id);
+                  }}
                   onToggleReaction={() => void toggleReaction(post.id)}
                   onOpenComments={() => {
                     setActivePostId(post.id);

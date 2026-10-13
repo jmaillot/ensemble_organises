@@ -178,7 +178,7 @@ export function useNotifications(): NotificationsSummary {
       if (conversation.unread > 0) ids.push(`message:${conversation.id}`);
     }
     for (const post of cercle.feed) {
-      if (post.unreadComments > 0) ids.push(`cercle:${post.id}`);
+      if (post.unreadComments > 0 || post.isNew) ids.push(`cercle:${post.id}`);
     }
     return ids.sort().join('\n');
   }, [cercle.feed, feed.conversations]);
@@ -230,15 +230,18 @@ export function useNotifications(): NotificationsSummary {
       }
     }
 
+    // Fils inédits compris (UAT phase 9) : un nouveau fil sans commentaire
+    // a 0 commentaire non lu mais doit surface comme les autres non-lus.
+    // `markPostRead` à l'ouverture éteint `isNew` comme les commentaires.
     for (const post of cercle.feed) {
-      if (post.unreadComments === 0) continue;
+      if (post.unreadComments === 0 && !post.isNew) continue;
       const latest = [...post.comments].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
       list.push({
         id: `cercle:${post.id}`,
         ref: post.id,
         kind: 'cercle',
         title: post.author?.display_name ?? 'Cercle',
-        detail: latest ? latest.content : null,
+        detail: latest ? latest.content : post.text,
         at: latest?.createdAt ?? post.createdAt,
         href: KIND_META.cercle.href,
         markable: true,
@@ -379,7 +382,7 @@ export function useNotifications(): NotificationsSummary {
       if (conversation.unread > 0) feed.markRead(conversation.id);
     }
     for (const post of cercle.feed) {
-      if (post.unreadComments > 0) cercle.markPostRead(post.id);
+      if (post.unreadComments > 0 || post.isNew) cercle.markPostRead(post.id);
     }
   };
 

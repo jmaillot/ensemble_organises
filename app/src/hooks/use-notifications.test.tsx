@@ -418,3 +418,30 @@ describe('centre de notifications — régime voyage (15-01)', () => {
     }
   });
 });
+
+describe('centre de notifications — fils inédits (UAT phase 9)', () => {
+  it('un nouveau fil sans commentaire surface avec son texte, puis se solde', async () => {
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    const body = `Fil inédit à ${new Date().toISOString()}`;
+    const created = (await data.create('posts', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      author_id: DEMO_MEMBERS.thomas,
+      text: body,
+      created_at: new Date().toISOString(),
+    } as never)) as unknown as { id: string };
+    try {
+      await waitFor(() => expect(result.current.items.some((item) => item.id === `cercle:${created.id}`)).toBe(true));
+      const row = result.current.items.find((item) => item.id === `cercle:${created.id}`);
+      expect(row?.detail).toBe(body);
+      await act(async () => {
+        result.current.markItem(row!);
+      });
+      await waitFor(() => expect(result.current.items.some((item) => item.id === `cercle:${created.id}`)).toBe(false));
+    } finally {
+      await data.remove('posts', created.id).catch(() => undefined);
+    }
+  });
+});

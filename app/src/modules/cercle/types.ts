@@ -52,6 +52,8 @@ export interface FeedPost {
   liked: boolean;
   unreadComments: number;
   mine: boolean;
+  /** Fil inédit d'un autre membre, jamais ouvert (0 commentaire possible). */
+  isNew: boolean;
 }
 
 export interface PublishInput {
@@ -90,7 +92,7 @@ export function toPostReaction(row: PostReactionRow): PostReaction {
   return { id: row.id, postId: row.post_id, authorId: row.author_id, type: row.reaction_type };
 }
 
-export function toPost(row: PostRow): Omit<FeedPost, 'author' | 'media' | 'comments' | 'commentCount' | 'reactionCount' | 'liked' | 'unreadComments'> {
+export function toPost(row: PostRow): Omit<FeedPost, 'author' | 'media' | 'comments' | 'commentCount' | 'reactionCount' | 'liked' | 'unreadComments' | 'isNew'> {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -160,6 +162,7 @@ export function composeFeed({ posts, media, comments, reactions, members, curren
           (comment) => comment.authorId !== currentMemberId && isUnseen(comment.createdAt, readAt(row.id)),
         ).length,
         mine: row.author_id === currentMemberId,
+        isNew: row.author_id !== currentMemberId && isUnseen(row.created_at, readAt(row.id)),
       };
     });
 }

@@ -262,6 +262,7 @@ describe('Cercle', () => {
       liked: false,
       unreadComments: 0,
       mine: false,
+        isNew: false,
     };
     const noop = () => {};
 
@@ -329,6 +330,7 @@ describe('Cercle', () => {
           liked: false,
           unreadComments: 0,
           mine: false,
+        isNew: false,
         }}
         open
         currentMemberId={DEMO_MEMBERS.thomas}
@@ -476,6 +478,7 @@ describe('Cercle', () => {
       liked: false,
       unreadComments: 0,
       mine: false,
+        isNew: false,
     };
     renderWithProviders(
       <PostCard
