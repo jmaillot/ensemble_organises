@@ -353,6 +353,51 @@ export async function leaveTrip(tripId: string): Promise<void> {
   await callTripInvite('member-leave', { tripId });
 }
 
+/* ------------------------------------------------------------------ */
+/* Rubrique Membres (0120) : cochage par les admins du foyer seuls.    */
+/*                                                                     */
+/* En ligne : Edge `member-add` / `member-remove` (RPC 0120, admin     */
+/* seul, jamais le dernier). En démo : mêmes lignes rejouées en local */
+/* (voyage + miroir ardoise adultes seuls, comme `createTripFlow`).    */
+/* ------------------------------------------------------------------ */
+
+/** Coche un membre du foyer comme participant (idempotent, admin seul en ligne). */
+export async function addTripMember(tripId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    await callTripInvite('member-add', { tripId, memberId });
+    return;
+  }
+  const existing = await data.list<{ member_id: string }>('trip_members', { trip_id: tripId });
+  if (existing.some((entry) => entry.member_id === memberId)) return;
+  await data.create('trip_members', { trip_id: tripId, member_id: memberId });
+  const role = (await data.list<{ id: string; role: string }>('household_members', { id: memberId }))[0]?.role;
+  if (role === 'admin' || role === 'membre') {
+    const ardoises = await data.list<{ id: string }>('ardoises', { trip_id: tripId }).catch(() => []);
+    const ardoiseId = ardoises[0]?.id;
+    if (ardoiseId) {
+      await data.create('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }).catch(() => undefined);
+    }
+  }
+}
+
+/** Décoche un participant (admin seul en ligne, jamais le dernier — garde RPC). */
+export async function removeTripMember(tripId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    await callTripInvite('member-remove', { tripId, memberId });
+    return;
+  }
+  const remaining = (await data.list<{ member_id: string }>('trip_members', { trip_id: tripId })).filter(
+    (entry) => entry.member_id !== memberId,
+  );
+  if (remaining.length === 0) throw new Error('Le voyage garde au moins un participant.');
+  await data.removeWhere('trip_members', { trip_id: tripId, member_id: memberId });
+  const ardoises = await data.list<{ id: string }>('ardoises', { trip_id: tripId }).catch(() => []);
+  const ardoiseId = ardoises[0]?.id;
+  if (ardoiseId) {
+    await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }).catch(() => undefined);
+  }
+}
+
 /**
  * Fermeture douce (D-08) : fige sans détruire, via l'Edge `close` (jamais en
  * PostgREST direct — le trigger serveur refuse `is_closed` au client).

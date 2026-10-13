@@ -4,7 +4,8 @@
  * Point d'entrée : `POST /functions/v1/trip-invite`
  * Corps : `{ action: 'create-trip' | 'create' | 'revoke' | 'summary' |
  *           'join' | 'redeem-guest' | 'guest-view' | 'link-view' |
- *           'member-leave' | 'close' | 'reopen' |
+ *           'member-leave' | 'member-add' | 'member-remove' |
+ *           'close' | 'reopen' |
  *           'guest-expense-create', ... }`
  *
  * Copie le byte-motif de `ardoise-invite` / `gift-list-invite` (jamais un
@@ -15,7 +16,8 @@
  *   `auth: ['user', 'publishable']`
  *   * `user`        → session utilisateur. Seul mode qui exécute
  *                     `create-trip`, `create`, `revoke`, `summary`, `join`,
- *                     `member-leave`, `close` et `reopen`.
+ *                     `member-leave`, `member-add`, `member-remove`,
+ *                     `close` et `reopen`.
  *   * `publishable` → accepté par la passerelle, mais REFUSÉ ici avec 401
  *                     SANS valider le code, SAUF pour `redeem-guest`,
  *                     `guest-view`, `link-view` et `guest-expense-create` :
@@ -53,6 +55,8 @@
  *   guest-view  -> { trip, guest } (ticket vérifié, sans conso use_count)
  *   link-view   -> { trip, guest: null } (code vérifié, sans conso use_count)
  *   member-leave -> { trip_id, left }
+ *   member-add -> { trip_id, member_id, already_member }
+ *   member-remove -> { trip_id, member_id, removed }
  *   close        -> { trip_id, is_closed: true } (fige, D-08)
  *   reopen       -> { trip_id, is_closed: false } (admin du foyer seul, D-08)
  *   guest-expense-create -> dépense (ligne `expenses` de l'ardoise liée)
@@ -200,6 +204,20 @@ const requestSchema = z.discriminatedUnion('action', [
     tripId: tripField,
   }),
   z.object({
+    action: z.literal('member-add'),
+    /** Voyage concerné : le membre coché doit appartenir au même foyer. */
+    tripId: tripField,
+    /** Membre du foyer à inscrire (admin du foyer seul, RPC `trip_add_member`). */
+    memberId: tripField,
+  }),
+  z.object({
+    action: z.literal('member-remove'),
+    /** Voyage concerné : jamais le dernier participant (garde RPC). */
+    tripId: tripField,
+    /** Membre à retirer (admin du foyer seul, RPC `trip_remove_member`). */
+    memberId: tripField,
+  }),
+  z.object({
     action: z.literal('close'),
     /** Voyage à figer (D-08) : participant écrivain OU admin, RPC `trip_close`. */
     tripId: tripField,
@@ -297,6 +315,8 @@ const LIMITS: Record<string, number> = {
   'guest-view': 30,
   'link-view': 30,
   'member-leave': 10,
+  'member-add': 20,
+  'member-remove': 20,
   close: 10,
   reopen: 10,
   'guest-expense-create': 20,
@@ -362,6 +382,15 @@ function translateRpcError(error: { code?: string; message: string }): TripInvit
   }
   if (message.includes('quitter impossible')) {
     return new TripInviteError(404, 'Ce lien ne passe plus. Demandez un nouveau lien pour rejoindre à nouveau.');
+  }
+  if (message.includes('membre du foyer introuvable')) {
+    return new TripInviteError(404, 'Membre du foyer introuvable.');
+  }
+  if (message.includes('participation introuvable')) {
+    return new TripInviteError(404, 'Ce membre ne participe pas à ce voyage.');
+  }
+  if (message.includes('le voyage garde au moins un participant')) {
+    return new TripInviteError(400, 'Le voyage garde au moins un participant.');
   }
   if (message.includes('voyage introuvable')) return new TripInviteError(404, 'Voyage introuvable.');
   if (message.includes('gestion du voyage réservée') || error.code === '42501') {
@@ -613,6 +642,35 @@ async function handleMemberLeave(admin: AdminClient, userId: string, body: Reque
 }
 
 /**
+ * Gestion des participants par les admins du foyer (0120, section
+ * Paramètres) : le RPC tranche (admin seul, même foyer, jamais le
+ * dernier) ; le refus enfant `manage` précède, comme les autres gestions.
+ */
+async function handleMemberAdd(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-add' }) {
+  await refuseEnfant(admin, userId, await tripHousehold(admin, body.tripId), 'manage');
+  const { data, error } = await admin.rpc('trip_add_member', {
+    p_actor_id: userId,
+    p_trip_id: body.tripId,
+    p_member_id: body.memberId,
+  });
+
+  if (error) throw translateRpcError(error);
+  return json((data ?? {}) as { trip_id?: string; member_id?: string; already_member?: boolean });
+}
+
+async function handleMemberRemove(admin: AdminClient, userId: string, body: RequestBody & { action: 'member-remove' }) {
+  await refuseEnfant(admin, userId, await tripHousehold(admin, body.tripId), 'manage');
+  const { data, error } = await admin.rpc('trip_remove_member', {
+    p_actor_id: userId,
+    p_trip_id: body.tripId,
+    p_member_id: body.memberId,
+  });
+
+  if (error) throw translateRpcError(error);
+  return json((data ?? {}) as { trip_id?: string; member_id?: string; removed?: boolean });
+}
+
+/**
  * Fermeture douce (D-08, 15-02) : fige sans détruire, rouvrable admin.
  * Même régime que `member-leave` (refus enfant `manage`, RPC serveur seul,
  * erreurs déjà traduites : `voyage introuvable` → 404, `gestion du voyage
@@ -804,6 +862,8 @@ Deno.serve(
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);
       if (body.action === 'summary') return await handleSummary(admin, userId, body);
       if (body.action === 'member-leave') return await handleMemberLeave(admin, userId, body);
+      if (body.action === 'member-add') return await handleMemberAdd(admin, userId, body);
+      if (body.action === 'member-remove') return await handleMemberRemove(admin, userId, body);
       if (body.action === 'close') return await handleClose(admin, userId, body);
       if (body.action === 'reopen') return await handleReopen(admin, userId, body);
       return await handleJoin(admin, ctx.supabase, userId, body);

@@ -10,6 +10,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { formatEuro } from '@/lib/utils';
 import { useTripDetail, type TripDetailState } from './hooks/use-trip-detail';
 import { TripFormDialog } from './components/trip-form-dialog';
+import { TripMembersSection } from './components/trip-members-section';
 import { TripShareDialog } from './components/trip-share-dialog';
 import { TripTasksTab } from './components/trip-tasks-tab';
 import { TripCoursesTab } from './components/trip-courses-tab';
@@ -259,52 +260,63 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
 
   if (readOnly) {
     return (
-      <Panel
-        id="trip-parametres"
-        title="Paramètres"
-        description="Vue de modération : ce voyage ne vous attend pas comme participant."
-      >
-        <p className="m-0 text-[13px] text-muted">
-          Édition, rubriques, fermeture et départ sont réservés aux participants ; le partage par code et la
-          réouverture d’un voyage figé restent possibles ci-dessous pour les administrateurs.
-        </p>
-        {!frozen && isAdmin ? (
-          <div className="mt-3">
-            <Button variant="secondary" icon="share" onClick={() => setShareOpen(true)}>
-              Partager le voyage
-            </Button>
-          </div>
-        ) : null}
-        {frozen && isAdmin ? (
-          <div className="mt-3">
-            <Button
-              variant="secondary"
-              icon="check"
-              disabled={acting}
-              onClick={() => {
-                setActing(true);
-                reopenTrip(detail.tripId as string)
-                  .then(() => {
-                    toast('Voyage rouvert.', 'success');
-                    detail.refetch();
-                  })
-                  .catch((reopenError: unknown) =>
-                    toast(reopenError instanceof Error ? reopenError.message : 'Réouverture impossible.', 'error'),
-                  )
-                  .finally(() => setActing(false));
-              }}
-            >
-              {acting ? 'Réouverture…' : 'Rouvrir le voyage'}
-            </Button>
-          </div>
-        ) : null}
-        <TripShareDialog
-          open={shareOpen}
-          onOpenChange={setShareOpen}
-          tripId={detail.tripId}
-          tripName={trip.name}
+      <div className="grid gap-3.5">
+        <Panel
+          id="trip-parametres"
+          title="Paramètres"
+          description="Vue de modération : ce voyage ne vous attend pas comme participant."
+        >
+          <p className="m-0 text-[13px] text-muted">
+            Édition, rubriques, fermeture et départ sont réservés aux participants ; la liste des membres, le
+            partage par code et la réouverture d’un voyage figé restent possibles ci-dessous pour les
+            administrateurs.
+          </p>
+          {!frozen && isAdmin ? (
+            <div className="mt-3">
+              <Button variant="secondary" icon="share" onClick={() => setShareOpen(true)}>
+                Partager le voyage
+              </Button>
+            </div>
+          ) : null}
+          {frozen && isAdmin ? (
+            <div className="mt-3">
+              <Button
+                variant="secondary"
+                icon="check"
+                disabled={acting}
+                onClick={() => {
+                  setActing(true);
+                  reopenTrip(detail.tripId as string)
+                    .then(() => {
+                      toast('Voyage rouvert.', 'success');
+                      detail.refetch();
+                    })
+                    .catch((reopenError: unknown) =>
+                      toast(reopenError instanceof Error ? reopenError.message : 'Réouverture impossible.', 'error'),
+                    )
+                    .finally(() => setActing(false));
+                }}
+              >
+                {acting ? 'Réouverture…' : 'Rouvrir le voyage'}
+              </Button>
+            </div>
+          ) : null}
+          <TripShareDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            tripId={detail.tripId}
+            tripName={trip.name}
+          />
+        </Panel>
+        <TripMembersSection
+          tripId={detail.tripId as string}
+          participantIds={detail.participantMembers.map((member) => member.id)}
+          guests={detail.guests}
+          canManage={isAdmin && !frozen}
+          frozen={frozen}
+          onChanged={detail.refetch}
         />
-      </Panel>
+      </div>
     );
   }
 
@@ -428,6 +440,15 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
           </div>
         )}
       </Panel>
+
+      <TripMembersSection
+        tripId={detail.tripId as string}
+        participantIds={detail.participantMembers.map((member) => member.id)}
+        guests={detail.guests}
+        canManage={isAdmin && !frozen}
+        frozen={frozen}
+        onChanged={detail.refetch}
+      />
 
       <Panel
         id="trip-parametres-lifecycle"
