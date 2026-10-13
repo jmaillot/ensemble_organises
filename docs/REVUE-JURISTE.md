@@ -7,7 +7,7 @@ Date : 5 octobre 2026. Documents à relire :
 ## Contexte technique (constaté, pas supposé)
 
 - PWA familiale, pas de publicité, pas de revente de données, pas de traceurs.
-- Authentification : Google / Facebook SSO (nom + e-mail uniquement) ou e-mail + mot de passe.
+- Authentification : Google SSO (nom + e-mail uniquement) ou e-mail + mot de passe.
 - Hébergement : base et auth auto-hébergées (Supabase), serveurs situés en France / Union européenne (Oracle OCI,
   formulation prudente retenue). Notifications push envoyées par notre propre serveur (pas de prestataire tiers).
 - Mineurs : pas d'inscription directe avant 15 ans ; profils « enfant » créés et gérés par un parent depuis son
@@ -35,7 +35,7 @@ Date : 5 octobre 2026. Documents à relire :
    opposable, notamment pour les invités d'ardoise en lecture seule sans compte ?
 6. **Prospection et preuve du consentement notifications** : le consentement navigateur/appareil suffit-il, et
    faut-il journaliser les acceptations CGU/politique (horodatage) au-delà de l'attestation d'âge ?
-7. **Transferts hors UE** : le SSO Google/Facebook implique un transfert nom + e-mail vers les États-Unis à la
+7. **Transferts hors UE** : le SSO Google implique un transfert nom + e-mail vers les États-Unis à la
    connexion — la mention actuelle suffit-elle, ou faut-il détailler base légale et garanties ?
 
 ## Questions ouvertes au juriste

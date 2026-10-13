@@ -64,7 +64,7 @@ export default function TermsPage() {
               l’accès au service reste bloqué tant qu’elle n’est pas confirmée.
             </li>
             <li>
-              <strong>Connexion :</strong> via Google, Facebook ou e-mail et mot de passe. Vous êtes responsable de
+              <strong>Connexion :</strong> via Google ou e-mail et mot de passe. Vous êtes responsable de
               la confidentialité de vos identifiants.
             </li>
             <li>

@@ -155,11 +155,11 @@ export function useAuthBootstrap() {
   return ready;
 }
 
-export async function signInWithProvider(provider: 'google' | 'facebook') {
+export async function signInWithProvider(provider: 'google') {
   if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: `${window.location.origin}/accueil`, scopes: provider === 'facebook' ? 'email,public_profile' : undefined },
+    options: { redirectTo: `${window.location.origin}/accueil` },
   });
   if (error) throw error;
 }
@@ -174,7 +174,7 @@ export async function signInWithProvider(provider: 'google' | 'facebook') {
  * seconde identité au même `auth.users`, et les deux connexions mènent ensuite
  * au même profil. Requiert « Enable Manual Linking » côté Auth.
  */
-export type OAuthProvider = 'google' | 'facebook';
+export type OAuthProvider = 'google';
 
 export interface LinkedIdentity {
   provider: string;
@@ -193,14 +193,13 @@ export async function getLinkedIdentities(): Promise<LinkedIdentity[]> {
   }));
 }
 
-/** Lie Google/Facebook au compte connecté (redirection OAuth, comme à la connexion). */
+/** Lie Google au compte connecté (redirection OAuth, comme à la connexion). */
 export async function linkOAuthProvider(provider: OAuthProvider) {
   if (!supabase) throw new Error('Supabase n’est pas configuré sur cet environnement.');
   const { error } = await supabase.auth.linkIdentity({
     provider,
     options: {
       redirectTo: `${window.location.origin}/parametres`,
-      scopes: provider === 'facebook' ? 'email,public_profile' : undefined,
     },
   });
   if (error) throw error;

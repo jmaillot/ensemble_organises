@@ -13,7 +13,7 @@ export interface SessionUser {
   email: string;
   displayName: string;
   avatarUrl: string | null;
-  provider: 'google' | 'facebook' | 'email';
+  provider: 'google' | 'email';
 }
 
 export type SessionStatus = 'initialising' | 'guest' | 'authenticated';

@@ -7,10 +7,9 @@ import SignInPage from './sign-in-page';
 import WelcomePage from './welcome-page';
 
 describe('LandingPage', () => {
-  it('présente les trois chemins de connexion de l’onboarding (AGENTS.md §4)', () => {
+  it('présente les deux chemins de connexion de l’onboarding (AGENTS.md §4)', () => {
     renderWithProviders(<LandingPage />, { withHousehold: false });
     expect(screen.getByRole('link', { name: 'Commencer avec Google' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Continuer avec Facebook' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Continuer avec un email' })).toBeInTheDocument();
   });
 

@@ -78,12 +78,11 @@ Contraintes liées à l'auto-hébergement :
 
 ### 2.5 Authentification
 
-**Supabase Auth auto-hébergé** gère l'email/mot de passe et l'OAuth (Google, Facebook) sans développer de couche d'authentification maison.
+**Supabase Auth auto-hébergé** gère l'email/mot de passe et l'OAuth Google sans développer de couche d'authentification maison. Facebook a été retiré le 2026-10-13 (friction Meta : Business Suite, compte développeur par testeur) : Google + e-mail uniquement.
 
 - **Google SSO** : renseigner `GOOGLE_ENABLED`, `GOOGLE_CLIENT_ID` et `GOOGLE_SECRET`, puis les injecter dans le service Auth avec le préfixe `GOTRUE_EXTERNAL_GOOGLE_*`. Callback : `https://api.votredomaine.fr/auth/v1/callback`.
-- **Facebook SSO** : même principe avec `FACEBOOK_*` et `GOTRUE_EXTERNAL_FACEBOOK_*`; demander les permissions `public_profile` et `email`.
 - Fallback **email / mot de passe** conservé ; un service SMTP de production est obligatoire pour les confirmations et les réinitialisations.
-- Côté frontend, utiliser deux appels explicites : `supabase.auth.signInWithOAuth({ provider: 'google' })` et `supabase.auth.signInWithOAuth({ provider: 'facebook' })`.
+- Côté frontend, un seul appel OAuth : `supabase.auth.signInWithOAuth({ provider: 'google' })`.
 - Un enregistrement `profiles` (`id = user_id`, `email`, `display_name`, `avatar_url`, `provider`) est créé à la première connexion par un trigger `SECURITY DEFINER` sur `auth.users`, avec `search_path` fixe, privilèges restreints et `upsert` idempotent.
 - Utiliser uniquement la clé publiable `SUPABASE_PUBLISHABLE_KEY` dans le frontend. La clé secrète `SUPABASE_SECRET_KEY` reste exclusivement dans les services serveur/Edge Functions.
 
@@ -392,7 +391,7 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 
 ## 4. Flux d'onboarding (landing page → tableau de bord)
 
-1. **Landing page** : présentation courte de l'app + boutons "Continuer avec Google", "Continuer avec Facebook", et un lien "Continuer avec un email" en option secondaire.
+1. **Landing page** : présentation courte de l'app + bouton "Continuer avec Google", et un lien "Continuer avec un email" en option secondaire.
 2. **Après connexion réussie**, l'app vérifie si l'utilisateur est déjà membre d'au moins un foyer (`household_members` où `user_id = utilisateur courant`) :
    - **Si oui** → direction vers le tableau de bord du foyer (ou un sélecteur de foyer si l'utilisateur en a plusieurs).
    - **Si non** → écran de choix à deux options claires, sans étape intermédiaire inutile :
@@ -415,7 +414,7 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 > **Cette section est une carte fonctionnelle non exhaustive, pas un schéma SQL exécutable.** Les migrations sous `supabase/migrations` font foi. Dans chaque migration, chaque table doit déclarer explicitement sa clé primaire ou sa contrainte composite, son rattachement au foyer et ses champs d'audit; aucune colonne n'est présumée implicite. Les tables métier racines portent `id` (uuid) et `household_id`, sauf `profiles` (globale), `households` (racine du tenant) et les tables personnelles explicitement listées. Les tables d'association portent leurs clés parentes (`task_id`, `routine_id`, `expense_id`, etc.) et dérivent leur accès du foyer via leur parent. Toute dénormalisation de `household_id` doit être justifiée, contrainte et couverte par la RLS.
 
 ### Foyer & membres
-- `profiles` (id = user_id Supabase Auth, email, display_name, avatar_url, provider [google/facebook/email])
+- `profiles` (id = user_id Supabase Auth, email, display_name, avatar_url, provider [google/email])
 - `households` (id, name, avatar_color)
 - `household_members` (id, household_id, user_id, display_name, avatar_url, color_tag, role [admin/membre/enfant])
 - `household_invite_tokens` (id, household_id, token_hash, created_by, expires_at nullable, max_uses, use_count, is_active) — `token_hash` est un HMAC-SHA-256 calculé avec un secret dédié `INVITE_TOKEN_HMAC_SECRET`, stocké dans Vault/secret manager et jamais en base; le token brut n'est affiché qu'à sa génération
@@ -525,7 +524,7 @@ Idées spécifiques :
 ## 7. Roadmap suggérée
 
 **Phase 1 — MVP foyer**
-Authentification (SSO Google/Facebook + email), création/rejoindre un foyer par token, Tâches, Courses, Calendrier, Notes, Widgets de base (Calendrier, Tâches, Météo)
+Authentification (SSO Google + email), création/rejoindre un foyer par token, Tâches, Courses, Calendrier, Notes, Widgets de base (Calendrier, Tâches, Météo)
 
 **Phase 2 — Vie quotidienne étendue**
 Routines, Ardoise, Anniversaires, Widget Anniversaires/Routines
@@ -694,10 +693,6 @@ services:
       GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOOGLE_SECRET}
       GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${API_EXTERNAL_URL}/callback
-      GOTRUE_EXTERNAL_FACEBOOK_ENABLED: ${FACEBOOK_ENABLED}
-      GOTRUE_EXTERNAL_FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID}
-      GOTRUE_EXTERNAL_FACEBOOK_SECRET: ${FACEBOOK_SECRET}
-      GOTRUE_EXTERNAL_FACEBOOK_REDIRECT_URI: ${API_EXTERNAL_URL}/callback
 
   studio:
     networks:
@@ -795,10 +790,6 @@ GOOGLE_ENABLED=true
 GOOGLE_CLIENT_ID=...
 GOOGLE_SECRET=...
 
-FACEBOOK_ENABLED=true
-FACEBOOK_CLIENT_ID=...
-FACEBOOK_SECRET=...
-
 SMTP_ADMIN_EMAIL=...
 SMTP_HOST=...
 SMTP_PORT=465
@@ -821,7 +812,7 @@ Contraintes :
 - Générer séparément `INVITE_TOKEN_HMAC_SECRET` avec au moins 256 bits (`openssl rand -base64 48`), le stocker dans Vault/secret manager et l'injecter uniquement dans la fonction serveur qui génère et valide les tokens. Ne jamais réutiliser une clé Supabase pour ce HMAC. Sa rotation invalide tous les tokens actifs.
 - Les variables OAuth sont injectées dans le service `auth` par l'override actif de la section 8.3.
 - `SUPABASE_SECRET_KEY`, `POSTGRES_PASSWORD`, les clés OAuth et SMTP ne doivent jamais être passés comme arguments de build frontend.
-- Dans les consoles OAuth, enregistrer l'origine frontend `https://app.votredomaine.fr` et le callback `https://api.votredomaine.fr/auth/v1/callback`. Pour Facebook, demander `public_profile` et `email`.
+- Dans la console Google, enregistrer l'origine frontend `https://app.votredomaine.fr` et le callback `https://api.votredomaine.fr/auth/v1/callback`.
 - `SITE_URL` pointe vers le frontend ; `API_EXTERNAL_URL` pointe vers la gateway Auth. En production, conserver des URLs de redirection exactes plutôt qu'un glob large.
 - `FUNCTIONS_VERIFY_JWT=false` est nécessaire pour mélanger appels navigateur, utilisateur et cron serveur dans cette stack. Chaque Edge Function doit toutefois utiliser `withSupabase` avec `auth: 'publishable'`, `auth: 'user'`, `auth: 'secret'` ou `auth: 'none'`; une fonction multi-clients accepte un tableau et une fonction `none` vérifie elle-même toute signature entrante.
 - Le CORS global par défaut d'Envoy est volontairement permissif; l'autorisation repose sur la clé API, le JWT et les RLS, pas sur l'origine. Si une allowlist stricte est requise, modifier `volumes/api/envoy/lds.template.yaml` et tester les requêtes OPTIONS avant de personnaliser la configuration.

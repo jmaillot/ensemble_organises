@@ -10,7 +10,7 @@ export type IsoDate = string; // YYYY-MM-DD
 export type IsoDateTime = string; // timestamptz
 
 export type Role = 'admin' | 'membre' | 'enfant';
-export type AuthProvider = 'google' | 'facebook' | 'email';
+export type AuthProvider = 'google' | 'email';
 /** Cadence choisie pour les rappels. Aucun envoi n'en dépend encore : voir §13 du runbook. */
 export type ReminderFrequency = 'immediat' | 'matin' | 'journée' | 'soir';
 

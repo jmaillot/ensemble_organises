@@ -58,9 +58,6 @@ export default function LandingPage() {
                   Commencer avec Google
                 </Link>
               </Button>
-              <Button asChild variant="secondary">
-                <Link to="/connexion">Continuer avec Facebook</Link>
-              </Button>
               <Button asChild variant="quiet" className="w-full max-[650px]:w-auto">
                 <Link to="/connexion">
                   Continuer avec un email

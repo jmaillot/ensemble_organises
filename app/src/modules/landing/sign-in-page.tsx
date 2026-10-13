@@ -89,9 +89,9 @@ export default function SignInPage() {
           </Link>
           <p className="eyebrow mb-2">Connexion</p>
           <h2 className="mb-2 text-[clamp(24px,2.6vw,32px)] leading-[1.08]">Ravi de vous revoir</h2>
-          <p className="lede mb-6 text-[13px]">Utilisez votre compte Google, Facebook, ou votre adresse e-mail.</p>
+          <p className="lede mb-6 text-[13px]">Utilisez votre compte Google ou votre adresse e-mail.</p>
           <p className="mb-5 text-[11px] text-muted">
-            Déjà un compte e-mail ? Connectez-vous avec, puis liez Google ou Facebook depuis Paramètres → Profil :
+            Déjà un compte e-mail ? Connectez-vous avec, puis liez Google depuis Paramètres → Profil :
             les deux connexions mèneront au même foyer.
           </p>
 
@@ -99,10 +99,6 @@ export default function SignInPage() {
             <Button variant="secondary" disabled={pending !== null} onClick={() => run('google', () => signInWithProvider('google'))}>
               <BrandMark initial="G" />
               {pending === 'google' ? 'Redirection en cours…' : 'Continuer avec Google'}
-            </Button>
-            <Button variant="secondary" disabled={pending !== null} onClick={() => run('facebook', () => signInWithProvider('facebook'))}>
-              <BrandMark initial="f" />
-              {pending === 'facebook' ? 'Redirection en cours…' : 'Continuer avec Facebook'}
             </Button>
           </div>
 

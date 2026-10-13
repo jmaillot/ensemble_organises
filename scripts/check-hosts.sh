@@ -232,7 +232,7 @@ if [ -n "$site_url" ]; then
     done
     if [ "$found" -eq 1 ]; then
       note_error "ADDITIONAL_REDIRECT_URLS ne contient pas $site_url"
-      echo "      Sans cette origine, le SSO Google et Facebook sera refusé."
+      echo "      Sans cette origine, le SSO Google sera refusé."
     else
       echo "  ADDITIONAL_REDIRECT_URLS  → $redirects"
       echo "    ✓ contient le frontend"

@@ -9,10 +9,7 @@ import {
   type OAuthProvider,
 } from '@/hooks/use-auth';
 
-const providers: { value: OAuthProvider; label: string }[] = [
-  { value: 'google', label: 'Google' },
-  { value: 'facebook', label: 'Facebook' },
-];
+const providers: { value: OAuthProvider; label: string }[] = [{ value: 'google', label: 'Google' }];
 
 /**
  * Liaison des comptes (fusion email + OAuth).
@@ -48,7 +45,7 @@ export function LinkedAccountsPanel() {
 
   if (!isSupabaseConfigured) {
     return (
-      <Panel title="Comptes liés" description="Fusion de la connexion e-mail avec Google ou Facebook.">
+      <Panel title="Comptes liés" description="Fusion de la connexion e-mail avec Google.">
         <p className="m-0 text-xs text-muted">
           Disponible une fois connecté à Supabase. En démonstration locale, il n’y a qu’un seul compte.
         </p>
@@ -72,7 +69,7 @@ export function LinkedAccountsPanel() {
   return (
     <Panel
       title="Comptes liés"
-      description="Liez Google ou Facebook à ce compte : les deux connexions mèneront ensuite au même foyer."
+      description="Liez Google à ce compte : les deux connexions mèneront ensuite au même foyer."
     >
       {loading ? (
         <p className="m-0 text-xs text-muted">Lecture des comptes liés…</p>

@@ -71,7 +71,6 @@ export const reminderFrequencyLabel = (value: ReminderFrequency) =>
 
 export const providerLabels = {
   google: 'Google',
-  facebook: 'Facebook',
   email: 'E-mail et mot de passe',
 } as const;
 

@@ -106,10 +106,6 @@ GOOGLE_ENABLED=true
 GOOGLE_CLIENT_ID=...
 GOOGLE_SECRET=...
 
-FACEBOOK_ENABLED=true
-FACEBOOK_CLIENT_ID=...
-FACEBOOK_SECRET=...
-
 SMTP_ADMIN_EMAIL=...
 SMTP_HOST=...
 SMTP_PORT=465
@@ -155,9 +151,8 @@ Contraintes :
 - `SUPABASE_SECRET_KEY`, `POSTGRES_PASSWORD`, `INVITE_TOKEN_HMAC_SECRET`, les
   clés OAuth et SMTP ne doivent **jamais** être passés comme arguments de build
   du frontend.
-- Dans les consoles OAuth, enregistrer l'origine `https://app.votredomaine.fr`
-  et le callback `https://api.votredomaine.fr/auth/v1/callback` (Facebook :
-  `public_profile` et `email`).
+- Dans la console Google, enregistrer l'origine `https://app.votredomaine.fr`
+  et le callback `https://api.votredomaine.fr/auth/v1/callback`.
 - Le CORS global d'Envoy est volontairement permissif : l'autorisation repose
   sur la clé d'API, le JWT et la RLS, pas sur l'origine. Une allowlist stricte
   se configure dans `volumes/api/envoy/lds.template.yaml` — tester les

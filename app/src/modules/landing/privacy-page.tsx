@@ -65,9 +65,8 @@ export default function PrivacyPage() {
           <p className="mt-0 mb-2">
             Nous ne demandons ni n’utilisons aucun autre accès Google : ni Gmail, ni Drive, ni Agenda, ni
             Contacts, ni YouTube. Nous ne lisons jamais le contenu de vos e-mails, fichiers ou calendriers, et
-            nous n’y accédons tout simplement pas. Avec Facebook, nous recevons uniquement votre nom, votre
-            adresse e-mail et votre photo de profil (autorisations <em>public_profile</em> et <em>email</em>).
-            Si vous créez un compte avec votre adresse e-mail, nous recevons uniquement cette adresse.
+            nous n’y accédons tout simplement pas. Si vous créez un compte avec votre adresse e-mail, nous
+            recevons uniquement cette adresse.
           </p>
           <p className="mt-0 mb-2">
             <strong>Contenus que vous ajoutez.</strong> Tâches, listes de courses, événements de calendrier, dépenses
@@ -166,8 +165,8 @@ export default function PrivacyPage() {
             navigateur.
           </p>
           <p className="mb-0">
-            Les contenus d’un foyer sont accessibles aux membres que vous y avez invités. Google et Facebook
-            interviennent uniquement pour l’authentification. Si vous activez les rappels, les notifications
+            Les contenus d’un foyer sont accessibles aux membres que vous y avez invités. Google
+            intervient uniquement pour l’authentification. Si vous activez les rappels, les notifications
             transitent par le service de notifications de votre navigateur (par exemple Google pour Chrome, Mozilla
             pour Firefox) : leur contenu est chiffré et illisible pour ces intermédiaires techniques, qui ne voient
             que les informations nécessaires à l’acheminement. Il n’y a pas d’autre destinataire de vos contenus.
