@@ -368,6 +368,8 @@ export interface ExpenseRow {
   expense_date: IsoDate;
   split_type: 'egal' | 'personnalise';
   created_at: IsoDateTime;
+  /** Membre créateur (0121, null pour les lignes héritées). */
+  created_by: Uuid | null;
 }
 
 export interface ExpenseParticipantRow {

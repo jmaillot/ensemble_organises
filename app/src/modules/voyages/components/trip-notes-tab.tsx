@@ -19,7 +19,8 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { data } from '@/lib/data';
 import { NOTE_CATEGORIES, OTHER_CATEGORY } from '@/modules/notes/types';
-import type { NoteRow } from '@/types';
+import { createNoteAttachment, removeNoteAttachment } from '@/modules/notes/api';
+import type { NoteAttachmentRow, NoteRow } from '@/types';
 import { createTripNote, fetchTripNotes } from '../api';
 
 export const tripNotesKeys = {
@@ -42,6 +43,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('Voyage');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<NoteRow | null>(null);
   const [pendingDelete, setPendingDelete] = useState<NoteRow | null>(null);
@@ -54,6 +56,21 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
     () => [...(notesQuery.data ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     [notesQuery.data],
   );
+  const noteIds = useMemo(() => notes.map((note) => note.id), [notes]);
+  const attachmentsQuery = useQuery({
+    queryKey: [...tripNotesKeys.list(tripId), 'attachments', noteIds],
+    enabled: noteIds.length > 0,
+    queryFn: () => data.list<NoteAttachmentRow>('note_attachments', { note_id: noteIds }),
+  });
+  const attachmentsByNote = useMemo(() => {
+    const grouped = new Map<string, NoteAttachmentRow[]>();
+    for (const attachment of attachmentsQuery.data ?? []) {
+      const list = grouped.get(attachment.note_id) ?? [];
+      list.push(attachment);
+      grouped.set(attachment.note_id, list);
+    }
+    return grouped;
+  }, [attachmentsQuery.data]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: tripNotesKeys.list(tripId) });
@@ -63,6 +80,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
     setTitle('');
     setContent('');
     setCategory('Voyage');
+    setPhotoFile(null);
     setEditing(null);
   };
 
@@ -70,6 +88,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
     if (saving || title.trim() === '') return;
     setSaving(true);
     try {
+      let noteId: string;
       if (editing) {
         await data.update('notes', editing.id, {
           title: title.trim(),
@@ -77,10 +96,19 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
           category: category.trim() || 'Voyage',
           updated_at: new Date().toISOString(),
         });
+        noteId = editing.id;
         toast('Note du voyage mise à jour.');
       } else {
-        await createTripNote({ tripId, householdId, title, content, category, createdBy: currentMemberId });
+        const created = await createTripNote({ tripId, householdId, title, content, category, createdBy: currentMemberId });
+        noteId = created.id;
         toast('Note ajoutée au voyage.');
+      }
+      if (photoFile) {
+        try {
+          await createNoteAttachment(householdId, noteId, photoFile);
+        } catch (uploadError) {
+          toast(uploadError instanceof Error ? uploadError.message : 'Photo impossible.', 'error');
+        }
       }
       resetForm();
       refresh();
@@ -89,6 +117,14 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
     } finally {
       setSaving(false);
     }
+  };
+
+  const removePhoto = (attachment: NoteAttachmentRow) => {
+    void removeNoteAttachment(attachment.id)
+      .then(refresh)
+      .catch((removalError: unknown) =>
+        toast(removalError instanceof Error ? removalError.message : 'La photo n’a pas pu être retirée.', 'error'),
+      );
   };
 
   const confirmDelete = () => {
@@ -148,6 +184,29 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
                 </Select>
               )}
             </Field>
+            <div className="grid gap-1.5">
+              <span className="text-[11px] font-extrabold text-muted">
+                Photo <span className="ml-1 font-normal">· optionnel</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-border bg-bg px-3.5 text-xs font-extrabold text-fg">
+                  {photoFile ? photoFile.name : 'Choisir une photo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    aria-label="Photo jointe à la note"
+                    onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {photoFile ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setPhotoFile(null)}>
+                    Retirer
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-[10px] text-muted">Une image jointe à la note (optionnel).</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button icon="plus" disabled={saving || title.trim() === ''} onClick={() => void submit()}>
                 {saving ? 'Enregistrement…' : editing ? 'Mettre à jour' : 'Ajouter au voyage'}
@@ -205,6 +264,40 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
                   ) : null}
                 </div>
                 {note.content ? <p className="mt-1.5 mb-0 text-[12px] whitespace-pre-line">{note.content}</p> : null}
+                {(attachmentsByNote.get(note.id) ?? []).length > 0 ? (
+                  <ul className="m-0 mt-2 grid list-none gap-1.5 p-0" aria-label={`Photos jointes à ${note.title}`}>
+                    {(attachmentsByNote.get(note.id) ?? []).map((attachment) => (
+                      <li key={attachment.id}>
+                        <a
+                          href={attachment.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 rounded-[9px] bg-bg px-2.5 py-2 text-xs hover:bg-accent-faint"
+                        >
+                          <img
+                            src={attachment.file_url}
+                            alt={`Photo jointe à ${note.title}`}
+                            className="size-8 shrink-0 rounded-[7px] border border-border object-cover"
+                          />
+                          <span className="min-w-0 flex-1 truncate">{attachment.file_name}</span>
+                          {!readOnly ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                removePhoto(attachment);
+                              }}
+                              aria-label={`Retirer la photo de ${note.title}`}
+                              className="grid size-11 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                            >
+                              <Icon name="trash" size="sm" />
+                            </button>
+                          ) : null}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ))}
           </div>

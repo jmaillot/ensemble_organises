@@ -51,7 +51,7 @@ begin
           ('task_lists', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
           ('note_folders', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
           ('routine_folders', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'is_default', 'created_at']::text[]),
-          ('expenses', ARRAY['id', 'household_id', 'ardoise_id', 'title', 'amount', 'paid_by', 'paid_by_guest', 'expense_date', 'split_type', 'created_at']::text[]),
+          ('expenses', ARRAY['id', 'household_id', 'ardoise_id', 'title', 'amount', 'paid_by', 'paid_by_guest', 'expense_date', 'split_type', 'created_at', 'created_by']::text[]),
           ('expense_participants', ARRAY['id', 'expense_id', 'participant_type', 'member_id', 'guest_id', 'share_amount']::text[]),
           ('gift_lists', ARRAY['id', 'household_id', 'owner_member_id', 'name', 'visibility', 'created_at']::text[]),
           ('gift_items', ARRAY['id', 'list_id', 'household_id', 'name', 'price', 'comment', 'photo_url', 'url', 'reserved_by', 'reserved_by_name', 'purchased', 'idea_id', 'created_at']::text[]),

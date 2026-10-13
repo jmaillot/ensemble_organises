@@ -1,5 +1,6 @@
 import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
+import { useHouseholdStore } from '@/stores/household-store';
 import type {
   ArdoiseGuestRow,
   ArdoiseMemberRow,
@@ -375,6 +376,7 @@ export async function createExpense(householdId: string, input: NewExpenseInput)
     paid_by_guest: paidByKind === 'guest' ? input.paidBy : null,
     expense_date: input.date,
     split_type: input.splitType,
+    created_by: useHouseholdStore.getState().currentMemberId,
     created_at: new Date().toISOString(),
   });
 

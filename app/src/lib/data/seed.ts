@@ -455,6 +455,7 @@ export const demoExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: day(0),
     split_type: 'egal',
+    created_by: DEMO_MEMBERS.camille,
     created_at: now(),
   },
   {
@@ -467,6 +468,7 @@ export const demoExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: day(-2),
     split_type: 'egal',
+    created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
   },
   {
@@ -479,6 +481,7 @@ export const demoExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: day(-5),
     split_type: 'egal',
+    created_by: DEMO_MEMBERS.lina,
     created_at: now(),
   },
   {
@@ -491,6 +494,7 @@ export const demoExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: day(-9),
     split_type: 'personnalise',
+    created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
   },
 ];
@@ -1169,6 +1173,7 @@ export const demoTripExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: '2027-04-12',
     split_type: 'egal',
+    created_by: DEMO_MEMBERS.camille,
     created_at: now(),
   },
   {
@@ -1181,6 +1186,7 @@ export const demoTripExpenses: ExpenseRow[] = [
     paid_by_guest: null,
     expense_date: '2027-04-12',
     split_type: 'egal',
+    created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
   },
 ];

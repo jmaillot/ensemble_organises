@@ -51,6 +51,7 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
   const [dueDate, setDueDate] = useState('');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<TaskRow | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TaskRow | null>(null);
 
   const tripMemberIds = useMemo(() => members.map((member) => member.id), [members]);
@@ -102,6 +103,26 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
     }
     setSaving(true);
     try {
+      if (editing) {
+        const trimmed = name.trim();
+        if (trimmed.length === 0 || trimmed.length > 200) throw new Error('Nommez la tâche (1 à 200 caractères).');
+        await data.update('tasks', editing.id, { name: trimmed, due_date: dueDate || null });
+        await data.removeWhere('task_assignees', { task_id: editing.id }).catch(() => undefined);
+        if (assigneeIds.length > 0) {
+          await Promise.all(
+            assigneeIds.map((memberId) =>
+              data.create('task_assignees', { task_id: editing.id, member_id: memberId }),
+            ),
+          );
+        }
+        setEditing(null);
+        setName('');
+        setDueDate('');
+        setAssigneeIds([]);
+        refresh();
+        toast('Tâche du voyage mise à jour.');
+        return;
+      }
       await createTripTask({
         tripId,
         householdId,
@@ -123,6 +144,20 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
     }
   };
 
+  const startEdit = (task: TaskRow) => {
+    setEditing(task);
+    setName(task.name);
+    setDueDate(task.due_date ?? '');
+    setAssigneeIds((assigneesByTask.get(task.id) ?? []).map((member) => member.id));
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setName('');
+    setDueDate('');
+    setAssigneeIds([]);
+  };
+
   const toggleStatus = (task: TaskRow) => {
     void data
       .update('tasks', task.id, { status: task.status === 'fait' ? 'a_faire' : 'fait' })
@@ -141,6 +176,7 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
       await data.removeWhere('task_assignees', { task_id: target.id }).catch(() => undefined);
       await data.removeWhere('task_reminders', { task_id: target.id }).catch(() => undefined);
       await data.remove('tasks', target.id);
+      if (editing?.id === target.id) cancelEdit();
       refresh();
       toast('Tâche du voyage supprimée.');
     })().catch((removalError: unknown) =>
@@ -162,7 +198,7 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
   return (
     <div className="grid gap-3.5">
       {!readOnly ? (
-        <Panel id="trip-tasks-new" title="Ajouter une tâche" description="Assignée aux participants du voyage uniquement.">
+        <Panel id="trip-tasks-new" title={editing ? 'Modifier la tâche' : 'Ajouter une tâche'} description="Assignée aux participants du voyage uniquement.">
           <div className="grid gap-3.5">
             <Field label="Nom de la tâche">
               {(props) => (
@@ -206,10 +242,15 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
                 </div>
               )}
             </fieldset>
-            <div>
-              <Button icon="plus" disabled={saving || name.trim() === ''} onClick={() => void submit()}>
-                {saving ? 'Ajout…' : 'Ajouter au voyage'}
+            <div className="flex flex-wrap gap-2">
+              <Button icon={editing ? 'check' : 'plus'} disabled={saving || name.trim() === ''} onClick={() => void submit()}>
+                {saving ? (editing ? 'Mise à jour…' : 'Ajout…') : editing ? 'Mettre à jour' : 'Ajouter au voyage'}
               </Button>
+              {editing ? (
+                <Button variant="secondary" onClick={cancelEdit}>
+                  Annuler
+                </Button>
+              ) : null}
             </div>
           </div>
         </Panel>
@@ -253,14 +294,24 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
                     <MemberAvatar key={member.id} member={member} size="sm" />
                   ))}
                   {!readOnly ? (
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(task)}
-                      aria-label={`Supprimer ${task.name}`}
-                      className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
-                    >
-                      <Icon name="trash" size="sm" />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(task)}
+                        aria-label={`Modifier ${task.name}`}
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-accent-faint hover:text-fg"
+                      >
+                        <Icon name="edit" size="sm" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(task)}
+                        aria-label={`Supprimer ${task.name}`}
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                      >
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </div>

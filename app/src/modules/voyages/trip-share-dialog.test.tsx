@@ -105,4 +105,19 @@ describe('TripShareDialog — partage par code (D-09, motif cadeau)', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('code mémorisé : QR + lien réaffichés sans régénérer (0121)', async () => {
+    stubTripInvite({ tripId: 'trip-1', isActive: true, hasCode: true, expiresAt: null, maxUses: 20, useCount: 2 });
+    try {
+      window.localStorage.setItem('eo:trip:code:trip-1', CODE);
+      renderShare();
+
+      // Ni Générer ni attente : le QR et le lien reviennent tout seuls.
+      expect(await screen.findByText(CODE)).toBeInTheDocument();
+      expect(screen.getByText(/Lien à partager/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Régénérer' })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

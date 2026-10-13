@@ -529,17 +529,59 @@ export interface TripInviteSummary {
 
 /** Génère (ou régénère, invalidant le précédent) le code d'un voyage. */
 export async function createTripInviteCode(tripId: string): Promise<TripInviteCode> {
-  return callTripInvite<TripInviteCode>('create', { tripId });
+  const created = await callTripInvite<TripInviteCode>('create', { tripId });
+  writeTripCode(tripId, created.code);
+  return created;
 }
 
 /** Arrête le partage : le code ne passe plus, l'historique reste. */
 export async function revokeTripInviteCode(tripId: string): Promise<void> {
   await callTripInvite('revoke', { tripId });
+  clearTripCode(tripId);
 }
 
 export async function fetchTripInviteSummary(tripId: string): Promise<TripInviteSummary | null> {
   if (!isSupabaseConfigured) return null;
   return callTripInvite<TripInviteSummary | null>('summary', { tripId });
+}
+
+/* ------------------------------------------------------------------ */
+/* Code de partage mémorisé (0121) : le code brut n'est rendu qu'à sa  */
+/* génération — le dialogue le conserve sur CET appareil pour réafficher */
+/* QR + lien sans régénérer (qui invaliderait le précédent). Un code    */
+/* régénéré ailleurs rend le lien mémorisé caduc : la régénération      */
+/* reste proposée, et l'arrêt du partage efface la mémoire.            */
+/* ------------------------------------------------------------------ */
+
+export const tripCodeStorageKey = (tripId: string): string => `eo:trip:code:${tripId}`;
+
+export function readTripCode(tripId: string): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const stored = localStorage.getItem(tripCodeStorageKey(tripId));
+    const trimmed = stored?.trim() ?? '';
+    return trimmed ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeTripCode(tripId: string, code: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(tripCodeStorageKey(tripId), code.trim());
+  } catch {
+    // Stockage plein ou bloqué : le code reste affiché, sans mémoire.
+  }
+}
+
+export function clearTripCode(tripId: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(tripCodeStorageKey(tripId));
+  } catch {
+    // Décoratif : un code restant ne fait qu'afficher un lien caduc.
+  }
 }
 
 /**
@@ -840,17 +882,20 @@ export interface CreateTripPlaceArgs {
 /**
  * Création d'une adresse de voyage : charge du formulaire foyer
  * (`toPlacePayload`, jamais réinventée) + `trip_id` posé explicitement.
+ * Sans note saisie, `rating` part à NULL (0121 : 0 viole
+ * `places_rating_check`, qui n'admet que NULL ou 1–5).
  */
 export async function createTripPlace(args: CreateTripPlaceArgs): Promise<PlaceRow> {
   const { toPlacePayload } = await import('@/modules/adresses/api');
   const name = args.input.name.trim();
   if (name.length === 0 || name.length > 120) throw new Error('Nommez le lieu (1 à 120 caractères).');
+  const rating = args.input.rating && args.input.rating >= 1 && args.input.rating <= 5 ? args.input.rating : null;
   return data.create<PlaceRow>('places', {
     ...toPlacePayload(
       {
         name,
         type: args.input.type,
-        rating: args.input.rating ?? 0,
+        rating: rating ?? 0,
         street: args.input.street?.trim() || null,
         postalCode: args.input.postalCode?.trim() || null,
         city: args.input.city?.trim() || null,
@@ -860,6 +905,7 @@ export async function createTripPlace(args: CreateTripPlaceArgs): Promise<PlaceR
       },
       args.householdId,
     ),
+    rating,
     trip_id: args.tripId,
   } as Partial<PlaceRow>);
 }

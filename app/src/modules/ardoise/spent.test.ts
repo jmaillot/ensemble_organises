@@ -13,6 +13,7 @@ const expense = (id: string, overrides: Partial<Expense>): Expense => ({
   date: '2026-10-02',
   splitType: 'egal',
   participants: [],
+  createdBy: null,
   ...overrides,
 });
 

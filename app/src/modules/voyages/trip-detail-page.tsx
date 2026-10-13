@@ -4,6 +4,7 @@ import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { Switch } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
 import { useHouseholdStore } from '@/stores/household-store';
@@ -185,8 +186,18 @@ function CountCard({ label, value }: { label: string; value: number | null }) {
 function TripInfosTab({ detail }: { detail: TripDetailState }) {
   const { participantMembers, guests, counts, countsLoading } = detail;
   const budget: TripCounts | null = counts;
+  const emptyTrip = participantMembers.length === 0 && guests.length === 0;
   return (
     <div className="grid gap-3.5">
+      {emptyTrip ? (
+        <p
+          role="status"
+          className="m-0 rounded-[14px] border border-accent bg-accent-faint px-[15px] py-3 text-[13px] font-semibold text-accent-strong"
+        >
+          Aucun participant ni invité pour le moment — ajoutez des membres dans l’onglet Paramètres ou
+          partagez le voyage par code.
+        </p>
+      ) : null}
       <Panel id="trip-infos-people" title="Participants" description="Membres du voyage et invités externes.">
         <div className="flex flex-wrap items-center gap-2">
           {participantMembers.map((member) => (
@@ -403,21 +414,25 @@ function TripParametresTab({ detail, trip }: { detail: TripDetailState; trip: Tr
           {TRIP_TOGGLABLE_TABS.map((key) => {
             const checked = tabState?.[key] !== false;
             return (
-              <label
+              <div
                 key={key}
-                className="inline-flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-[9px] border border-border bg-bg px-2.5 text-[12px] font-semibold text-muted has-[:checked]:border-accent has-[:checked]:bg-accent-faint has-[:checked]:text-accent-strong"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-[9px] border border-border bg-bg px-2.5"
               >
-                <input
-                  type="checkbox"
+                <label
+                  htmlFor={`trip-tab-${key}`}
+                  className="flex-1 text-[12px] font-semibold text-muted"
+                >
+                  {tabLabels.get(key)}
+                  {toggling === key ? '…' : ''}
+                </label>
+                <Switch
+                  id={`trip-tab-${key}`}
                   checked={checked}
                   disabled={frozen || toggling !== null}
-                  onChange={() => setTab(key, !checked)}
-                  className="accent-accent"
+                  onCheckedChange={(next) => setTab(key, next)}
                   aria-label={`Afficher la rubrique ${tabLabels.get(key)}`}
                 />
-                {tabLabels.get(key)}
-                {toggling === key ? '…' : ''}
-              </label>
+              </div>
             );
           })}
         </div>

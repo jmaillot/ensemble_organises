@@ -9,8 +9,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '@/test/render';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderWithProviders, seedHouseholdStore } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 import { guestKey, memberKey } from '@/modules/ardoise/types';
 import type { ArdoiseRow } from '@/types';
@@ -195,5 +197,66 @@ describe('TripBudgetTab — enveloppe ardoise liée (15-03)', () => {
     expect(await screen.findByText('Dépense d’invité')).toBeInTheDocument();
     expect(screen.getByLabelText(/Partager avec Camille Martin/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Partager avec Mamie/)).toBeInTheDocument();
+  });
+});
+
+describe('TripBudgetTab — édition et camembert (0121)', () => {
+  it('affiche le camembert des dépensés par payeur', async () => {
+    renderBudget();
+
+    await screen.findByText('Vols aller-retour');
+    expect(screen.getByTestId('spending-pie')).toBeInTheDocument();
+    expect(screen.getByText('Qui a dépensé quoi')).toBeInTheDocument();
+  });
+
+  it('l’admin modifie une dépense (titre + montant)', async () => {
+    const user = userEvent.setup();
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    renderBudget();
+
+    await screen.findByText('Vols aller-retour');
+    await user.click(screen.getByRole('button', { name: 'Modifier Vols aller-retour' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Modifier la dépense');
+    const libelle = screen.getByLabelText(/Libellé/);
+    await user.clear(libelle);
+    await user.type(libelle, 'Vols aller-retour modifiés');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(await screen.findByText('Vols aller-retour modifiés')).toBeInTheDocument();
+    expect(await screen.findByText('Dépense mise à jour, les soldes sont à jour.')).toBeInTheDocument();
+    try {
+      const rows = (await adapter.list('expenses', { id: 'trip-expense-vol' } as never)) as unknown as {
+        title: string;
+      }[];
+      expect(rows[0]?.title).toBe('Vols aller-retour modifiés');
+    } finally {
+      await adapter.update('expenses', 'trip-expense-vol', { title: 'Vols aller-retour' } as never).catch(() => undefined);
+    }
+  });
+
+  it('un membre non-admin ne modifie que ses propres dépenses', async () => {
+    seedHouseholdStore();
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.lina });
+    renderWithProviders(
+      <TripBudgetTab
+        tripId="trip-1"
+        householdId={DEMO_HOUSEHOLD_ID}
+        members={tripMembers}
+        guests={[]}
+        currentMemberId={DEMO_MEMBERS.lina}
+      />,
+      { withHousehold: false },
+    );
+
+    await screen.findByText('Vols aller-retour');
+    // Lina (membre) n’a créé aucune dépense du voyage : aucun bouton Modifier.
+    expect(screen.queryByRole('button', { name: 'Modifier Vols aller-retour' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modifier Logement' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('spending-pie')).toBeInTheDocument();
+    });
   });
 });

@@ -20,14 +20,23 @@ import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { formatEuro } from '@/lib/utils';
+import { useIsAdmin } from '@/stores/household-store';
 import type { HouseholdMemberRow, TripGuestRow } from '@/types';
-import { useArdoiseDetail, useAddExpense } from '@/modules/ardoise/hooks/use-ardoise';
+import { useArdoiseDetail, useAddExpense, useUpdateExpense } from '@/modules/ardoise/hooks/use-ardoise';
 import { MemberBalances } from '@/modules/ardoise/components/balance-panel';
 import { SettlementsPanel } from '@/modules/ardoise/components/settlements-panel';
 import { ExpenseFormDialog } from '@/modules/ardoise/components/expense-form-dialog';
-import { applyFreePayerShare, type MemberOption, type NewExpenseInput } from '@/modules/ardoise/types';
+import { SpendingPie } from '@/modules/ardoise/ardoise-detail-page';
+import {
+  applyFreePayerShare,
+  computeSpent,
+  type Expense,
+  type MemberOption,
+  type NewExpenseInput,
+} from '@/modules/ardoise/types';
 import { ensureExpenseGuest } from '@/modules/ardoise/api';
 import {
   createTripGuestExpense,
@@ -116,7 +125,10 @@ function TripBudgetBody({
   const queryClient = useQueryClient();
   const detail = useArdoiseDetail(ardoiseId);
   const addExpense = useAddExpense(ardoiseId);
+  const updateExpenseMutation = useUpdateExpense();
+  const isAdmin = useIsAdmin();
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   // Dépenses membres : participants du voyage seuls (même régime que les
   // inscrits de l'ardoise, synchronisés à la création/venue 15-01).
@@ -131,6 +143,25 @@ function TripBudgetBody({
     (currentMemberId && expenseMembers.some((member) => member.id === currentMemberId)
       ? currentMemberId
       : expenseMembers[0]?.id) ?? null;
+  const paidByMember = useMemo(() => computeSpent(detail.expenses), [detail.expenses]);
+
+  /**
+   * Édition (0121) : l'admin du foyer modifie toute ligne, un membre
+   * seulement celles qu'il a créées (lignes héritées sans créateur :
+   * admin seuls).
+   */
+  const canEditExpense = (expense: Expense) =>
+    isAdmin || (expense.createdBy !== null && expense.createdBy === currentMemberId);
+
+  const openEditor = (expense: Expense) => {
+    setEditingExpense(expense);
+    setExpenseOpen(true);
+  };
+
+  const openCreator = () => {
+    setEditingExpense(null);
+    setExpenseOpen(true);
+  };
 
   const submitMemberExpense = async (values: NewExpenseInput) => {
     try {
@@ -147,6 +178,14 @@ function TripBudgetBody({
             splitType: values.splitType,
           }),
         };
+      }
+      if (editingExpense) {
+        await updateExpenseMutation.mutateAsync({ expenseId: editingExpense.id, input: resolved });
+        setExpenseOpen(false);
+        setEditingExpense(null);
+        detail.refetch();
+        toast('Dépense mise à jour, les soldes sont à jour.');
+        return;
       }
       await addExpense.mutateAsync(resolved);
       setExpenseOpen(false);
@@ -176,7 +215,7 @@ function TripBudgetBody({
         description={`Ardoise « ${ardoiseName} » liée au voyage — chaque ligne : qui a payé, combien, pour qui.`}
         action={
           !readOnly ? (
-            <Button icon="plus" onClick={() => setExpenseOpen(true)}>
+            <Button icon="plus" onClick={openCreator}>
               Ajouter une dépense
             </Button>
           ) : undefined
@@ -188,7 +227,7 @@ function TripBudgetBody({
             title="Aucune dépense sur l’ardoise liée"
             description="Ajoutez la première dépense du voyage : montant, payeur, participants."
             actionLabel={readOnly ? undefined : 'Ajouter une dépense'}
-            onAction={readOnly ? undefined : () => setExpenseOpen(true)}
+            onAction={readOnly ? undefined : openCreator}
           />
         ) : (
           <div role="list" aria-label="Dépenses du voyage" className="grid gap-2.5">
@@ -201,9 +240,31 @@ function TripBudgetBody({
                   </small>
                 </div>
                 <strong className="text-[15px]">{formatEuro(expense.amount)}</strong>
+                {!readOnly && canEditExpense(expense) ? (
+                  <button
+                    type="button"
+                    onClick={() => openEditor(expense)}
+                    aria-label={`Modifier ${expense.title}`}
+                    className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-accent-faint hover:text-fg"
+                  >
+                    <Icon name="edit" size="sm" />
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
+        )}
+      </Panel>
+
+      <Panel
+        id="trip-budget-pie"
+        title="Qui a dépensé quoi"
+        description="Part de chaque payeur dans le total avancé, du plus gros au plus petit."
+      >
+        {paidByMember.length === 0 ? (
+          <p className="m-0 text-xs text-muted">Aucune dépense pour le moment.</p>
+        ) : (
+          <SpendingPie shares={paidByMember} total={detail.total} />
         )}
       </Panel>
 
@@ -232,12 +293,15 @@ function TripBudgetBody({
 
       <ExpenseFormDialog
         open={expenseOpen}
-        onOpenChange={setExpenseOpen}
+        onOpenChange={(open) => {
+          if (!open) setEditingExpense(null);
+          setExpenseOpen(open);
+        }}
         members={expenseMembers}
         guests={detail.guestOptions}
         defaultPayerId={defaultPayerId}
-        initialExpense={null}
-        isPending={addExpense.isPending}
+        initialExpense={editingExpense}
+        isPending={addExpense.isPending || updateExpenseMutation.isPending}
         onSubmit={(values) => void submitMemberExpense(values)}
       />
     </div>

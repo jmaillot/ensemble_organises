@@ -12,6 +12,20 @@ import type { NoteRow } from '@/types';
 import { TripNotesTab } from './components/trip-notes-tab';
 import { createTripNote, fetchTripNotes } from './api';
 
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storage')>();
+  return {
+    ...actual,
+    depositHouseholdFile: vi.fn(async ({ file }: { file: File }) => ({
+      url: 'blob:photo-note-test',
+      path: null,
+      name: file.name,
+      mime: 'image/jpeg',
+      size: 12,
+    })),
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -92,5 +106,65 @@ describe('TripNotesTab — étanchéité du voyage (15-03)', () => {
     await expect(
       createTripNote({ tripId: 'trip-1', householdId: DEMO_HOUSEHOLD_ID, title: '  ', content: 'x' }),
     ).rejects.toThrow(/Titre requis/);
+  });
+});
+
+describe('TripNotesTab — photo optionnelle (0121)', () => {
+  it('une photo jointe à la création s’affiche sous la note', async () => {
+    const user = userEvent.setup();
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    renderNotes();
+
+    await screen.findByText('Passeports');
+    await user.type(screen.getByLabelText(/Titre/), 'Note avec photo');
+    await user.upload(
+      screen.getByLabelText(/Photo jointe à la note/),
+      new File(['pixels'], 'plage.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Ajouter au voyage' }));
+
+    expect(await screen.findByText('Note avec photo')).toBeInTheDocument();
+    expect(await screen.findByAltText('Photo jointe à Note avec photo')).toBeInTheDocument();
+    try {
+      const rows = (await adapter.list('notes', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as NoteRow[];
+      const row = rows.find((entry) => entry.title === 'Note avec photo');
+      expect(row?.trip_id).toBe('trip-1');
+      const attachments = (await adapter.list('note_attachments', { note_id: row?.id ?? 'rien' } as never)) as unknown as {
+        file_url: string;
+      }[];
+      expect(attachments).toHaveLength(1);
+      expect(attachments[0]?.file_url).toBe('blob:photo-note-test');
+    } finally {
+      const rows = (await adapter.list('notes', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as NoteRow[];
+      const row = rows.find((entry) => entry.title === 'Note avec photo');
+      if (row) {
+        await adapter.removeWhere('note_attachments', { note_id: row.id } as never).catch(() => undefined);
+        await adapter.remove('notes', row.id).catch(() => undefined);
+      }
+    }
+  });
+
+  it('sans photo, la note se crée comme avant', async () => {
+    const user = userEvent.setup();
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    renderNotes();
+
+    await screen.findByText('Passeports');
+    await user.type(screen.getByLabelText(/Titre/), 'Note sans photo');
+    await user.click(screen.getByRole('button', { name: 'Ajouter au voyage' }));
+
+    expect(await screen.findByText('Note sans photo')).toBeInTheDocument();
+    try {
+      const rows = (await adapter.list('notes', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as NoteRow[];
+      const row = rows.find((entry) => entry.title === 'Note sans photo');
+      const attachments = await adapter.list('note_attachments', { note_id: row?.id ?? 'rien' } as never);
+      expect(attachments).toHaveLength(0);
+    } finally {
+      const rows = (await adapter.list('notes', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as NoteRow[];
+      const row = rows.find((entry) => entry.title === 'Note sans photo');
+      if (row) await adapter.remove('notes', row.id).catch(() => undefined);
+    }
   });
 });

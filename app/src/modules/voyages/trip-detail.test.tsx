@@ -119,3 +119,32 @@ describe('TripDetailPage — fiche avec barre d’onglets (tracer 15-02)', () =>
     }
   });
 });
+
+describe('TripDetailPage — voyage vidé (0121)', () => {
+  it('sans participant ni invité, un bandeau visible l’avoue', async () => {
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    await adapter.create('trips', {
+      id: 'trip-vide',
+      household_id: 'household-martin',
+      name: 'Séjour vidé',
+      destination: 'Nulle part',
+      start_date: '2027-08-10',
+      end_date: '2027-08-16',
+      cover_photo: null,
+      notes: null,
+      created_by: DEMO_MEMBERS.thomas,
+      tab_state: null,
+      is_closed: false,
+    } as never);
+    try {
+      renderDetail('/voyages/trip-vide');
+
+      // Camille (admin) lit en modération, Infos affiché par défaut.
+      expect(await screen.findByRole('heading', { level: 2, name: 'Nulle part' })).toBeInTheDocument();
+      expect(await screen.findByText(/Aucun participant ni invité pour le moment/)).toBeInTheDocument();
+    } finally {
+      await adapter.remove('trips', 'trip-vide').catch(() => undefined);
+    }
+  });
+});

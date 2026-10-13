@@ -136,3 +136,46 @@ describe('TripTasksTab — étanchéité du voyage (tracer 15-03)', () => {
     });
   });
 });
+
+describe('TripTasksTab — édition (0121)', () => {
+  it('modifier renomme la tâche et conserve les assignés', async () => {
+    const user = userEvent.setup();
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    renderTasks();
+
+    await screen.findByText('Réserver le vol');
+    await user.click(screen.getByRole('button', { name: 'Modifier Réserver le vol' }));
+
+    expect(screen.getByLabelText(/Nom de la tâche/)).toHaveValue('Réserver le vol');
+    await user.clear(screen.getByLabelText(/Nom de la tâche/));
+    await user.type(screen.getByLabelText(/Nom de la tâche/), 'Réserver le vol aller');
+    await user.click(screen.getByRole('button', { name: 'Mettre à jour' }));
+
+    expect(await screen.findByText('Réserver le vol aller')).toBeInTheDocument();
+    expect(await screen.findByText('Tâche du voyage mise à jour.')).toBeInTheDocument();
+    try {
+      const rows = (await adapter.list('tasks', { id: 'trip-task-vol' } as never)) as unknown as TaskRow[];
+      expect(rows[0]?.name).toBe('Réserver le vol aller');
+      const assignees = (await adapter.list('task_assignees', { task_id: 'trip-task-vol' } as never)) as unknown as {
+        member_id: string;
+      }[];
+      expect(assignees.map((entry) => entry.member_id)).toEqual([DEMO_MEMBERS.thomas]);
+    } finally {
+      await adapter.update('tasks', 'trip-task-vol', { name: 'Réserver le vol' } as never).catch(() => undefined);
+    }
+  });
+
+  it('annuler l’édition restaure le formulaire d’ajout', async () => {
+    const user = userEvent.setup();
+    renderTasks();
+
+    await screen.findByText('Réserver le vol');
+    await user.click(screen.getByRole('button', { name: 'Modifier Réserver le vol' }));
+    expect(screen.getByRole('button', { name: 'Mettre à jour' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Annuler' }));
+
+    expect(screen.getByRole('button', { name: 'Ajouter au voyage' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nom de la tâche/)).toHaveValue('');
+  });
+});

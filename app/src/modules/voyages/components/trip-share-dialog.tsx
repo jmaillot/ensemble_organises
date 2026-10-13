@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/toast';
 import {
   createTripInviteCode,
   fetchTripInviteSummary,
+  readTripCode,
   revokeTripInviteCode,
   tripInviteLink,
   type TripInviteSummary,
@@ -25,7 +26,9 @@ export interface TripShareDialogProps {
  * immédiatement), code brut affiché une fois en mono + QR, mention
  * code-actif-créé-ailleurs, « Arrêter le partage » avec revoke.
  *
- * Le code brut vit dans l'état du dialogue : fermer (naviguer) le masque.
+ * Le code brut vit dans l'état du dialogue, adossé à la mémoire appareil
+ * (`eo:trip:code:<tripId>`, posée à la génération, effacée à l'arrêt) :
+ * rouvrir le partage réaffiche QR + lien sans régénérer.
  * Les invités externes rejoignent par le lien (compte du foyer ou pseudonyme
  * invité) ; l'échange passe par l'Edge `trip-invite`, jamais en direct.
  */
@@ -38,7 +41,8 @@ export function TripShareDialog({ open, onOpenChange, tripId, tripName }: TripSh
 
   useEffect(() => {
     if (!open) {
-      // Navigation / fermeture : le code brut ne survit pas au dialogue.
+      // Fermeture : le code affiché repart, la mémoire appareil (`readTripCode`)
+      // le rendra à la prochaine ouverture si le partage est toujours actif.
       setLastCode(null);
       return;
     }
@@ -46,9 +50,15 @@ export function TripShareDialog({ open, onOpenChange, tripId, tripName }: TripSh
     let active = true;
     fetchTripInviteSummary(tripId)
       .then((result) => {
-        if (active) {
-          setSummary(result);
-          setCodeError(false);
+        if (!active) return;
+        setSummary(result);
+        setCodeError(false);
+        // 0121 : un code actif généré sur cet appareil se réaffiche (QR +
+        // lien) sans régénérer ; sinon, seule la régénération l'affiche.
+        if (result?.hasCode) {
+          setLastCode(readTripCode(tripId));
+        } else {
+          setLastCode(null);
         }
       })
       .catch(() => {

@@ -45,6 +45,8 @@ export interface Expense {
   date: string;
   splitType: SplitType;
   participants: Participant[];
+  /** Membre créateur (0121, null pour les lignes héritées : admin seuls). */
+  createdBy: string | null;
 }
 
 export interface MemberOption {
@@ -148,6 +150,7 @@ export function toExpense(
     paidByColorTag: payer?.colorTag ?? null,
     date: row.expense_date,
     splitType: row.split_type === 'personnalise' ? 'personnalise' : 'egal',
+    createdBy: row.created_by ?? null,
     participants: participants
       .filter((participant) => participant.expense_id === row.id)
       .map((participant) => {

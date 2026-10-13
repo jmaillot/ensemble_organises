@@ -138,7 +138,7 @@ describe('TripDetailPage — Paramètres (tâche 2)', () => {
     renderDetail();
     await openParametres(user);
 
-    const toggle = screen.getByRole('checkbox', { name: 'Afficher la rubrique Budget' });
+    const toggle = screen.getByRole('switch', { name: 'Afficher la rubrique Budget' });
     expect(toggle).toBeChecked();
     await user.click(toggle);
     await waitFor(() => {
@@ -146,7 +146,7 @@ describe('TripDetailPage — Paramètres (tâche 2)', () => {
     });
     expect(screen.getByRole('tab', { name: 'Infos' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Afficher la rubrique Budget' }));
+    await user.click(screen.getByRole('switch', { name: 'Afficher la rubrique Budget' }));
     expect(await screen.findByRole('tab', { name: 'Budget' })).toBeInTheDocument();
   });
 

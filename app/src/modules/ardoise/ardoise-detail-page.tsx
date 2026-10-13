@@ -59,8 +59,9 @@ function pieFill(share: Share, index: number): string {
 /**
  * Camembert des dépensés par payeur (SVG maison, sans dépendance).
  * Donut + légende pastille + tableau `sr-only` de repli a11y.
+ * Exporté pour l'onglet Budget des voyages (0121).
  */
-function SpendingPie({ shares, total }: { shares: Share[]; total: number }) {
+export function SpendingPie({ shares, total }: { shares: Share[]; total: number }) {
   if (shares.length === 0 || total <= 0) return null;
   const radius = 45;
   const circumference = 2 * Math.PI * radius;

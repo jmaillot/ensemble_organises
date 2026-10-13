@@ -95,4 +95,19 @@ describe('TripPlacesTab — étanchéité du voyage (15-03)', () => {
       createTripPlace({ tripId: 'trip-1', householdId: DEMO_HOUSEHOLD_ID, input: { name: '  ', type: 'cafe' } }),
     ).rejects.toThrow(/Nommez le lieu/);
   });
+
+  it('sans note, rating part à NULL (0121, places_rating_check)', async () => {
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    const created = await createTripPlace({
+      tripId: 'trip-1',
+      householdId: DEMO_HOUSEHOLD_ID,
+      input: { name: 'Lieu sans note', type: 'cafe' },
+    });
+    try {
+      expect(created.rating).toBeNull();
+    } finally {
+      await adapter.remove('places', created.id).catch(() => undefined);
+    }
+  });
 });
