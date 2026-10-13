@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useResource } from '@/lib/data/useResource';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys, useResource } from '@/lib/data/useResource';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { fromProfileColumns } from '@/modules/parametres/lib/push';
 import { useMessagesFeed, useMessagesRealtime } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
+import { listTaskAssignees } from '@/modules/taches/api';
 import { toTask } from '@/modules/taches/types';
 import type { EventRow, ProfileRow, TaskRow } from '@/types';
 import type { IconName } from '@/components/shared/icon';
@@ -121,7 +123,27 @@ export function useNotifications(): NotificationsSummary {
   const routinesFeed = useRoutines();
   const tasksResource = useResource<TaskRow>('tasks');
   const eventsResource = useResource<EventRow>('events');
-  const profilesResource = useResource<ProfileRow>('profiles', {
+  // Assignés des tâches ouvertes : le centre ne rappelle que les tâches sans
+  // assigné (foyer) ou assignées à moi — même règle que le compteur À faire.
+  const currentMember = useCurrentMember();
+  const openTaskIds = useMemo(
+    () => tasksResource.rows.filter((row) => row.trip_id == null && row.status !== 'fait').map((row) => row.id),
+    [tasksResource.rows],
+  );
+  const taskAssigneesQuery = useQuery({
+    queryKey: [...queryKeys.tableAll('task_assignees'), openTaskIds],
+    enabled: openTaskIds.length > 0,
+    queryFn: () => listTaskAssignees(openTaskIds),
+  });
+  const assigneesByTask = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+    for (const entry of taskAssigneesQuery.data ?? []) {
+      const list = grouped.get(entry.task_id) ?? [];
+      list.push(entry.member_id);
+      grouped.set(entry.task_id, list);
+    }
+    return grouped;
+  }, [taskAssigneesQuery.data]);  const profilesResource = useResource<ProfileRow>('profiles', {
     scoped: false,
     filter: user?.id ? { id: user.id } : { id: '__aucun__' },
     enabled: Boolean(user?.id),
@@ -252,8 +274,14 @@ export function useNotifications(): NotificationsSummary {
     if (showTasks) {
       // Régime 15-01 (comme le module Tâches et le tableau de bord) : les
       // tâches propres à un voyage vivent dans sa fiche, pas dans les restes.
+      // Personnel (comme À faire) : sans assigné, ou assignées à moi.
       const open = tasksResource.rows
         .filter((row) => row.trip_id == null)
+        .filter((row) => {
+          const assignees = assigneesByTask.get(row.id) ?? [];
+          if (assignees.length === 0) return true;
+          return currentMember !== null && assignees.includes(currentMember.id);
+        })
         .map((row) => toTask(row))
         .filter((task) => task.status !== 'fait' && task.dueDate !== null)
         .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
@@ -408,7 +436,12 @@ export function useNotifications(): NotificationsSummary {
     messagesUnread,
     cercleUnread,
     isLoading:
-      feed.isLoading || cercle.isLoading || routinesFeed.isLoading || tasksResource.isLoading || eventsResource.isLoading,
+      feed.isLoading ||
+      cercle.isLoading ||
+      routinesFeed.isLoading ||
+      tasksResource.isLoading ||
+      taskAssigneesQuery.isLoading ||
+      eventsResource.isLoading,
     markAllRead,
     markItem,
     dismissItem,

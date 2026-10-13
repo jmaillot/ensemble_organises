@@ -445,3 +445,17 @@ describe('centre de notifications — fils inédits (UAT phase 9)', () => {
     }
   });
 });
+
+describe('centre de notifications — restes personnels', () => {
+  it('ne rappelle que les tâches sans assigné ou assignées à moi', async () => {
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    const taches = result.current.items.filter((item) => item.kind === 'tache').map((item) => item.title);
+    // Camille connectée : task-1 à elle ; task-2/task-4 à Thomas (exclues).
+    expect(taches).toContain('Valider les rendez-vous du carnet');
+    expect(taches).not.toContain('Ajouter le lait d’agne');
+    expect(taches).not.toContain('Choisir le menu du week-end');
+  });
+});
