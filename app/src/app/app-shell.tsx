@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
 import {
@@ -9,7 +9,7 @@ import {
   navModules,
   type ModuleKey,
 } from '@/lib/modules';
-import { useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
@@ -22,6 +22,8 @@ import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
 import { useResource } from '@/lib/data/useResource';
+import { useQuery } from '@tanstack/react-query';
+import { listTaskAssignees } from '@/modules/taches/api';
 import type { TaskRow } from '@/types';
 
 const homeIcon: IconName = 'home';
@@ -55,7 +57,28 @@ export function AppShell() {
     // Tâches — les lignes de voyage vivent dans leur fiche.
     select: (rows) => rows.filter((row) => (row as unknown as TaskRow).trip_id == null),
   });
-  const openTaskCount = openTasks.length;
+  // Compteur personnel (comme la page Tâches) : ouvertes sans assigné (foyer)
+  // ou assignées à moi — jamais celles des autres membres.
+  const currentMember = useCurrentMember();
+  const openTaskIds = useMemo(() => openTasks.map((row) => row.id), [openTasks]);
+  const taskAssigneesQuery = useQuery({
+    queryKey: ['app-shell', 'task-assignees', openTaskIds],
+    enabled: openTaskIds.length > 0,
+    queryFn: () => listTaskAssignees(openTaskIds),
+  });
+  const openTaskCount = useMemo(() => {
+    const assigneeByTask = new Map<string, string[]>();
+    for (const entry of taskAssigneesQuery.data ?? []) {
+      const list = assigneeByTask.get(entry.task_id) ?? [];
+      list.push(entry.member_id);
+      assigneeByTask.set(entry.task_id, list);
+    }
+    return openTasks.filter((row) => {
+      const assignees = assigneeByTask.get(row.id) ?? [];
+      if (assignees.length === 0) return true;
+      return currentMember !== null && assignees.includes(currentMember.id);
+    }).length;
+  }, [openTasks, taskAssigneesQuery.data, currentMember]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

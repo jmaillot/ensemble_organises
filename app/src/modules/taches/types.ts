@@ -248,6 +248,16 @@ export function taskMetrics(tasks: Task[]): TaskMetrics {
   };
 }
 
+/**
+ * Compteur « À faire » personnel : tâches ouvertes sans assigné (foyer) ou
+ * assignées au membre courant — jamais celles des autres membres.
+ */
+export function isOpenForMe(task: Task, memberId: string): boolean {
+  if (task.status === 'fait') return false;
+  if (task.assignees.length === 0) return true;
+  return task.assignees.some((assignee) => assignee.memberId === memberId);
+}
+
 /** Tâches accompagnées d'un rappel, de la plus proche à la plus lointaine. */
 export function reminderTasks(tasks: Task[]): Task[] {
   return tasks

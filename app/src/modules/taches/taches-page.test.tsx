@@ -115,3 +115,13 @@ describe('TachesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
+
+describe('TachesPage — compteur À faire personnel', () => {
+  it('ne compte que mes tâches ouvertes et celles sans assigné', async () => {
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // Camille connectée : task-1 à elle, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
+    expect(screen.getByText('pour moi ou sans assigné').previousSibling).toHaveTextContent('1');
+  });
+});

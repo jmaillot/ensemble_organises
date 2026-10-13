@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   DndContext,
@@ -20,7 +20,7 @@ import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
-import { memberFirstName, taskFilters, type Task } from './types';
+import { memberFirstName, isOpenForMe, taskFilters, type Task } from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
 import { useTaches } from './hooks/use-taches';
@@ -35,6 +35,7 @@ export default function TachesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const {
+    tasks,
     visibleTasks,
     reminders,
     members,
@@ -49,7 +50,6 @@ export default function TachesPage() {
     createFolder,
     renameFolder,
     deleteFolder,
-    open: openCount,
     total,
     highPriority,
     assigneeCount,
@@ -97,6 +97,13 @@ export default function TachesPage() {
   const openCreate = () => setDialog({ open: true, task: null, dueDate: null });
   const openEdit = (task: Task) => setDialog({ open: true, task, dueDate: null });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+
+  // Compteur « À faire » personnel : ouvertes sans assigné (foyer) ou pour
+  // moi — jamais celles des autres membres.
+  const openMine = useMemo(
+    () => tasks.filter((task) => isOpenForMe(task, currentMemberId)).length,
+    [tasks, currentMemberId],
+  );
 
   // Les annonces du glisser-déposer citent le nom de la tâche, pas son identifiant.
   const names = useRef<Map<string, string>>(new Map());
@@ -148,7 +155,7 @@ export default function TachesPage() {
     >
       <MetricRow
         items={[
-          { label: 'À faire', value: openCount, caption: 'tâches ouvertes' },
+          { label: 'À faire', value: openMine, caption: 'pour moi ou sans assigné' },
           { label: 'Total', value: total, caption: 'dans la liste' },
           { label: 'Priorité haute', value: highPriority, caption: 'à regarder aujourd’hui' },
           { label: 'Membres', value: assigneeCount, caption: 'participants actifs' },
@@ -342,7 +349,7 @@ export default function TachesPage() {
               </div>
             )}
             <p className="mt-4 mb-0 text-[11px] text-muted">
-              {total > 0 ? `${openCount} tâche${openCount > 1 ? 's' : ''} ouverte${openCount > 1 ? 's' : ''} sur ${total}.` : 'Créez votre première tâche pour lancer le compteur.'}
+              {total > 0 ? `${openMine} tâche${openMine > 1 ? 's' : ''} pour moi ou sans assigné sur ${total}.` : 'Créez votre première tâche pour lancer le compteur.'}
             </p>
           </Panel>
         </div>

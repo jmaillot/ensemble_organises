@@ -240,12 +240,12 @@ describe('AppShell — périmètre enfant', () => {
   });
 });
 
-describe('AppShell — badge À faire (15-01)', () => {
-  it('ne compte que les tâches du foyer, jamais celles des voyages', async () => {
+describe('AppShell — badge À faire (15-01, personnel)', () => {
+  it('ne compte que mes tâches ouvertes et celles sans assigné', async () => {
     renderShell('/accueil');
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
-    // Graines : 3 tâches de foyer à faire + 1 faite + 2 tâches de voyage.
-    const badge = await within(nav).findByLabelText('3 tâches ouvertes');
-    expect(badge).toHaveTextContent('3');
+    // Graines (Camille connectée) : task-1 à moi, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
+    const badge = await within(nav).findByLabelText('1 tâches ouvertes');
+    expect(badge).toHaveTextContent('1');
   });
 });
