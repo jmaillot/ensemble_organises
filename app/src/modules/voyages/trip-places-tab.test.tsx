@@ -4,13 +4,27 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import type { PlaceRow } from '@/types';
 import { TripPlacesTab } from './components/trip-places-tab';
 import { createTripPlace, fetchTripPlaces } from './api';
+
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storage')>();
+  return {
+    ...actual,
+    depositHouseholdFile: vi.fn(async ({ file }: { file: File }) => ({
+      url: 'blob:photo-lieu-test',
+      path: null,
+      name: file.name,
+      mime: 'image/jpeg',
+      size: 14,
+    })),
+  };
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -108,6 +122,56 @@ describe('TripPlacesTab — étanchéité du voyage (15-03)', () => {
       expect(created.rating).toBeNull();
     } finally {
       await adapter.remove('places', created.id).catch(() => undefined);
+    }
+  });
+
+  it('la bascule visité est un interrupteur à droite (0121)', async () => {
+    const user = userEvent.setup();
+    renderPlaces();
+
+    await screen.findByText('Café du port');
+    const toggle = screen.getByRole('switch', { name: 'Marquer Café du port visité' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.click(toggle);
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Marquer Café du port à visiter' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    });
+    // Retour à l’état initial pour les autres tests.
+    await user.click(screen.getByRole('switch', { name: 'Marquer Café du port à visiter' }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Marquer Café du port visité' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+    });
+  });
+
+  it('une photo jointe à la création s’affiche sur l’adresse (0121)', async () => {
+    const user = userEvent.setup();
+    const { getLocalAdapter } = await import('@/lib/data/local-adapter');
+    const adapter = getLocalAdapter();
+    renderPlaces();
+
+    await screen.findByText('Café du port');
+    await user.type(screen.getByLabelText(/Nom du lieu/), 'Belvédère photo');
+    await user.upload(
+      screen.getByLabelText(/Photo du lieu/),
+      new File(['pixels'], 'belvedere.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Ajouter au voyage' }));
+
+    expect(await screen.findByText('Belvédère photo')).toBeInTheDocument();
+    try {
+      const rows = (await adapter.list('places', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as PlaceRow[];
+      const row = rows.find((entry) => entry.name === 'Belvédère photo');
+      expect(row?.photo_url).toBe('blob:photo-lieu-test');
+    } finally {
+      const rows = (await adapter.list('places', { household_id: DEMO_HOUSEHOLD_ID } as never)) as unknown as PlaceRow[];
+      const row = rows.find((entry) => entry.name === 'Belvédère photo');
+      if (row) await adapter.remove('places', row.id).catch(() => undefined);
     }
   });
 });

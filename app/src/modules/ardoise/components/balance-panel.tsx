@@ -77,7 +77,7 @@ export function MemberBalances({ balances, source = 'local' }: MemberBalancesPro
           );
         })}
         <p className="mt-3 mb-0 text-[11px] text-muted">
-          {`+${NBSP}: le foyer vous doit\u00a0· −${NBSP}: vous devez au foyer`}
+          {`+${NBSP}: on vous doit de l’argent\u00a0· −${NBSP}: vous devez de l’argent`}
         </p>
       </div>
     </Panel>

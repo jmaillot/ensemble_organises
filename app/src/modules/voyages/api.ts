@@ -876,6 +876,8 @@ export interface CreateTripPlaceArgs {
     city?: string | null;
     phone?: string | null;
     note?: string | null;
+    /** Photo déposée (chemin bucket ou aperçu démo), NULL sans photo. */
+    photoUrl?: string | null;
   };
 }
 
@@ -901,7 +903,7 @@ export async function createTripPlace(args: CreateTripPlaceArgs): Promise<PlaceR
         city: args.input.city?.trim() || null,
         phone: args.input.phone?.trim() || null,
         note: args.input.note?.trim() || null,
-        photoUrl: null,
+        photoUrl: args.input.photoUrl ?? null,
       },
       args.householdId,
     ),

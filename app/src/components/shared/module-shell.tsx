@@ -12,10 +12,14 @@ export interface ModuleHeaderProps {
   description?: string;
   kicker?: string;
   className?: string;
+  /** Destination du bouton retour (`/accueil` par défaut, p. ex. `/voyages` depuis une fiche). */
+  backTo?: string;
+  /** Libellé du bouton retour (`Retour à la maison` par défaut). */
+  backLabel?: string;
 }
 
 /** En-tête de module : retour, sur-titre, titre, accroche et actions. */
-export function ModuleHeader({ module, actions, title, description, kicker, className }: ModuleHeaderProps) {
+export function ModuleHeader({ module, actions, title, description, kicker, className, backTo = '/accueil', backLabel = 'Retour à la maison' }: ModuleHeaderProps) {
   const navigate = useNavigate();
   const entry = moduleMap[module];
   return (
@@ -27,12 +31,12 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
           variant="quiet"
           size="sm"
           icon="arrowLeft"
-          onClick={() => navigate('/accueil')}
+          onClick={() => navigate(backTo)}
           className="mb-3 -ml-2 max-[650px]:m-0 max-[650px]:size-11 max-[650px]:shrink-0 max-[650px]:rounded-full max-[650px]:border max-[650px]:border-border max-[650px]:bg-surface max-[650px]:p-0"
         >
           {/* Le libellé reste le nom accessible (même en `sr-only`) : aucun
               `aria-label` redondant, qui casserait les requêtes par label. */}
-          <span className="max-[650px]:sr-only">Retour à la maison</span>
+          <span className="max-[650px]:sr-only">{backLabel}</span>
         </Button>
         <div className="min-w-0">
           <p className="eyebrow mb-2 max-[650px]:hidden">{kicker ?? entry?.kicker ?? 'Espace du foyer'}</p>
@@ -49,10 +53,10 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
   );
 }
 
-export function ModuleShell({ module, children, actions }: { module: ModuleKey; children: ReactNode; actions?: ReactNode }) {
+export function ModuleShell({ module, children, actions, backTo, backLabel }: { module: ModuleKey; children: ReactNode; actions?: ReactNode; backTo?: string; backLabel?: string }) {
   return (
     <section className="mx-auto w-full max-w-[1180px]" data-module={module}>
-      <ModuleHeader module={module} actions={actions} />
+      <ModuleHeader module={module} actions={actions} backTo={backTo} backLabel={backLabel} />
       {children}
     </section>
   );

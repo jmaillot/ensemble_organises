@@ -9,7 +9,7 @@
  * - Photos : relues telles quelles (aucun dépôt dans la fourche).
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
@@ -17,11 +17,18 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
+import { Switch } from '@/components/ui/primitives';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { data } from '@/lib/data';
 import { placeTypes, type PlaceType } from '@/modules/adresses/types';
-import { toVisitedPayload } from '@/modules/adresses/api';
+import {
+  deletePlacePhoto,
+  isPlacePhotoPath,
+  resolvePlacePhotoUrls,
+  toVisitedPayload,
+  uploadPlacePhoto,
+} from '@/modules/adresses/api';
 import type { PlaceRow } from '@/types';
 import { createTripPlace, fetchTripPlaces } from '../api';
 
@@ -42,6 +49,7 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
   const [name, setName] = useState('');
   const [type, setType] = useState<PlaceType>('cafe');
   const [city, setCity] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PlaceRow | null>(null);
 
@@ -54,6 +62,29 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
     [placesQuery.data],
   );
 
+  // Photos téléversées : chemins bucket forgés en URL courte, échec fermé
+  // par lieu (motif couvertures de voyage, D-11).
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const placeRows = placesQuery.data ?? [];
+  useEffect(() => {
+    const pending = placeRows.filter((row) => isPlacePhotoPath(row.photo_url ?? ''));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolvePlacePhotoUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls((current) => ({ ...current, ...resolved }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [placeRows]);
+
+  const photoOf = (place: PlaceRow): string | null => {
+    const stored = place.photo_url;
+    if (!stored) return null;
+    if (!isPlacePhotoPath(stored)) return stored;
+    return photoUrls[place.id] ?? null;
+  };
+
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: tripPlacesKeys.list(tripId) });
   };
@@ -62,9 +93,28 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
     if (saving || name.trim() === '') return;
     setSaving(true);
     try {
-      await createTripPlace({ tripId, householdId, input: { name, type, city: city || null } });
+      // Dépôt-puis-écriture (motif couvertures) : le fichier gagne, et tout
+      // échec d'écriture nettoie l'objet déposé (jamais d'orphelin).
+      let photoUrl: string | null = null;
+      let depositedPath: string | null = null;
+      if (photoFile) {
+        try {
+          photoUrl = await uploadPlacePhoto(householdId, photoFile);
+          depositedPath = photoUrl;
+        } catch (uploadError) {
+          toast(uploadError instanceof Error ? uploadError.message : 'Photo impossible.', 'error');
+          return;
+        }
+      }
+      try {
+        await createTripPlace({ tripId, householdId, input: { name, type, city: city || null, photoUrl } });
+      } catch (creationError) {
+        if (depositedPath) await deletePlacePhoto(depositedPath);
+        throw creationError;
+      }
       setName('');
       setCity('');
+      setPhotoFile(null);
       refresh();
       toast('Adresse ajoutée au voyage.');
     } catch (creationError) {
@@ -90,6 +140,8 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
     void data
       .remove('places', target.id)
       .then(() => {
+        // Photo téléversée : le fichier part avec la ligne (pas d'orphelin).
+        void deletePlacePhoto(target.photo_url);
         refresh();
         toast('Adresse du voyage supprimée.');
       })
@@ -137,6 +189,28 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
                 )}
               </Field>
             </div>
+            <div className="grid gap-1.5">
+              <span className="text-[11px] font-extrabold text-muted">
+                Photo <span className="ml-1 font-normal">· optionnel</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-border bg-bg px-3.5 text-xs font-extrabold text-fg">
+                  {photoFile ? photoFile.name : 'Choisir une photo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    aria-label="Photo du lieu"
+                    onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {photoFile ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setPhotoFile(null)}>
+                    Retirer
+                  </Button>
+                ) : null}
+              </div>
+            </div>
             <div>
               <Button icon="plus" disabled={saving || name.trim() === ''} onClick={() => void submit()}>
                 {saving ? 'Ajout…' : 'Ajouter au voyage'}
@@ -157,38 +231,47 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
           />
         ) : (
           <div role="list" aria-label="Adresses du voyage" className="grid gap-2.5">
-            {places.map((place) => (
-              <div key={place.id} role="listitem" className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border px-3.5 py-3">
-                <div className="min-w-[150px] flex-1">
-                  <p className="m-0 text-[13px] font-[760]">{place.name}</p>
-                  <small className="text-[11px] text-muted">
-                    {place.city ?? 'Ville à préciser'}
-                    {place.visited ? ' · déjà visité' : ' · à visiter'}
-                  </small>
-                </div>
-                {!readOnly ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleVisited(place)}
-                      aria-label={place.visited ? `Marquer ${place.name} à visiter` : `Marquer ${place.name} visité`}
-                      aria-pressed={place.visited}
-                      className="grid min-h-11 place-items-center rounded-[9px] px-2.5 text-[12px] font-semibold text-muted hover:bg-accent-faint hover:text-fg"
-                    >
-                      {place.visited ? 'Visité' : 'À visiter'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(place)}
-                      aria-label={`Supprimer ${place.name}`}
-                      className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
-                    >
-                      <Icon name="trash" size="sm" />
-                    </button>
+            {places.map((place) => {
+              const photo = photoOf(place);
+              return (
+                <div key={place.id} role="listitem" className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border px-3.5 py-3">
+                  {photo ? (
+                    <img
+                      src={photo}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      className="size-14 shrink-0 rounded-[10px] border border-border object-cover"
+                    />
+                  ) : null}
+                  <div className="min-w-[150px] flex-1">
+                    <p className="m-0 text-[13px] font-[760]">{place.name}</p>
+                    <small className="text-[11px] text-muted">
+                      {place.city ?? 'Ville à préciser'}
+                      {place.visited ? ' · déjà visité' : ' · à visiter'}
+                    </small>
                   </div>
-                ) : null}
-              </div>
-            ))}
+                  {!readOnly ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-muted">{place.visited ? 'Visité' : 'À visiter'}</span>
+                      <Switch
+                        checked={place.visited}
+                        onCheckedChange={() => toggleVisited(place)}
+                        aria-label={place.visited ? `Marquer ${place.name} à visiter` : `Marquer ${place.name} visité`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(place)}
+                        aria-label={`Supprimer ${place.name}`}
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                      >
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         )}
       </Panel>

@@ -148,3 +148,20 @@ describe('TripDetailPage — voyage vidé (0121)', () => {
     }
   });
 });
+
+describe('TripDetailPage — retour vers la liste (0121)', () => {
+  it('l’en-tête propose un retour aux voyages, pas seulement à l’accueil', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/voyages" element={<p>Liste des voyages</p>} />
+        <Route path="/voyages/:tripId" element={<TripDetailPage />} />
+      </Routes>,
+      { route: '/voyages/trip-1' },
+    );
+
+    await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
+    await user.click(screen.getByRole('button', { name: 'Retour aux voyages' }));
+    expect(await screen.findByText('Liste des voyages')).toBeInTheDocument();
+  });
+});

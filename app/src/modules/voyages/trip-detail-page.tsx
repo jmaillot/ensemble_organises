@@ -61,7 +61,7 @@ export default function TripDetailPage() {
   }, [tabState, activeTab]);
 
   return (
-    <ModuleShell module="voyages">
+    <ModuleShell module="voyages" backTo="/voyages" backLabel="Retour aux voyages">
       {isLoading ? (
         <LoadingRows rows={3} />
       ) : isError ? (
