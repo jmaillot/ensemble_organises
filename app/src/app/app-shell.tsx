@@ -49,7 +49,12 @@ export function AppShell() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifications = useNotifications();
   const unread = notifications.total;
-  const { rows: openTasks } = useResource<TaskRow>('tasks', { filter: { status: 'a_faire' } });
+  const { rows: openTasks } = useResource<TaskRow>('tasks', {
+    filter: { status: 'a_faire' },
+    // Régime 15-01 : le badge « tâches ouvertes » ne compte que le module
+    // Tâches — les lignes de voyage vivent dans leur fiche.
+    select: (rows) => rows.filter((row) => (row as unknown as TaskRow).trip_id == null),
+  });
   const openTaskCount = openTasks.length;
 
   useEffect(() => {
