@@ -3,9 +3,11 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * Parcours Recettes (phase 16) en mode démonstration (aucun backend
  * requis) : grille → fiche → scaler → partage → Courses, périmètre
- * enfant lecture seule, page invitée. Le lien réel (Edge `recipe-invite`)
- * exige le backend : la démo prouve le câblage (dialogue, erreur
- * explicite), les preuves serveur vivent en Vitest + suite SQL 0054.
+ * enfant lecture seule, page invitée, mode cuisine (phase 17 : toggle →
+ * cocher → recharger → reprise, membre + enfant). Le lien réel
+ * (Edge `recipe-invite`) exige le backend : la démo prouve le câblage
+ * (dialogue, erreur explicite), les preuves serveur vivent en Vitest +
+ * suite SQL 0054.
  */
 
 async function openDemoSession(page: Page) {
@@ -70,7 +72,10 @@ test.describe('Recettes — grille vers fiche', () => {
     await page.getByRole('button', { name: 'Ajouter à une liste' }).click();
     await page.getByLabel(/Liste de courses/).selectOption({ label: 'Fresque' });
     await page.getByRole('button', { name: 'Envoyer les ingrédients' }).click();
-    await expect(page.getByText(/1 ligne ajoutée à « Fresque »/)).toBeVisible();
+    // Copie depuis 8269d72 (fusion des lignes existantes : « N ajoutée(s)
+    // dans », plus « N ligne(s) ajoutée(s) à ») — assertion recalée sur
+    // la copie effective (cf. SUMMARY 17-02, déviation Rule 3).
+    await expect(page.getByText(/1 ajoutée dans « Fresque »/)).toBeVisible();
     await expect(page.getByText(/Farine \(1000 g\)/)).toBeVisible();
   });
 
@@ -131,5 +136,70 @@ test.describe('Recettes — page invitée sans compte', () => {
   test('avec code en démo : le mode hors ligne est dit, pas silencieux', async ({ page }) => {
     await page.goto('/invitation/recette?code=codelienpartage1234567890');
     await expect(page.getByText(/Mode hors ligne/)).toBeVisible();
+  });
+});
+
+test.describe('Recettes — mode cuisine (phase 17, démo)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openDemoSession(page);
+  });
+
+  /** La graine démo ne fournit aucune étape : l'enfant ne voyant pas le formulaire, chaque test prépare ses étapes en membre. */
+  async function seedTwoSteps(page: Page) {
+    await page.goto('/recettes/recipe-1');
+    await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
+    await page.locator('#recette-etape-nouvelle').fill('Éplucher les pommes de terre.');
+    await page.getByRole('button', { name: 'Ajouter une étape' }).click();
+    await expect(page.getByText('Éplucher les pommes de terre.', { exact: true }).first()).toBeVisible();
+    await page.locator('#recette-etape-nouvelle').fill('Enfourner 45 minutes.');
+    await page.getByRole('button', { name: 'Ajouter une étape' }).click();
+    await expect(page.getByText('Enfourner 45 minutes.', { exact: true }).first()).toBeVisible();
+  }
+
+  test('membre : toggle, cocher, recharger, reprise, retour édition', async ({ page }) => {
+    await seedTwoSteps(page);
+
+    await page.getByRole('button', { name: 'Mode cuisine', exact: true }).click();
+    await expect(page.getByText('0/2', { exact: true })).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Marquer l’étape 1 comme faite' }).click();
+    await expect(page.getByText('1/2', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
+    // Le mode n'est jamais persisté : OFF après rechargement…
+    await expect(page.getByRole('button', { name: 'Mode cuisine', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    // …mais les cases reprennent.
+    await page.getByRole('button', { name: 'Mode cuisine', exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Marquer l’étape 1 comme faite' })).toBeChecked();
+    await expect(page.getByText('1/2', { exact: true })).toBeVisible();
+
+    // Retour édition.
+    await page.getByRole('button', { name: 'Mode cuisine', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Ajouter une étape' })).toBeVisible();
+  });
+
+  test('enfant : toggle visible et cases cochables, rien d’autre', async ({ page }) => {
+    await seedTwoSteps(page);
+
+    // Bascule enfant (même idiome que `openChildSession`, sans repasser par l'accueil).
+    await page.evaluate(() => {
+      const key = 'ensemble-organises-household';
+      const raw = localStorage.getItem(key);
+      if (!raw) throw new Error('store foyer absent');
+      const parsed = JSON.parse(raw) as { state: Record<string, unknown> };
+      localStorage.setItem(
+        key,
+        JSON.stringify({ ...parsed, state: { ...parsed.state, currentMemberId: 'member-noe' } }),
+      );
+    });
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
+
+    await expect(page.getByRole('button', { name: 'Mode cuisine', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ajouter une étape' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mode cuisine', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Marquer l’étape 1 comme faite' }).click();
+    await expect(page.getByText('1/2', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ajouter une étape' })).toHaveCount(0);
   });
 });
