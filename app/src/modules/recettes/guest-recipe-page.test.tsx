@@ -127,6 +127,22 @@ describe('GuestRecipePage', () => {
     }
   });
 
+  it('code trop court : garde sans appel réseau', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    try {
+      renderGuest(null);
+      fireEvent.change(screen.getByLabelText(/Code d’invitation/), { target: { value: 'court' } });
+      const form = screen.getByLabelText(/Code d’invitation/).closest('form');
+      if (!form) throw new Error('formulaire invité absent');
+      fireEvent.submit(form);
+      expect(await screen.findByText(/semble incomplet/)).toBeInTheDocument();
+      expect(calls).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('lien révoqué : message et retour au formulaire', async () => {
     const calls: string[] = [];
     mockViewFetch(calls, false);

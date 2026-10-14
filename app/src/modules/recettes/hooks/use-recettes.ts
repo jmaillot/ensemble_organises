@@ -162,13 +162,18 @@ export function useRecettes(filter: RecipeSearchFilter = EMPTY_RECIPE_FILTER): U
   const visibleRecipes = useMemo(() => filterRecipes(recipes, ingredientsByRecipe, filter), [recipes, ingredientsByRecipe, filter]);
 
   const refreshChildren = useCallback(async () => {
+    // Contrat de clés (couche data) : les ressources `useResource`
+    // (catégories, tags) vivent sous `[table, …]`, les enfants lus en
+    // `useQuery` direct sous `['all', table, …]` (motif tâches/routines).
+    // Invalider `[table]` seul ne touchait jamais ces derniers : les
+    // ajouts d'ingrédients/étapes restaient invisibles sans rechargement.
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: [RECIPE_INGREDIENTS_TABLE] }),
-      queryClient.invalidateQueries({ queryKey: [RECIPE_STEPS_TABLE] }),
-      queryClient.invalidateQueries({ queryKey: [RECIPE_TAG_LINKS_TABLE] }),
-      queryClient.invalidateQueries({ queryKey: [RECIPE_TAGS_TABLE] }),
-      queryClient.invalidateQueries({ queryKey: [RECIPE_FAVORITES_TABLE] }),
       queryClient.invalidateQueries({ queryKey: [RECIPE_CATEGORIES_TABLE] }),
+      queryClient.invalidateQueries({ queryKey: [RECIPE_TAGS_TABLE] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_INGREDIENTS_TABLE) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_STEPS_TABLE) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_TAG_LINKS_TABLE) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_FAVORITES_TABLE) }),
     ]);
   }, [queryClient]);
 
@@ -236,7 +241,7 @@ export function useRecettes(filter: RecipeSearchFilter = EMPTY_RECIPE_FILTER): U
     async (recipe: Recipe) => {
       if (!currentMember || !householdId) throw new Error('Aucun foyer sélectionné.');
       await toggleRecipeFavorite(recipe.id, householdId, currentMember.id, !recipe.isFavorite);
-      await queryClient.invalidateQueries({ queryKey: [RECIPE_FAVORITES_TABLE] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_FAVORITES_TABLE) });
     },
     [currentMember, householdId, queryClient],
   );
@@ -249,7 +254,7 @@ export function useRecettes(filter: RecipeSearchFilter = EMPTY_RECIPE_FILTER): U
       const changed = orderedIds.filter((id, index) => positions.get(id) !== index);
       if (changed.length === 0 && orderedIds.length === current.length) return;
       await reorderRecipeSteps(orderedIds);
-      await queryClient.invalidateQueries({ queryKey: [RECIPE_STEPS_TABLE] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tableAll(RECIPE_STEPS_TABLE) });
     },
     [canWrite, queryClient, stepsByRecipe],
   );
