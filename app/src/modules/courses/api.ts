@@ -106,6 +106,14 @@ export async function deleteShoppingList(id: string, householdId: string): Promi
   await data.remove(SHOPPING_LISTS_TABLE, id);
 }
 
+/** Articles d'une liste (lecture ciblée pour la fusion à l'envoi recette). */
+export async function listShoppingItems(listId: string, householdId: string): Promise<ShoppingListItemRow[]> {
+  return data.list<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, {
+    household_id: householdId,
+    list_id: listId,
+  });
+}
+
 export async function createShoppingItem(input: ShoppingItemInput): Promise<ShoppingListItemRow> {
   return data.create<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, {
     household_id: input.householdId,

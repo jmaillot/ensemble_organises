@@ -15,7 +15,7 @@ describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () 
       created_at: '2026-10-14T10:00:00.000Z',
     });
 
-    const created = await sendRecipeIngredientsToCourses({
+    const sent = await sendRecipeIngredientsToCourses({
       householdId: DEMO_HOUSEHOLD_ID,
       listId: list.id,
       addedBy: DEMO_MEMBERS.camille,
@@ -29,11 +29,73 @@ describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () 
     });
 
     // Quantités doublées, unité accordée, NULL « au goût » intact.
-    expect(created.map((row) => [row.name, row.quantity, row.unit])).toEqual([
+    expect(sent.rows.map((row) => [row.name, row.quantity, row.unit])).toEqual([
       ['Farine', 1000, 'g'],
       ['Œuf', 2, 'œufs'],
       ['Sel', null, 'au goût'],
     ]);
+    expect(sent.createdCount).toBe(3);
+    expect(sent.mergedCount).toBe(0);
+    const stored = await adapter.list('shopping_list_items', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      list_id: list.id,
+    });
+    expect(stored).toHaveLength(3);
+  });
+
+  it('les lignes existantes non cochées sont incrémentées, pas dupliquées', async () => {
+    const adapter = getLocalAdapter();
+    const list = await adapter.create<ShoppingListRow>('shopping_lists', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Courses fusion',
+      created_by: DEMO_MEMBERS.camille,
+      created_at: '2026-10-14T10:00:00.000Z',
+    });
+    await adapter.create('shopping_list_items', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      list_id: list.id,
+      name: 'Œuf',
+      quantity: 1,
+      unit: 'œuf',
+      category: 'Frais',
+      checked: false,
+      added_by: DEMO_MEMBERS.camille,
+      product_id: null,
+      created_at: '2026-10-14T10:00:00.000Z',
+    });
+    // Ligne cochée : déjà achetée, ne fusionne pas.
+    await adapter.create('shopping_list_items', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      list_id: list.id,
+      name: 'Farine',
+      quantity: 200,
+      unit: 'g',
+      category: 'Épicerie',
+      checked: true,
+      added_by: DEMO_MEMBERS.camille,
+      product_id: null,
+      created_at: '2026-10-14T10:00:00.000Z',
+    });
+
+    const sent = await sendRecipeIngredientsToCourses({
+      householdId: DEMO_HOUSEHOLD_ID,
+      listId: list.id,
+      addedBy: DEMO_MEMBERS.camille,
+      ingredients: [
+        { name: 'oeuf', quantity: 3, unit: 'œuf' },
+        { name: 'Farine', quantity: 500, unit: 'g' },
+      ],
+      baseServings: 4,
+      targetServings: 4,
+    });
+
+    // « oeuf » sans accent rejoint « Œuf » : 1 + 3 = 4, unité accordée.
+    expect(sent.rows.map((row) => [row.name, row.quantity, row.unit])).toEqual([
+      ['Œuf', 4, 'œufs'],
+      ['Farine', 500, 'g'],
+    ]);
+    expect(sent.mergedCount).toBe(1);
+    expect(sent.createdCount).toBe(1);
     const stored = await adapter.list('shopping_list_items', {
       household_id: DEMO_HOUSEHOLD_ID,
       list_id: list.id,

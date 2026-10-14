@@ -11,7 +11,7 @@ import type {
   RecipeTagRow,
   ShoppingListItemRow,
 } from '@/types';
-import { createShoppingItem } from '../courses/api';
+import { createShoppingItem, listShoppingItems, updateShoppingItem } from '../courses/api';
 import { guessRayon } from '../courses/types';
 import { agreeUnit, scaleQuantity, type RecipeFormValues } from './types';
 
@@ -556,25 +556,87 @@ export interface RecipeCoursesSendInput {
 /**
  * Insère les ingrédients aux quantités de l'échelle courante
  * (`qté × cible/base`, NULL « au goût » intact), unité accordée (+s/+x),
- * rayon deviné depuis le nom. Le chemin d'appel est gardé `canWrite`
- * (T-16-13, garde page) ; la RLS refuse de toute façon les écritures
- * enfant côté serveur.
+ * rayon deviné depuis le nom. Les lignes existantes non cochées de même
+ * nom (insensible casse/accents) et même unité sont incrémentées au lieu
+ * d'être dupliquées ; les lignes cochées (déjà achetées), les unités
+ * différentes et les quantités NULL restent des lignes séparées.
+ * Le chemin d'appel est gardé `canWrite` (T-16-13, garde page) ; la RLS
+ * refuse de toute façon les écritures enfant côté serveur.
  */
-export async function sendRecipeIngredientsToCourses(input: RecipeCoursesSendInput): Promise<ShoppingListItemRow[]> {
-  const created: ShoppingListItemRow[] = [];
+export interface RecipeCoursesSendResult {
+  rows: ShoppingListItemRow[];
+  createdCount: number;
+  mergedCount: number;
+}
+
+/** Normalisation de comparaison : casse + accents + ligatures + espaces ignorés. */
+function normalizeItemName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
+function normalizeItemUnit(value: string | null): string | null {
+  const trimmed = value?.trim().toLowerCase() ?? '';
+  if (!trimmed) return null;
+  // Forme singulière : l'accord (+s au-delà de 1) ne doit pas empêcher la
+  // fusion (`1 œuf` existant + `3 œufs` calculés = `4 œufs`).
+  return trimmed.replace(/s$/, '');
+}
+
+export async function sendRecipeIngredientsToCourses(input: RecipeCoursesSendInput): Promise<RecipeCoursesSendResult> {
+  const existing = await listShoppingItems(input.listId, input.householdId);
+  // Copie de travail : deux ingrédients identiques de la même recette
+  // s'accumulent sur la même ligne plutôt qu'en deux créations.
+  const working = existing.map((row) => ({ ...row }));
+  const rows: ShoppingListItemRow[] = [];
+  let createdCount = 0;
+  let mergedCount = 0;
   for (const ingredient of input.ingredients) {
     const scaled = scaleQuantity(ingredient.quantity, input.baseServings, input.targetServings);
-    created.push(
-      await createShoppingItem({
-        householdId: input.householdId,
-        listId: input.listId,
-        name: ingredient.name,
-        quantity: scaled,
-        unit: agreeUnit(ingredient.unit, scaled),
-        rayon: guessRayon(ingredient.name),
-        addedBy: input.addedBy,
-      }),
-    );
+    const unit = agreeUnit(ingredient.unit, scaled);
+    const nameKey = normalizeItemName(ingredient.name);
+    const unitKey = normalizeItemUnit(unit);
+    const match =
+      scaled !== null
+        ? working.find(
+            (row) =>
+              !row.checked &&
+              row.quantity !== null &&
+              normalizeItemName(row.name) === nameKey &&
+              normalizeItemUnit(row.unit) === unitKey,
+          )
+        : undefined;
+    if (match) {
+      const mergedQuantity = (match.quantity as number) + (scaled as number);
+      const updated = await updateShoppingItem(match.id, {
+        name: match.name,
+        quantity: mergedQuantity,
+        // Accord réévalué sur le total (`1 œuf` + 3 → `4 œufs`).
+        unit: agreeUnit(match.unit, mergedQuantity),
+        rayon: match.category ?? guessRayon(match.name),
+      });
+      match.quantity = updated.quantity;
+      rows.push(updated);
+      mergedCount += 1;
+    } else {
+      rows.push(
+        await createShoppingItem({
+          householdId: input.householdId,
+          listId: input.listId,
+          name: ingredient.name,
+          quantity: scaled,
+          unit,
+          rayon: guessRayon(ingredient.name),
+          addedBy: input.addedBy,
+        }),
+      );
+      createdCount += 1;
+    }
   }
-  return created;
+  return { rows, createdCount, mergedCount };
 }

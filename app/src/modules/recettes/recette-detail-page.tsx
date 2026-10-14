@@ -94,7 +94,14 @@ export default function RecetteDetailPage() {
   };
 
   const effectiveTarget = targetServings ?? closestServingsStep(recipe?.servings ?? 4);
-  const selectedCoursesListId = coursesListId !== '' ? coursesListId : (shoppingLists.rows[0]?.id ?? '');
+  /** Listes du foyer seul (phase 15 : les fourches voyage `trip_id` sont exclues, comme Courses). */
+  const householdShoppingLists = useMemo(
+    () => shoppingLists.rows.filter((list) => list.trip_id == null),
+    [shoppingLists.rows],
+  );
+  const validCoursesListId =
+    coursesListId !== '' && householdShoppingLists.some((list) => list.id === coursesListId) ? coursesListId : '';
+  const selectedCoursesListId = validCoursesListId !== '' ? validCoursesListId : (householdShoppingLists[0]?.id ?? '');
   const printModel = recipe
     ? toRecipePrintModel({
         title: recipe.title,
@@ -120,7 +127,7 @@ export default function RecetteDetailPage() {
         return;
       }
       setCoursesBusy(true);
-      const created = await sendRecipeIngredientsToCourses({
+      const sent = await sendRecipeIngredientsToCourses({
         householdId: recipe.householdId,
         listId: selectedCoursesListId,
         addedBy: currentMemberId === '' ? null : currentMemberId,
@@ -128,11 +135,15 @@ export default function RecetteDetailPage() {
         baseServings: recipe.servings,
         targetServings: effectiveTarget,
       });
-      const listName = shoppingLists.rows.find((list) => list.id === selectedCoursesListId)?.name ?? 'la liste';
-      const lines = created
+      const listName = householdShoppingLists.find((list) => list.id === selectedCoursesListId)?.name ?? 'la liste';
+      const lines = sent.rows
         .map((row) => `${row.name} (${row.quantity === null ? (row.unit ?? 'au goût') : `${row.quantity}${row.unit ? ` ${row.unit}` : ''}`})`)
         .join(', ');
-      setCoursesResult(`${created.length} ligne${created.length > 1 ? 's' : ''} ajoutée${created.length > 1 ? 's' : ''} à « ${listName} » : ${lines}.`);
+      const parts: string[] = [];
+      if (sent.createdCount > 0) parts.push(`${sent.createdCount} ajoutée${sent.createdCount > 1 ? 's' : ''}`);
+      if (sent.mergedCount > 0)
+        parts.push(`${sent.mergedCount} quantité${sent.mergedCount > 1 ? 's' : ''} cumulée${sent.mergedCount > 1 ? 's' : ''}`);
+      setCoursesResult(`${parts.join(', ')} dans « ${listName} » : ${lines}.`);
       toast('Ingrédients envoyés vers Courses.');
     } catch (sendError) {
       toast(sendError instanceof Error ? sendError.message : 'L’envoi vers Courses a échoué.', 'error');
@@ -333,10 +344,10 @@ export default function RecetteDetailPage() {
                     id="recette-courses-liste"
                     value={selectedCoursesListId}
                     onChange={(event) => setCoursesListId(event.target.value)}
-                    disabled={coursesBusy || shoppingLists.rows.length === 0}
+                    disabled={coursesBusy || householdShoppingLists.length === 0}
                   >
-                    {shoppingLists.rows.length === 0 ? <option value="">Aucune liste dans ce foyer</option> : null}
-                    {shoppingLists.rows.map((list) => (
+                    {householdShoppingLists.length === 0 ? <option value="">Aucune liste dans ce foyer</option> : null}
+                    {householdShoppingLists.map((list) => (
                       <option key={list.id} value={list.id}>
                         {list.name}
                       </option>
