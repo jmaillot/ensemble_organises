@@ -69,21 +69,40 @@ export interface PanelProps {
   children: ReactNode;
   className?: string;
   id?: string;
+  /**
+   * En-tête inline sur mobile (G-17-2, D-12) : quand vrai, l'en-tête garde
+   * la rangée titre-à-gauche/action-à-droite sous 650px au lieu de
+   * s'empiler en colonne. Faux par défaut : rendu strictement identique
+   * pour tous les autres consommateurs. Seuls les deux panneaux Étapes
+   * (membre + invité) l'activent pour garder le toggle Mode cuisine en
+   * haut à droite sur mobile.
+   */
+  headerInlineOnMobile?: boolean;
 }
 
-export function Panel({ title, description, action, children, className, id }: PanelProps) {
+export function Panel({ title, description, action, children, className, id, headerInlineOnMobile = false }: PanelProps) {
   return (
     // `min-w-0` : une carte peut toujours rétrécir sous la largeur de sa colonne
     // de grille, sinon son contenu le plus large ferait déborder la page.
     <section id={id} className={cn('panel-surface min-w-0 rounded-[16px] p-[19px] max-[650px]:p-[14px]', className)}>
       {title || action ? (
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-col max-[650px]:gap-2.5">
-          <div>
-            {title ? <h3 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h3> : null}
-            {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}
+        headerInlineOnMobile ? (
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-row max-[650px]:gap-2.5">
+            <div className="min-w-0 flex-1">
+              {title ? <h3 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h3> : null}
+              {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}
+            </div>
+            {action ? <div className="shrink-0">{action}</div> : null}
           </div>
-          {action}
-        </div>
+        ) : (
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-col max-[650px]:gap-2.5">
+            <div>
+              {title ? <h3 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h3> : null}
+              {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}
+            </div>
+            {action}
+          </div>
+        )
       ) : null}
       {children}
     </section>

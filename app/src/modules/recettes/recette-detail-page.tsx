@@ -294,6 +294,7 @@ export default function RecetteDetailPage() {
 
       <Panel
         title="Étapes"
+        headerInlineOnMobile
         description={
           cuisine
             ? 'Cochez au fur et à mesure. Progression mémorisée sur cet appareil.'
