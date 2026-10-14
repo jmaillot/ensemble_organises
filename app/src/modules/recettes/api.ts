@@ -1,5 +1,5 @@
 import { data } from '@/lib/data';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 import type {
   RecipeCategoryRow,
@@ -9,8 +9,11 @@ import type {
   RecipeStepRow,
   RecipeTagLinkRow,
   RecipeTagRow,
+  ShoppingListItemRow,
 } from '@/types';
-import { type RecipeFormValues } from './types';
+import { createShoppingItem } from '../courses/api';
+import { guessRayon } from '../courses/types';
+import { agreeUnit, scaleQuantity, type RecipeFormValues } from './types';
 
 export const RECIPES_TABLE = 'recipes';
 export const RECIPE_CATEGORIES_TABLE = 'recipe_categories';
@@ -295,3 +298,240 @@ export async function resolveRecipeCoverUrls(
 }
 
 export type { RecipeRow };
+
+/* ------------------------------------------------------------------ */
+/* Partage invité (Edge Function `recipe-invite`, R11, D-13/D-14)       */
+/*                                                                     */
+/* Même régime que `ardoise-invite` / `gift-list-invite` : lien seul   */
+/* `link-view` en lecture seule, code brut affiché une seule fois,     */
+/* révocation immédiate, compteur max-uses consommé côté serveur       */
+/* (`FOR UPDATE`, prouvé en 0054, 16-01). La page invitée n'appelle     */
+/* jamais PostgREST en direct — `fetchGuestRecipeView` seul y accède.  */
+/* ------------------------------------------------------------------ */
+
+/** Lien à envoyer à l'externe : affiché une seule fois avec le code (QR). */
+export function recipeInviteLink(code: string): string {
+  return `/invitation/recette?code=${encodeURIComponent(code)}`;
+}
+
+async function callRecipeInvite<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
+  const { data: authData } = await supabase!.auth.getSession();
+  const session = authData.session;
+  const response = await fetch(`${supabaseFunctionsBase}/recipe-invite`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
+    },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error((detail as { error?: string } | null)?.error ?? 'Partage impossible.');
+  }
+  return (await response.json()) as T;
+}
+
+/**
+ * Appel sans session (invités externes) : le code EST le contrôle d'accès.
+ * La clé publiable part toujours, le jeton porteur seulement quand une
+ * session existe — un visiteur sans compte reste strictement anonyme.
+ */
+async function callRecipeInvitePublishable<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+  };
+  try {
+    const session = (await supabase?.auth.getSession())?.data.session ?? null;
+    if (session?.access_token) headers.authorization = `Bearer ${session.access_token}`;
+  } catch {
+    // Stockage de session illisible : on part sans jeton (chemin visiteur).
+  }
+  const response = await fetch(`${supabaseFunctionsBase}/recipe-invite`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error((detail as { error?: string } | null)?.error ?? 'Opération impossible.');
+  }
+  return (await response.json()) as T;
+}
+
+export interface RecipeInviteCode {
+  code: string;
+  expiresAt: string | null;
+  maxUses: number;
+  recipeId: string;
+}
+
+export interface RecipeInviteSummary {
+  recipeId: string;
+  isActive: boolean;
+  hasCode: boolean;
+  expiresAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+}
+
+/** Génère (ou régénère, invalidant le précédent) le lien d'une recette. */
+export async function createRecipeInviteCode(
+  recipeId: string,
+  options?: { expiresAt?: string; maxUses?: number },
+): Promise<RecipeInviteCode> {
+  return callRecipeInvite<RecipeInviteCode>('create', {
+    recipeId,
+    ...(options?.expiresAt ? { expiresAt: options.expiresAt } : {}),
+    ...(options?.maxUses ? { maxUses: options.maxUses } : {}),
+  });
+}
+
+/** Arrête le partage : tous les liens actifs de la recette sont révoqués. */
+export async function revokeRecipeInviteCode(recipeId: string): Promise<void> {
+  await callRecipeInvite('revoke', { recipeId });
+}
+
+export async function fetchRecipeInviteSummary(recipeId: string): Promise<RecipeInviteSummary | null> {
+  if (!isSupabaseConfigured) return null;
+  return callRecipeInvite<RecipeInviteSummary | null>('summary', { recipeId });
+}
+
+/* ------------------------------------------------------------------ */
+/* Vue invitée sans compte (R11, T-16-10/T-16-12)                       */
+/* ------------------------------------------------------------------ */
+
+export interface GuestRecipeIngredient {
+  id: string;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  position: number;
+}
+
+export interface GuestRecipeStep {
+  id: string;
+  content: string;
+  position: number;
+}
+
+/** Fiche telle que la voit un visiteur : contenu seul, jamais d'auteur. */
+export interface GuestRecipeView {
+  recipeId: string | null;
+  title: string | null;
+  servings: number | null;
+  prepMinutes: number | null;
+  cookMinutes: number | null;
+  /** URL signée éphémère forgée par requête, ou null (échec fermé). */
+  coverPhotoUrl: string | null;
+  category: string | null;
+  ingredients: GuestRecipeIngredient[];
+  steps: GuestRecipeStep[];
+  tags: string[];
+}
+
+/** Chaîne non vide telle quelle, sinon null (même normalisation que l'Edge). */
+function asGuestText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toGuestIngredient(entry: unknown): GuestRecipeIngredient {
+  const row = (entry ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    quantity: typeof row.quantity === 'number' ? row.quantity : null,
+    unit: typeof row.unit === 'string' ? row.unit : null,
+    position: typeof row.position === 'number' ? row.position : 0,
+  };
+}
+
+function toGuestStep(entry: unknown): GuestRecipeStep {
+  const row = (entry ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ''),
+    content: String(row.content ?? ''),
+    position: typeof row.position === 'number' ? row.position : 0,
+  };
+}
+
+/**
+ * Lecture invitée sans compte : rend la fiche lecture seule. Projection
+ * défensive côté client (miroir du handler Edge) : même si la charge servie
+ * rendait un jour plus, aucun identifiant de membre ne quitte ce helper.
+ * Les erreurs Edge sont des messages utilisateurs (oracle unique
+ * `Ce lien est invalide.`) : propagés tels quels, sans reformulation.
+ */
+export async function fetchGuestRecipeView(code: string): Promise<GuestRecipeView> {
+  const trimmed = code.trim();
+  if (trimmed.length < 22) throw new Error('Lien invalide.');
+  const view = await callRecipeInvitePublishable<{
+    recipeId: string | null;
+    title: string | null;
+    servings: number | null;
+    prepMinutes: number | null;
+    cookMinutes: number | null;
+    coverPhotoUrl: string | null;
+    category: string | null;
+    ingredients: unknown;
+    steps: unknown;
+    tags: unknown;
+  }>('link-view', { code: trimmed });
+  return {
+    recipeId: typeof view.recipeId === 'string' ? view.recipeId : null,
+    title: typeof view.title === 'string' ? view.title : null,
+    servings: typeof view.servings === 'number' ? view.servings : null,
+    prepMinutes: typeof view.prepMinutes === 'number' ? view.prepMinutes : null,
+    cookMinutes: typeof view.cookMinutes === 'number' ? view.cookMinutes : null,
+    coverPhotoUrl: asGuestText(view.coverPhotoUrl),
+    category: asGuestText(view.category),
+    ingredients: Array.isArray(view.ingredients) ? view.ingredients.map(toGuestIngredient) : [],
+    steps: Array.isArray(view.steps) ? view.steps.map(toGuestStep) : [],
+    tags: Array.isArray(view.tags) ? view.tags.map(String) : [],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Envoi vers Courses (R14, D-16)                                       */
+/* ------------------------------------------------------------------ */
+
+export interface RecipeCoursesSendInput {
+  householdId: string;
+  listId: string;
+  addedBy: string | null;
+  ingredients: { name: string; quantity: number | null; unit: string | null }[];
+  baseServings: number;
+  targetServings: number;
+}
+
+/**
+ * Insère les ingrédients aux quantités de l'échelle courante
+ * (`qté × cible/base`, NULL « au goût » intact), unité accordée (+s/+x),
+ * rayon deviné depuis le nom. Le chemin d'appel est gardé `canWrite`
+ * (T-16-13, garde page) ; la RLS refuse de toute façon les écritures
+ * enfant côté serveur.
+ */
+export async function sendRecipeIngredientsToCourses(input: RecipeCoursesSendInput): Promise<ShoppingListItemRow[]> {
+  const created: ShoppingListItemRow[] = [];
+  for (const ingredient of input.ingredients) {
+    const scaled = scaleQuantity(ingredient.quantity, input.baseServings, input.targetServings);
+    created.push(
+      await createShoppingItem({
+        householdId: input.householdId,
+        listId: input.listId,
+        name: ingredient.name,
+        quantity: scaled,
+        unit: agreeUnit(ingredient.unit, scaled),
+        rayon: guessRayon(ingredient.name),
+        addedBy: input.addedBy,
+      }),
+    );
+  }
+  return created;
+}

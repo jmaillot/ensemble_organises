@@ -233,6 +233,12 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/invitation/recette"
+        element={
+          <LazyRoute load={routeChunkLoaders.guestRecette} />
+        }
+      />
+      <Route
         path="/confidentialite"
         element={
           <LazyRoute load={routeChunkLoaders.privacy} />

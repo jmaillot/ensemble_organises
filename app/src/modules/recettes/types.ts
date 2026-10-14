@@ -213,3 +213,44 @@ export const toStep = (row: RecipeStepRow): RecipeStep => ({
   content: row.content,
   position: row.position,
 });
+
+/* ------------------------------------------------------------------ */
+/* Vue print (SPEC R12) : nom + ingredients a l'echelle + etapes.       */
+/* ------------------------------------------------------------------ */
+
+export interface RecipePrintModel {
+  title: string;
+  meta: string;
+  ingredientLines: string[];
+  stepLines: string[];
+}
+
+/**
+ * Modèle de la vue print : nom + ingrédients recalculés à l'échelle
+ * courante + étapes numérotées. Robuste sans photo : aucune URL requise,
+ * la photo n'apparaît jamais dans le modèle.
+ */
+export function toRecipePrintModel(args: {
+  title: string;
+  servings: number;
+  targetServings: number;
+  prepMinutes: number | null;
+  cookMinutes: number | null;
+  ingredients: RecipeIngredient[];
+  steps: RecipeStep[];
+}): RecipePrintModel {
+  const total = formatTotalTime(args.prepMinutes, args.cookMinutes);
+  const meta = [
+    `Pour ${args.targetServings} personne${args.targetServings > 1 ? 's' : ''} (référence : ${args.servings})`,
+    ...(total ? [total] : []),
+  ].join(' · ');
+  const ingredientLines = args.ingredients.map((ingredient) => {
+    const scaled = scaleQuantity(ingredient.quantity, args.servings, args.targetServings);
+    const display = formatQuantity(scaled);
+    const unit = agreeUnit(ingredient.unit, scaled);
+    const qty = display === null ? (ingredient.unit ?? 'au goût') : `${display}${unit ? ` ${unit}` : ''}`;
+    return `${ingredient.name} — ${qty}`;
+  });
+  const stepLines = args.steps.map((step, index) => `${index + 1}. ${step.content}`);
+  return { title: args.title, meta, ingredientLines, stepLines };
+}
