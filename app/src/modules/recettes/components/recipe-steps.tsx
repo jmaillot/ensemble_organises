@@ -215,7 +215,7 @@ function StepRow(props: StepRowProps) {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('relative flex gap-3 py-3 first:pt-0 last:pb-0', isDragging && 'opacity-50')}
     >
-      <span className="flex flex-col items-center" aria-hidden="true">
+      <span className="flex flex-col items-center">
         {readOnly ? (
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-soft text-[13px] font-[800] text-accent-strong">
             {number}
@@ -233,7 +233,7 @@ function StepRow(props: StepRowProps) {
             {number}
           </button>
         )}
-        {!isLast ? <span className="mt-1 w-px flex-1 bg-border" /> : null}
+        {!isLast ? <span aria-hidden="true" className="mt-1 w-px flex-1 bg-border" /> : null}
       </span>
 
       <div className="min-w-0 flex-1">

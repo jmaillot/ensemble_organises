@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agreeUnit, formatQuantity, formatTotalTime, roundToEven, scaleQuantity } from './types';
+import { agreeUnit, closestServingsStep, formatQuantity, formatTotalTime, roundToEven, scaleQuantity, SERVINGS_STEPS } from './types';
 
 describe('Scaler recettes (R8, D-06, D-07)', () => {
   it('arrondit la reference au pair le plus proche (3 vers 4)', () => {
@@ -7,6 +7,15 @@ describe('Scaler recettes (R8, D-06, D-07)', () => {
     expect(roundToEven(5)).toBe(6);
     expect(roundToEven(4)).toBe(4);
     expect(roundToEven(2)).toBe(2);
+  });
+
+  it('le curseur demarre a la reference arrondie, paires 2-12', () => {
+    expect(SERVINGS_STEPS).toEqual([2, 4, 6, 8, 10, 12]);
+    expect(closestServingsStep(3)).toBe(4);
+    expect(closestServingsStep(4)).toBe(4);
+    expect(closestServingsStep(7)).toBe(8);
+    expect(closestServingsStep(1)).toBe(2);
+    expect(closestServingsStep(48)).toBe(12);
   });
 
   it('1 oeuf pour 4 donne 0.5 oeuf a 2 et 2 oeufs a 8', () => {
