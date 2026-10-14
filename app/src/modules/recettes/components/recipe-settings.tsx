@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -29,7 +28,9 @@ export interface RecipeSettingsProps {
  * Parametres du module (R2/R4) : renommer/supprimer categories (pleine
  * re-assignee au defaut par le trigger serveur, vide en DELETE direct) et
  * tags (repercute sur les recettes via les liens). Creation reservee aux
- * roles qui ecrivent (garde canWrite + serveur).
+ * roles qui ecrivent (garde canWrite + serveur). Contenu affiche dans le
+ * dialogue « Catégories et étiquettes » de la page (bouton engrenage),
+ * comme les types prestataires.
  */
 export function RecipeSettings({ householdId, categories, tags, recipeCounts, isSaving, onChanged }: RecipeSettingsProps) {
   const toast = useToast();
@@ -51,9 +52,8 @@ export function RecipeSettings({ householdId, categories, tags, recipeCounts, is
   };
 
   return (
-    <Panel title="Catégories et étiquettes" description="Gérez l’organisation de vos recettes.">
-      <div className="grid gap-4 md:grid-cols-2">
-        <section aria-label="Catégories">
+    <div className="grid gap-4 md:grid-cols-2">
+      <section aria-label="Catégories">
           <h3 className="m-0 mb-2 text-[13px] font-[800]">Catégories</h3>
           <ul className="m-0 grid list-none gap-0 p-0">
             {categories.map((category) => {
@@ -258,6 +258,5 @@ export function RecipeSettings({ householdId, categories, tags, recipeCounts, is
           ) : null}
         </section>
       </div>
-    </Panel>
   );
 }

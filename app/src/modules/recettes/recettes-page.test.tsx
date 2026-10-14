@@ -90,4 +90,20 @@ describe('Recettes — grille vers fiche (tracer)', () => {
     expect(await screen.findByRole('link', { name: 'Ouvrir la fiche Gratin dauphinois' })).toBeInTheDocument();
     expect(screen.getByText('1h15')).toBeInTheDocument();
   });
+
+  it('le bouton engrenage ouvre les parametres categories et etiquettes en dialogue', async () => {
+    await seedGrid();
+    const user = userEvent.setup();
+    renderWithProviders(<Shell />, { route: '/recettes' });
+
+    await screen.findByRole('heading', { name: 'Recettes du foyer' });
+    // Panneau de gestion masqué tant que le dialogue est fermé.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Catégories et étiquettes' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Catégories')).toBeInTheDocument();
+    expect(within(dialog).getByText('Étiquettes')).toBeInTheDocument();
+  });
 });

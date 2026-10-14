@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -34,6 +35,7 @@ export default function RecettesPage() {
   const toast = useToast();
   const householdId = useHouseholdStore((state) => state.householdId);
   const [dialog, setDialog] = useState<{ open: boolean; recipe: Recipe | null }>({ open: false, recipe: null });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const coverInputs = useMemo(
     () => visibleRecipes.map((recipe) => ({ id: recipe.id, cover_photo: recipe.coverPhoto })),
@@ -95,9 +97,14 @@ export default function RecettesPage() {
       module="recettes"
       actions={
         canWrite ? (
-          <Button icon="plus" onClick={() => setDialog({ open: true, recipe: null })}>
-            Nouvelle recette
-          </Button>
+          <>
+            <Button variant="secondary" icon="settings" onClick={() => setSettingsOpen(true)}>
+              Catégories et étiquettes
+            </Button>
+            <Button icon="plus" onClick={() => setDialog({ open: true, recipe: null })}>
+              Nouvelle recette
+            </Button>
+          </>
         ) : undefined
       }
     >
@@ -208,15 +215,24 @@ export default function RecettesPage() {
           ))
         : null}
 
-      {canWrite && !isLoading && !isError && householdId ? (
-        <RecipeSettings
-          householdId={householdId}
-          categories={categories}
-          tags={tags}
-          recipeCounts={recipeCounts}
-          isSaving={isMutating}
-          onChanged={() => refreshChildren()}
-        />
+      {canWrite && householdId ? (
+        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <p className="eyebrow mb-2">Recettes</p>
+              <DialogTitle>Catégories et étiquettes</DialogTitle>
+              <DialogDescription>Gérez l’organisation de vos recettes.</DialogDescription>
+            </DialogHeader>
+            <RecipeSettings
+              householdId={householdId}
+              categories={categories}
+              tags={tags}
+              recipeCounts={recipeCounts}
+              isSaving={isMutating}
+              onChanged={() => refreshChildren()}
+            />
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       <RecipeFormDialog
