@@ -302,6 +302,12 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/recettes/:id"
+          element={
+            <LazyRoute load={routeChunkLoaders.recetteDetail} />
+          }
+        />
+        <Route
           path="/ardoise"
           element={
             <RequireGrownUp>

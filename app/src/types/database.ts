@@ -355,6 +355,61 @@ export interface RecipeRow {
   household_id: Uuid;
   title: string;
   created_at: IsoDateTime;
+  /** Categorie du foyer (0122, null = categorie par defaut). */
+  category_id?: Uuid | null;
+  /** Personnes de reference du scaler (0122, null = 4). */
+  servings?: number | null;
+  /** Minutes de preparation (0122, null = non renseigne). */
+  prep_minutes?: number | null;
+  /** Minutes de cuisson (0122, null = non renseigne). */
+  cook_minutes?: number | null;
+  /** Chemin prive de la couverture (`recipes/<id>/…`, 0122). */
+  cover_photo?: string | null;
+  /** Membre createur (0122, null pour les lignes heritees). */
+  created_by?: Uuid | null;
+}
+
+export interface RecipeCategoryRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+}
+
+export interface RecipeTagRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+}
+
+export interface RecipeTagLinkRow {
+  recipe_id: Uuid;
+  household_id: Uuid;
+  tag_id: Uuid;
+}
+
+export interface RecipeIngredientRow {
+  id: Uuid;
+  recipe_id: Uuid;
+  household_id: Uuid;
+  name: string;
+  /** null = « au gout », affiche tel quel a toutes les echelles (R8). */
+  quantity: number | null;
+  unit: string | null;
+  position: number;
+}
+
+export interface RecipeStepRow {
+  id: Uuid;
+  recipe_id: Uuid;
+  household_id: Uuid;
+  content: string;
+  position: number;
+}
+
+export interface RecipeFavoriteRow {
+  recipe_id: Uuid;
+  household_id: Uuid;
+  member_id: Uuid;
 }
 
 export interface ExpenseRow {

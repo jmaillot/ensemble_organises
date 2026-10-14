@@ -35,7 +35,13 @@ import type {
   ProviderRow,
   ProviderTypeRow,
   PublicHolidayRow,
+  RecipeCategoryRow,
+  RecipeFavoriteRow,
+  RecipeIngredientRow,
   RecipeRow,
+  RecipeStepRow,
+  RecipeTagLinkRow,
+  RecipeTagRow,
   RoutineAssigneeRow,
   RoutineCompletionRow,
   RoutineRow,
@@ -418,6 +424,33 @@ export const demoRoutineCompletions: RoutineCompletionRow[] = [
 export const demoRecipes: RecipeRow[] = [
   { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', created_at: now() },
 ];
+
+/** Categorie par defaut + 14 tags (miroir des seeds SQL 0122, R2/R4). */
+export const demoRecipeCategories: RecipeCategoryRow[] = [
+  { id: 'recipe-category-default', household_id: DEMO_HOUSEHOLD_ID, name: 'Recettes du foyer' },
+];
+
+export const demoRecipeTags: RecipeTagRow[] = [
+  'Apéro',
+  'Entrée',
+  'Plat',
+  'Dessert',
+  'Goûter',
+  'Petit-déj',
+  'Boissons',
+  'Asie',
+  'Italien',
+  'Mexicain',
+  'Oriental',
+  'Pâtes',
+  'Végétarien',
+  'Poisson',
+].map((name, index) => ({ id: `recipe-tag-${index + 1}`, household_id: DEMO_HOUSEHOLD_ID, name }));
+
+export const demoRecipeTagLinks: RecipeTagLinkRow[] = [];
+export const demoRecipeIngredients: RecipeIngredientRow[] = [];
+export const demoRecipeSteps: RecipeStepRow[] = [];
+export const demoRecipeFavorites: RecipeFavoriteRow[] = [];
 
 export const demoArdoises: ArdoiseRow[] = [
   {
@@ -1350,6 +1383,12 @@ const seedTables: Record<string, Row[]> = {
   routine_assignees: demoRoutineAssignees as unknown as Row[],
   routine_completions: demoRoutineCompletions as unknown as Row[],
   recipes: demoRecipes as unknown as Row[],
+  recipe_categories: demoRecipeCategories as unknown as Row[],
+  recipe_tags: demoRecipeTags as unknown as Row[],
+  recipe_tag_links: demoRecipeTagLinks as unknown as Row[],
+  recipe_ingredients: demoRecipeIngredients as unknown as Row[],
+  recipe_steps: demoRecipeSteps as unknown as Row[],
+  recipe_favorites: demoRecipeFavorites as unknown as Row[],
   expenses: [...demoExpenses, ...demoTripExpenses] as unknown as Row[],
   expense_participants: [...demoExpenseParticipants, ...demoTripExpenseParticipants] as unknown as Row[],
   ardoises: [...demoArdoises, demoTripArdoise] as unknown as Row[],

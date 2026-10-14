@@ -35,6 +35,7 @@ export const routeChunkLoaders = {
   productCatalog: () => import('@/modules/courses/product-catalog-page'),
   routines: () => import('@/modules/routines/routines-page'),
   recettes: () => import('@/modules/recettes/recettes-page'),
+  recetteDetail: () => import('@/modules/recettes/recette-detail-page'),
   ardoise: () => import('@/modules/ardoise/ardoise-page'),
   ardoiseDetail: () => import('@/modules/ardoise/ardoise-detail-page'),
   cadeaux: () => import('@/modules/cadeaux/cadeaux-page'),
