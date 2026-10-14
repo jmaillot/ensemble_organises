@@ -44,7 +44,14 @@ begin
           ('routine_assignees', ARRAY['routine_id', 'member_id']::text[]),
           ('routine_reminders', ARRAY['id', 'routine_id', 'remind_at']::text[]),
           ('routine_completions', ARRAY['id', 'routine_id', 'household_id', 'occurrence_date', 'completed_by', 'completed_at', 'status']::text[]),
-          ('recipes', ARRAY['id', 'household_id', 'title', 'created_at']::text[]),
+          ('recipes', ARRAY['id', 'household_id', 'title', 'category_id', 'servings', 'prep_minutes', 'cook_minutes', 'cover_photo', 'created_by', 'created_at']::text[]),
+          ('recipe_categories', ARRAY['id', 'household_id', 'name', 'created_at']::text[]),
+          ('recipe_tags', ARRAY['id', 'household_id', 'name', 'created_at']::text[]),
+          ('recipe_tag_links', ARRAY['recipe_id', 'tag_id', 'household_id', 'created_at']::text[]),
+          ('recipe_ingredients', ARRAY['id', 'recipe_id', 'household_id', 'name', 'quantity', 'unit', 'position', 'created_at']::text[]),
+          ('recipe_steps', ARRAY['id', 'recipe_id', 'household_id', 'content', 'position', 'created_at']::text[]),
+          ('recipe_favorites', ARRAY['recipe_id', 'member_id', 'household_id', 'created_at']::text[]),
+          ('recipe_shares', ARRAY['id', 'recipe_id', 'household_id', 'share_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('ardoises', ARRAY['id', 'household_id', 'name', 'description', 'cover_url', 'invite_hash', 'is_active', 'max_uses', 'use_count', 'expires_at', 'created_by', 'created_at', 'trip_id']::text[]),
           ('ardoise_members', ARRAY['ardoise_id', 'member_id']::text[]),
           ('ardoise_guests', ARRAY['id', 'ardoise_id', 'display_name', 'ticket_hash', 'created_at']::text[]),
@@ -154,6 +161,9 @@ $$;
 --     pour rester inatteignable ;
 --   * `gift_list_invites` de même (0079) : codes de partage des listes de
 --     cadeaux, RPC `service_role` seuls ;
+--   * `trip_invites` de même (0118) : codes de partage des voyages ;
+--   * `recipe_shares` de même (0122) : liens de partage des recettes, lecture
+--     invitee via le seul RPC `view_recipe_share` ;
 --   * `push_subscriptions` de même, pour une raison plus forte encore : un
 --     `endpoint` de Push est une CAPACITÉ. Le laisser lire, même par son
 --     propriétaire, revient à exposer à toute fuite de jeton la possibilité de
@@ -179,7 +189,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -202,6 +212,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''trip_invites'''),
     0::bigint,
     'trip_invites reste sans politique, donc inatteignable'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''recipe_shares'''),
+    0::bigint,
+    'recipe_shares reste sans politique, donc inatteignable (lecture invitee via RPC seul)'
   );
   perform testkit.eq(
     testkit.count('select 1 from pg_policies where tablename = ''push_subscriptions'''),
@@ -276,7 +291,9 @@ declare
     'pet_records', 'pet_attachments', 'note_attachments',
     'provider_attachments',
     'post_media', 'post_comments', 'post_reactions', 'messages',
-    'contacts'
+    'contacts',
+    'recipe_tag_links', 'recipe_ingredients', 'recipe_steps',
+    'recipe_favorites', 'recipe_shares'
   ];
   r text;
 begin
@@ -318,7 +335,7 @@ declare
   v_privilege text;
   v_table text;
 begin
-  foreach v_table in array array['household_invite_tokens', 'gift_list_invites', 'trip_invites', 'push_subscriptions'] loop
+  foreach v_table in array array['household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions'] loop
     perform testkit.eq(
       testkit.count(format('select 1 from pg_policies where schemaname = ''public'' and tablename = %L', v_table)),
       0::bigint,
