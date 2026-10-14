@@ -11,6 +11,13 @@ export interface IngredientListProps {
   /** Faux pour le rôle `enfant` : saisie masquee. */
   readOnly?: boolean;
   isSaving?: boolean;
+  /**
+   * Curseur contrôlé (fiche membre : l'export print et l'envoi Courses
+   * lisent l'échelle courante, R12/R14). Absent = état local (page
+   * invitée, D-14) — comportement historique inchangé.
+   */
+  servings?: number;
+  onServingsChange?: (value: number) => void;
   onAdd: (input: { name: string; quantity: number | null; unit: string | null }) => Promise<void> | void;
   onUpdate: (ingredient: RecipeIngredient, input: { name: string; quantity: number | null; unit: string | null }) => Promise<void> | void;
   onDelete: (ingredient: RecipeIngredient) => Promise<void> | void;
@@ -21,8 +28,10 @@ export interface IngredientListProps {
  * a la reference arrondie au pair, pas de 2 sur 2–12 ; recalcul decimal +
  * accord d'unite ; lignes sans nombre affichees telles quelles (R8).
  */
-export function IngredientList({ ingredients, baseServings, readOnly = false, isSaving = false, onAdd, onUpdate, onDelete }: IngredientListProps) {
-  const [target, setTarget] = useState(() => closestServingsStep(baseServings));
+export function IngredientList({ ingredients, baseServings, readOnly = false, isSaving = false, servings, onServingsChange, onAdd, onUpdate, onDelete }: IngredientListProps) {
+  const [internalTarget, setInternalTarget] = useState(() => closestServingsStep(baseServings));
+  const target = servings ?? internalTarget;
+  const setTarget = onServingsChange ?? setInternalTarget;
   const [draft, setDraft] = useState({ name: '', quantity: '', unit: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({ name: '', quantity: '', unit: '' });

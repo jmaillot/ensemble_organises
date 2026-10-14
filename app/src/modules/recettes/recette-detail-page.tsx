@@ -3,9 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/input';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { formatTotalTime, type Recipe, type RecipeFormValues } from './types';
+import { useResource } from '@/lib/data/useResource';
+import type { ShoppingListRow } from '@/types';
+import { closestServingsStep, formatTotalTime, toRecipePrintModel, type Recipe, type RecipeFormValues } from './types';
 import { Icon } from '@/components/shared/icon';
 import {
   createRecipeIngredient,
@@ -13,6 +16,7 @@ import {
   deleteRecipeIngredient,
   deleteRecipeStep,
   resolveRecipeCoverUrl,
+  sendRecipeIngredientsToCourses,
   updateRecipeIngredient,
   updateRecipeStep,
 } from './api';
@@ -20,6 +24,8 @@ import { EMPTY_RECIPE_FILTER, useRecettes } from './hooks/use-recettes';
 import { IngredientList } from './components/ingredient-list';
 import { RecipeSteps } from './components/recipe-steps';
 import { RecipeFormDialog } from './components/recipe-form-dialog';
+import { RecipeShareDialog } from './components/recipe-share-dialog';
+import './components/recipe-export.css';
 
 /**
  * Fiche recette en defilement unique (D-03) : header photo/nom/meta,
@@ -36,6 +42,7 @@ export default function RecetteDetailPage() {
     ingredientsByRecipe,
     stepsByRecipe,
     canWrite,
+    currentMemberId,
     isLoading,
     isError,
     error,
@@ -47,9 +54,17 @@ export default function RecetteDetailPage() {
     reorderSteps,
     refreshChildren,
   } = useRecettes(EMPTY_RECIPE_FILTER);
+  const shoppingLists = useResource<ShoppingListRow>('shopping_lists');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [coursesOpen, setCoursesOpen] = useState(false);
+  const [coursesListId, setCoursesListId] = useState('');
+  const [coursesBusy, setCoursesBusy] = useState(false);
+  const [coursesResult, setCoursesResult] = useState<string | null>(null);
+  /** Échelle courante du curseur, partagée entre fiche, print et Courses. */
+  const [targetServings, setTargetServings] = useState<number | null>(null);
 
   const recipe: Recipe | null = useMemo(() => recipes.find((entry) => entry.id === id) ?? null, [recipes, id]);
   const ingredients = recipe ? (ingredientsByRecipe[recipe.id] ?? []) : [];
@@ -75,6 +90,54 @@ export default function RecetteDetailPage() {
       setDialogOpen(false);
     } catch (submitError) {
       toast(submitError instanceof Error ? submitError.message : 'La recette n’a pas pu être enregistrée.', 'error');
+    }
+  };
+
+  const effectiveTarget = targetServings ?? closestServingsStep(recipe?.servings ?? 4);
+  const selectedCoursesListId = coursesListId !== '' ? coursesListId : (shoppingLists.rows[0]?.id ?? '');
+  const printModel = recipe
+    ? toRecipePrintModel({
+        title: recipe.title,
+        servings: recipe.servings,
+        targetServings: effectiveTarget,
+        prepMinutes: recipe.prepMinutes,
+        cookMinutes: recipe.cookMinutes,
+        ingredients,
+        steps,
+      })
+    : null;
+
+  const sendToCourses = async () => {
+    if (!recipe) return;
+    try {
+      guard();
+      if (selectedCoursesListId === '') {
+        toast('Choisissez une liste de courses.', 'error');
+        return;
+      }
+      if (ingredients.length === 0) {
+        toast('Aucun ingrédient à envoyer.', 'error');
+        return;
+      }
+      setCoursesBusy(true);
+      const created = await sendRecipeIngredientsToCourses({
+        householdId: recipe.householdId,
+        listId: selectedCoursesListId,
+        addedBy: currentMemberId === '' ? null : currentMemberId,
+        ingredients: ingredients.map((ingredient) => ({ name: ingredient.name, quantity: ingredient.quantity, unit: ingredient.unit })),
+        baseServings: recipe.servings,
+        targetServings: effectiveTarget,
+      });
+      const listName = shoppingLists.rows.find((list) => list.id === selectedCoursesListId)?.name ?? 'la liste';
+      const lines = created
+        .map((row) => `${row.name} (${row.quantity === null ? (row.unit ?? 'au goût') : `${row.quantity}${row.unit ? ` ${row.unit}` : ''}`})`)
+        .join(', ');
+      setCoursesResult(`${created.length} ligne${created.length > 1 ? 's' : ''} ajoutée${created.length > 1 ? 's' : ''} à « ${listName} » : ${lines}.`);
+      toast('Ingrédients envoyés vers Courses.');
+    } catch (sendError) {
+      toast(sendError instanceof Error ? sendError.message : 'L’envoi vers Courses a échoué.', 'error');
+    } finally {
+      setCoursesBusy(false);
     }
   };
 
@@ -109,6 +172,8 @@ export default function RecetteDetailPage() {
   }
 
   return (
+    <>
+    <div className="recipe-screen">
     <ModuleShell
       module="recettes"
       actions={
@@ -159,10 +224,13 @@ export default function RecetteDetailPage() {
 
       <Panel title="Ingrédients" description="Quantités recalculées au nombre de personnes.">
         <IngredientList
+          key={recipe.id}
           ingredients={ingredients}
           baseServings={recipe.servings}
           readOnly={!canWrite}
           isSaving={isMutating}
+          servings={effectiveTarget}
+          onServingsChange={setTargetServings}
           onAdd={async (input) => {
             try {
               guard();
@@ -244,8 +312,50 @@ export default function RecetteDetailPage() {
       </Panel>
 
       {canWrite ? (
-        <Panel title="Actions" description="Zone sensible.">
-          {confirmDelete ? (
+        <Panel title="Actions" description="Partage, export, Courses, zone sensible.">
+          <div className="grid gap-3">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" icon="share" onClick={() => setShareOpen(true)}>
+                Partager
+              </Button>
+              <Button variant="secondary" icon="download" onClick={() => window.print()}>
+                Exporter
+              </Button>
+              <Button variant="secondary" icon="plus" onClick={() => setCoursesOpen((current) => !current)} aria-expanded={coursesOpen}>
+                Ajouter à une liste
+              </Button>
+            </div>
+            {coursesOpen ? (
+              <div className="grid gap-2.5 rounded-[11px] border border-border bg-bg p-3">
+                <label className="grid gap-1.5 text-[11px] font-extrabold text-muted" htmlFor="recette-courses-liste">
+                  Liste de courses (quantités pour {effectiveTarget} personnes)
+                  <Select
+                    id="recette-courses-liste"
+                    value={selectedCoursesListId}
+                    onChange={(event) => setCoursesListId(event.target.value)}
+                    disabled={coursesBusy || shoppingLists.rows.length === 0}
+                  >
+                    {shoppingLists.rows.length === 0 ? <option value="">Aucune liste dans ce foyer</option> : null}
+                    {shoppingLists.rows.map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                {coursesResult ? (
+                  <p className="m-0 text-[12px] font-semibold text-accent-strong" role="status">
+                    {coursesResult}
+                  </p>
+                ) : null}
+                <div>
+                  <Button disabled={coursesBusy || selectedCoursesListId === ''} onClick={() => void sendToCourses()}>
+                    {coursesBusy ? 'Envoi…' : 'Envoyer les ingrédients'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {confirmDelete ? (
             <div role="alertdialog" aria-modal="true" aria-label={`Supprimer ${recipe.title} ?`}>
               <p className="m-0 text-[13px]">
                 Supprimer <strong>{recipe.title}</strong> et tout son contenu (ingrédients, étapes, photo) ?
@@ -278,6 +388,7 @@ export default function RecetteDetailPage() {
               Supprimer la recette
             </Button>
           )}
+          </div>
         </Panel>
       ) : null}
 
@@ -295,5 +406,26 @@ export default function RecetteDetailPage() {
         onSubmit={submitRecipe}
       />
     </ModuleShell>
+    </div>
+    {printModel ? (
+      <div className="recipe-print" aria-hidden="true">
+        <h2>{printModel.title}</h2>
+        <p>{printModel.meta}</p>
+        <h3>Ingrédients</h3>
+        <ul>
+          {printModel.ingredientLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <h3>Étapes</h3>
+        <ol>
+          {printModel.stepLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ol>
+      </div>
+    ) : null}
+    {canWrite ? <RecipeShareDialog open={shareOpen} onOpenChange={setShareOpen} recipe={recipe} /> : null}
+    </>
   );
 }

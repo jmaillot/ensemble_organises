@@ -1,0 +1,56 @@
+/**
+ * Export print de la fiche recette (R12, D-13) : mise en page `@media
+ * print` sans lib PDF (0 nouvelle dépendance, T-16-SC).
+ *
+ * La fiche membre rend son écran dans `.recipe-screen` et le modèle
+ * d'impression (`toRecipePrintModel` : nom + ingrédients à l'échelle
+ * courante + étapes numérotées) dans `.recipe-print`, masqué à l'écran.
+ * À l'impression, l'écran, le chrome applicatif (barre latérale, haut de
+ * page, navigation) et les toasts sont masqués : seule la recette sort,
+ * lisible même sans photo (le modèle n'en porte aucune).
+ */
+
+.recipe-print {
+  display: none;
+}
+
+@media print {
+  body aside,
+  body header,
+  body nav,
+  body [role='region'],
+  body .recipe-screen {
+    display: none !important;
+  }
+
+  body .recipe-print {
+    display: block !important;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.45;
+  }
+
+  .recipe-print h2 {
+    font-size: 18pt;
+    margin: 0 0 4pt;
+  }
+
+  .recipe-print p {
+    margin: 0 0 10pt;
+  }
+
+  .recipe-print h3 {
+    font-size: 13pt;
+    margin: 12pt 0 4pt;
+  }
+
+  .recipe-print ul,
+  .recipe-print ol {
+    margin: 0 0 10pt;
+    padding-left: 18pt;
+  }
+
+  .recipe-print li {
+    margin-bottom: 4pt;
+  }
+}

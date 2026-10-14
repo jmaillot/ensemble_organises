@@ -117,6 +117,13 @@ export function formatQuantity(value: number | null): string | null {
 }
 
 /**
+ * Unités abrégées invariables (16-03, Rule 1 : `g` donnait `gs`) : les
+ * abréviations métriques et de cuillères ne prennent jamais la marque du
+ * pluriel — `500 g` pour 4 reste `1000 g` à 8, jamais `1000 gs`.
+ */
+const INVARIABLE_UNITS = new Set(['g', 'kg', 'mg', 'ml', 'cl', 'dl', 'l', 'cas', 'cac', 'cc', 'cs']);
+
+/**
  * Accord simple de l'unite (+s/+x, D-07) : `oeuf → oeufs` au-dela de 1,
  * `noix → noix` (terminaison x invariable), unites deja marquees
  * (`pincée(s)`) et chaines vides inchangees.
@@ -125,6 +132,7 @@ export function agreeUnit(unit: string | null, scaled: number | null): string | 
   if (!unit || scaled === null) return unit;
   const trimmed = unit.trim();
   if (trimmed === '' || /[()]/.test(trimmed)) return unit;
+  if (INVARIABLE_UNITS.has(trimmed.toLowerCase())) return trimmed;
   if (scaled <= 1) return trimmed.replace(/s$/i, '');
   if (/[sx]$/i.test(trimmed)) return trimmed;
   return `${trimmed}s`;
