@@ -25,6 +25,7 @@ import { IngredientList } from './components/ingredient-list';
 import { RecipeSteps } from './components/recipe-steps';
 import { CuisineToggle } from './components/cuisine-toggle';
 import { RecipeCuisineView } from './components/recipe-cuisine-view';
+import { useScreenWakeLock } from './hooks/use-screen-wake-lock';
 import { RecipeFormDialog } from './components/recipe-form-dialog';
 import { RecipeShareDialog } from './components/recipe-share-dialog';
 import './components/recipe-export.css';
@@ -75,7 +76,8 @@ export default function RecetteDetailPage() {
     setCuisine(false);
   }, [id]);
   /** Repli discret en attendant le hook de veille (tâche 2) : feature-detect, jamais d'erreur. */
-  const wakeLockSupported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+  const wakeLock = useScreenWakeLock(cuisine);
+  const wakeLockSupported = wakeLock.supported;
 
   const recipe: Recipe | null = useMemo(() => recipes.find((entry) => entry.id === id) ?? null, [recipes, id]);
   const ingredients = recipe ? (ingredientsByRecipe[recipe.id] ?? []) : [];
