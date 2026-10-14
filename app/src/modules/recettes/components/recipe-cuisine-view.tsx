@@ -8,6 +8,14 @@ export interface RecipeCuisineViewProps {
   steps: RecipeStep[];
   recipeId: string;
   wakeLockSupported: boolean;
+  /**
+   * Classe de collage de l’en-tête sticky (G-17-1) : `top-0` par défaut
+   * (page invitée hors shell, zéro topbar). La fiche membre sous AppShell
+   * passe `top-[76px] max-[650px]:top-14` (hauteur exacte de la topbar).
+   * Valeurs en chaînes littérales complètes aux sites d’appel (scan
+   * statique Tailwind), jamais d’interpolation à l’appel.
+   */
+  stickyTopClass?: string;
 }
 
 /**
@@ -15,7 +23,7 @@ export interface RecipeCuisineViewProps {
  * pastille XL statique + connecteur + case à gauche + compteur sticky N/M.
  * Reçoit `steps` déjà chargés par la fiche : zéro appel réseau.
  */
-export function RecipeCuisineView({ steps, recipeId, wakeLockSupported }: RecipeCuisineViewProps) {
+export function RecipeCuisineView({ steps, recipeId, wakeLockSupported, stickyTopClass = 'top-0' }: RecipeCuisineViewProps) {
   const { checked, toggle, reset } = useCuisineProgress(recipeId, steps);
   const done = steps.filter((step) => checked.has(step.id)).length;
   const total = steps.length;
@@ -32,7 +40,7 @@ export function RecipeCuisineView({ steps, recipeId, wakeLockSupported }: Recipe
 
   return (
     <section aria-label="Mode cuisine">
-      <div className="sticky top-0 z-10 bg-surface/95 py-1 backdrop-blur">
+      <div className={`sticky ${stickyTopClass} z-10 bg-surface/95 py-1 backdrop-blur`}>
         <div className="flex items-center justify-between gap-2">
           <p
             className="m-0 text-[14px] font-bold"

@@ -9,7 +9,39 @@ import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import { CuisineToggle } from './components/cuisine-toggle';
 import { RecipeCuisineView } from './components/recipe-cuisine-view';
 import RecetteDetailPage from './recette-detail-page';
+import GuestRecipePage from './guest-recipe-page';
+import { fetchGuestRecipeView, type GuestRecipeView } from './api';
 import type { RecipeStep } from './types';
+
+/**
+ * `isSupabaseConfigured` est lu UNE fois à l’import par `lib/data/index.ts`
+ * pour figer l’adaptateur : `false` ici (évalué avant les imports via
+ * `vi.hoisted`), donc la fiche membre utilise l’adaptateur local. Seul le
+ * test invité G-17-1 repasse le flag à `true` (la page invitée le lit à
+ * chaque rendu) puis le restaure — même idiome que
+ * `guest-recipe-cuisine.test.tsx`.
+ */
+const clientConfig = vi.hoisted(() => ({ configured: false }));
+vi.mock('@/lib/supabase/client', () => ({
+  get isSupabaseConfigured() {
+    return clientConfig.configured;
+  },
+  supabase: { auth: { getSession: async () => ({ data: { session: null } }) } },
+  supabaseUrl: 'http://localhost',
+  supabasePublishableKey: 'pk_test',
+  supabaseFunctionsBase: 'http://localhost/functions/v1',
+}));
+
+/**
+ * La page invitée ne parle qu’à l’Edge via `fetchGuestRecipeView` : moqué
+ * pour le seul test invité G-17-1 (la fiche membre ne l’appelle jamais).
+ */
+vi.mock('./api', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./api')>();
+  return { ...original, fetchGuestRecipeView: vi.fn() };
+});
+
+const mockedFetchView = vi.mocked(fetchGuestRecipeView);
 
 const STEP_CONTENTS = ['Éplucher les pommes de terre.', 'Les couper en rondelles.', 'Enfourner 45 minutes.'];
 
@@ -353,5 +385,101 @@ describe('Mode cuisine — prohibitions et robustesse (SPEC, plan 17-01 tâche 3
     expect(text.className).not.toContain('line-clamp-2');
     expect(text.className).not.toContain('truncate');
     expect(text.className).toContain('text-[18px]');
+  });
+});
+
+const GUEST_CODE = 'code-partage-recette-123456';
+
+const GUEST_STICKY_VIEW: GuestRecipeView = {
+  recipeId: 'recipe-sticky-invite',
+  title: 'Gratin dauphinois',
+  servings: 4,
+  prepMinutes: 30,
+  cookMinutes: 45,
+  coverPhotoUrl: null,
+  category: 'Recettes du foyer',
+  ingredients: [],
+  steps: [
+    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0 },
+    { id: 's2', content: 'Enfourner 45 minutes.', position: 1 },
+  ],
+  tags: ['Plat'],
+};
+
+describe('Mode cuisine — offset sticky sous-topbar (G-17-1)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+    clientConfig.configured = false;
+    mockedFetchView.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clientConfig.configured = false;
+  });
+
+  /** En-tête sticky = le `div.sticky` parent du compteur N/M. */
+  function stickyHeaderOf(counterText: string): HTMLElement {
+    const counter = screen.getByText(counterText, { selector: 'p' });
+    const header = counter.closest('div.sticky');
+    if (!(header instanceof HTMLElement)) throw new Error('en-tête sticky introuvable');
+    return header;
+  }
+
+  it('défaut : l’en-tête colle à top-0 (page invitée hors shell, zéro topbar)', () => {
+    renderWithProviders(<RecipeCuisineView steps={VIEW_STEPS} recipeId="r-sticky-defaut" wakeLockSupported />);
+
+    const header = stickyHeaderOf('0/3');
+    expect(header.classList.contains('top-0')).toBe(true);
+    expect(header.classList.contains('top-[76px]')).toBe(false);
+  });
+
+  it('prop : l’en-tête colle sous la topbar, fond surface-blur et z intacts (UI-SPEC Color)', () => {
+    renderWithProviders(
+      <RecipeCuisineView
+        steps={VIEW_STEPS}
+        recipeId="r-sticky-offset"
+        wakeLockSupported
+        stickyTopClass="top-[76px] max-[650px]:top-14"
+      />,
+    );
+
+    const header = stickyHeaderOf('0/3');
+    expect(header.classList.contains('top-[76px]')).toBe(true);
+    expect(header.classList.contains('max-[650px]:top-14')).toBe(true);
+    expect(header.classList.contains('top-0')).toBe(false);
+    expect(header.classList.contains('z-10')).toBe(true);
+    expect(header.classList.contains('bg-surface/95')).toBe(true);
+    expect(header.classList.contains('backdrop-blur')).toBe(true);
+  });
+
+  it('fiche membre : toggle-ON colle l’en-tête sous la topbar (topbar cliquable)', async () => {
+    const { recipeId } = await seedFiche('Sticky membre');
+    renderDetail(recipeId);
+    await openCuisine();
+
+    const header = stickyHeaderOf('0/3');
+    expect(header.classList.contains('top-[76px]')).toBe(true);
+    expect(header.classList.contains('max-[650px]:top-14')).toBe(true);
+    expect(header.classList.contains('top-0')).toBe(false);
+  });
+
+  it('page invitée : toggle-ON colle l’en-tête à top-0, sans vide parasite', async () => {
+    clientConfig.configured = true;
+    mockedFetchView.mockResolvedValue(GUEST_STICKY_VIEW);
+    renderWithProviders(
+      <Routes>
+        <Route path="/invitation/recette" element={<GuestRecipePage />} />
+      </Routes>,
+      { route: `/invitation/recette?code=${GUEST_CODE}`, withHousehold: false },
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Mode cuisine' }));
+
+    const header = stickyHeaderOf('0/2');
+    expect(header.classList.contains('top-0')).toBe(true);
+    expect(header.classList.contains('top-[76px]')).toBe(false);
   });
 });
