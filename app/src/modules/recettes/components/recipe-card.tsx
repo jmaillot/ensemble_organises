@@ -48,7 +48,7 @@ export function RecipeCard({ recipe, coverUrl, readOnly = false, onToggleFavorit
             aria-pressed={recipe.isFavorite}
             aria-label={recipe.isFavorite ? `Retirer ${recipe.title} des favoris` : `Ajouter ${recipe.title} aux favoris`}
             className={cn(
-              'grid size-11 shrink-0 place-items-center rounded-full bg-black/35 text-white backdrop-blur-[2px] transition-colors',
+              'grid size-11 shrink-0 place-items-center rounded-full bg-black/35 text-white backdrop-blur-[2px] transition-colors relative z-10',
               recipe.isFavorite ? 'text-amber-300' : 'hover:bg-black/55',
               readOnly && 'cursor-default opacity-60',
             )}
