@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
@@ -23,6 +23,8 @@ import {
 import { EMPTY_RECIPE_FILTER, useRecettes } from './hooks/use-recettes';
 import { IngredientList } from './components/ingredient-list';
 import { RecipeSteps } from './components/recipe-steps';
+import { CuisineToggle } from './components/cuisine-toggle';
+import { RecipeCuisineView } from './components/recipe-cuisine-view';
 import { RecipeFormDialog } from './components/recipe-form-dialog';
 import { RecipeShareDialog } from './components/recipe-share-dialog';
 import './components/recipe-export.css';
@@ -65,6 +67,15 @@ export default function RecetteDetailPage() {
   const [coursesResult, setCoursesResult] = useState<string | null>(null);
   /** Échelle courante du curseur, partagée entre fiche, print et Courses. */
   const [targetServings, setTargetServings] = useState<number | null>(null);
+  /** Mode cuisine : OFF à chaque ouverture, seule la progression est mémorisée (R1, D-12). */
+  const [cuisine, setCuisine] = useState(false);
+  useEffect(() => {
+    // La route `/recettes/:id` est réutilisée entre fiches : on force OFF
+    // (même idiome que `key={recipe.id}`, piège Pitfall 3).
+    setCuisine(false);
+  }, [id]);
+  /** Repli discret en attendant le hook de veille (tâche 2) : feature-detect, jamais d'erreur. */
+  const wakeLockSupported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
 
   const recipe: Recipe | null = useMemo(() => recipes.find((entry) => entry.id === id) ?? null, [recipes, id]);
   const ingredients = recipe ? (ingredientsByRecipe[recipe.id] ?? []) : [];
@@ -279,7 +290,18 @@ export default function RecetteDetailPage() {
         />
       </Panel>
 
-      <Panel title="Étapes" description="Glissez la pastille numérotée pour réordonner.">
+      <Panel
+        title="Étapes"
+        description={
+          cuisine
+            ? 'Cochez au fur et à mesure. Progression mémorisée sur cet appareil.'
+            : 'Glissez la pastille numérotée pour réordonner.'
+        }
+        action={<CuisineToggle active={cuisine} onToggle={() => setCuisine((current) => !current)} />}
+      >
+        {cuisine ? (
+          <RecipeCuisineView steps={steps} recipeId={recipe.id} wakeLockSupported={wakeLockSupported} />
+        ) : (
         <RecipeSteps
           steps={steps}
           readOnly={!canWrite}
@@ -320,6 +342,7 @@ export default function RecetteDetailPage() {
             }
           }}
         />
+        )}
       </Panel>
 
       {canWrite ? (
