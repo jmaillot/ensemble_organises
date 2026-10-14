@@ -384,21 +384,64 @@ export async function createRecipeInviteCode(
   recipeId: string,
   options?: { expiresAt?: string; maxUses?: number },
 ): Promise<RecipeInviteCode> {
-  return callRecipeInvite<RecipeInviteCode>('create', {
+  const created = await callRecipeInvite<RecipeInviteCode>('create', {
     recipeId,
     ...(options?.expiresAt ? { expiresAt: options.expiresAt } : {}),
     ...(options?.maxUses ? { maxUses: options.maxUses } : {}),
   });
+  writeRecipeInviteCode(recipeId, created.code);
+  return created;
 }
 
 /** Arrête le partage : tous les liens actifs de la recette sont révoqués. */
 export async function revokeRecipeInviteCode(recipeId: string): Promise<void> {
   await callRecipeInvite('revoke', { recipeId });
+  clearRecipeInviteCode(recipeId);
 }
 
 export async function fetchRecipeInviteSummary(recipeId: string): Promise<RecipeInviteSummary | null> {
   if (!isSupabaseConfigured) return null;
   return callRecipeInvite<RecipeInviteSummary | null>('summary', { recipeId });
+}
+
+/* ------------------------------------------------------------------ */
+/* Code de partage mémorisé (même régime qu'ardoise/voyage) : le code  */
+/* brut n'est rendu qu'à sa génération — le dialogue le conserve sur   */
+/* CET appareil (`eo:recipe:code:<recipeId>`) pour réafficher QR + lien */
+/* sans régénérer (qui invaliderait le précédent). Un code régénéré    */
+/* ailleurs rend le lien mémorisé caduc : la régénération reste        */
+/* proposée, et l'arrêt du partage efface la mémoire.                  */
+/* ------------------------------------------------------------------ */
+
+export const recipeInviteCodeStorageKey = (recipeId: string): string => `eo:recipe:code:${recipeId}`;
+
+export function readRecipeInviteCode(recipeId: string): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const stored = localStorage.getItem(recipeInviteCodeStorageKey(recipeId));
+    const trimmed = stored?.trim() ?? '';
+    return trimmed ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeRecipeInviteCode(recipeId: string, code: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(recipeInviteCodeStorageKey(recipeId), code.trim());
+  } catch {
+    // Stockage plein ou bloqué : le code reste affiché, sans mémoire.
+  }
+}
+
+export function clearRecipeInviteCode(recipeId: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(recipeInviteCodeStorageKey(recipeId));
+  } catch {
+    // Décoratif : un code restant ne fait qu'afficher un lien caduc.
+  }
 }
 
 /* ------------------------------------------------------------------ */

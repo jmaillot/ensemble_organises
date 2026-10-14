@@ -4,8 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { QrCode } from '@/components/shared/qr-code';
 import { useToast } from '@/components/ui/toast';
 import {
+  clearRecipeInviteCode,
   createRecipeInviteCode,
   fetchRecipeInviteSummary,
+  readRecipeInviteCode,
   recipeInviteLink,
   revokeRecipeInviteCode,
   type RecipeInviteSummary,
@@ -23,8 +25,10 @@ export interface RecipeShareDialogProps {
  * d'e-mail — l'Edge `recipe-invite` ne connaît que `link-view` (lecture
  * seule, SPEC hors-scope verrouillé, T-16-12).
  *
- * Le code brut vit dans l'état du dialogue : fermer le masque, régénérer
- * invalide le précédent, révoquer coupe tous les liens actifs aussitôt
+ * Le code brut vit dans l'état du dialogue, adossé à la mémoire appareil
+ * (`eo:recipe:code:<recipeId>`, posée à la génération, effacée à l'arrêt) :
+ * rouvrir le partage réaffiche QR + lien sans régénérer, comme
+ * ardoise (`eo:ardoise-code:`) et voyage (`eo:trip:code:`).
  * (T-16-11 : jamais réaffiché depuis le serveur, jamais journalisé).
  */
 export function RecipeShareDialog({ open, onOpenChange, recipe }: RecipeShareDialogProps) {
@@ -38,19 +42,27 @@ export function RecipeShareDialog({ open, onOpenChange, recipe }: RecipeShareDia
 
   useEffect(() => {
     if (!open) {
-      // Fermeture : le code brut ne survit pas au dialogue.
+      // Fermeture : le code affiché repart, la mémoire appareil
+      // (`readRecipeInviteCode`) le rendra à la prochaine ouverture si le
+      // partage est toujours actif.
       setLastCode(null);
+      return;
     }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !recipeId) return;
+    if (!recipeId) return;
     let active = true;
     fetchRecipeInviteSummary(recipeId)
       .then((result) => {
-        if (active) {
-          setSummary(result);
-          setCodeError(false);
+        if (!active) return;
+        setSummary(result);
+        setCodeError(false);
+        // Un lien actif généré sur cet appareil se réaffiche (QR + lien)
+        // sans régénérer ; sinon, seule la régénération l'affiche.
+        if (result?.hasCode) {
+          setLastCode(readRecipeInviteCode(recipeId));
+        } else {
+          // Partage coupé ailleurs : la mémoire locale est périmée, on la purge.
+          clearRecipeInviteCode(recipeId);
+          setLastCode(null);
         }
       })
       .catch(() => {
