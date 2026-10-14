@@ -3,15 +3,21 @@ import { useQuery } from '@tanstack/react-query';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { Input, Select } from '@/components/ui/input';
+import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { DEFAULT_RECIPE_CATEGORY, type Recipe, type RecipeFormValues } from './types';
+import { useHouseholdStore } from '@/stores/household-store';
+import { DEFAULT_RECIPE_CATEGORY, type Recipe, type RecipeFormValues, type RecipeSearchFilter } from './types';
 import { resolveRecipeCoverUrls } from './api';
-import { EMPTY_RECIPE_FILTER, useRecettes } from './hooks/use-recettes';
+import { useRecettes } from './hooks/use-recettes';
 import { RecipeCard } from './components/recipe-card';
 import { RecipeFormDialog } from './components/recipe-form-dialog';
+import { RecipeSettings } from './components/recipe-settings';
 
 export default function RecettesPage() {
+  const [filter, setFilter] = useState<RecipeSearchFilter>({ query: '', categoryId: null, tag: null, favoritesOnly: false });
   const {
+    recipes,
     visibleRecipes,
     categories,
     tags,
@@ -23,8 +29,10 @@ export default function RecettesPage() {
     isMutating,
     saveRecipe,
     toggleFavorite,
-  } = useRecettes(EMPTY_RECIPE_FILTER);
+    refreshChildren,
+  } = useRecettes(filter);
   const toast = useToast();
+  const householdId = useHouseholdStore((state) => state.householdId);
   const [dialog, setDialog] = useState<{ open: boolean; recipe: Recipe | null }>({ open: false, recipe: null });
 
   const coverInputs = useMemo(
@@ -59,6 +67,16 @@ export default function RecettesPage() {
         return (order.get(a.categoryId ?? '') ?? 0) - (order.get(b.categoryId ?? '') ?? 0);
       });
   }, [visibleRecipes, categories]);
+
+  const recipeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const recipe of recipes) {
+      if (recipe.categoryId) counts[recipe.categoryId] = (counts[recipe.categoryId] ?? 0) + 1;
+    }
+    return counts;
+  }, [recipes]);
+
+  const hasActiveFilter = filter.query.trim() !== '' || filter.categoryId !== null || filter.tag !== null || filter.favoritesOnly;
 
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
 
@@ -98,6 +116,73 @@ export default function RecettesPage() {
         />
       ) : null}
 
+      {!isLoading && !isError ? (
+        <Panel title="Rechercher" description="Nom, ingrédient, catégorie, étiquette et favoris se combinent.">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
+            <label className="grid gap-1 text-[11px] font-[700] text-muted">
+              Recherche
+              <span className="relative block">
+                <Input
+                  value={filter.query}
+                  onChange={(event) => setFilter((current) => ({ ...current, query: event.target.value }))}
+                  placeholder="Gratin, crème, chocolat…"
+                  aria-label="Rechercher une recette"
+                  autoComplete="off"
+                  className="pl-9"
+                />
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true">
+                  <Icon name="search" size="sm" />
+                </span>
+              </span>
+            </label>
+            <label className="grid gap-1 text-[11px] font-[700] text-muted">
+              Catégorie
+              <Select
+                value={filter.categoryId ?? ''}
+                onChange={(event) =>
+                  setFilter((current) => ({ ...current, categoryId: event.target.value === '' ? null : event.target.value }))
+                }
+                aria-label="Filtrer par catégorie"
+              >
+                <option value="">Toutes</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="grid gap-1 text-[11px] font-[700] text-muted">
+              Étiquette
+              <Select
+                value={filter.tag ?? ''}
+                onChange={(event) => setFilter((current) => ({ ...current, tag: event.target.value === '' ? null : event.target.value }))}
+                aria-label="Filtrer par étiquette"
+              >
+                <option value="">Toutes</option>
+                {tags.map((tag) => (
+                  <option key={tag.id} value={tag.name}>
+                    #{tag.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <button
+              type="button"
+              onClick={() => setFilter((current) => ({ ...current, favoritesOnly: !current.favoritesOnly }))}
+              aria-pressed={filter.favoritesOnly}
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-[10px] border border-border bg-surface px-[11px] text-[12px] font-[760] text-fg aria-pressed:border-accent aria-pressed:bg-accent-faint aria-pressed:text-accent-strong"
+            >
+              <Icon name="heart" size="sm" className={filter.favoritesOnly ? 'fill-current' : undefined} />
+              Favoris
+            </button>
+          </div>
+          {hasActiveFilter && visibleRecipes.length === 0 ? (
+            <p className="m-0 pt-2 text-xs text-muted">Aucune recette ne correspond à ces filtres.</p>
+          ) : null}
+        </Panel>
+      ) : null}
+
       {!isLoading && !isError
         ? sections.map((section) => (
             <Panel key={section.categoryId ?? 'defaut'} title={section.name} description={`${section.items.length} recette${section.items.length > 1 ? 's' : ''}`}>
@@ -122,6 +207,17 @@ export default function RecettesPage() {
             </Panel>
           ))
         : null}
+
+      {canWrite && !isLoading && !isError && householdId ? (
+        <RecipeSettings
+          householdId={householdId}
+          categories={categories}
+          tags={tags}
+          recipeCounts={recipeCounts}
+          isSaving={isMutating}
+          onChanged={() => refreshChildren()}
+        />
+      ) : null}
 
       <RecipeFormDialog
         open={dialog.open}
