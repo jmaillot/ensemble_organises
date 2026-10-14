@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { fetchGuestRecipeView } from './api';
 import { formatTotalTime, type RecipeIngredient, type RecipeStep } from './types';
 import { IngredientList } from './components/ingredient-list';
 import { RecipeSteps } from './components/recipe-steps';
+import { CuisineToggle } from './components/cuisine-toggle';
+import { RecipeCuisineView } from './components/recipe-cuisine-view';
+import { useScreenWakeLock } from './hooks/use-screen-wake-lock';
 
 const noop = () => undefined;
 
@@ -31,6 +34,14 @@ export default function GuestRecipePage() {
     return initial.length >= 22 ? initial : null;
   });
   const [formError, setFormError] = useState<string | null>(null);
+  /** Mode cuisine invité : OFF à chaque ouverture de lien (R5, D-16), seule la progression est mémorisée. */
+  const [cuisine, setCuisine] = useState(false);
+  useEffect(() => {
+    // Le composant survit au changement de lien (même route) : on force OFF
+    // (même idiome que la fiche membre sur `[id]`, piège Pitfall 3).
+    setCuisine(false);
+  }, [activeCode]);
+  const wakeLockSupported = useScreenWakeLock(cuisine).supported;
 
   const viewQuery = useQuery({
     queryKey: ['recettes', 'link-view', activeCode ?? ''],
@@ -68,6 +79,10 @@ export default function GuestRecipePage() {
     position: entry.position,
   }));
   const totalTime = view ? formatTotalTime(view.prepMinutes, view.cookMinutes) : null;
+  // Mémoire sur l'appareil de l'invité, même clé que la fiche membre (D-17).
+  // Entrée locale orpheline (recette supprimée côté foyer) : inoffensive —
+  // la clé par id n'est jamais relue ailleurs, aucune migration (edge R3).
+  const cuisineRecipeId = view?.recipeId ?? activeCode ?? 'invite';
 
   return (
     <ModuleShell module="recettes">
@@ -140,7 +155,21 @@ export default function GuestRecipePage() {
               onUpdate={noop}
               onDelete={noop}
             />
-            <RecipeSteps steps={steps} readOnly onAdd={noop} onUpdate={noop} onDelete={noop} onReorder={noop} />
+            <Panel
+              title="Étapes"
+              description={
+                cuisine
+                  ? 'Cochez au fur et à mesure. Progression mémorisée sur cet appareil.'
+                  : 'Glissez la pastille numérotée pour réordonner.'
+              }
+              action={<CuisineToggle active={cuisine} onToggle={() => setCuisine((current) => !current)} />}
+            >
+              {cuisine ? (
+                <RecipeCuisineView steps={steps} recipeId={cuisineRecipeId} wakeLockSupported={wakeLockSupported} />
+              ) : (
+                <RecipeSteps steps={steps} readOnly onAdd={noop} onUpdate={noop} onDelete={noop} onReorder={noop} />
+              )}
+            </Panel>
             <Panel
               id="guest-recipe-join-panel"
               title="Envie de cuisiner ?"
