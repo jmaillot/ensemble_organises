@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { Route, Routes, useNavigate } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { getLocalAdapter } from '@/lib/data/local-adapter';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
+import { CuisineToggle } from './components/cuisine-toggle';
 import { RecipeCuisineView } from './components/recipe-cuisine-view';
 import RecetteDetailPage from './recette-detail-page';
 import type { RecipeStep } from './types';
@@ -16,7 +18,7 @@ const keyOf = (recipeId: string): string => `eo:recette:cuisine:${recipeId}`;
 /** Fiche + 3 étapes aux ids déterministes (`<recipeId>-s1..s3`). */
 async function seedFiche(title: string): Promise<{ recipeId: string; stepIds: string[] }> {
   const adapter = getLocalAdapter();
-  const recipe = await adapter.create<{ id: string }>('recipes', {
+  const created = await adapter.create('recipes', {
     household_id: DEMO_HOUSEHOLD_ID,
     title,
     servings: 4,
@@ -25,19 +27,20 @@ async function seedFiche(title: string): Promise<{ recipeId: string; stepIds: st
     category_id: null,
     created_at: new Date().toISOString(),
   });
+  const recipeId = String((created as unknown as { id: unknown }).id);
   const stepIds: string[] = [];
   for (let index = 0; index < STEP_CONTENTS.length; index += 1) {
-    const id = `${recipe.id}-s${index + 1}`;
+    const id = `${recipeId}-s${index + 1}`;
     stepIds.push(id);
     await adapter.create('recipe_steps', {
       id,
-      recipe_id: recipe.id,
+      recipe_id: recipeId,
       household_id: DEMO_HOUSEHOLD_ID,
       content: STEP_CONTENTS[index],
       position: index,
     });
   }
-  return { recipeId: recipe.id, stepIds };
+  return { recipeId, stepIds };
 }
 
 function DetailShell() {
@@ -281,5 +284,74 @@ describe('Mode cuisine — tracer fiche membre (R1, R2, R3)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(setItem).toHaveBeenCalled();
     setItem.mockRestore();
+  });
+});
+
+describe('Mode cuisine — prohibitions et robustesse (SPEC, plan 17-01 tâche 3)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Faisceau toggle + vue, comme câblé sur la fiche, mais isolé du réseau. */
+  function CuisineHarness() {
+    const [cuisine, setCuisine] = useState(false);
+    return (
+      <>
+        <CuisineToggle active={cuisine} onToggle={() => setCuisine((current) => !current)} />
+        {cuisine ? <RecipeCuisineView steps={VIEW_STEPS} recipeId="r-reseau" wakeLockSupported /> : null}
+      </>
+    );
+  }
+
+  it('prohibition 1 : zéro appel réseau en vue isolée (cases + toggle + resets)', async () => {
+    // Vue isolée (pas la page entière, piège Pitfall 7 : coverQuery et les
+    // refetch TanStack fausseraient la preuve).
+    const calls: unknown[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        calls.push(url);
+        throw new Error('réseau interdit en mode cuisine');
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<CuisineHarness />);
+
+    await user.click(screen.getByRole('button', { name: 'Mode cuisine' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Marquer l’étape 1 comme faite' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Marquer l’étape 2 comme faite' }));
+    await user.click(screen.getByRole('button', { name: 'Tout réinitialiser' }));
+    const prompt = screen.getByText('Tout effacer ?');
+    await user.click(within(prompt.parentElement as HTMLElement).getByRole('button', { name: 'Réinitialiser' }));
+
+    expect(calls).toEqual([]);
+  });
+
+  it('prohibition 3 : aucun handler d’écriture câblé, zéro affordance d’édition en ON', () => {
+    // La vue ne reçoit que steps + état de cases : sa signature exclut
+    // onAdd/onUpdate/onDelete/onReorder (vérifié au typage), et le DOM ON
+    // ne contient ni formulaire ni bouton d’édition/suppression/drag.
+    renderWithProviders(<RecipeCuisineView steps={VIEW_STEPS} recipeId="r-ecriture" wakeLockSupported />);
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
+    const buttons = screen.getAllByRole('button').map((button) => button.textContent);
+    expect(buttons.sort()).toEqual(['Réinitialiser', 'Tout réinitialiser']);
+  });
+
+  it('edge : étape très longue non cochée rendue entière, jamais tronquée', () => {
+    const long = `Faire fondre le beurre à feu doux, ajouter la farine en pluie, remuer sans cesse pendant dix minutes, verser le lait petit à petit, laisser épaissir, assaisonner, goûter, rectifier, réserver au chaud.`;
+    renderWithProviders(
+      <RecipeCuisineView steps={[{ id: 'longue', content: long, position: 0 }]} recipeId="r-longue" wakeLockSupported />,
+    );
+    const text = screen.getByText(long);
+    expect(text.className).not.toContain('line-clamp-2');
+    expect(text.className).not.toContain('truncate');
+    expect(text.className).toContain('text-[18px]');
   });
 });
