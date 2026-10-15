@@ -60,10 +60,24 @@ export function isBarcodeScannerSupported(): boolean {
   return nativeDetectorCtor() !== null || hasCamera();
 }
 
-function toScanFormat(format: string | number | undefined): ScanFormat {
+/**
+ * Entier d'énumération `Html5QrcodeSupportedFormats` → `ScanFormat`.
+ *
+ * Le nom (`formatName`) est la forme **stable** que le repli renvoie et que
+ * `toScanFormat` lit en premier. Cet entier n'est qu'un **second recours**
+ * tolérant : il est là pour qu'un site d'appel qui passerait encore le nombre
+ * d'énumération ne réintroduise pas le défaut WR-15a (un QR enregistré en
+ * code-barres). Valeurs alignées sur `html5-qrcode` : `QR_CODE = 0`,
+ * `CODE_128 = 5`, `EAN_13 = 9` (vérifiées dans `core.d.ts`).
+ */
+const ENUM_FORMAT: Readonly<Record<number, ScanFormat>> = { 0: 'qr_code', 5: 'code_128', 9: 'ean_13' };
+
+/** Normalise un format lu (nom stable, ou entier d'énumération en recours). */
+export function toScanFormat(format: string | number | undefined): ScanFormat {
   if (format === 'qr_code' || format === 'QR_CODE') return 'qr_code';
   if (format === 'code_128' || format === 'CODE_128') return 'code_128';
   if (format === 'ean_13' || format === 'EAN_13') return 'ean_13';
+  if (typeof format === 'number' && format in ENUM_FORMAT) return ENUM_FORMAT[format] as ScanFormat;
   return 'other';
 }
 
@@ -181,7 +195,9 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, aspectRatio: 1.6, qrbox: { width: 260, height: 160 } },
-          (decodedText, decodedResult) => handleValue(decodedText, decodedResult?.result?.format?.format),
+          // WR-15a : le NOM du format, jamais l'entier d'énumération — c'est
+          // `formatName` que `toScanFormat` sait lire ('QR_CODE', 'CODE_128'…).
+          (decodedText, decodedResult) => handleValue(decodedText, decodedResult?.result?.format?.formatName),
           () => undefined,
         );
         setEngine('fallback');
