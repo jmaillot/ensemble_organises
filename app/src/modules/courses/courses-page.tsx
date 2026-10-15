@@ -59,6 +59,7 @@ export default function CoursesPage() {
     removeList,
     editItem,
     products,
+    productPhotoUrls,
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
@@ -292,6 +293,7 @@ export default function CoursesPage() {
                       grouping={grouping}
                       suggestions={suggestionsFor(visible.id)}
                       catalogue={products}
+                      photoUrls={productPhotoUrls}
                       disabled={isMutating}
                       onToggle={handleToggle}
                       onQuickAdd={handleQuickAdd}

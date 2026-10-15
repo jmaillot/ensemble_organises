@@ -34,12 +34,12 @@ vi.mock('@/modules/cercle/lib/media', () => ({
   JPEG_QUALITY: 0.85,
 }));
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage')>()),
   depositHouseholdFile: vi
     .fn()
     .mockResolvedValue({ url: 'https://signed.example/p.webp', path: 'hh/products/p.webp', name: 'p.jpg', mime: 'image/webp', size: 18 }),
   removeHouseholdFile: vi.fn().mockResolvedValue(undefined),
-  HOUSEHOLD_MEDIA_BUCKET: 'household-media',
 }));
 
 vi.mock('./products-api', async (importOriginal) => ({

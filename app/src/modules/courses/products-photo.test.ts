@@ -7,15 +7,16 @@ import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import type { ProductRow, ShoppingListRow } from '@/types';
 import { ProductSheet } from './components/product-sheet';
-import { PRODUCTS_TABLE } from './products-api';
+import { PRODUCTS_TABLE, productPhotoUrl } from './products-api';
 import type { OffProduct } from './off-client';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 
 /**
- * Persistance photo produit (D-05) : la photo locale compressée part en
- * bucket privé `products` et son URL signée est persistée en `photo_url` ;
- * l'image OFF reste un repli d'affichage jamais persisté.
+ * Persistance photo produit (D-05, D-01) : la photo locale compressée part en
+ * bucket privé `products` et son CHEMIN est persisté en `photo_url` (jamais
+ * l'URL signée éphémère) ; l'image OFF reste un repli d'affichage jamais
+ * persisté. Le remplacement retire l'objet précédent (D-03).
  *
  * `compressImage` est mockée (pas de `createImageBitmap` sous jsdom) et
  * `depositHouseholdFile` est mocké (pas de Storage en test) : les assertions
@@ -31,10 +32,10 @@ vi.mock('@/modules/cercle/lib/media', () => ({
   JPEG_QUALITY: 0.85,
 }));
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage')>()),
   depositHouseholdFile: vi.fn(),
   removeHouseholdFile: vi.fn(),
-  HOUSEHOLD_MEDIA_BUCKET: 'household-media',
 }));
 
 const compressMock = vi.mocked(compressImage);
@@ -81,8 +82,8 @@ function renderSheet(listId: string, offProduct: OffProduct | null, ean: string)
   );
 }
 
-describe('photo produit persistée (D-05)', () => {
-  it("upload photo.jpg : dépôt en dossier products et photo_url = URL signée", async () => {
+describe('photo produit persistée (D-05, D-01)', () => {
+  it('upload photo.jpg : dépôt en dossier products et photo_url = chemin du bucket', async () => {
     const user = userEvent.setup();
     const list = await createList();
     compressMock.mockResolvedValue({
@@ -118,7 +119,9 @@ describe('photo produit persistée (D-05)', () => {
       ean: NUTELLA_EAN,
     });
     expect(products).toHaveLength(1);
-    expect(products[0].photo_url).toMatch(/^https:\/\//);
+    // La colonne porte un CHEMIN de bucket, jamais l'URL signée du dépôt (D-01).
+    expect(products[0].photo_url).toBe('foyer/products/fichier.webp');
+    expect(products[0].photo_url).not.toMatch(/^https?:/);
   });
 
   it('sans photo locale : image OFF affichée avec crédit, photo_url null', async () => {
@@ -249,7 +252,58 @@ describe('photo produit persistée (D-05)', () => {
       await screen.findByText(/ajouté à la liste/);
 
       const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
-      expect(rows[0].photo_url).toBe('https://signed.example/nouvelle.webp');
+      // Non-remplacement (le produit n'avait pas de photo) : chemin posé, aucun retrait.
+      expect(rows[0].photo_url).toBe('foyer/products/nouvelle.webp');
+      expect(removeMock).not.toHaveBeenCalled();
+    } finally {
+      await data.remove('products', existing.id).catch(() => undefined);
+    }
+  });
+
+  it('produit déjà connu : la nouvelle photo remplace et retire l’objet précédent (D-03)', async () => {
+    const user = userEvent.setup();
+    const list = await createList();
+    const existing = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: OTHER_EAN,
+      name: 'Huile',
+      brand: null,
+      category: 'Divers',
+      photo_url: 'foyer/products/ancienne.webp',
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    try {
+      compressMock.mockResolvedValue({
+        blob: new Blob(['p'], { type: 'image/webp' }),
+        mime: 'image/webp',
+        name: 'photo.webp',
+        originalName: 'photo.jpg',
+        size: 18,
+        width: 10,
+        height: 10,
+        previewUrl: 'blob:apercu',
+      });
+      depositMock.mockResolvedValue({
+        url: 'https://signed.example/nouvelle.webp',
+        path: 'foyer/products/nouvelle.webp',
+        name: 'photo.jpg',
+        mime: 'image/webp',
+        size: 18,
+      });
+
+      renderSheet(list.id, null, OTHER_EAN);
+      await user.type(screen.getByLabelText(/Nom/), 'Huile');
+      await user.upload(screen.getByLabelText(/^Photo/), new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }));
+      await user.click(screen.getByRole('button', { name: 'Enregistrer et ajouter à la liste' }));
+      await screen.findByText(/ajouté à la liste/);
+
+      const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
+      expect(rows[0].photo_url).toBe('foyer/products/nouvelle.webp');
+      expect(removeMock).toHaveBeenCalledWith('foyer/products/ancienne.webp');
+      expect(removeMock).not.toHaveBeenCalledWith('foyer/products/nouvelle.webp');
     } finally {
       await data.remove('products', existing.id).catch(() => undefined);
     }
@@ -297,9 +351,55 @@ describe('photo produit persistée (D-05)', () => {
       expect(await screen.findByText(/ajouté à la liste/)).toBeInTheDocument();
       expect(removeMock).not.toHaveBeenCalledWith('foyer/products/nouvelle.webp');
       const rows = (await data.list<ProductRow>('products', { id: existing.id })) as ProductRow[];
-      expect(rows[0].photo_url).toBe('https://signed.example/nouvelle.webp');
+      expect(rows[0].photo_url).toBe('foyer/products/nouvelle.webp');
     } finally {
       await data.remove('products', existing.id).catch(() => undefined);
     }
+  });
+});
+
+describe('productPhotoUrl — valeur affichable (D-01, D-05)', () => {
+  const baseRow: ProductRow = {
+    id: 'prod-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ean: NUTELLA_EAN,
+    name: 'Nutella',
+    brand: null,
+    category: 'Divers',
+    photo_url: null,
+    off_data: {},
+    created_by: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  } as ProductRow;
+
+  it('un chemin se résout par la carte (URL signée forgée à la lecture)', () => {
+    const row = { ...baseRow, photo_url: 'foyer/products/p.webp' };
+    expect(productPhotoUrl(row, { 'prod-1': 'https://signed.example/p.webp' })).toBe('https://signed.example/p.webp');
+  });
+
+  it('un chemin sans résolution échoue fermé (null, jamais le chemin brut)', () => {
+    const row = { ...baseRow, photo_url: 'foyer/products/p.webp' };
+    expect(productPhotoUrl(row, {})).toBeNull();
+    expect(productPhotoUrl(row)).toBeNull();
+  });
+
+  it('une valeur non-chemin est rendue telle quelle (URL héritée, data:)', () => {
+    expect(productPhotoUrl({ ...baseRow, photo_url: 'https://externe.example/p.jpg' })).toBe(
+      'https://externe.example/p.jpg',
+    );
+    expect(productPhotoUrl({ ...baseRow, photo_url: 'data:image/webp;base64,AAAA' })).toBe(
+      'data:image/webp;base64,AAAA',
+    );
+  });
+
+  it('photo_url vide : le repli `off_data.image_url` reste prioritaire', () => {
+    const row = {
+      ...baseRow,
+      photo_url: null,
+      off_data: { image_url: 'https://images.openfoodfacts.org/p.jpg' },
+    };
+    expect(productPhotoUrl(row)).toBe('https://images.openfoodfacts.org/p.jpg');
+    expect(productPhotoUrl({ ...baseRow, photo_url: '   ', off_data: {} })).toBeNull();
   });
 });

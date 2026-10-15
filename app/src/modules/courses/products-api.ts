@@ -1,4 +1,5 @@
 import { data, DataError } from '@/lib/data';
+import { householdMediaPathOf, isHouseholdMediaPath, resolveHouseholdMediaUrl } from '@/lib/storage';
 import type { ProductRow, ShoppingListItemRow } from '@/types';
 import { createShoppingItem, SHOPPING_ITEMS_TABLE } from './api';
 import { type OffProduct, cleanOffImageUrl } from './off-client';
@@ -118,12 +119,39 @@ export async function findProductByEan(householdId: string, ean: string): Promis
   return rows[0] ?? null;
 }
 
-/** Photo affichable d'un produit : téléversée, sinon repli OFF contrôlé. */
-export function productPhotoUrl(row: ProductRow): string | null {
-  if (row.photo_url) return row.photo_url;
+/**
+ * Photo affichable d'un produit : la photo locale re-signée à la lecture,
+ * sinon le repli OFF contrôlé.
+ *
+ * La colonne `photo_url` porte un CHEMIN de bucket pour un dépôt récent (D-01) :
+ * il se forge à la lecture via la carte `resolved` (échec fermé — `null` quand
+ * la signature n'a pas abouti). Les formes non-chemin (URL OFF copiée à la main,
+ * `data:` hérité, aperçu `blob:` du mode démo) rendent telles quelles ; une
+ * valeur blanche laisse parler le repli `off_data.image_url`.
+ */
+export function productPhotoUrl(row: ProductRow, resolved: Record<string, string> = {}): string | null {
+  const path = householdMediaPathOf(row.photo_url);
+  if (path) return resolved[row.id] ?? null;
+  const stored = (row.photo_url ?? '').trim();
+  if (stored !== '') return row.photo_url as string;
   const offData = row.off_data ?? {};
   if (typeof offData !== 'object' || offData === null) return null;
   return cleanOffImageUrl((offData as Record<string, unknown>).image_url);
+}
+
+/** Forge chaque photo de produit en URL affichable, en une passe (échec fermé par produit). */
+export async function resolveProductPhotoUrls(
+  rows: { id: string; photo_url: string | null }[],
+): Promise<Record<string, string>> {
+  const pending = rows.filter((row) => row.photo_url !== null && isHouseholdMediaPath(row.photo_url));
+  const entries = await Promise.all(
+    pending.map(async (row) => [row.id, await resolveHouseholdMediaUrl(row.photo_url)] as const),
+  );
+  const resolved: Record<string, string> = {};
+  for (const [id, url] of entries) {
+    if (url) resolved[id] = url;
+  }
+  return resolved;
 }
 
 /** Reconstruit un enrichissement OFF depuis une ligne produit connue. */

@@ -7,7 +7,7 @@ import { useCourses } from './hooks/use-courses';
 /** Catalogue des produits scannés : espace dédié, photo/code/rayon éditables. */
 export default function ProductCatalogPage() {
   const navigate = useNavigate();
-  const { products, editProduct } = useCourses();
+  const { products, productPhotoUrls, editProduct } = useCourses();
 
   return (
     <ModuleShell
@@ -18,7 +18,7 @@ export default function ProductCatalogPage() {
         </Button>
       }
     >
-      <ProductCatalog products={products} onEdit={editProduct} />
+      <ProductCatalog products={products} photoUrls={productPhotoUrls} onEdit={editProduct} />
     </ModuleShell>
   );
 }

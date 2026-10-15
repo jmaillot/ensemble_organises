@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { productPhotoUrl } from '../products-api';
 import { useHouseholdStore } from '@/stores/household-store';
 import { compressImage } from '@/modules/cercle/lib/media';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
 import { isQueryableEan } from '../off-client';
 import { normalizeRayon, RAYONS } from '../types';
 import type { ProductRow } from '@/types';
@@ -35,7 +35,7 @@ type EditFormValues = z.infer<typeof editSchema>;
  * modifiables. L'édition suit la RLS (créateur ou ligne sans auteur) :
  * un refus serveur remonte en toast, sans écran d'erreur.
  */
-export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; onEdit: (
+export function ProductCatalog({ products, photoUrls, onEdit }: { products: ProductRow[]; photoUrls: Record<string, string>; onEdit: (
   id: string,
   values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null },
 ) => Promise<void> }) {
@@ -100,7 +100,7 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
           ) : null}
           <ul className="grid gap-2">
             {visible.map((product) => {
-              const photo = productPhotoUrl(product);
+              const photo = productPhotoUrl(product, photoUrls);
               return (
                 <li
                   key={product.id}
@@ -133,17 +133,19 @@ export function ProductCatalog({ products, onEdit }: { products: ProductRow[]; o
           </ul>
         </>
       )}
-      <ProductEditDialog product={editing} onOpenChange={(open) => { if (!open) setEditing(null); }} onEdit={onEdit} />
+      <ProductEditDialog product={editing} photoUrls={photoUrls} onOpenChange={(open) => { if (!open) setEditing(null); }} onEdit={onEdit} />
     </Panel>
   );
 }
 
 function ProductEditDialog({
   product,
+  photoUrls,
   onOpenChange,
   onEdit,
 }: {
   product: ProductRow | null;
+  photoUrls: Record<string, string>;
   onOpenChange: (open: boolean) => void;
   onEdit: (
     id: string,
@@ -165,6 +167,11 @@ function ProductEditDialog({
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Aperçu de la photo stockée, re-signée à la lecture (D-01) : `photoPreview`
+  // (`null` par défaut) ne porte QUE l'aperçu local d'un fichier fraîchement
+  // choisi, le repli tombant sur cette valeur dérivée sans jamais re-signer une
+  // URL dans la colonne.
+  const storedPreview = product ? productPhotoUrl(product, photoUrls) : null;
 
   useEffect(() => {
     if (product) {
@@ -175,21 +182,30 @@ function ProductEditDialog({
         ean: product.ean,
       });
       setPhotoFile(null);
-      setPhotoPreview(product.photo_url);
+      setPhotoPreview(null);
       if (photoInputRef.current) photoInputRef.current.value = '';
     }
+    // `product` identifie une ouverture ; l'aperçu dérivé suit `photoUrls` sans
+    // réinitialiser la saisie en cours.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product, reset]);
 
   const submit = handleSubmit(async (values) => {
     if (!product) return;
+    let depositedPath: string | null = null;
     try {
       let photoUrl: string | undefined;
       if (photoFile) {
         if (!householdId) throw new Error('Aucun foyer actif : reconnectez-vous.');
         const compressed = await compressImage(photoFile);
         const uploadable = new File([compressed.blob], compressed.name, { type: compressed.mime });
-        photoUrl = (await depositHouseholdFile({ householdId, folder: 'products', file: uploadable })).url;
+        const deposited = await depositHouseholdFile({ householdId, folder: 'products', file: uploadable });
+        // Valeur de COLONNE (chemin du bucket, point unique de 19-01) :
+        // persister l'URL du dépôt enverrait une URL signée éphémère (D-01).
+        photoUrl = storedValueOf(deposited);
+        depositedPath = deposited.path;
       }
+      const previousPath = photoUrl !== undefined ? replacedMediaPath(product.photo_url, photoUrl) : null;
       await onEdit(product.id, {
         name: values.name.trim(),
         brand: values.brand.trim(),
@@ -197,9 +213,13 @@ function ProductEditDialog({
         ean: values.ean.trim(),
         ...(photoUrl !== undefined ? { photoUrl } : {}),
       });
+      // Objet remplacé (D-03) : retrait best-effort après un succès d'écriture.
+      if (previousPath) await removeHouseholdFile(previousPath).catch(() => {});
       onOpenChange(false);
       toast(`« ${values.name.trim()} » mis à jour.`, 'success');
     } catch (error) {
+      // Compensation : aucun dépôt orphelin si l'écriture échoue.
+      if (depositedPath) await removeHouseholdFile(depositedPath).catch(() => {});
       toast(error instanceof Error ? error.message : 'Modification impossible.', 'error');
     }
   });
@@ -213,9 +233,9 @@ function ProductEditDialog({
           <DialogDescription>Photo, code-barres et rayon du produit scanné.</DialogDescription>
         </DialogHeader>
         <form className="grid gap-3.5" noValidate onSubmit={submit}>
-          {photoPreview ? (
+          {photoPreview ?? storedPreview ? (
             <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
-              <img src={photoPreview} alt="Photo du produit" className="max-h-44 w-full object-cover" />
+              <img src={photoPreview ?? storedPreview ?? ''} alt="Photo du produit" className="max-h-44 w-full object-cover" />
             </figure>
           ) : null}
           <Field label="Nom" error={errors.name?.message}>
@@ -254,10 +274,10 @@ function ProductEditDialog({
                     try {
                       setPhotoPreview(URL.createObjectURL(file));
                     } catch {
-                      setPhotoPreview(product?.photo_url ?? null);
+                      setPhotoPreview(null);
                     }
                   } else {
-                    setPhotoPreview(product?.photo_url ?? null);
+                    setPhotoPreview(null);
                   }
                 }}
               />

@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useToast } from '@/components/ui/toast';
 import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { daysBetween, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import type { EventRow, ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 import {
@@ -18,6 +19,7 @@ import {
 } from '../api';
 import {
   findProductByEan,
+  productPhotoUrl,
   PRODUCTS_TABLE,
   resolveManualOffProduct,
   resolveScannedProduct,
@@ -25,7 +27,7 @@ import {
   updateProduct,
   type ScanResolution,
 } from '../products-api';
-import { cleanOffImageUrl, isQueryableEan } from '../off-client';
+import { isQueryableEan } from '../off-client';
 import {
   NEW_LIST_OPTION,
   guessRayon,
@@ -67,6 +69,8 @@ export interface UseCoursesResult {
   editItem: (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => Promise<void>;
   /** Catalogue brut trié (lignes `products` du foyer) pour l'espace catalogue. */
   products: ProductRow[];
+  /** Photos affichables du catalogue, forgées à la lecture (D-01) — clé = id produit. */
+  productPhotoUrls: Record<string, string>;
   editProduct: (id: string, values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null }) => Promise<void>;
 }
 
@@ -84,6 +88,26 @@ export function useCourses(): UseCoursesResult {
   const itemResource = useResource<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE);
   const eventResource = useResource<EventRow>('events');
   const productResource = useResource<ProductRow>(PRODUCTS_TABLE);
+
+  // Les lignes produits portent des CHEMINS de bucket (D-01, WR-08) : on forge
+  // les photos affichables à la lecture, en échec fermé (annulation stricte).
+  // Les formes non-chemin (URL OFF héritée, `data:`, aperçu démo) rendent en
+  // synchrone — seuls les chemins passent par l'effet.
+  const [productPhotoUrls, setProductPhotoUrls] = useState<Record<string, string>>({});
+  const productRows = productResource.rows;
+  useEffect(() => {
+    const pending = productRows
+      .filter((row) => row.photo_url !== null && isHouseholdMediaPath(row.photo_url))
+      .map((row) => ({ id: row.id, file_url: row.photo_url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setProductPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [productRows]);
 
   /**
    * Phase 15 : les listes propres à un voyage (`trip_id` renseigné) — et
@@ -163,23 +187,20 @@ export function useCourses(): UseCoursesResult {
 
   /**
    * Produits du catalogue du foyer (D-03) : triés par nom pour un ordre
-   * stable, photo locale prioritaire puis repli `off_data.image_url` (D-05).
+   * stable, photo locale re-signée à la lecture puis repli `off_data.image_url`
+   * (D-05, D-01).
    */
   const productEntries = useMemo(
     () =>
       [...productResource.rows]
         .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-        .map((row) => {
-          const offData = row.off_data ?? {};
-          const fallback = cleanOffImageUrl(offData.image_url);
-          return {
-            name: row.name.trim(),
-            rayon: normalizeRayon(row.category),
-            photoUrl: row.photo_url ?? fallback,
-          };
-        })
+        .map((row) => ({
+          name: row.name.trim(),
+          rayon: normalizeRayon(row.category),
+          photoUrl: productPhotoUrl(row, productPhotoUrls),
+        }))
         .filter((entry) => entry.name.length > 0),
-    [productResource.rows],
+    [productPhotoUrls, productResource.rows],
   );
 
   const suggestionsFor = useCallback(
@@ -450,6 +471,7 @@ export function useCourses(): UseCoursesResult {
     removeList,
     editItem,
     products,
+    productPhotoUrls,
     editProduct,
   };
 }

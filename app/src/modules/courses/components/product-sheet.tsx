@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { compressImage } from '@/modules/cercle/lib/media';
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
 import { createShoppingItem, SHOPPING_ITEMS_TABLE, SHOPPING_LISTS_TABLE } from '../api';
 import { isQueryableEan, type OffProduct } from '../off-client';
 import { offCategoriesToRayon } from '../off-rayon';
@@ -189,7 +189,10 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
             const compressed = await compressImage(photoFile);
             const uploadable = new File([compressed.blob], compressed.name, { type: compressed.mime });
             const deposited = await depositHouseholdFile({ householdId, folder: 'products', file: uploadable });
-            photoUrl = deposited.url;
+            // Valeur de COLONNE (chemin du bucket, point unique de 19-01) : c'est
+            // elle qui part en `products.photo_url`. Persister l'URL du dépôt
+            // enverrait une URL signée éphémère (D-01, WR-08).
+            photoUrl = storedValueOf(deposited);
             depositedPath = deposited.path;
           }
           const resolution = await productsApi.resolveScannedProduct(
@@ -218,9 +221,15 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
           // Produit déjà connu : la photo fournie ici n'est pas dans l'écriture
           // unique ci-dessus. On la pose si la RLS le permet (tout admin/membre
           // du foyer depuis 0088), sinon on nettoie le dépôt et on le dit franchement.
+          // La comparaison porte désormais sur deux CHEMINS (D-01) : une écriture
+          // inutile n'est plus déclenchée par une URL signée qui diffère.
           if (photoUrl && resolution.product.photo_url !== photoUrl) {
+            const previousPath = replacedMediaPath(resolution.product.photo_url, photoUrl);
             try {
               await productsApi.updateProductPhoto(resolution.product.id, photoUrl);
+              // Objet remplacé (D-03) : best-effort, ne transforme jamais un
+              // succès d'écriture en échec (même doctrine que cadeaux T-05-09).
+              if (previousPath) await removeHouseholdFile(previousPath).catch(() => {});
             } catch {
               await removeHouseholdFile(depositedPath).catch(() => {});
               toast('Produit ajouté, mais la photo n’a pas pu être enregistrée.', 'error');

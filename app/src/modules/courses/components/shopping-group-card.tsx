@@ -30,6 +30,8 @@ export interface ShoppingGroupCardProps {
   suggestions: ItemSuggestion[];
   /** Catalogue du foyer pour la correspondance à la frappe. */
   catalogue: ProductRow[];
+  /** Photos affichables du catalogue (chemins re-signés à la lecture, D-01). */
+  photoUrls: Record<string, string>;
   disabled?: boolean;
   onToggle: (item: ShoppingItem) => void;
   onQuickAdd: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => void;
@@ -50,6 +52,7 @@ export function ShoppingGroupCard({
   grouping,
   suggestions,
   catalogue,
+  photoUrls,
   disabled = false,
   onToggle,
   onQuickAdd,
@@ -202,8 +205,8 @@ export function ShoppingGroupCard({
                   onMouseDown={(event) => event.preventDefault()}
                   className="flex w-full min-h-9 items-center gap-2 rounded-[9px] px-2 py-1.5 text-left transition-colors hover:bg-accent-faint disabled:opacity-55"
                 >
-                  {productPhotoUrl(product) ? (
-                    <img src={productPhotoUrl(product) as string} alt="" aria-hidden="true" className="size-7 shrink-0 rounded-[7px] object-cover" />
+                  {productPhotoUrl(product, photoUrls) ? (
+                    <img src={productPhotoUrl(product, photoUrls) as string} alt="" aria-hidden="true" className="size-7 shrink-0 rounded-[7px] object-cover" />
                   ) : null}
                   <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{product.name}</span>
                 </button>
