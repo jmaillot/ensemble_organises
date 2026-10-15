@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+
 /**
  * Point unique de conversion entre un **instant** (ce que la base stocke : une
  * colonne `timestamptz`) et la valeur d'un `<input type="datetime-local">`
@@ -8,18 +10,27 @@
  * même instant. Le défaut d'origine (WR-07) était de faire la relecture par
  * `instant.slice(0, 16)` — la chaîne stockée est en UTC, le champ est en local :
  * un rappel de 18:30 à Paris s'affichait 16:30 et reculait de 2 h à chaque
- * enregistrement.
+ * enregistrement. Passer par `format` (et non par un découpage de chaîne) est
+ * la correction, et c'est la seule lecture d'un instant qui vive ici.
  */
 
-/** Relecture : instant → valeur de `datetime-local` (`YYYY-MM-DDTHH:mm`). */
+/**
+ * Relecture : instant → valeur de `datetime-local` (`YYYY-MM-DDTHH:mm`), dans le
+ * fuseau local du navigateur. Vide ou illisible → `''` (jamais `Invalid Date`).
+ */
 export function instantToLocalInput(instant: string | Date | null | undefined): string {
   if (instant === null || instant === undefined) return '';
-  const value = instant instanceof Date ? instant.toISOString() : instant;
-  if (value.trim() === '') return '';
-  return value.slice(0, 16);
+  if (typeof instant === 'string' && instant.trim() === '') return '';
+  const value = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(value.getTime())) return '';
+  return format(value, "yyyy-MM-dd'T'HH:mm");
 }
 
-/** Écriture : valeur de `datetime-local` → instant ISO UTC (`null` = aucun rappel). */
+/**
+ * Écriture : valeur de `datetime-local` (interprétée en **local** par `Date`) →
+ * instant ISO UTC. Chaîne vide = « aucun rappel » (`taches/types.ts`), tout
+ * comme `null` ou une valeur illisible.
+ */
 export function instantOfDatetimeLocal(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
