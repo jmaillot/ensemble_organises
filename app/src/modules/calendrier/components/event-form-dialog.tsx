@@ -9,6 +9,7 @@ import { Input, Select, Textarea } from '@/components/ui/input';
 import { Switch } from '@/components/ui/primitives';
 import { useMembers } from '@/stores/household-store';
 import { useResource } from '@/lib/data/useResource';
+import { instantToLocalInput } from '@/lib/datetime';
 import type { EventCalendarRow, EventCategoryRow } from '@/types';
 import { toColorTag } from '../types';
 import type { CalendarEvent, EventFormValues } from '../types';
@@ -66,8 +67,6 @@ const toTimeValue = (iso: string | null, allDay: boolean) => {
   return iso.slice(11, 16);
 };
 
-const toReminderValue = (remindAt: string | null | undefined) => (remindAt ? remindAt.slice(0, 16) : '');
-
 function defaultValues(
   event: CalendarEvent | null,
   defaultDate: string,
@@ -86,7 +85,7 @@ function defaultValues(
       memberId: '',
       categoryId: '',
       calendarId: '',
-      remindAt: toReminderValue(remindAt),
+      remindAt: instantToLocalInput(remindAt),
     };
   }
   return {
@@ -100,7 +99,7 @@ function defaultValues(
     memberId,
     categoryId: event.categoryId ?? '',
     calendarId: event.calendarId ?? '',
-    remindAt: toReminderValue(remindAt),
+    remindAt: instantToLocalInput(remindAt),
   };
 }
 

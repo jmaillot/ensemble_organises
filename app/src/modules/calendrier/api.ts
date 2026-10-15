@@ -1,5 +1,6 @@
 import { data } from '@/lib/data';
 import type { EventCalendarRow, EventCategoryRow, EventReminderRow, EventRow, MemberColorTag, PublicHolidayRow, SchoolHolidayRow } from '@/types';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import type { EventFormValues } from './types';
 
 const EVENTS = 'events';
@@ -141,7 +142,12 @@ export async function updateEventRow(id: string, input: EventInput): Promise<Eve
   return data.update<EventRow>(EVENTS, id, toRowValues(input));
 }
 
-/** Un rappel par événement : on remplace l'existant plutôt que de l'accumuler. */
+/**
+ * Un rappel par événement : on remplace l'existant plutôt que de l'accumuler.
+ * `remind_at` est un **instant** (`timestamptz`) : la valeur du champ, qui est
+ * locale, est convertie par `@/lib/datetime` avant d'être stockée (WR-07). Une
+ * chaîne naïve (`2026-10-15T18:30:00`) serait interprétée au fuseau du serveur.
+ */
 export async function replaceEventReminder(eventId: string, remindAt: string | null): Promise<void> {
   const existing = await listEventReminders([eventId]);
   await Promise.all(existing.map((reminder) => data.remove(REMINDERS, reminder.id)));
@@ -151,7 +157,7 @@ export async function replaceEventReminder(eventId: string, remindAt: string | n
 /** Création ou mise à jour, rappel compris. */
 export async function saveEvent(id: string | null, input: EventInput): Promise<EventRow> {
   const row = id ? await updateEventRow(id, input) : await createEventRow(input);
-  await replaceEventReminder(row.id, input.remindAt.trim() === '' ? null : `${input.remindAt.trim()}:00`);
+  await replaceEventReminder(row.id, instantOfDatetimeLocal(input.remindAt));
   return row;
 }
 
