@@ -44,7 +44,7 @@ function renderDialog(target: Place | null, onSubmit: (input: PlaceInput) => Pro
 describe('PlaceFormDialog — la valeur transportée est la valeur stockée (WR-05)', () => {
   it('photo non touchée : affiche l’URL résolue, soumet le chemin stocké', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn(async () => {});
+    const onSubmit = vi.fn<(input: PlaceInput) => Promise<void>>(async () => {});
     renderDialog(place, onSubmit);
     const dialog = screen.getByRole('dialog');
 
@@ -59,7 +59,7 @@ describe('PlaceFormDialog — la valeur transportée est la valeur stockée (WR-
 
   it('« Retirer la photo » : soumet `null`, le signal de retrait attendu par editPlace', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn(async () => {});
+    const onSubmit = vi.fn<(input: PlaceInput) => Promise<void>>(async () => {});
     renderDialog(place, onSubmit);
     const dialog = screen.getByRole('dialog');
 
@@ -74,7 +74,7 @@ describe('PlaceFormDialog — la valeur transportée est la valeur stockée (WR-
 
   it('lieu neuf sans photo : soumet `null` et affiche l’icône du type', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn(async () => {});
+    const onSubmit = vi.fn<(input: PlaceInput) => Promise<void>>(async () => {});
     renderDialog(null, onSubmit);
     const dialog = screen.getByRole('dialog');
 
