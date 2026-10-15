@@ -8,8 +8,10 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
+import { data } from '@/lib/data';
 import { createInviteToken } from '@/lib/invites';
 import { createHousehold, loadHousehold } from '@/stores/session-store';
+import { useHouseholdStore } from '@/stores/household-store';
 import { QrCode } from '@/components/shared/qr-code';
 
 const colors = ['accent', 'coral', 'amber', 'ink'] as const;
@@ -46,13 +48,26 @@ export default function CreateHouseholdPage() {
   const onSubmit = async (values: FormValues) => {
     setPending(true);
     setError(null);
+    let createdHouseholdId: string | null = null;
     try {
-      await createHousehold(values.name, values.color);
+      const { household } = await createHousehold(values.name, values.color);
+      createdHouseholdId = household.id;
       await loadHousehold();
       const preview = await createInviteToken({ maxUses: 10 });
       setToken(preview.token);
       toast('Foyer créé. Partagez le token ci-dessous.');
     } catch (creationError) {
+      // Compensation (D-08) : le token est le seul second temps (il a besoin du
+      // foyer). S'il échoue, le foyer créé est retiré, l'appartenance locale
+      // purgée (l'adaptateur démo n'a pas de cascade) et la session remise à
+      // « aucun foyer » — sinon un second foyer naissait à la réédition.
+      if (createdHouseholdId) {
+        await data.remove('households', createdHouseholdId).catch(() => undefined);
+        await data
+          .removeWhere('household_members', { household_id: createdHouseholdId }, { ifMissing: 'ignore' })
+          .catch(() => undefined);
+        useHouseholdStore.getState().reset();
+      }
       setError(creationError instanceof Error ? creationError.message : 'Création impossible.');
     } finally {
       setPending(false);

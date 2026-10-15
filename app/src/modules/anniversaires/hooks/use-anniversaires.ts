@@ -96,8 +96,14 @@ export function useAnniversaires(): AnniversairesResource {
               linkedMemberId: row.linked_member_id,
             });
           } catch (contactError) {
+            // Compensation (D-08) : sans elle, l'anniversaire restait écrit et
+            // une resoumission créait un DOUBLON. La ligne créée est retirée
+            // (jamais celle d'une édition, `!id` étant garanti ici) avant de
+            // relayer l'échec du contact — l'erreur d'origine reste nommée.
+            await deleteBirthday(row.id).catch(() => undefined);
             throw new Error(
-              `Anniversaire enregistré, mais le contact n’a pas pu être créé : ${contactError instanceof Error ? contactError.message : 'erreur inconnue'}`,
+              `L’anniversaire n’a pas pu être créé : le contact n’a pas pu être créé (${contactError instanceof Error ? contactError.message : 'erreur inconnue'}).`,
+              { cause: contactError },
             );
           }
         }
