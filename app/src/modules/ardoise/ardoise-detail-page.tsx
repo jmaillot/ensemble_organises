@@ -8,7 +8,7 @@ import { Input, Textarea } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Icon } from '@/components/shared/icon';
 import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
 import { formatEuro } from '@/lib/utils';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -469,7 +469,7 @@ function useSessionMemberId(): string | null {
 function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { ardoise, refetch } = useArdoiseDetail(ardoiseId);
+  const { ardoise, coverUrlOf, refetch } = useArdoiseDetail(ardoiseId);
   const householdId = useHouseholdStore((state) => state.householdId);
   const [name, setName] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
@@ -512,6 +512,8 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
 
   const currentName = name ?? ardoise?.name ?? '';
   const currentDescription = description ?? ardoise?.description ?? '';
+  // Affichage : l'URL signée forgée à la lecture, jamais le chemin brut (D-01).
+  const coverUrl = ardoise ? coverUrlOf(ardoise) : null;
 
   const save = () => {
     if (currentName.trim() === '') {
@@ -520,17 +522,28 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
     }
     setIsSaving(true);
     void (async () => {
+      // Le brouillon part de la VALEUR STOCKÉE (`cover_url`, un chemin), jamais
+      // de la valeur affichable : réinjecter l'URL signée ici ferait écrire une
+      // URL éphémère dans une colonne que tout le dépôt traite comme un chemin
+      // (T-19-24, piège nommé de l'objectif).
       let coverUrl = ardoise?.cover_url ?? null;
       if (coverFile) {
         if (!householdId) throw new Error('Aucun foyer sélectionné.');
         const deposited = await depositHouseholdFile({ householdId, folder: 'ardoises', file: coverFile });
-        coverUrl = deposited.url;
+        coverUrl = storedValueOf(deposited);
       }
+      // Remplacement : l'objet précédent n'est retiré que si la valeur de
+      // colonne change (D-03) — la décision se prend sur les valeurs stockées,
+      // pas sur l'URL affichée (WR-05, généralisé par `replacedMediaPath`).
+      const obsoletePath = replacedMediaPath(ardoise?.cover_url ?? null, coverUrl);
       await updateArdoise(ardoiseId, {
         name: currentName.trim(),
         description: currentDescription.trim() === '' ? null : currentDescription.trim(),
         cover_url: coverUrl,
       });
+      // Best-effort après succès de l'écriture : un nettoyage qui échoue ne
+      // transforme pas un enregistrement réussi en échec.
+      if (obsoletePath) await removeHouseholdFile(obsoletePath).catch(() => undefined);
       setCoverFile(null);
       await queryClient.invalidateQueries({ queryKey: ardoiseKeys.all });
       refetch();
@@ -579,8 +592,12 @@ function ArdoiseSettings({ ardoiseId }: { ardoiseId: string }) {
   return (
     <div className="grid gap-[18px]">
       <Panel id="ardoise-settings-panel" title="Paramètres" description="Nom, description et photo de couverture.">
-        {ardoise?.cover_url ? (
-          <img src={ardoise.cover_url} alt={`Couverture de ${ardoise.name}`} className="mb-3 h-36 w-full rounded-[12px] object-cover" />
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={`Couverture de ${ardoise?.name ?? ''}`}
+            className="mb-3 h-36 w-full rounded-[12px] object-cover"
+          />
         ) : null}
         <div className="grid gap-3.5">
           <Field label="Nom de l’ardoise">

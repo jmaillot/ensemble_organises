@@ -11,14 +11,14 @@ import { CountBadge, MetricRow, ModuleShell, Panel } from '@/components/shared/m
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, storedValueOf } from '@/lib/storage';
 import { useArdoises } from './hooks/use-ardoise';
 import { joinArdoise, redeemGuestTicket } from './api';
 import { useSessionUser } from '@/hooks/use-auth';
 
 /** Liste des ardoises du foyer + création + rejoindre par code. */
 export default function ArdoisePage() {
-  const { ardoises, isLoading, isError, error, refetch, isMutating, addArdoise, removeArdoise } = useArdoises();
+  const { ardoises, coverUrlOf, isLoading, isError, error, refetch, isMutating, addArdoise, removeArdoise } = useArdoises();
   const toast = useToast();
   const navigate = useNavigate();
   const sessionUser = useSessionUser();
@@ -74,51 +74,57 @@ export default function ArdoisePage() {
           action={<CountBadge value={ardoises.length} label="ardoises" />}
         >
           <div role="list" aria-label="Ardoises du foyer" className="grid gap-2.5">
-            {ardoises.map((ardoise) => (
-              <div
-                key={ardoise.id}
-                role="listitem"
-                className={`relative flex flex-wrap items-center gap-3 overflow-hidden rounded-[12px] border px-3.5 py-3 ${
-                  ardoise.cover_url ? 'border-transparent' : 'border-border'
-                }`}
-              >
-                {ardoise.cover_url ? (
-                  <>
-                    <img
-                      src={ardoise.cover_url}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                    <div aria-hidden="true" className="absolute inset-0 bg-fg/60" />
-                  </>
-                ) : null}
-                <div className="relative min-w-[150px] flex-1">
-                  <p className={`m-0 text-[14px] font-[760] ${ardoise.cover_url ? 'text-white' : ''}`}>
-                    {ardoise.name}
-                  </p>
-                  <small className={`text-[11px] ${ardoise.cover_url ? 'text-white/75' : 'text-muted'}`}>
-                    {ardoise.description ? `${ardoise.description} · ` : ''}
-                    {ardoise.is_active ? 'Partage actif' : 'Partage coupé'}
-                  </small>
-                </div>
-                <div className="relative">
-                  <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
-                    Ouvrir
-                  </Button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPendingDeleteId(ardoise.id)}
-                  aria-label={`Supprimer ${ardoise.name}`}
-                  className={`relative grid size-11 place-items-center rounded-[9px] transition-colors hover:bg-coral-soft hover:text-coral ${
-                    ardoise.cover_url ? 'text-white/85' : 'text-muted'
+            {ardoises.map((ardoise) => {
+              // Une seule lecture par ligne : l'affichage et le style conditionnel
+              // partagent la même valeur résolue. Une couverture dont la
+              // signature a échoué retombe donc sur le style sans image.
+              const coverUrl = coverUrlOf(ardoise);
+              return (
+                <div
+                  key={ardoise.id}
+                  role="listitem"
+                  className={`relative flex flex-wrap items-center gap-3 overflow-hidden rounded-[12px] border px-3.5 py-3 ${
+                    coverUrl ? 'border-transparent' : 'border-border'
                   }`}
                 >
-                  <Icon name="trash" size="sm" />
-                </button>
-              </div>
-            ))}
+                  {coverUrl ? (
+                    <>
+                      <img
+                        src={coverUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      <div aria-hidden="true" className="absolute inset-0 bg-fg/60" />
+                    </>
+                  ) : null}
+                  <div className="relative min-w-[150px] flex-1">
+                    <p className={`m-0 text-[14px] font-[760] ${coverUrl ? 'text-white' : ''}`}>
+                      {ardoise.name}
+                    </p>
+                    <small className={`text-[11px] ${coverUrl ? 'text-white/75' : 'text-muted'}`}>
+                      {ardoise.description ? `${ardoise.description} · ` : ''}
+                      {ardoise.is_active ? 'Partage actif' : 'Partage coupé'}
+                    </small>
+                  </div>
+                  <div className="relative">
+                    <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
+                      Ouvrir
+                    </Button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteId(ardoise.id)}
+                    aria-label={`Supprimer ${ardoise.name}`}
+                    className={`relative grid size-11 place-items-center rounded-[9px] transition-colors hover:bg-coral-soft hover:text-coral ${
+                      coverUrl ? 'text-white/85' : 'text-muted'
+                    }`}
+                  >
+                    <Icon name="trash" size="sm" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </Panel>
       )}
@@ -130,11 +136,14 @@ export default function ArdoisePage() {
         onSubmit={async (values) => {
           try {
             // Photo de couverture optionnelle : déposée avant création, comme
-            // dans l'onglet Paramètres (même dossier `ardoises`).
+            // dans l'onglet Paramètres (même dossier `ardoises`). On persiste la
+            // VALEUR DE COLONNE (chemin du bucket), jamais l'URL signée
+            // éphémère du dépôt (D-01, WR-08).
             let coverUrl: string | undefined;
             if (values.coverFile) {
               if (!householdId) throw new Error('Aucun foyer sélectionné.');
-              coverUrl = (await depositHouseholdFile({ householdId, folder: 'ardoises', file: values.coverFile })).url;
+              const deposited = await depositHouseholdFile({ householdId, folder: 'ardoises', file: values.coverFile });
+              coverUrl = storedValueOf(deposited);
             }
             const created = await addArdoise({
               name: values.name,
