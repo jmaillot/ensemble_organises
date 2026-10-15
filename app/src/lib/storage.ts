@@ -28,6 +28,24 @@ const ACCEPTED_MIMES = [
   'application/pdf',
 ];
 
+/**
+ * Table UNIQUE de correspondance extension → type MIME (D-04).
+ *
+ * C'est le seul endroit où une extension devient un type : `acceptedMimeOf` y
+ * lit le type d'un fichier à `type` vide, et le dépôt écrit exactement le type
+ * ainsi reconnu. Deux tables divergentes rouvriraient le défaut — le bucket
+ * n'admet que les types d'`ACCEPTED_MIMES`.
+ */
+const EXTENSION_MIMES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+};
+
 export interface DepositedFile {
   /** URL signée (Supabase) ou aperçu local (mode démo). */
   url: string;
@@ -49,15 +67,43 @@ function extensionFor(mime: string, fallbackName: string): string {
   return fromName && /^[a-z0-9]+$/i.test(fromName) ? fromName.toLowerCase() : 'bin';
 }
 
-function isAccepted(file: File): boolean {
-  if (ACCEPTED_MIMES.includes(file.type)) return true;
-  // Certains mobiles déclarent un type vide : on se rabat sur l'extension.
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  return ext === 'pdf' || ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp' || ext === 'avif';
+/** Type MIME déduit de l'extension du nom, `null` quand il reste indéterminé. */
+function extensionMime(name: string): string | null {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return null;
+  const ext = name.slice(dot + 1).trim().toLowerCase();
+  if (ext === '') return null;
+  return EXTENSION_MIMES[ext] ?? null;
+}
+
+/**
+ * Type MIME de dépôt d'un fichier : celui que le navigateur déclare s'il est
+ * admis, sinon celui déduit de l'extension. `null` quand le type reste
+ * indéterminé — un type indéterminé se refuse, il ne s'invente pas (D-04).
+ */
+function acceptedMimeOf(file: File): string | null {
+  const declared = normalizeMime(file.type);
+  if (declared !== '' && ACCEPTED_MIMES.includes(declared)) return declared;
+  return extensionMime(file.name);
+}
+
+/** Type déclaré par le navigateur, normalisé (`''` s'il est absent). */
+function normalizeMime(declared: string): string {
+  return declared.trim().toLowerCase();
+}
+
+/** Refus d'un type que la table ne permet pas de déterminer. */
+function refusalMessage(file: File): string {
+  const declared = file.type.trim();
+  return declared === ''
+    ? `Type de fichier indéterminé : « ${file.name} » (extension inconnue). Seules les images et les PDF sont acceptés.`
+    : `Type de fichier non pris en charge : « ${declared} ». Seules les images et les PDF sont acceptés.`;
 }
 
 /**
  * Dépose un fichier sous `<householdId>/<folder>/…` et renvoie son URL.
+ * Le type est celui déclaré par le navigateur s'il est admis, sinon celui
+ * déduit de l'extension ; indéterminé, il est refusé avant tout envoi (D-04).
  * Les images sont compressées avant envoi ; les PDF partent tels quels.
  */
 export async function depositHouseholdFile(input: {
@@ -68,27 +114,32 @@ export async function depositHouseholdFile(input: {
 }): Promise<DepositedFile> {
   const { householdId, folder, file } = input;
   if (!householdId) throw new Error('Aucun foyer sélectionné.');
-  if (!isAccepted(file)) throw new Error('Seules les images et les PDF sont acceptés.');
+
+  // Le type est résolu AVANT tout envoi : déclaré par le navigateur s'il est
+  // admis, sinon déduit de l'extension. Indéterminé, il se refuse — l'ancien
+  // repli `application/pdf` déposait un JPEG mobile sous un type faux (WR-16).
+  const mime = acceptedMimeOf(file);
+  if (mime === null) throw new Error(refusalMessage(file));
 
   let blob: Blob = file;
-  let mime = file.type || 'application/octet-stream';
-  if (file.type.startsWith('image/')) {
-    const compressed = await compressImage(file);
+  let storedMime = mime;
+  if (mime.startsWith('image/')) {
+    // `compressImage` lit `file.type`, vide sur les fichiers reconnus par leur
+    // seule extension : on lui présente le type résolu, sinon il renoncerait
+    // pour une image qu'on vient justement d'identifier.
+    const source = file.type === mime ? file : new File([file], file.name, { type: mime });
+    const compressed = await compressImage(source);
     blob = compressed.blob;
-    mime = compressed.mime;
-  } else if (mime !== 'application/pdf') {
-    // Type deviné par l'extension (mobiles) : le bucket n'admet que le PDF
-    // hors images.
-    mime = 'application/pdf';
+    storedMime = compressed.mime;
   }
 
   if (!isSupabaseConfigured || !supabase) {
-    return { url: URL.createObjectURL(blob), path: null, name: file.name, mime, size: blob.size };
+    return { url: URL.createObjectURL(blob), path: null, name: file.name, mime: storedMime, size: blob.size };
   }
 
-  const path = `${householdId}/${folder}/${randomId('file')}.${extensionFor(mime, file.name)}`;
+  const path = `${householdId}/${folder}/${randomId('file')}.${extensionFor(storedMime, file.name)}`;
   const { error } = await supabase.storage.from(HOUSEHOLD_MEDIA_BUCKET).upload(path, blob, {
-    contentType: mime,
+    contentType: storedMime,
     upsert: false,
   });
   if (error) throw new Error(error.message);
@@ -96,7 +147,7 @@ export async function depositHouseholdFile(input: {
     .from(HOUSEHOLD_MEDIA_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL);
   if (signError) throw new Error(signError.message);
-  return { url: signed.signedUrl, path, name: file.name, mime, size: blob.size };
+  return { url: signed.signedUrl, path, name: file.name, mime: storedMime, size: blob.size };
 }
 
 /**
