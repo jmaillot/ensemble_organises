@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFreePayerShare, computeSpent, type Expense } from './types';
+import { applyFreePayerShare, computeSpent, customSharesTotal, normalizeShares, splitEqual, type Expense } from './types';
 
 const expense = (id: string, overrides: Partial<Expense>): Expense => ({
   id,
@@ -67,5 +67,55 @@ describe('applyFreePayerShare', () => {
     expect(applyFreePayerShare(['membre:a'], 'g1', { include: true, splitType: 'personnalise' })).toEqual([
       'membre:a',
     ]);
+  });
+});
+
+/**
+ * WR-06 : le calcul est la barrière, pas seulement l'écran — l'API et les
+ * graines appellent `normalizeShares` directement, donc c'est ici que le refus
+ * doit vivre.
+ */
+describe('normalizeShares — parts personnalisées bornées (WR-06)', () => {
+  it('(a) refuse une part personnalisée négative', () => {
+    expect(() => normalizeShares(10, ['membre:a', 'membre:b'], { 'membre:a': -1, 'membre:b': 11 })).toThrow(
+      'Une part ne peut pas être négative.',
+    );
+  });
+
+  it('(b) refuse une somme supérieure au montant (la part du dernier serait négative)', () => {
+    // Dépense 10 €, parts 10 + 10 + 1 : le dernier absorbe 10 − 21 = −10.
+    expect(() =>
+      normalizeShares(10, ['membre:a', 'membre:b', 'membre:c'], {
+        'membre:a': 10,
+        'membre:b': 10,
+        'membre:c': 1,
+      }),
+    ).toThrow('La somme des parts dépasse le montant de la dépense.');
+  });
+
+  it('(c) une somme exacte est rendue telle quelle', () => {
+    expect(normalizeShares(10, ['membre:a', 'membre:b'], { 'membre:a': 4, 'membre:b': 6 })).toEqual([4, 6]);
+  });
+
+  it('(d) sans parts personnalisées, le partage égal reste inchangé', () => {
+    expect(normalizeShares(10, ['membre:a', 'membre:b', 'membre:c'])).toEqual(splitEqual(10, 3));
+    expect(splitEqual(10, 3)).toEqual([3.33, 3.33, 3.34]);
+  });
+
+  it('(e) arrondit au centime une somme légitime, l’écart d’arrondi allant au dernier', () => {
+    expect(
+      normalizeShares(10, ['membre:a', 'membre:b', 'membre:c'], {
+        'membre:a': 3.33,
+        'membre:b': 3.33,
+        'membre:c': 3.33,
+      }),
+    ).toEqual([3.33, 3.33, 3.34]);
+  });
+
+  it('customSharesTotal somme les parts retenues, sans absorption d’écart', () => {
+    expect(customSharesTotal(['membre:a', 'membre:b'], { 'membre:a': 4, 'membre:b': 6 })).toBe(10);
+    // Une clé absente ou non retenue vaut zéro.
+    expect(customSharesTotal(['membre:a', 'membre:b'], { 'membre:a': 4 })).toBe(4);
+    expect(customSharesTotal([], { 'membre:a': 4 })).toBe(0);
   });
 });

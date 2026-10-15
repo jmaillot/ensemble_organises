@@ -108,6 +108,23 @@ export const roundCents = (value: number) => Math.round((Number(value) || 0) * 1
 const sum = (values: number[]) => roundCents(values.reduce((total, value) => total + value, 0));
 
 /**
+ * Tolérance d'un demi-centime pour comparer une somme de parts à un montant :
+ * les parts viennent de chaînes décimales et sont arrondies au centime, donc
+ * une répartition légitime peut s'écarter d'un arrondi de la valeur exacte.
+ */
+export const SHARE_TOLERANCE = 0.005;
+
+/**
+ * Somme des parts personnalisées **retenues** pour des clés données, arrondie
+ * au centime, **sans** absorption d'écart. C'est la grandeur que le formulaire
+ * compare au montant : la règle de l'écran et celle du calcul ne peuvent donc
+ * pas diverger (WR-06).
+ */
+export function customSharesTotal(keys: string[], custom?: Record<string, number>): number {
+  return sum(keys.map((key) => roundCents(custom?.[key] ?? 0)));
+}
+
+/**
  * Partage égal au centime : les parts sont arrondies et le dernier participant
  * absorbe la différence, afin que la somme reproduce toujours le montant exact.
  */
@@ -119,13 +136,29 @@ export function splitEqual(amount: number, count: number): number[] {
   return shares;
 }
 
-/** Normalise des parts personnalisées : le dernier participant porte l'écart. */
+/**
+ * Normalise des parts personnalisées : le dernier participant porte l'écart
+ * d'arrondi, afin que la somme reproduce exactement le montant.
+ *
+ * Deux refus l'encadrent (WR-06). Une part saisie négative n'est jamais
+ * valide ; et un total supérieur au montant rendrait la part du dernier
+ * négative — une ligne alors persistée telle quelle par les chemins qui ne
+ * passent pas par le formulaire (API, graines), que le contrôle différé du RPC
+ * n'attrape qu'en mode Supabase. Le calcul est donc la barrière, pas seulement
+ * l'écran.
+ */
 export function normalizeShares(amount: number, keys: string[], custom?: Record<string, number>): number[] {
   if (!custom) return splitEqual(amount, keys.length);
   const shares = keys.map((key) => roundCents(custom[key] ?? 0));
+  if (shares.some((share) => share < 0)) {
+    throw new Error('Une part ne peut pas être négative.');
+  }
   if (shares.length > 0) {
     const last = shares.length - 1;
     shares[last] = roundCents(shares[last] + (amount - sum(shares)));
+  }
+  if (shares.some((share) => share < 0)) {
+    throw new Error('La somme des parts dépasse le montant de la dépense.');
   }
   return shares;
 }

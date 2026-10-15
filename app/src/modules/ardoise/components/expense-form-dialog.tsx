@@ -9,7 +9,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { formatEuro, todayIso } from '@/lib/utils';
-import { GUEST_KEY_PREFIX, MEMBER_KEY_PREFIX, FREE_PAYER_VALUE, guestKey, memberKey, participantKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type ParticipantKind, type SplitType } from '../types';
+import { GUEST_KEY_PREFIX, MEMBER_KEY_PREFIX, FREE_PAYER_VALUE, SHARE_TOLERANCE, customSharesTotal, guestKey, memberKey, participantKey, roundCents, type Expense, type MemberOption, type NewExpenseInput, type ParticipantKind, type SplitType } from '../types';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -52,6 +52,29 @@ const schema = z
   .refine((values) => values.paidBy !== FREE_PAYER_VALUE || (values.payerName ?? '').trim() !== '', {
     message: 'Indiquez le nom de la personne.',
     path: ['payerName'],
+  })
+  .superRefine((values, ctx) => {
+    // WR-06 : chaque part positive ne suffit pas, la SOMME doit égaler le
+    // montant. La somme porte sur `participants` (la liste fait autorité :
+    // c'est elle que `resolveParticipantKeys` consomme), jamais sur les clés
+    // de `customShares` — une clé laissée par un participant décoché
+    // fausserait le total.
+    if (values.splitType !== 'personnalise') return;
+    const amount = roundCents(parseAmount(values.amount));
+    const retained = Object.fromEntries(
+      Object.entries(values.customShares).map(([key, value]) => [key, parseAmount(value)]),
+    );
+    const total = customSharesTotal(values.participants, retained);
+    const gap = roundCents(amount - total);
+    if (Math.abs(gap) <= SHARE_TOLERANCE) return;
+    ctx.addIssue({
+      code: 'custom',
+      path: ['customShares'],
+      message:
+        gap > 0
+          ? `La somme des parts doit égaler le montant : il reste ${formatEuro(gap)} à répartir.`
+          : `La somme des parts doit égaler le montant : les parts le dépassent de ${formatEuro(-gap)}.`,
+    });
   });
 
 type FormValues = z.infer<typeof schema>;
@@ -314,7 +337,7 @@ export function ExpenseFormDialog({
                 <fieldset className="grid gap-2">
                   <legend className="text-[11px] font-extrabold text-muted">Montants personnalisés</legend>
                   <p className="m-0 text-[10px] text-muted">
-                    Le dernier participant absorbe l’écart pour que la somme corresponde au montant.
+                    La somme des parts doit égaler le montant de la dépense (au centime près).
                   </p>
                   {typeof errors.customShares?.message === 'string' ? (
                     <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
