@@ -1,5 +1,6 @@
 import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
+import { householdMediaPathOf, isHouseholdMediaPath, removeHouseholdFile, resolveHouseholdMediaUrl } from '@/lib/storage';
 import { useHouseholdStore } from '@/stores/household-store';
 import type {
   ArdoiseGuestRow,
@@ -179,9 +180,56 @@ export async function updateArdoise(
   return data.update<ArdoiseRow>('ardoises', id, input);
 }
 
+/**
+ * Couverture d'ardoise (D-01) : `ardoises.cover_url` porte le CHEMIN du bucket,
+ * jamais l'URL signée éphémère du dépôt. L'URL affichable est forgée à la
+ * lecture, par le point unique `lib/storage` (19-01) — aucune copie locale de
+ * `createSignedUrl` (D-01), échec fermé.
+ *
+ * Le verdict « chemin » est délégué à `isHouseholdMediaPath` : une couverture
+ * héritée en http(s) n'est pas un objet du bucket, il n'y a rien à signer pour
+ * elle.
+ */
+export async function resolveArdoiseCoverUrl(stored: string | null): Promise<string | null> {
+  if (stored === null || !isHouseholdMediaPath(stored)) return null;
+  return resolveHouseholdMediaUrl(stored);
+}
+
+/**
+ * Forge chaque couverture en URL affichable, en une passe (échec fermé par
+ * ardoise). Seuls les CHEMINS entrent dans la carte : une valeur non-chemin
+ * s'affiche telle quelle et reste absente — l'appelant la sert sans signature.
+ */
+export async function resolveArdoiseCoverUrls(
+  rows: { id: string; cover_url: string | null }[],
+): Promise<Record<string, string>> {
+  const pending = rows.filter((row) => row.cover_url !== null && isHouseholdMediaPath(row.cover_url));
+  const entries = await Promise.all(
+    pending.map(async (row) => [row.id, await resolveHouseholdMediaUrl(row.cover_url)] as const),
+  );
+  const resolved: Record<string, string> = {};
+  for (const [id, url] of entries) {
+    if (url) resolved[id] = url;
+  }
+  return resolved;
+}
+
+/**
+ * Suppression : la ligne part d'abord, l'objet de sa couverture ensuite (D-03).
+ * La lecture précède le retrait (le chemin n'existe plus après), mais son échec
+ * ne retient pas la suppression — la ligne doit partir même si la compensation
+ * ne peut pas être préparée.
+ *
+ * Le retrait de l'objet est best-effort : une suppression réussie ne se
+ * transforme pas en échec si le nettoyage échoue. Fermeture avant ouverture :
+ * une ligne sans objet est réparable, un objet sans ligne ne l'est pas.
+ */
 export async function deleteArdoise(id: string): Promise<void> {
   clearGuestTicket(id);
+  const [row] = await data.list<ArdoiseRow>('ardoises', { id }).catch(() => [] as ArdoiseRow[]);
   await data.remove('ardoises', id);
+  const path = householdMediaPathOf(row?.cover_url ?? null);
+  if (path) await removeHouseholdFile(path).catch(() => undefined);
 }
 
 /** Membres inscrits à l'ardoise (ids de `household_members`). */

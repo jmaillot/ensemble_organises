@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatMonthLabel, todayIso } from '@/lib/utils';
+import { isHouseholdMediaPath } from '@/lib/storage';
 import type { ArdoiseRow, HouseholdMemberRow, MemberColorTag } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
 import {
@@ -13,6 +14,7 @@ import {
   fetchArdoiseMemberIds,
   fetchArdoises,
   removeArdoiseMember,
+  resolveArdoiseCoverUrls,
   toServerBalances,
   toServerSettlements,
   updateArdoise,
@@ -39,8 +41,49 @@ import {
 /** Membres qui partagent réellement : les enfants en sont exclus. */
 const sharingMembers = (members: MemberOption[]) => members.filter((member) => member.role !== 'enfant');
 
+/**
+ * Valeur AFFICHABLE d'une couverture, à partir de sa valeur de colonne (D-01).
+ *
+ * Un chemin se lit dans la carte `resolved` — échec fermé : absent (`null`),
+ * jamais un chemin brut ni un lien mort. Toute forme non-chemin (URL héritée,
+ * `data:`, aperçu `blob:`, ressource applicative `/…`) s'affiche telle quelle,
+ * sans passer par le Storage ; une valeur blanche ne donne aucune image.
+ */
+export function displayableCoverUrl(row: ArdoiseRow, resolved: Record<string, string>): string | null {
+  const stored = row.cover_url;
+  if (stored === null || stored.trim() === '') return null;
+  if (!isHouseholdMediaPath(stored)) return stored;
+  return resolved[row.id] ?? null;
+}
+
+/**
+ * Carte des couvertures signées pour un jeu de lignes. Seuls les chemins
+ * passent par le Storage ; les valeurs non-chemin n'ont rien à signer et
+ * restent hors de la carte (l'affichage les rend telles quelles). Annulation
+ * stricte : une réponse tardive d'un ancien jeu de lignes ne s'applique pas.
+ */
+function useArdoiseCoverUrls(rows: { id: string; cover_url: string | null }[]): Record<string, string> {
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const pending = rows.filter((row) => row.cover_url !== null && isHouseholdMediaPath(row.cover_url));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveArdoiseCoverUrls(pending).then((resolved) => {
+      if (!cancelled) setCoverUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+  return coverUrls;
+}
+
 export interface ArdoisesData {
   ardoises: ArdoiseRow[];
+  /** Couvertures signées, indexées par id d'ardoise (chemins seulement). */
+  coverUrls: Record<string, string>;
+  /** Valeur affichable d'une couverture : URL signée, brute, ou `null`. */
+  coverUrlOf: (row: ArdoiseRow) => string | null;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -63,6 +106,16 @@ export function useArdoises(): ArdoisesData {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ardoiseKeys.all });
 
+  /**
+   * Phase 15 : les ardoises liées à un voyage vivent dans sa fiche Budget,
+   * pas dans la liste du foyer (régime historique `trip_id NULL`, 15-01).
+   * Le détail par id (`useArdoiseDetail`) reste inchangé : la fiche Budget
+   * (15-03) le réutilise tel quel.
+   */
+  const ardoises = useMemo(() => (query.data ?? []).filter((row) => row.trip_id == null), [query.data]);
+  const coverUrls = useArdoiseCoverUrls(ardoises);
+  const coverUrlOf = useCallback((row: ArdoiseRow) => displayableCoverUrl(row, coverUrls), [coverUrls]);
+
   const createMutation = useMutation({
     mutationFn: (input: NewArdoiseInput) => createArdoise(householdId as string, input),
     onSuccess: invalidate,
@@ -73,13 +126,9 @@ export function useArdoises(): ArdoisesData {
   });
 
   return {
-    /**
-     * Phase 15 : les ardoises liées à un voyage vivent dans sa fiche Budget,
-     * pas dans la liste du foyer (régime historique `trip_id NULL`, 15-01).
-     * Le détail par id (`useArdoiseDetail`) reste inchangé : la fiche Budget
-     * (15-03) le réutilise tel quel.
-     */
-    ardoises: (query.data ?? []).filter((row) => row.trip_id == null),
+    ardoises,
+    coverUrls,
+    coverUrlOf,
     isLoading: query.isLoading,
     isError: query.isError,
     error: (query.error as Error | null) ?? null,
@@ -122,6 +171,10 @@ export function useArdoiseMembers(ardoiseId: string | null) {
 }
 
 export interface ArdoiseDetailData {  ardoise: ArdoiseRow | null;
+  /** Couvertures signées, indexées par id d'ardoise (chemins seulement). */
+  coverUrls: Record<string, string>;
+  /** Valeur affichable de la couverture : URL signée, brute, ou `null`. */
+  coverUrlOf: (row: ArdoiseRow) => string | null;
   expenses: Expense[];
   balances: Balance[];
   settlements: Settlement[];
@@ -166,6 +219,17 @@ export function useArdoiseDetail(ardoiseId: string | null): ArdoiseDetailData {
     () => members.map((member) => ({ id: member.id, name: member.display_name, colorTag: member.color_tag, role: member.role })),
     [members],
   );
+
+  // La ligne unique porte un chemin : le détail en forge l'URL affichable une
+  // fois (D-01), plutôt que de laisser l'écran lire `cover_url` brut.
+  const ardoise = ardoiseQuery.data ?? null;
+  const coverRows = useMemo(
+    () => (ardoise ? [{ id: ardoise.id, cover_url: ardoise.cover_url }] : []),
+    [ardoise],
+  );
+  const coverUrls = useArdoiseCoverUrls(coverRows);
+  const coverUrlOf = useCallback((row: ArdoiseRow) => displayableCoverUrl(row, coverUrls), [coverUrls]);
+
   const sharers = useMemo(() => sharingMembers(memberOptions), [memberOptions]);
   const guests = useMemo(() => query.data?.guests ?? [], [query.data]);
 
@@ -245,7 +309,9 @@ export function useArdoiseDetail(ardoiseId: string | null): ArdoiseDetailData {
   }, [expenses]);
 
   return {
-    ardoise: ardoiseQuery.data ?? null,
+    ardoise,
+    coverUrls,
+    coverUrlOf,
     expenses,
     balances: displayBalances,
     settlements: displaySettlements,
