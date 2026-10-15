@@ -23,7 +23,17 @@ vi.mock('@/lib/supabase/client', () => ({
   supabaseFunctionsBase: 'https://api.exemple.fr/functions/v1',
 }));
 
-const { depositHouseholdFile, formatBytes, isImageMime } = await import('./storage');
+const {
+  depositHouseholdFile,
+  formatBytes,
+  householdMediaPathOf,
+  isHouseholdMediaPath,
+  isImageMime,
+  replacedMediaPath,
+  resolveHouseholdMediaUrl,
+  resolveHouseholdMediaUrls,
+  storedValueOf,
+} = await import('./storage');
 
 const pdf = () => new File(['%PDF-1.4'], 'ordonnance.pdf', { type: 'application/pdf' });
 const image = () =>
@@ -86,6 +96,94 @@ describe('dépôt de fichiers du foyer', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+});
+
+describe('valeur de colonne et résolution des médias du foyer (D-01)', () => {
+  beforeEach(() => {
+    state.configured = true;
+    state.upload.mockReset().mockResolvedValue({ error: null });
+    state.createSignedUrl
+      .mockReset()
+      .mockResolvedValue({ data: { signedUrl: 'https://stockage/signe' }, error: null });
+  });
+
+  it('le chemin du bucket est la valeur de colonne ; l’URL ne sert qu’en démo', () => {
+    expect(
+      storedValueOf({ url: 'https://signe.example/expire', path: 'foyer-1/notes/n/ordonnance.pdf', name: 'ordonnance.pdf', mime: 'application/pdf', size: 12 }),
+    ).toBe('foyer-1/notes/n/ordonnance.pdf');
+    expect(
+      storedValueOf({ url: 'blob:apercu-demo', path: null, name: 'ordonnance.pdf', mime: 'application/pdf', size: 12 }),
+    ).toBe('blob:apercu-demo');
+    // Une valeur blanche est rendue telle quelle, sans valeur inventée.
+    expect(
+      storedValueOf({ url: '  ', path: '', name: 'vide.pdf', mime: 'application/pdf', size: 0 }),
+    ).toBe('');
+  });
+
+  it('distingue un chemin de bucket des formes affichables héritées', () => {
+    expect(isHouseholdMediaPath('foyer-1/notes/n/ordonnance.pdf')).toBe(true);
+    expect(isHouseholdMediaPath('https://signe.example/x?token=1')).toBe(false);
+    expect(isHouseholdMediaPath('HTTP://exemple.fr/signe')).toBe(false);
+    expect(isHouseholdMediaPath('data:image/png;base64,AAAA')).toBe(false);
+    expect(isHouseholdMediaPath('blob:apercu')).toBe(false);
+    expect(isHouseholdMediaPath('/assets/ordonnance.png')).toBe(false);
+  });
+
+  it('normalise une valeur blanche : rien à signer, rien à retirer', () => {
+    expect(householdMediaPathOf('  foyer-1/notes/n/a.pdf  ')).toBe('foyer-1/notes/n/a.pdf');
+    expect(householdMediaPathOf('   ')).toBeNull();
+    expect(householdMediaPathOf('')).toBeNull();
+    expect(householdMediaPathOf(null)).toBeNull();
+    expect(householdMediaPathOf('https://signe.example/x')).toBeNull();
+  });
+
+  it('forge une URL signée à la lecture, en échec fermé', async () => {
+    expect(await resolveHouseholdMediaUrl('foyer-1/notes/n/a.pdf')).toBe('https://stockage/signe');
+    expect(state.createSignedUrl).toHaveBeenCalledWith('foyer-1/notes/n/a.pdf', 60 * 60 * 24 * 30);
+
+    // Formes non-chemin : rendues telles quelles, jamais signées.
+    expect(await resolveHouseholdMediaUrl('blob:apercu-demo')).toBe('blob:apercu-demo');
+    expect(await resolveHouseholdMediaUrl('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA');
+    // Valeur blanche : `null`, et aucune signature tentée.
+    state.createSignedUrl.mockClear();
+    expect(await resolveHouseholdMediaUrl('  ')).toBeNull();
+    expect(state.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('forge impossible → null, jamais un lien mort vers le DOM', async () => {
+    state.createSignedUrl.mockResolvedValueOnce({ data: null, error: new Error('expiré') });
+    expect(await resolveHouseholdMediaUrl('foyer-1/notes/n/a.pdf')).toBeNull();
+
+    state.configured = false;
+    expect(await resolveHouseholdMediaUrl('foyer-1/notes/n/a.pdf')).toBeNull();
+  });
+
+  it('forge chaque ligne en une passe, en omettant les échecs', async () => {
+    state.createSignedUrl
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://stockage/a' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: new Error('refus') });
+
+    const resolved = await resolveHouseholdMediaUrls([
+      { id: 'pj-a', file_url: 'foyer-1/notes/n/a.pdf' },
+      { id: 'pj-b', file_url: 'foyer-1/notes/n/b.pdf' },
+    ]);
+
+    expect(resolved).toEqual({ 'pj-a': 'https://stockage/a' });
+  });
+
+  it('remplacement : le chemin précédent est retiré tant qu’il diffère de la suite', () => {
+    expect(replacedMediaPath('foyer-1/places/a.webp', 'foyer-1/places/b.webp')).toBe('foyer-1/places/a.webp');
+    // Retrait (valeur suivante blanche) : c’est un remplacement par rien.
+    expect(replacedMediaPath('foyer-1/places/a.webp', '')).toBe('foyer-1/places/a.webp');
+    expect(replacedMediaPath('foyer-1/places/a.webp', null)).toBe('foyer-1/places/a.webp');
+    // Même valeur : rien à retirer (c’est le défaut WR-05).
+    expect(replacedMediaPath('foyer-1/places/a.webp', 'foyer-1/places/a.webp')).toBeNull();
+    // Formes non-chemin : jamais un objet de bucket.
+    expect(replacedMediaPath('https://signe.example/a?token=1', 'foyer-1/places/b.webp')).toBeNull();
+    expect(replacedMediaPath('data:image/png;base64,AAAA', null)).toBeNull();
+    expect(replacedMediaPath('  ', null)).toBeNull();
+    expect(replacedMediaPath(null, null)).toBeNull();
   });
 });
 

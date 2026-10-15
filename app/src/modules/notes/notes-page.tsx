@@ -244,12 +244,12 @@ export default function NotesPage() {
                       {note.attachments.map((attachment) => (
                         <li key={attachment.id}>
                           <a
-                            href={attachment.url}
+                            href={attachment.url ?? undefined}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center gap-2 rounded-[9px] bg-bg px-2.5 py-2 text-xs transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint"
                           >
-                            {isImageMime(attachment.mime) ? (
+                            {isImageMime(attachment.mime) && attachment.url ? (
                               <img
                                 src={attachment.url}
                                 alt={`Aperçu de ${attachment.fileName}`}

@@ -66,18 +66,37 @@ export interface Note {
 export interface NoteAttachment {
   id: string;
   noteId: string;
-  url: string;
+  /**
+   * URL affichable forgée à la lecture (D-01), `null` en échec fermé : le DOM
+   * ne reçoit jamais un chemin brut ni un lien mort. Éphémère — ne jamais la
+   * confondre avec `storedUrl`.
+   */
+  url: string | null;
+  /**
+   * Valeur de la colonne `file_url` : chemin du bucket pour les dépôts
+   * récents, `blob:`/`data:`/http(s) hérités sinon. C'est la seule grandeur
+   * comparable d'une édition à l'autre, et celle que la suppression d'objet
+   * lit pour retirer le fichier du bucket.
+   */
+  storedUrl: string;
   fileName: string;
   mime: string;
   size: number;
   createdAt: string;
 }
 
-export function toNoteAttachment(row: NoteAttachmentRow): NoteAttachment {
+/**
+ * Conversion d'une ligne `note_attachments` en type métier. L'URL affichable
+ * est passée par l'appelant (résolue par `resolveHouseholdMediaUrls`) ; les
+ * formes non-chemin lui sont transmises telles quelles (aperçus démo, valeurs
+ * héritées), à l'image de `toProviderAttachment`.
+ */
+export function toNoteAttachment(row: NoteAttachmentRow, url: string | null = null): NoteAttachment {
   return {
     id: row.id,
     noteId: row.note_id,
-    url: row.file_url,
+    url,
+    storedUrl: row.file_url,
     fileName: row.file_name,
     mime: row.mime_type,
     size: row.size_bytes,

@@ -1,4 +1,4 @@
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import type { PlaceRow } from '@/types';
 import type { Place, PlaceInput } from './types';
@@ -94,21 +94,15 @@ export function placePhotoPathOf(stored: string | null): string | null {
  * Supabase. La suppression se déclenchait donc à chaque enregistrement, même
  * sans toucher à la photo, et la colonne recevait l'URL signée.
  *
- * Verdict vrai seulement si la valeur précédente est un chemin bucket ET
- * diffère de la valeur suivante — un retrait (`nextStored` nul ou vide) en
- * fait partie, une valeur non-chemin (URL signée héritée, `data:`, `/…`,
- * `blob:`) n'est jamais un objet de bucket à retirer.
+ * La règle n'existe plus ici qu'en délégation : elle vaut pour tous les médias
+ * du foyer et vit dans `replacedMediaPath` (D-01), que les modules alignés par
+ * la phase 19 appellent directement.
  */
 export function shouldRemovePreviousPlacePhoto(
   previousStored: string | null,
   nextStored: string | null,
 ): boolean {
-  // Une valeur précédente blanche n'est pas un objet de bucket : le reste du
-  // module normalise déjà par `toNullable`, la décision fait de même.
-  const previous = placePhotoPathOf(previousStored ? previousStored.trim() : null);
-  if (!previous) return false;
-  const next = (nextStored ?? '').trim();
-  return next.length === 0 || next !== previous;
+  return replacedMediaPath(previousStored, nextStored) !== null;
 }
 
 /**

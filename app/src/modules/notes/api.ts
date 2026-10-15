@@ -1,6 +1,6 @@
 import { data } from '@/lib/data';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, storedValueOf } from '@/lib/storage';
 import { randomId } from '@/lib/utils';
 import { resolveCategory, visibilityToColor, type NoteFormValues } from './types';
 
@@ -61,7 +61,11 @@ export async function createNoteAttachment(
     id: randomId('note-attachment'),
     note_id: noteId,
     household_id: householdId,
-    file_url: deposited.url,
+    // Chemin du bucket (D-01), jamais l'URL signée : l'URL affichable est
+    // forgée à la lecture par `resolveHouseholdMediaUrls`. En démo
+    // (`path: null`), l'aperçu local éphémère reste la valeur, comme pour le
+    // Cercle. Le seul lecteur des champs du dépôt est `lib/storage.ts`.
+    file_url: storedValueOf(deposited),
     file_name: deposited.name,
     mime_type: deposited.mime,
     size_bytes: deposited.size,

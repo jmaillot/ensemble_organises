@@ -110,6 +110,102 @@ export async function removeHouseholdFile(path: string | null): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Point unique de la VALEUR DE COLONNE d'un média du foyer (D-01).
+ *
+ * Le chemin du bucket est la référence durable ; l'`url` n'est lue qu'en repli
+ * du mode démo, où `path` vaut `null` et l'`url` est un aperçu local (`blob:`,
+ * éphémère après rechargement). C'est le seul endroit qui lit les champs du
+ * dépôt : un module qui les lirait lui-même persisterait une URL signée
+ * éphémère, et rouvrirait la famille WR-08.
+ */
+export function storedValueOf(deposited: DepositedFile): string {
+  return deposited.path ?? deposited.url;
+}
+
+/**
+ * Vrai quand la valeur stockée est un CHEMIN de bucket à forger : ni URL
+ * http(s) (saisie manuelle ou URL signée héritée), ni `data:` hérité, ni aperçu
+ * local `blob:`, ni ressource applicative `/…`.
+ */
+export function isHouseholdMediaPath(stored: string): boolean {
+  return !/^(https?:\/\/|blob:|data:|\/)/i.test(stored);
+}
+
+/**
+ * Chemin de bucket d'une valeur stockée, `null` pour les autres formes.
+ *
+ * La valeur est rognée AVANT le verdict : une chaîne exclusivement blanche
+ * n'est pas un chemin, et il n'y a rien à signer ni à supprimer pour elle
+ * (constat §5 de `deferred-items.md` de la phase 18, fermé ici dès la
+ * naissance du helper).
+ */
+export function householdMediaPathOf(stored: string | null): string | null {
+  if (stored === null) return null;
+  const trimmed = stored.trim();
+  if (trimmed === '') return null;
+  return isHouseholdMediaPath(trimmed) ? trimmed : null;
+}
+
+/**
+ * Forge l'URL affichable d'une valeur stockée — point unique de la lecture
+ * (D-01), échec fermé (forme invité 06-04).
+ *
+ * Les formes non-chemin rendent telles quelles (`data:` et http(s) hérités,
+ * aperçus `blob:` du mode démo) ; un chemin se signe sur
+ * `HOUSEHOLD_MEDIA_BUCKET` ; toute erreur ou absence d'URL rend `null` :
+ * le DOM ne reçoit jamais un chemin brut ni un lien mort.
+ */
+export async function resolveHouseholdMediaUrl(
+  stored: string | null,
+  ttl: number = SIGNED_URL_TTL,
+): Promise<string | null> {
+  if (stored === null) return null;
+  const path = householdMediaPathOf(stored);
+  if (!path) return stored.trim() === '' ? null : stored;
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data: signed, error } = await supabase.storage
+      .from(HOUSEHOLD_MEDIA_BUCKET)
+      .createSignedUrl(path, ttl);
+    if (error || !signed) return null;
+    return signed.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
+/** Forge chaque valeur en URL affichable, en une passe (échec fermé par ligne). */
+export async function resolveHouseholdMediaUrls(
+  rows: { id: string; file_url: string | null }[],
+  ttl: number = SIGNED_URL_TTL,
+): Promise<Record<string, string>> {
+  const entries = await Promise.all(
+    rows.map(async (row) => [row.id, await resolveHouseholdMediaUrl(row.file_url, ttl)] as const),
+  );
+  const resolved: Record<string, string> = {};
+  for (const [id, url] of entries) {
+    if (url) resolved[id] = url;
+  }
+  return resolved;
+}
+
+/**
+ * Décision pure « quel objet retirer quand un média en remplace un autre »
+ * (D-03, généralisation de `shouldRemovePreviousPlacePhoto`).
+ *
+ * Rend le chemin PRÉCÉDENT quand c'est un chemin de bucket ET qu'il diffère de
+ * la valeur suivante — un retrait (`nextStored` blanc) en fait partie. Rend
+ * `null` pour toute forme non-chemin (URL signée héritée, `data:`, `blob:`,
+ * `/…`), qui n'est pas un objet de bucket à supprimer.
+ */
+export function replacedMediaPath(previousStored: string | null, nextStored: string | null): string | null {
+  const previous = householdMediaPathOf(previousStored);
+  if (!previous) return null;
+  const next = (nextStored ?? '').trim();
+  return next.length === 0 || next !== previous ? previous : null;
+}
+
 /** « ordonnance.pdf · 214 Ko », comme dans le Cercle. */
 export function describeAttachment(name: string, size: number): string {
   return `${name} · ${formatBytes(size)}`;

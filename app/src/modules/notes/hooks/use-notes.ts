@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { useResource } from '@/lib/data/useResource';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
 import { NOTES_TABLE, NOTE_FOLDERS_TABLE, createNoteAttachment, createNoteFolder, nowIso, removeNoteAttachment, renameNoteFolder, toNotePayload } from '../api';
@@ -99,10 +100,31 @@ export function useNotes(): UseNotesResult {
   const canWrite = currentMember?.role !== 'enfant';
   const isAdmin = useIsAdmin();
 
+  // Les lignes portent des chemins (D-01) : on forge les URL affichables à la
+  // lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
+  // valeurs non-chemin (aperçus démo, http(s) ou `data:` hérités) rendent en
+  // synchrone — aucun rendu ajouté ; seuls les chemins passent par l'effet.
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const attachmentRows = attachmentsResource.rows;
+  useEffect(() => {
+    const pending = attachmentRows.filter((row) => isHouseholdMediaPath(row.file_url));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setAttachmentUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentRows]);
+
   const attachmentsByNote = useMemo(() => {
     const grouped = new Map<string, NoteAttachment[]>();
-    for (const row of attachmentsResource.rows) {
-      const attachment = toNoteAttachment(row);
+    for (const row of attachmentRows) {
+      // Non-chemin : valeur affichable telle quelle (synchrone) ; chemin :
+      // URL forgée par l'effet, `null` en attendant ou en échec fermé.
+      const url = isHouseholdMediaPath(row.file_url) ? (attachmentUrls[row.id] ?? null) : row.file_url;
+      const attachment = toNoteAttachment(row, url);
       const list = grouped.get(attachment.noteId) ?? [];
       list.push(attachment);
       grouped.set(attachment.noteId, list);
@@ -111,7 +133,7 @@ export function useNotes(): UseNotesResult {
       list.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     }
     return grouped;
-  }, [attachmentsResource.rows]);
+  }, [attachmentRows, attachmentUrls]);
 
   const notes = useMemo(
     () => sortNotes(rows.map((row) => toNote(row, attachmentsByNote.get(row.id) ?? []))),
