@@ -454,37 +454,57 @@ describe('centre de notifications — fils inédits (UAT phase 9)', () => {
  * toucher `tasks.rows` : la cloche ne se recalculait donc jamais, alors que le
  * compteur « à faire » du module Tâches, lui, suivait — deux nombres qui se
  * contredisaient pour la même donnée.
+ *
+ * Session **connectée** requise pour que ce test puisse échouer. Sans elle, la
+ * lecture des marques de lecture (`notification_reads`) est désactivée et son
+ * `rows` vaut un `[]` neuf à chaque rendu (`useResource` rend `query.data ?? []`) ;
+ * les feeds messages et Cercle qui en dérivent changent alors d'identité à
+ * **chaque** rendu, le memo `items` se recalcule pour cette raison étrangère, et
+ * la dépendance manquante ne se voit plus. Ici les feeds se stabilisent, le rendu
+ * qui voit `assigneesByTask` changer ne change **que** lui, et le memo ne peut se
+ * recalculer que si cette valeur est déclarée — sans le correctif, les trois
+ * assertions ci-dessous expirent.
  */
 describe('centre de notifications — réassignation (WR-19)', () => {
   it('retire de la cloche une tâche réassignée, et le compteur décroît d’autant', async () => {
     localStorage.removeItem('eo-notifications-masquees-v1');
     seedHouseholdStore();
-    const queryClient = createTestQueryClient();
-    const ownWrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>{children}</ToastProvider>
-      </QueryClientProvider>
-    );
-    const { result } = renderHook(() => useNotifications(), { wrapper: ownWrapper });
+    useSessionStore.setState({ user: demoUser, status: 'authenticated' });
+    try {
+      const queryClient = createTestQueryClient();
+      const ownWrapper = ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>{children}</ToastProvider>
+        </QueryClientProvider>
+      );
+      const { result } = renderHook(() => useNotifications(), { wrapper: ownWrapper });
 
-    // task-1 est assignée à Camille, le membre courant : elle est dans la cloche.
-    await waitFor(() => expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(true));
-    const totalBefore = result.current.total;
-    const tasksBefore = result.current.items.filter((item) => item.kind === 'tache').length;
+      // task-1 est assignée à Camille, le membre courant : elle est dans la cloche.
+      await waitFor(() => expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(true));
+      const totalBefore = result.current.total;
+      const tasksBefore = result.current.items.filter((item) => item.kind === 'tache').length;
 
-    // Réassignation réelle (même chemin que le module Tâches) : la table
-    // `task_assignees` change, la ligne `tasks` reste identique.
-    await setTaskAssignees('task-1', [DEMO_MEMBERS.thomas]);
-    await act(async () => {
-      await queryClient.refetchQueries({ queryKey: queryKeys.tableAll('task_assignees') });
-    });
+      // Réassignation réelle (même chemin que le module Tâches) : la table
+      // `task_assignees` change, la ligne `tasks` reste identique.
+      await setTaskAssignees('task-1', [DEMO_MEMBERS.thomas]);
+      await act(async () => {
+        await queryClient.refetchQueries({ queryKey: queryKeys.tableAll('task_assignees') });
+      });
 
-    // Elle quitte la cloche, et le compteur de la barre décroît du même pas :
-    // les deux nombres s'accordent dans le même rendu.
-    expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(false);
-    expect(totalBefore - result.current.total).toBe(1);
-    expect(tasksBefore - result.current.items.filter((item) => item.kind === 'tache').length).toBe(1);
-  });
+      // Elle quitte la cloche, et le compteur de la barre décroît du même pas :
+      // les trois assertions lisent le MÊME rendu.
+      await waitFor(() => {
+        expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(false);
+        expect(result.current.total).toBe(totalBefore - 1);
+        expect(result.current.items.filter((item) => item.kind === 'tache').length).toBe(tasksBefore - 1);
+      });
+    } finally {
+      useSessionStore.setState({ user: null, status: 'guest' });
+    }
+    // Budget du test au-dessus du `asyncUtilTimeout` (8 s) du fichier : sans le
+    // correctif, l'échec doit dire quelle assertion n'a pas tenu, pas être coupé
+    // par le délai global de Vitest (5 s) — un délai qui tombe ne dit rien.
+  }, 12_000);
 });
 
 describe('centre de notifications — restes personnels', () => {

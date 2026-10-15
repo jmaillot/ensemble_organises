@@ -345,7 +345,14 @@ export function useNotifications(): NotificationsSummary {
 
     return list;
   }, [
+    // WR-19 : toutes les valeurs que le corps lit. `task_assignees` change sans
+    // que `tasks.rows` bouge — sans `assigneesByTask`, la cloche gardait la
+    // tâche réassignée alors que le compteur du module Tâches suivait déjà.
+    // `currentMember` décide du même filtre (« sans assigné, ou assignées à
+    // moi ») : une bascule de membre change aussi la liste.
+    assigneesByTask,
     cercle.feed,
+    currentMember,
     eventsResource.rows,
     feed.conversations,
     householdId,
