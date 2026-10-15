@@ -44,11 +44,34 @@ interface NativeBarcodeDetector {
   detect: (source: HTMLVideoElement) => Promise<NativeDetectedBarcode[]>;
 }
 
-type NativeBarcodeDetectorCtor = new (options: { formats: string[] }) => NativeBarcodeDetector;
+interface NativeBarcodeDetectorCtor {
+  new (options: { formats: string[] }): NativeBarcodeDetector;
+  /** API statique, absente sur certaines implémentations partielles. */
+  getSupportedFormats?: () => Promise<string[]>;
+}
 
 function nativeDetectorCtor(): NativeBarcodeDetectorCtor | null {
   const ctor = (globalThis as { BarcodeDetector?: unknown }).BarcodeDetector;
   return typeof ctor === 'function' ? (ctor as NativeBarcodeDetectorCtor) : null;
+}
+
+/**
+ * Formats réellement supportés par un `BarcodeDetector` natif.
+ *
+ * `getSupportedFormats` est la seule source fiable : construire le détecteur
+ * avec un format non supporté **lève** (WR-15b). Quand l'API statique est
+ * absente ou défaillante, on suppose que les formats demandés le sont — c'est
+ * l'ancien comportement, conservé comme repli tolérant.
+ */
+async function supportedNativeFormats(ctor: NativeBarcodeDetectorCtor): Promise<string[]> {
+  if (typeof ctor.getSupportedFormats !== 'function') return [...NATIVE_FORMATS];
+  try {
+    const supported = await ctor.getSupportedFormats();
+    if (!Array.isArray(supported)) return [...NATIVE_FORMATS];
+    return NATIVE_FORMATS.filter((format) => supported.includes(format));
+  } catch {
+    return [...NATIVE_FORMATS];
+  }
 }
 
 function hasCamera(): boolean {
@@ -160,22 +183,33 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
 
         const Ctor = nativeDetectorCtor();
         if (Ctor) {
-          setEngine('native');
-          setStatus('scanning');
-          const detector = new Ctor({ formats: [...NATIVE_FORMATS] });
-          const pump = async () => {
-            if (detectedRef.current || !streamRef.current) return;
+          // WR-15b : ne construire le détecteur qu'avec des formats qu'il
+          // supporte — sinon `new BarcodeDetector` lève, et l'ancien `catch`
+          // externe concluait `'error'` au lieu du repli promis.
+          const formats = await supportedNativeFormats(Ctor);
+          if (formats.length > 0) {
             try {
-              const codes = await detector.detect(video);
-              const first = codes[0];
-              if (first?.rawValue) handleValue(first.rawValue, first.format);
+              const detector = new Ctor({ formats });
+              setEngine('native');
+              setStatus('scanning');
+              const pump = async () => {
+                if (detectedRef.current || !streamRef.current) return;
+                try {
+                  const codes = await detector.detect(video);
+                  const first = codes[0];
+                  if (first?.rawValue) handleValue(first.rawValue, first.format);
+                } catch {
+                  // Une frame illisible est sans conséquence : on continue.
+                }
+                frameRef.current = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => void pump()) : null;
+              };
+              void pump();
+              return;
             } catch {
-              // Une frame illisible est sans conséquence : on continue.
+              // Le détecteur refuse ces formats : on poursuit vers le repli,
+              // jamais vers `'error'` — le repli est la promesse du hook.
             }
-            frameRef.current = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => void pump()) : null;
-          };
-          void pump();
-          return;
+          }
         }
 
         // Repli : `html5-qrcode` injecte sa propre vidéo dans le conteneur.

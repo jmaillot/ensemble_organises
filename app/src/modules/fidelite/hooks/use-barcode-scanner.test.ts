@@ -111,6 +111,19 @@ async function startFallback() {
   return { ...view, onDetected, video, scanner };
 }
 
+/** Monte le hook avec un `BarcodeDetector` donné, caméra simulée et `<video>` détaché. */
+async function startWithDetector(ctor: unknown) {
+  setBarcodeDetector(ctor);
+  setMediaDevices(vi.fn(async () => makeStream().stream));
+  const onDetected = vi.fn();
+  const view = renderHook(() => useBarcodeScanner(onDetected));
+  const video = makeVideo();
+  await act(async () => {
+    await view.result.current.start(video);
+  });
+  return { ...view, onDetected, video };
+}
+
 /** Monte le hook sur le moteur natif `BarcodeDetector` et rend le détecteur posé. */
 async function startNative(detect: (video: unknown) => Promise<Array<{ rawValue?: string; format?: string }>>) {
   const constructed: Array<{ formats: string[] }> = [];
@@ -120,15 +133,8 @@ async function startNative(detect: (video: unknown) => Promise<Array<{ rawValue?
     }
     detect = (source: unknown) => detect(source);
   }
-  setBarcodeDetector(FakeDetector);
-  setMediaDevices(vi.fn(async () => makeStream().stream));
-  const onDetected = vi.fn();
-  const view = renderHook(() => useBarcodeScanner(onDetected));
-  const video = makeVideo();
-  await act(async () => {
-    await view.result.current.start(video);
-  });
-  return { ...view, onDetected, video, constructed };
+  const view = await startWithDetector(FakeDetector);
+  return { ...view, constructed };
 }
 
 describe('useBarcodeScanner — le repli lit le NOM du format (WR-15a)', () => {
@@ -185,6 +191,85 @@ describe('useBarcodeScanner — le repli lit le NOM du format (WR-15a)', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(blank.onDetected).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBarcodeScanner — un format non supporté bascule sur le repli (WR-15b)', () => {
+  it('ne demande au détecteur natif que les formats qu’il supporte réellement', async () => {
+    const constructed: Array<{ formats: string[] }> = [];
+    class PartialDetector {
+      static getSupportedFormats = async () => ['qr_code'];
+      constructor(options: { formats: string[] }) {
+        constructed.push(options);
+      }
+      detect = async () => [];
+    }
+    const { result } = await startWithDetector(PartialDetector);
+    expect(constructed).toEqual([{ formats: ['qr_code'] }]);
+    expect(result.current.engine).toBe('native');
+  });
+
+  it('construit le détecteur avec les trois formats demandés quand getSupportedFormats est absent', async () => {
+    const constructed: Array<{ formats: string[] }> = [];
+    class BareDetector {
+      constructor(options: { formats: string[] }) {
+        constructed.push(options);
+      }
+      detect = async () => [];
+    }
+    const { result } = await startWithDetector(BareDetector);
+    expect(constructed).toEqual([{ formats: ['qr_code', 'code_128', 'ean_13'] }]);
+    expect(result.current.engine).toBe('native');
+  });
+
+  it('un constructeur qui lève poursuit en repli, jamais en `error`', async () => {
+    class ThrowingDetector {
+      static getSupportedFormats = async () => ['qr_code', 'code_128', 'ean_13'];
+      constructor() {
+        throw new DOMException('format refusé', 'NotSupportedError');
+      }
+      detect = async () => [];
+    }
+    const { result } = await startWithDetector(ThrowingDetector);
+    // Le repli est instancié et lit tous les formats demandés, CODE_128 compris.
+    const scanner = html5.FakeHtml5Qrcode.instances.at(-1);
+    expect(scanner).toBeDefined();
+    expect((scanner?.config as { formatsToSupport?: number[] })?.formatsToSupport).toEqual([0, 5, 9]);
+    expect(result.current.engine).toBe('fallback');
+    expect(result.current.status).toBe('scanning');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('un tableau de formats supportés vide bascule en repli, sans construire de détecteur', async () => {
+    let constructed = 0;
+    class EmptyDetector {
+      static getSupportedFormats = async () => [];
+      constructor() {
+        constructed += 1;
+      }
+      detect = async () => [];
+    }
+    const { result } = await startWithDetector(EmptyDetector);
+    expect(constructed).toBe(0);
+    expect(result.current.engine).toBe('fallback');
+    expect(result.current.status).toBe('scanning');
+  });
+
+  it('un refus de caméra reste `denied` — le repli ne masque pas une autorisation refusée', async () => {
+    clearBarcodeDetector();
+    setMediaDevices(
+      vi.fn(async () => {
+        throw Object.assign(new Error('refus'), { name: 'NotAllowedError' });
+      }),
+    );
+    const onDetected = vi.fn();
+    const view = renderHook(() => useBarcodeScanner(onDetected));
+    const video = makeVideo();
+    await act(async () => {
+      await view.result.current.start(video);
+    });
+    expect(view.result.current.status).toBe('denied');
+    expect(view.result.current.engine).toBeNull();
   });
 });
 
