@@ -13,7 +13,13 @@ export function Switch({ className, ...rest }: React.ComponentProps<typeof Switc
       )}
       {...rest}
     >
-      <SwitchPrimitive.Thumb className="pointer-events-none block size-[18px] rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform duration-[var(--duration-quick)] data-[state=checked]:translate-x-4" />
+      <SwitchPrimitive.Thumb
+        // G-17-3 : piste w-[38px] border-box − border-2 (2px×2) − p-0.5
+        // (2px×2) = 30px utiles ; pastille 18px + translate-x-3 (12px)
+        // = 30px = contenue. translate-x-4 (16px) donnait 34px > 30px,
+        // soit ~4px de dépassement à ON. Taille visuelle 38px inchangée.
+        className="pointer-events-none block size-[18px] rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform duration-[var(--duration-quick)] data-[state=checked]:translate-x-3"
+      />
     </SwitchPrimitive.Root>
   );
 }
