@@ -55,7 +55,7 @@ vi.mock('@/lib/supabase/client', () => ({
 
 // Le chargement du foyer interroge l'adaptateur de données : on l'observe sans
 // le laisser décider du statut, qui est l'objet du test.
-const listMock = vi.fn(async () => [] as unknown[]);
+const listMock = vi.fn(async (_table: string) => [] as unknown[]);
 vi.mock('@/lib/data', () => ({ data: { list: listMock, create: vi.fn(), update: vi.fn(), remove: vi.fn() } }));
 
 const { signInWithEmail, signUpWithEmail, applySession } = await import('./use-auth');
@@ -68,7 +68,7 @@ describe("chemin d'authentification", () => {
     auth.signUp.mockReset();
     auth.signInWithPassword.mockReset();
     listMock.mockClear();
-    useSessionStore.setState({ status: 'guest', user: null });
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
   });
 
   it("établit la session après une inscription confirmée automatiquement", async () => {
@@ -157,6 +157,99 @@ describe("chemin d'authentification", () => {
 
     expect(useSessionStore.getState().status).toBe('authenticated');
     expect(listMock.mock.calls.length).toBe(appelsApresPremiereApplication);
+  });
+
+  it("recharge le foyer à la reprise quand sa première lecture a échoué", async () => {
+    // `signIn` passe le statut à `authenticated` AVANT d'attendre
+    // `loadHousehold` : un échec de cette lecture laisse donc une session
+    // « authentifiée » sans foyer. Avec l'ancien témoin (`status`), la reprise
+    // (`retry`, TOKEN_REFRESHED, SIGNED_IN) sortait par le raccourci « session
+    // déjà établie » et le foyer n'était JAMAIS relu : l'utilisateur
+    // atterrissait sur « Vous n'avez pas encore de foyer » (`deferred-items.md`
+    // §4). Le témoin `householdLoaded` force le chemin complet.
+    auth.getSession.mockResolvedValue({ data: { session: { user } } });
+    const membership = { id: 'm-1', household_id: 'h-1', user_id: user.id, display_name: 'Alice Martin', role: 'admin' };
+    const household = { id: 'h-1', name: 'Foyer Martin', avatar_color: 'accent' };
+    let membersReads = 0;
+    listMock.mockImplementation(async (table: string) => {
+      if (table === 'profiles') return [{ id: user.id, display_name: 'Alice Martin' }];
+      if (table === 'household_members') {
+        membersReads += 1;
+        if (membersReads === 1) throw new Error('réseau indisponible');
+        return [membership];
+      }
+      if (table === 'households') return [household];
+      return [];
+    });
+    const { useAuthBootstrap } = await import('./use-auth');
+    const { useHouseholdStore } = await import('@/stores/household-store');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    // Échec de la lecture : statut posé, foyer absent, témoin à faux.
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().householdLoaded).toBe(false);
+    expect(useHouseholdStore.getState().householdId).toBeNull();
+
+    act(() => result.current.retry());
+
+    // La reprise rejoue la lecture et pose enfin le foyer.
+    await waitFor(() => expect(useSessionStore.getState().householdLoaded).toBe(true));
+    expect(useHouseholdStore.getState().householdId).toBe('h-1');
+    expect(result.current.error).toBeNull();
+  });
+
+  it("ne relit pas le foyer sur TOKEN_REFRESHED quand il est déjà chargé", async () => {
+    auth.getSession.mockResolvedValue({ data: { session: { user } } });
+    listMock.mockImplementation(async (table: string) => {
+      if (table === 'profiles') return [{ id: user.id, display_name: 'Alice Martin' }];
+      if (table === 'household_members') {
+        return [{ id: 'm-1', household_id: 'h-1', user_id: user.id, display_name: 'Alice Martin', role: 'admin' }];
+      }
+      if (table === 'households') return [{ id: 'h-1', name: 'Foyer Martin', avatar_color: 'accent' }];
+      return [];
+    });
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { unmount } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(useSessionStore.getState().householdLoaded).toBe(true));
+
+    const householdReads = () =>
+      listMock.mock.calls.filter(([table]) => table === 'household_members').length;
+    const before = householdReads();
+
+    await act(async () => {
+      for (const listener of listeners) listener('TOKEN_REFRESHED', { user });
+    });
+
+    // Foyer déjà chargé : le renouvellement de jeton ne le relit pas.
+    expect(householdReads()).toBe(before);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    unmount();
+  });
+
+  it("marque le foyer chargé même sans foyer trouvé, et ne relit pas à la reprise", async () => {
+    // « Aucun foyer » est un résultat connu, pas un échec : la reprise ne doit
+    // pas rejouer indéfiniment une lecture qui a abouti.
+    auth.getSession.mockResolvedValue({ data: { session: { user } } });
+    listMock.mockImplementation(async (table: string) => {
+      if (table === 'profiles') return [{ id: user.id, display_name: 'Alice Martin' }];
+      return [];
+    });
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(useSessionStore.getState().householdLoaded).toBe(true));
+
+    const householdReads = () =>
+      listMock.mock.calls.filter(([table]) => table === 'household_members').length;
+    const before = householdReads();
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+
+    expect(householdReads()).toBe(before);
   });
 
   it("établit la session quand l'événement d'état apporte une session", async () => {

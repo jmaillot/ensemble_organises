@@ -8,6 +8,23 @@ import type { HouseholdMemberRow, HouseholdRow, SessionStatus, SessionUser } fro
 interface SessionState {
   status: SessionStatus;
   user: SessionUser | null;
+  /**
+   * « Le foyer a été chargé » — état **explicite**, et non déduit du statut.
+   *
+   * `signIn` passe le statut à `authenticated` **avant** d'attendre
+   * `loadHousehold`, pour que l'écran ne reste pas « déconnecté » pendant la
+   * lecture. Le statut ne dit donc rien de l'issue du chargement, et s'en
+   * servir de témoin faisait sortir la reprise d'un échec de `loadHousehold`
+   * par la branche « session déjà établie » d'`applySession` : le foyer
+   * n'était jamais relu et l'utilisateur atterrissait sur « Vous n'avez pas
+   * encore de foyer » alors que son foyer existait (`deferred-items.md` §4).
+   *
+   * Vrai dès que la lecture a abouti — **y compris** quand elle ne trouve
+   * aucun foyer, qui est un résultat connu et non un échec. Faux au démarrage
+   * d'une session (`signIn`) et à la déconnexion : le foyer est alors à
+   * (re)charger.
+   */
+  householdLoaded: boolean;
   signIn: (user: SessionUser) => Promise<void>;
   signOut: () => Promise<void>;
   setStatus: (status: SessionStatus) => void;
@@ -19,14 +36,15 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       status: 'initialising',
       user: null,
+      householdLoaded: false,
       setStatus: (status) => set({ status }),
       refreshUser: (user) => set({ user }),
       signIn: async (user) => {
-        set({ user, status: 'authenticated' });
+        set({ user, status: 'authenticated', householdLoaded: false });
         await loadHousehold();
       },
       signOut: async () => {
-        set({ user: null, status: 'guest' });
+        set({ user: null, status: 'guest', householdLoaded: false });
         useHouseholdStore.getState().reset();
       },
     }),
@@ -34,13 +52,21 @@ export const useSessionStore = create<SessionState>()(
   ),
 );
 
+/** Marque le foyer comme chargé : tous les `await` du chargement ont abouti. */
+function markHouseholdLoaded() {
+  useSessionStore.setState({ householdLoaded: true });
+}
+
 /** Charge le foyer de l'utilisateur et l'enregistre dans le store. */
 export async function loadHousehold() {
   const memberships = await data.list<RowWithHousehold>('household_members');
   const store = useHouseholdStore.getState();
 
   if (memberships.length === 0) {
+    // « Aucun foyer » est un résultat connu, pas un échec : la lecture a
+    // abouti et la reprise ne doit pas la rejouer indéfiniment.
     store.reset();
+    markHouseholdLoaded();
     return null;
   }
 
@@ -54,7 +80,10 @@ export async function loadHousehold() {
   const householdsFound = households.filter((row): row is HouseholdRow => Boolean(row));
   const active = householdsFound.find((household) => household.id === store.householdId) ?? householdsFound[0];
   if (!active) {
+    // Même chose ici : les lignes `household_members` pointaient vers des
+    // foyers introuvables, la lecture est terminée et aboutie.
     store.reset();
+    markHouseholdLoaded();
     return null;
   }
   const members = memberships.filter((membership) => membership.household_id === active.id) as HouseholdMemberRow[];
@@ -75,6 +104,7 @@ export async function loadHousehold() {
     ownMemberId ??
     (members.some((member) => member.id === store.currentMemberId) ? store.currentMemberId : undefined);
   store.setHousehold(active, members, currentMemberId);
+  markHouseholdLoaded();
   return active;
 }
 
@@ -90,6 +120,7 @@ export async function signInDemo() {
   store.setHousehold(demoHousehold as HouseholdRow, members, DEMO_MEMBERS.camille);
   useSessionStore.setState({
     status: 'authenticated',
+    householdLoaded: true,
     user: {
       id: demoProfile.id,
       email: demoProfile.email,

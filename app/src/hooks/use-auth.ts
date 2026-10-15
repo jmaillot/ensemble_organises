@@ -40,13 +40,19 @@ function toSessionUser(user: User): SessionUser {
  * semblaient ne rien faire. Ce chemin n'avait jamais été exercé — l'application
  * tournait jusqu'ici en mode démo, où le bootstrap pose le statut directement.
  *
- * Une session déjà établie n'est que rafraîchie : un renouvellement de jeton ne
- * doit pas recharger le foyer.
+ * Une session **déjà établie et dont le foyer est chargé** n'est que rafraîchie :
+ * un renouvellement de jeton ne doit pas recharger le foyer. Le témoin est
+ * `householdLoaded`, pas le statut : `signIn` passe le statut à `authenticated`
+ * avant d'attendre `loadHousehold`, donc un échec de cette lecture laissait
+ * `status === 'authenticated'` avec un foyer jamais posé. La reprise
+ * (`TOKEN_REFRESHED`, `SIGNED_IN`) sortait alors par ce raccourci et le foyer
+ * n'était jamais relu (`deferred-items.md` §4). Tant que le foyer n'est pas
+ * chargé, on repasse par le chemin complet.
  */
 export async function applySession(user: User): Promise<void> {
   const sessionUser = toSessionUser(user);
   const store = useSessionStore.getState();
-  if (store.status === 'authenticated' && store.user?.id === sessionUser.id) {
+  if (store.status === 'authenticated' && store.householdLoaded && store.user?.id === sessionUser.id) {
     // Le nom de référence vit dans `profiles` (chemin complet ci-dessous) :
     // un renouvellement de jeton n'apporte que les métadonnées Auth et
     // écraserait le nom du profil par l'email. On garde le nom déjà connu ;
@@ -130,7 +136,10 @@ export function useAuthBootstrap(): AuthBootstrap {
             (persisted.id === demoProfile.id ? demoProfile.display_name : '');
           if (ownName) useSessionStore.getState().refreshUser({ ...persisted, displayName: ownName });
         }
-        setStatus('authenticated');
+        // Le foyer est posé directement ci-dessus : la lecture « foyer chargé »
+        // a bien eu lieu, on le marque explicitement pour que `applySession`
+        // (un `TOKEN_REFRESHED` plus tard) n'aille pas le relire.
+        useSessionStore.setState({ status: 'authenticated', householdLoaded: true });
         setReady(true);
       } else {
         setStatus('guest');
