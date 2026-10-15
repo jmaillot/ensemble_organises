@@ -14,6 +14,13 @@ export interface TaskRowProps {
   onDelete: (task: Task) => void;
   /** Rôle `enfant` : lecture seule, sans poignée ni actions d'écriture. */
   readOnly?: boolean;
+  /**
+   * Gouverne la seule corbeille. Par défaut l'ancien comportement
+   * (`!readOnly`) : un appelant qui n'a pas migré ne change pas de rendu.
+   * Un membre peut éditer mais pas supprimer : la politique serveur
+   * `tasks_delete_admin` réserve la suppression à l'administrateur.
+   */
+  canDelete?: boolean;
 }
 
 /**
@@ -21,7 +28,7 @@ export interface TaskRowProps {
  * assignataires, rappel, priorité et actions. Le glisser-déposer s'appuie sur
  * dnd-kit, la poignée restant un vrai bouton utilisable au clavier.
  */
-export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false }: TaskRowProps) {
+export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, canDelete = !readOnly }: TaskRowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -91,24 +98,24 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false }: 
       <div className="flex items-center gap-[5px]">
         <PriorityTag priority={task.priority} />
         {!readOnly ? (
-          <>
-            <button
-              type="button"
-              onClick={() => onEdit(task)}
-              aria-label={`Modifier ${task.name}`}
-              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg max-[650px]:hidden"
-            >
-              <Icon name="edit" size="sm" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(task)}
-              aria-label={`Supprimer ${task.name}`}
-              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
-            >
-              <Icon name="trash" size="sm" />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => onEdit(task)}
+            aria-label={`Modifier ${task.name}`}
+            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg max-[650px]:hidden"
+          >
+            <Icon name="edit" size="sm" />
+          </button>
+        ) : null}
+        {canDelete ? (
+          <button
+            type="button"
+            onClick={() => onDelete(task)}
+            aria-label={`Supprimer ${task.name}`}
+            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+          >
+            <Icon name="trash" size="sm" />
+          </button>
         ) : null}
       </div>
     </div>

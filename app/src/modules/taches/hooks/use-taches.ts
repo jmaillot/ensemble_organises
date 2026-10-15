@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
-import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import type { HouseholdMemberRow, TaskListRow, TaskRow } from '@/types';
 import {
   TASK_ASSIGNEES_TABLE,
@@ -55,6 +55,12 @@ export interface UseTachesResult extends TaskMetrics {
   setAssigneeFilter: (filter: AssigneeFilter) => void;
   /** Faux pour le rôle `enfant` (lecture seule). */
   canWrite: boolean;
+  /**
+   * Vrai pour le rôle `admin` du foyer. Capacité distincte de `canWrite` : un
+   * membre peut écrire (créer, renommer, cocher) mais la **suppression** est
+   * admin-seule côté serveur (`tasks_delete_admin`).
+   */
+  isAdmin: boolean;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -116,6 +122,7 @@ export function useTaches(): UseTachesResult {
   );
 
   const canWrite = currentMember?.role !== 'enfant';
+  const isAdmin = useIsAdmin();
   const { rows: allRows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<TaskRow>(TASKS_TABLE);
 
@@ -206,6 +213,7 @@ export function useTaches(): UseTachesResult {
   const removeTask = useCallback(
     async (task: Task) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       await Promise.all([
         remove(task.id),
         // IndexedDB n'a pas de cascade : on nettoie les tables enfants.
@@ -214,7 +222,7 @@ export function useTaches(): UseTachesResult {
       ]);
       await refresh();
     },
-    [canWrite, refresh, remove],
+    [canWrite, isAdmin, refresh, remove],
   );
 
   const reorder = useCallback(
@@ -246,6 +254,7 @@ export function useTaches(): UseTachesResult {
     assigneeFilter,
     setAssigneeFilter,
     canWrite,
+    isAdmin,
     refreshFolders: async () => {
       await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
     },
@@ -263,6 +272,10 @@ export function useTaches(): UseTachesResult {
     },
     deleteFolder: async (id) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      // Supprimer un dossier est admin-seul (`task_lists_delete` : admin et non
+      // default), alors que le créer et le renommer est ouvert au membre : deux
+      // capacités, jamais une seule.
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       await data.remove(TASK_LISTS_TABLE, id);
       if (activeFolderId === id) setActiveFolderId(null);
       await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });

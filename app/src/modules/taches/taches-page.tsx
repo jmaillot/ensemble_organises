@@ -47,6 +47,7 @@ export default function TachesPage() {
     activeFolderId,
     setActiveFolderId,
     canWrite,
+    isAdmin,
     createFolder,
     renameFolder,
     deleteFolder,
@@ -258,6 +259,7 @@ export default function TachesPage() {
                     key={task.id}
                     task={task}
                     readOnly
+                    canDelete={isAdmin}
                     onToggle={(target) => {
                       void toggleStatus(target).catch((toggleError: unknown) =>
                         toast(
@@ -289,6 +291,7 @@ export default function TachesPage() {
                         key={task.id}
                         task={task}
                         readOnly={!canWrite}
+                        canDelete={isAdmin}
                         onToggle={(target) => {
                           void toggleStatus(target).catch((toggleError: unknown) =>
                             toast(

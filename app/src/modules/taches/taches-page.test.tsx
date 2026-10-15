@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { useHouseholdStore } from '@/stores/household-store';
 import TachesPage from './taches-page';
 import { renderWithProviders } from '@/test/render';
 
@@ -123,5 +125,40 @@ describe('TachesPage — compteur À faire personnel', () => {
     await findTaskList();
     // Camille connectée : task-1 à elle, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
     expect(screen.getByText('pour moi ou sans assigné').previousSibling).toHaveTextContent('1');
+  });
+});
+
+/**
+ * WR-02 : la corbeille suit le rôle, pas la capacité d'écriture.
+ *
+ * Le mode démo (Dexie) ne porte **ni RLS ni contrainte** : c'est la raison
+ * structurelle du défaut (une suppression non autorisée y réussit, donc l'écart
+ * entre l'interface et le serveur ne se voyait pas). Ce qui est vérifié ici est
+ * donc l'**affichage**, pas l'autorisation serveur : celle-ci est portée par
+ * `tasks_delete_admin` (0118:349-354) et par le test SQL de la phase.
+ */
+describe('TachesPage — corbeille réservée à l’administrateur', () => {
+  const TRASH = 'Supprimer Choisir le menu du week-end';
+  const EDIT = 'Modifier Choisir le menu du week-end';
+
+  it('expose la corbeille à un administrateur', async () => {
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    expect(taskList().getByRole('button', { name: TRASH })).toBeInTheDocument();
+  });
+
+  it('masque la corbeille à un membre non admin, sans retirer l’édition ni la création', async () => {
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // Thomas est un `membre` : il écrit, mais ne supprime pas.
+    await act(async () => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    });
+
+    expect(taskList().queryByRole('button', { name: TRASH })).not.toBeInTheDocument();
+    expect(taskList().getByRole('button', { name: EDIT })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
   });
 });
