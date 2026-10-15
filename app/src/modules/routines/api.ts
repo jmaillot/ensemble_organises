@@ -1,4 +1,5 @@
 import { data } from '@/lib/data';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import type { RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
 import type { RoutineAssigneeRecord, RoutineFormValues, RoutineReminderRecord } from './types';
 
@@ -49,14 +50,15 @@ export async function renameRoutineFolder(id: string, name: string): Promise<Rou
   return data.update<RoutineFolderRow>(ROUTINE_FOLDERS_TABLE, id, { name: trimmed });
 }
 
-/** Valeur d'un `datetime-local` convertie en ISO, chaîne vide = aucun rappel. */
+/**
+ * Valeur d'un `datetime-local` convertie en instant ISO, chaîne vide = aucun
+ * rappel. La conversion vit dans `@/lib/datetime` (D-05).
+ */
 export function toReminderIso(value: string): string | null {
-  if (value.trim() === '') return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return instantOfDatetimeLocal(value);
 }
 
-/** Liste de `datetime-local` → ISO triés, avec doublon J-1 optionnel. */
+/** Liste de `datetime-local` → instants ISO triés, avec doublon J-1 optionnel. */
 export function toReminderIsos(values: string[], autoMinus1: boolean): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -70,6 +72,8 @@ export function toReminderIsos(values: string[], autoMinus1: boolean): string[] 
     if (iso) push(iso);
   });
   if (autoMinus1) {
+    // Les 24 h se soustraient à l'INSTANT (chaque entrée est déjà en ISO UTC),
+    // jamais à la valeur locale saisie : sinon le doublon se décale du fuseau.
     [...result].forEach((iso) => push(new Date(new Date(iso).getTime() - 24 * 60 * 60 * 1000).toISOString()));
   }
   return result.sort();

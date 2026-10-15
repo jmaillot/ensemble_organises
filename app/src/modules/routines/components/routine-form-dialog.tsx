@@ -9,6 +9,7 @@ import { Input, Select, Textarea } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useMembers } from '@/stores/household-store';
+import { instantToLocalInput } from '@/lib/datetime';
 import {
   defaultRecurrenceSelection,
   describeRecurrence,
@@ -75,8 +76,7 @@ const routineSchema = z
     if (error) ctx.addIssue({ code: 'custom', message: error, path: ['customRule'] });
   });
 
-const toReminderValue = (remindAt: string | null) => (remindAt ? remindAt.slice(0, 16) : '');
-
+/* Relecture d'un rappel : conversion locale par `@/lib/datetime` (D-05, WR-07). */
 function defaultValues(routine: Routine | null, currentMemberId: string, initialFolderId: string | null = null): RoutineFormValues {
   const base = defaultRecurrenceSelection();
   if (!routine) {
@@ -102,7 +102,7 @@ function defaultValues(routine: Routine | null, currentMemberId: string, initial
     };
   }
   const { preset, selection } = selectionForRule(routine.recurrenceRule);
-  const reminders = routine.reminders.length > 0 ? routine.reminders.map(toReminderValue) : [''];
+  const reminders = routine.reminders.length > 0 ? routine.reminders.map((remindAt) => instantToLocalInput(remindAt)) : [''];
   return {
     name: routine.name,
     frequency: preset,

@@ -9,6 +9,7 @@ import { Input, Select, Textarea } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useMembers } from '@/stores/household-store';
+import { instantToLocalInput } from '@/lib/datetime';
 import { todayIso } from '@/lib/utils';
 import { taskPriorityLabels, type Task, type TaskFormValues } from '../types';
 
@@ -27,8 +28,7 @@ const taskSchema = z.object({
     .refine((value) => value === '' || DATE_TIME_PATTERN.test(value), 'Indiquez une date de rappel valide.'),
 });
 
-const toReminderValue = (remindAt: string | null) => (remindAt ? remindAt.slice(0, 16) : '');
-
+/* Relecture d'un rappel : conversion locale par `@/lib/datetime` (D-05, WR-07). */
 function defaultValues(
   task: Task | null,
   currentMemberId: string,
@@ -53,7 +53,7 @@ function defaultValues(
     priority: task.priority,
     assigneeIds: task.assignees.map((assignee) => assignee.memberId),
     folderId: task.folderId ?? '',
-    reminderAt: toReminderValue(task.reminderAt),
+    reminderAt: instantToLocalInput(task.reminderAt),
   };
 }
 

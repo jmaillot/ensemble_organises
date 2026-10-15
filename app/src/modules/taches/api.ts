@@ -1,4 +1,5 @@
 import { data } from '@/lib/data';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import type { TaskListRow, TaskRow } from '@/types';
 import type { TaskAssigneeRecord, TaskFormValues, TaskReminderRecord } from './types';
 
@@ -24,11 +25,13 @@ export function toTaskPayload(
   };
 }
 
-/** Valeur d'un `datetime-local` convertie en ISO, chaîne vide = aucun rappel. */
+/**
+ * Valeur d'un `datetime-local` convertie en instant ISO, chaîne vide = aucun
+ * rappel. La conversion vit dans `@/lib/datetime` (D-05) : une seule règle de
+ * fuseau pour toutes les saisies de rappel du dépôt.
+ */
 export function toReminderIso(value: string): string | null {
-  if (value.trim() === '') return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return instantOfDatetimeLocal(value);
 }
 
 /** Assignataires d'un ensemble de tâches (table de jointure, sans `household_id`). */

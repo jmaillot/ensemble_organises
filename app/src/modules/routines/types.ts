@@ -1,4 +1,5 @@
 import { RRule, type ByWeekday, type Frequency, type Options } from 'rrule';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import { addDays, relativeDayLabel, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, RoutineAssigneeRow, RoutineCompletionRow, RoutineReminderRow, RoutineRow } from '@/types';
 
@@ -476,17 +477,17 @@ export interface RoutineFormValues {
   autoMinus1: boolean;
 }
 
-/** Valeurs `datetime-local` → ISO triés, dédupliqués, invalides écartés. */
+/**
+ * Valeurs `datetime-local` → instants ISO triés, dédupliqués, invalides écartés.
+ * La conversion elle-même vit dans `@/lib/datetime` (D-05) ; ici, seule la
+ * règle de liste (dédoublonnage, tri) reste locale.
+ */
 export function remindersToIso(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   values.forEach((value) => {
-    const trimmed = value.trim();
-    if (trimmed === '') return;
-    const date = new Date(trimmed);
-    if (Number.isNaN(date.getTime())) return;
-    const iso = date.toISOString();
-    if (seen.has(iso)) return;
+    const iso = instantOfDatetimeLocal(value);
+    if (iso === null || seen.has(iso)) return;
     seen.add(iso);
     result.push(iso);
   });
