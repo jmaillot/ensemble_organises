@@ -110,6 +110,44 @@ export class LocalAdapter implements DataAdapter {
   }
 
   /**
+   * Symétrie du mode démo de `SupabaseAdapter.upsert` : la ligne est retrouvée
+   * par les colonnes d'`onConflict` — jamais par la lecture de l'appelant, qui
+   * peut être vide sans que la base le soit — puis fusionnée en conservant son
+   * `id`. Sans cette symétrie, Dexie (ni contrainte unique ni `CHECK`) laisserait
+   * coexister deux lignes pour un même couple et le défaut resterait invisible
+   * en CI.
+   */
+  async upsert<T = Row>(table: string, values: Partial<T>, options: { onConflict: string }): Promise<T> {
+    await this.ensureSeeded();
+    const db = getDatabase();
+    const columns = options.onConflict.split(',').map((column) => column.trim()).filter(Boolean);
+    const record = values as Record<string, unknown>;
+    const householdId = record.household_id;
+    // Même mécanisme que `list` : l'index composite quand l'écriture porte son
+    // foyer, l'index de table sinon.
+    const collection =
+      typeof householdId === 'string'
+        ? db.rows.where('[table+householdId]').equals([table, householdId])
+        : db.rows.where('table').equals(table);
+    const entries = await collection.toArray();
+    const existing = entries.find((entry) => columns.every((column) => entry.data[column] === record[column]));
+    const id = existing?.data.id;
+    // Aucune ligne ne porte la cible : c'est une création, avec sa clé et ses
+    // horodatages, exactement comme `create`.
+    if (!existing || typeof id !== 'string') return this.create<T>(table, values);
+    const row = {
+      ...existing.data,
+      ...values,
+      id,
+      created_at: (existing.data.created_at as string | undefined) ?? new Date().toISOString(),
+      updated_at: record.updated_at ?? new Date().toISOString(),
+    } as unknown as T;
+    await db.rows.put({ ...existing, data: row as unknown as Row, updatedAt: Date.now() });
+    this.emit(table);
+    return row;
+  }
+
+  /**
    * En mode local, la création d'un foyer passe par la même méthode que le
    * reste : il n'y a ni politique RLS ni transaction à outrepasser, et
    * l'adaptateur IndexedDB est lui-même atomique sur une écriture. Le contrat

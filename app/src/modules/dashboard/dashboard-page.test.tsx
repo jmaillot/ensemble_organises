@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { data } from '@/lib/data';
+import { getDatabase } from '@/lib/data/dexie';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoHousehold, demoMembers } from '@/lib/data/seed';
-import type { DashboardWidgetRow } from '@/types';
+import type { DashboardWidgetRow, RowFilter } from '@/types';
 import DashboardPage from './dashboard-page';
 import { layoutWidgets, reorderPreferences, resetPreferences, toWidgetPreferences, toggleWidget } from './types';
 
@@ -162,6 +163,72 @@ describe('Accueil — rendu', () => {
     // Les widgets visibles, eux, gardent une largeur > 0 : la même écriture
     // n'a pas fait basculer toute la table à 0.
     expect(rows.find((row) => row.widget_type === 'taches')?.width).toBeGreaterThan(0);
+  });
+
+  it('enregistre les préférences sur une lecture vide, sans doubler les lignes (escalade 1)', async () => {
+    // Camille a des préférences SEMÉES (`widget-1`…`widget-5`). On force la
+    // lecture de `dashboard_widgets` à rendre `[]` : c'est l'état exact dans
+    // lequel l'ancien `setWidgetOrder` décidait `create` pour CHAQUE
+    // préférence, sous un `id` déterministe (`widget-<membre>-<type>`) distinct
+    // de la ligne semée — donc deux lignes pour un même
+    // `(member_id, widget_type)`. Hors de cet état, le défaut ne se produit
+    // pas : c'est ce qui l'a laissé franchir la CI.
+    await data.list('household_members'); // amorce le jeu de démonstration
+    const readAll = data.list.bind(data);
+    const listSpy = vi.spyOn(data, 'list').mockImplementation((async (table: string, filter?: RowFilter) =>
+      table === 'dashboard_widgets' ? [] : readAll(table, filter)) as unknown as typeof data.list);
+
+    // Lecture brute du magasin : `data.list` est simulé pour `dashboard_widgets`.
+    const myWidgets = async () => {
+      const entries = await getDatabase().rows.where('table').equals('dashboard_widgets').toArray();
+      return (entries.map((entry) => entry.data as unknown as DashboardWidgetRow)).filter(
+        (row) => row.member_id === DEMO_MEMBERS.camille,
+      );
+    };
+
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />);
+    await screen.findByRole('heading', { level: 1, name: /Bonjour Camille/ });
+    await user.click(screen.getByRole('button', { name: 'Personnaliser l’accueil' }));
+    const panel = screen.getByRole('region', { name: 'Personnalisation des widgets' });
+
+    // Le libellé du bouton ne porte pas le nom du widget : on vise la ligne
+    // par son intitulé, sinon « premier bouton Visible » dépendrait de l'état
+    // laissé par l'écriture précédente.
+    const toggleFor = (label: string) => {
+      const row = within(panel)
+        .getAllByRole('listitem')
+        .find((item) => within(item).queryByText(label));
+      if (!row) throw new Error(`Ligne « ${label} » introuvable dans le panneau`);
+      return within(row).getByRole('button');
+    };
+
+    // Premier enregistrement : le Calendrier est masqué…
+    await user.click(toggleFor('Calendrier'));
+    await waitFor(async () => {
+      expect((await myWidgets()).some((row) => row.widget_type === 'calendrier' && row.width === 0)).toBe(true);
+    });
+
+    // …puis un second, la lecture restant vide : la fusion doit rester
+    // idempotente sur la cible `(member_id, widget_type)`.
+    await user.click(toggleFor('Calendrier'));
+
+    await waitFor(async () => {
+      const mine = await myWidgets();
+      // Cinq types, une ligne chacun : la série parallèle créée à côté des
+      // lignes semées (ancien comportement) en laisserait dix.
+      expect(mine).toHaveLength(5);
+      for (const type of ['calendrier', 'taches', 'meteo', 'anniversaires', 'routines']) {
+        expect(mine.filter((row) => row.widget_type === type)).toHaveLength(1);
+      }
+      // L'écriture a bien eu lieu, et la fusion a visé la ligne semée : son
+      // `id` est conservé, sa largeur suit le dernier état (réaffiché).
+      const calendrier = mine.find((row) => row.widget_type === 'calendrier');
+      expect(calendrier?.id).toBe('widget-1');
+      expect(calendrier?.width).toBe(1);
+    });
+
+    listSpy.mockRestore();
   });
 
   it('liste les tâches du jour avec une case à cocher étiquetée', async () => {

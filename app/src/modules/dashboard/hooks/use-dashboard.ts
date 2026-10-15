@@ -123,30 +123,33 @@ export function useDashboard(): DashboardData {
   const setWidgetOrder = useCallback(async (next: WidgetPreference[]) => {
     if (!currentMember || !householdId) return;
     setPreferences(next);
-    const existing = widgets.rows as { id?: string; widget_type: string; position_x: number }[];
     await Promise.all(
       next.map(async (preference, index) => {
-        const current = existing.find((row) => row.widget_type === preference.kind);
-        if (current?.id) {
-          await data.update('dashboard_widgets', current.id, {
+        // Une seule écriture, fusionnée par le serveur sur la cible
+        // `(member_id, widget_type)` (`dashboard_widgets_member_type_key`,
+        // 0004). Décider `update` ou `create` d'après `widgets.rows` laissait
+        // une fenêtre où la lecture est vide sans que la base le soit (course
+        // au premier rendu, lecture en échec) : chaque préférence passait alors
+        // par `create`, ce qui heurtait la contrainte en mode Supabase
+        // (`23505`, rejet avalé par l'appelant) et ajoutait une seconde ligne
+        // par `(member_id, widget_type)` en mode démo.
+        //
+        // Aucun `id` : `dashboard_widgets.id` a un défaut
+        // (`private.new_id('widget')`) et un `id` étranger à la ligne existante
+        // ferait échouer la fusion sur la clé primaire au lieu de la cible.
+        await data.upsert(
+          'dashboard_widgets',
+          {
+            household_id: householdId,
+            member_id: currentMember.id,
+            widget_type: preference.kind,
             position_x: index,
             position_y: 0,
             width: preference.visible ? (preference.kind === 'routines' ? 2 : 1) : 0,
-          } as never);
-          return;
-        }
-        await data.create('dashboard_widgets', {
-          // Identifiant déterministe : un second enregistrement du même widget
-          // remplace la ligne au lieu de s'ajouter.
-          id: `widget-${currentMember.id}-${preference.kind}`,
-          household_id: householdId,
-          member_id: currentMember.id,
-          widget_type: preference.kind,
-          position_x: index,
-          position_y: 0,
-          width: preference.visible ? (preference.kind === 'routines' ? 2 : 1) : 0,
-          height: 1,
-        } as never);
+            height: 1,
+          } as never,
+          { onConflict: 'member_id,widget_type' },
+        );
       }),
     );
     await widgets.refetch();

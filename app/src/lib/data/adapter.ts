@@ -36,6 +36,24 @@ export interface DataAdapter {
   readonly kind: 'supabase' | 'local';
   list<T = Row>(table: string, filter?: RowFilter): Promise<T[]>;
   create<T = Row>(table: string, values: Partial<T>): Promise<T>;
+  /**
+   * Écriture idempotente sur une **cible d'unicité déclarée par l'appelant**.
+   *
+   * Pendant de `create` quand l'unicité d'une ligne ne vient pas de sa clé
+   * primaire : `onConflict` nomme la contrainte qui la matérialise (ici
+   * `dashboard_widgets_member_type_key unique (member_id, widget_type)`, 0004)
+   * et `values` doit porter ses colonnes.
+   *
+   * Décider `create` ou `update` après une **lecture** ne rend pas le même
+   * service : entre la lecture et l'écriture, l'état lu n'est plus l'état de la
+   * base (course au premier rendu, lecture en échec, onglet resté ouvert). La
+   * ligne écrite ne retrouve alors pas celle qui existe déjà, et l'écriture
+   * échoue sur la contrainte (`23505`) ou ajoute une seconde ligne. La cible de
+   * conflit reste donc un paramètre explicite, jamais déduit du payload.
+   *
+   * **Ne jamais fournir d'`id`** dans `values` : voir `SupabaseAdapter.upsert`.
+   */
+  upsert<T = Row>(table: string, values: Partial<T>, options: { onConflict: string }): Promise<T>;
   update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T>;
   /** Lève si zéro ligne est supprimée, sauf `{ ifMissing: 'ignore' }`. */
   remove(table: string, id: string, options?: RemoveOptions): Promise<void>;

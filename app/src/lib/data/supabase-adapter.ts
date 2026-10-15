@@ -96,6 +96,28 @@ export class SupabaseAdapter implements DataAdapter {
     return row as T;
   }
 
+  /**
+   * Écriture idempotente sur la cible d'unicité déclarée : PostgREST fusionne
+   * (`on conflict … do update`) au lieu d'échouer sur un doublon. C'est le
+   * pendant de `create` pour une unicité que la clé primaire ne porte pas.
+   *
+   * **Aucun `id` n'est injecté**, contrairement à `create`. `dashboard_widgets.id`
+   * a un défaut (`private.new_id('widget')`, 0004) : un `id` fourni qui n'est pas
+   * celui de la ligne existante ne fusionne pas sur la cible déclarée mais
+   * entre en collision de clé primaire, et l'écriture échoue là où elle devait
+   * être idempotente.
+   */
+  async upsert<T = Row>(table: string, values: Partial<T>, options: { onConflict: string }): Promise<T> {
+    const client = this.client();
+    const { data: row, error } = await client
+      .from(table)
+      .upsert(values as never, { onConflict: options.onConflict })
+      .select('*')
+      .single();
+    if (error) throw new DataError(error.message, error);
+    return row as T;
+  }
+
   async createHousehold(values: {
     name: string;
     avatarColor: string;
