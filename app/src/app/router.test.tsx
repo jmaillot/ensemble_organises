@@ -10,11 +10,15 @@ import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { useSessionStore } from '@/stores/session-store';
 import { demoUser } from '@/hooks/use-auth';
 import { catalogueModules, modulePath } from '@/lib/modules';
+import { internalPathOf } from '@/modules/landing/sign-in-page';
 import { AppRoutes } from './router';
 
-function renderAt(path: string) {
+function renderAt(path: string, state: unknown = {}) {
   // `BrowserRouter` lit l'URL du document : c'est elle qui décide de la route.
-  window.history.pushState({}, '', path);
+  // `state.usr` est ce que `useLocation()` rend comme `state` (react-router le
+  // range sous `usr`), donc c'est par là qu'on simule un `state.from` posé par
+  // `RequireAuth` ou forgé par un tiers.
+  window.history.pushState(state, '', path);
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
       <ToastProvider>
@@ -160,4 +164,95 @@ describe('Garde des écrans de foyer en écriture', () => {
     },
     15_000,
   );
+
+  /**
+   * Le défaut mesuré : la chaîne de requête EST la route visée. Un lien
+   * d'invitation (`/foyer/rejoindre?token=…`, émis par les paramètres du foyer)
+   * porte son jeton dans l'URL ; ne garder que `pathname` le perd à la
+   * connexion, et le jeton est le contrôle d'accès (AGENTS.md §4).
+   */
+  it('conserve la chaîne de requête dans `from`', async () => {
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
+    const target = '/foyer/rejoindre?token=abcdefghijklmnopqrstuv';
+    renderAt(target);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/connexion'));
+    expect(window.history.state?.usr).toEqual({ from: target });
+  });
+
+  it('ramène le visiteur sur la route visée après connexion, jeton compris', async () => {
+    const user = userEvent.setup();
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
+    const target = '/foyer/rejoindre?token=abcdefghijklmnopqrstuv';
+    renderAt(target);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/connexion'));
+    // Seul chemin de connexion exerçable sans backend : la session de démo.
+    await user.click(await screen.findByRole('button', { name: 'Entrer dans la démonstration' }, { timeout: 5000 }));
+
+    await waitFor(() =>
+      expect(window.location.pathname + window.location.search).toBe(target),
+    );
+  });
+
+  /**
+   * T-19-43 : `state.from` est une donnée du navigateur. L'honorer sans
+   * contrôle ferait de la connexion une redirection ouverte. La garde est
+   * vérifiée ICI directement (`internalPathOf`) : le test d'intégration
+   * ci-dessus rougit bien quand on la retire, mais il rougirait pour une autre
+   * raison — jsdom refuse lui-même une poussée hors origine — et une preuve qui
+   * ne distingue pas la garde du filet du navigateur ne prouve pas la garde.
+   */
+  it.each([
+    ['un chemin interne', '/foyer/rejoindre?token=abc', '/foyer/rejoindre?token=abc'],
+    ['la racine', '/', '/'],
+    ['une URL absolue', 'https://externe.example/pwned', null],
+    ['une forme protocole-relative', '//externe.example/pwned', null],
+    ['une barre oblique inversée', '/\\externe.example/pwned', null],
+    ['un schéma javascript', 'javascript:alert(1)', null],
+    ['une valeur non textuelle', 42, null],
+    ['une valeur vide', '', null],
+  ])('`from` : %s', (_label, input, expected) => {
+    expect(internalPathOf(input)).toBe(expected);
+  });
+
+  it('refuse une origine externe dans `from` (pas de redirection ouverte)', async () => {
+    const user = userEvent.setup();
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
+    renderAt('/connexion', { usr: { from: 'https://externe.example/pwned' } });
+
+    await user.click(await screen.findByRole('button', { name: 'Entrer dans la démonstration' }, { timeout: 5000 }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/accueil'));
+    expect(window.location.href).not.toContain('externe.example');
+  });
+
+  /**
+   * L'invariant d'amorçage reste maître : honorer `from` ne déplace pas la
+   * destination par défaut, et un utilisateur sans foyer est toujours ramené au
+   * choix « créer / rejoindre » par `RequireHousehold` — c'est la garde, pas la
+   * page de connexion, qui décide.
+   */
+  it('ouvrir la page d’accueil déconnecté mène toujours à /accueil après connexion', async () => {
+    const user = userEvent.setup();
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
+    renderAt('/');
+
+    await user.click(await screen.findByRole('link', { name: 'Continuer avec un email' }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: 'Entrer dans la démonstration' }, { timeout: 5000 }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/accueil'));
+  });
+
+  it('sans foyer, /accueil mène toujours au choix créer/rejoindre', async () => {
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    renderAt('/accueil');
+
+    expect(await screen.findByRole('heading', { name: /pas encore de foyer/i })).toBeInTheDocument();
+  });
 });

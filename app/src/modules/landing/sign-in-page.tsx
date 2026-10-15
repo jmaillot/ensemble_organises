@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,8 +31,36 @@ function BrandMark({ initial }: { initial: string }) {
   );
 }
 
+/**
+ * Chemin INTERNE visé après connexion, ou `null`. `RequireAuth` écrit
+ * `state.from` ; ce module est son seul lecteur.
+ *
+ * `state.from` est une donnée du navigateur : l'honorer sans contrôle ferait
+ * de la connexion une redirection ouverte (T-19-43). On la résout donc contre
+ * l'origine courante et on refuse tout ce qui change d'origine — une URL
+ * absolue (`https://…`), une forme protocole-relative (`//evil.example`) et la
+ * variante à barre oblique inversée (`/\evil.example`, que l'analyseur d'URL
+ * normalise en `//evil.example`). Seul un chemin de l'application passe.
+ *
+ * Exportée pour être vérifiable directement : un test d'intégration de
+ * navigation ne peut pas distinguer cette garde de la même-origine imposée par
+ * `history.pushState` (jsdom refuse déjà la poussée hors origine). La preuve
+ * doit porter sur la garde elle-même, pas sur le filet du navigateur.
+ */
+export function internalPathOf(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  try {
+    const resolved = new URL(value, window.location.origin);
+    if (resolved.origin !== window.location.origin) return null;
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function SignInPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [mode, setMode] = useState<'connexion' | 'inscription'>('connexion');
   const [pending, setPending] = useState<string | null>(null);
@@ -43,12 +71,23 @@ export default function SignInPage() {
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
 
+  /**
+   * Route visée avant la connexion, si `RequireAuth` en a laissé une. Le
+   * routage d'amorçage reste MAÎTRE : on ne fait que rendre à l'utilisateur la
+   * route qu'il visait, et les gardes en aval gouvernent la suite — un
+   * utilisateur sans foyer arrivé sur `/accueil` (ou `/foyer`) repart vers le
+   * choix « créer / rejoindre » (`RequireHousehold` / `RequireNoHousehold`),
+   * exactement comme avant. C'est pourquoi honorer `from` ne déplace pas
+   * l'invariant d'amorçage : ce sont les gardes, pas cette page, qui décident.
+   */
+  const requestedPath = internalPathOf((location.state as { from?: unknown } | null)?.from);
+
   const run = async (label: string, action: () => Promise<unknown>) => {
     setPending(label);
     setFormError(null);
     try {
       await action();
-      navigate('/accueil');
+      navigate(requestedPath ?? '/accueil');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Connexion impossible pour le moment.');
     } finally {

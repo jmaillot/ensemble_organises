@@ -31,7 +31,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated();
   const location = useLocation();
   if (!isAuthenticated) {
-    return <Navigate to="/connexion" replace state={{ from: location.pathname }} />;
+    // La chaîne de requête fait partie de la route visée : un lien
+    // d'invitation (`/foyer/rejoindre?token=…`, émis par les paramètres du
+    // foyer) porte son jeton dans l'URL, et le jeton EST le contrôle d'accès
+    // (AGENTS.md §4). Ne garder que `pathname` le perdrait à la connexion.
+    return <Navigate to="/connexion" replace state={{ from: location.pathname + location.search }} />;
   }
   return <RequireAttestation>{children}</RequireAttestation>;
 }
