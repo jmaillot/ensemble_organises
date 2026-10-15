@@ -25,12 +25,19 @@ async function openDemoSession(page: Page) {
 }
 
 test.describe('Connexion et foyer', () => {
-  test('la landing page présente les trois chemins de connexion', async ({ page }) => {
+  test('la landing page présente les deux chemins de connexion', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Tout le foyer');
+    // Facebook a été retiré le 2026-10-13 (AGENTS.md §2.5 : Google + e-mail).
+    // Le compte est cadré sur l'accroche — la première section — parce que
+    // `main` porte aussi les tuiles des espaces et l'appel final : sans ce
+    // cadrage, « deux » ne décrirait plus le groupe de connexion.
+    const onboardingLinks = page.getByRole('main').locator('section').first().getByRole('link');
+    await expect(onboardingLinks).toHaveCount(2);
     await expect(page.getByRole('link', { name: 'Commencer avec Google' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Continuer avec Facebook' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Continuer avec un email' })).toBeVisible();
+    // La doctrine courante (D-07) : en ligne d'abord, plus de hors ligne promis.
+    await expect(page.getByText('Application web installable, utilisable en ligne.')).toBeVisible();
   });
 
   test('la session de démonstration ouvre le tableau de bord', async ({ page }) => {
