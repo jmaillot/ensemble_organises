@@ -291,7 +291,6 @@ describe('CalendrierPage', () => {
   });
 
   it('borne aussi l’édition des événements existants pour un enfant (D-13)', async () => {
-    const user = userEvent.setup();
     await data.create('events', {
       household_id: DEMO_HOUSEHOLD_ID,
       title: 'Réunion parents',
@@ -306,38 +305,45 @@ describe('CalendrierPage', () => {
       created_by: DEMO_MEMBERS.camille,
     } as never);
 
-    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+    // La vue est lue dans le stockage au montage : on la pilote par ce biais,
+    // jamais par un clic d'onglet, pour ne pas laisser une vue non standard
+    // derrière soi (un test qui échoue en cours de route ne doit pas
+    // contaminer les suivants).
+    const viewKey = 'eo:calendrier:view';
+    window.localStorage.removeItem(viewKey);
+    try {
+      // Surface 1 : l'agenda du jour (vue Mois).
+      const agenda = renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+      // Admin d'abord : sans ce versant, l'assertion négative de l'enfant
+      // serait un test qui ne peut pas échouer pour la bonne raison.
+      expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
 
-    // Admin d'abord : sans ce versant, l'assertion négative de l'enfant serait
-    // un test qui ne peut pas échouer pour la bonne raison.
-    expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
+      act(() => {
+        useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+      });
+      expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
+      expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
+      // Les tâches restent consultables : seul l'événement perd ses commandes.
+      expect(
+        screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
+      ).toBeInTheDocument();
+      agenda.unmount();
 
-    // La liste des 30 jours est la seconde surface de l'agenda : même garde.
-    await user.click(screen.getByRole('tab', { name: 'Liste' }));
-    expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Mois' }));
+      // Surface 2 : la liste des 30 jours — même garde, commandes comprises.
+      window.localStorage.setItem(viewKey, 'liste');
+      renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+      expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
 
-    act(() => {
-      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
-    });
-
-    // Agenda du jour : plus aucune action d'édition ou de suppression.
-    expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
-    expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
-    // Les tâches restent consultables : seul l'événement perd ses commandes.
-    expect(
-      screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
-    ).toBeInTheDocument();
-
-    // Liste des 30 jours : idem, la seconde surface tient le même garde.
-    await user.click(screen.getByRole('tab', { name: 'Liste' }));
-    expect(await screen.findByRole('button', { name: /Ouvrir Choisir le menu du week-end dans les tâches/ })).toBeInTheDocument();
-    expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
-    expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
-
-    await user.click(screen.getByRole('tab', { name: 'Mois' }));
+      act(() => {
+        useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+      });
+      expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
+      expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
+    } finally {
+      window.localStorage.removeItem(viewKey);
+    }
   });
 
   it('colore la pastille du jour avec la catégorie, couleur membre inchangée (D-07)', async () => {

@@ -216,12 +216,17 @@ export default function CalendrierPage() {
       action={<CountBadge value={agenda.length} label="éléments dans l’agenda" />}
     >
       <div aria-live="polite">
+        {/*
+          D-13 (WR-18) : les entrées de création sont bornées depuis D-06, mais
+          l'édition d'un événement EXISTANT ne l'était pas. `AgendaList` retire
+          ses deux commandes dès que les deux rappels sont absents.
+        */}
         <AgendaList
           date={selected}
           items={agenda}
           isLoading={isLoading}
-          onEdit={openEdit}
-          onDelete={(event) => setPendingDelete(event)}
+          onEdit={isChild ? undefined : openEdit}
+          onDelete={isChild ? undefined : (event) => setPendingDelete(event)}
           onOpenTask={() => navigate('/taches')}
         />
       </div>
@@ -537,8 +542,8 @@ export default function CalendrierPage() {
                 date={section.iso}
                 items={section.items}
                 isLoading={isLoading}
-                onEdit={openEdit}
-                onDelete={(event) => setPendingDelete(event)}
+                onEdit={isChild ? undefined : openEdit}
+                onDelete={isChild ? undefined : (event) => setPendingDelete(event)}
                 onOpenTask={() => navigate('/taches')}
               />
             </Panel>
