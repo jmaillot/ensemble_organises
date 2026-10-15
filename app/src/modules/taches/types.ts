@@ -91,10 +91,18 @@ export const formatClockTime = (iso: string) => clockFormatter.format(toLocalDat
 
 export const memberFirstName = (name: string) => name.split(' ')[0]?.trim() || name;
 
+/**
+ * Retard d'une tâche : échéance strictement antérieure à aujourd'hui, tâche non
+ * faite. La règle est écrite une seule fois — `toTask` la lit pour `isLate` et
+ * `lateDays`, `sortTasks` la relit pour épingler le retard.
+ */
+export function lateDaysFor(task: Pick<Task, 'status' | 'dueDate'>): number {
+  return task.status !== 'fait' && task.dueDate ? Math.max(0, -daysBetween(todayIso(), task.dueDate)) : 0;
+}
+
 /** Conversion d'une ligne `tasks` en type métier. */
 export function toTask(row: TaskRow, context: TaskContext = emptyContext): Task {
-  const done = row.status === 'fait';
-  const lateDays = !done && row.due_date ? Math.max(0, -daysBetween(todayIso(), row.due_date)) : 0;
+  const lateDays = lateDaysFor({ status: row.status, dueDate: row.due_date });
   const reminderTime = context.reminderAt ? formatClockTime(context.reminderAt) : null;
   return {
     id: row.id,
@@ -188,16 +196,35 @@ export function filterByAssignee(tasks: Task[], assignee: AssigneeFilter): Task[
   return tasks.filter((task) => task.assignees.some((entry) => entry.memberId === assignee));
 }
 
-/** Échéance croissante, tâches en retard naturellement en tête, tâches faites en dernier. */
+/**
+ * Groupe d'épinglage d'une tâche (D-11) : la frontière que le tri ne franchit
+ * jamais, et que le glisser-déposer ne promet donc pas de franchir.
+ */
+export type TaskGroup = 'retard' | 'ouverte' | 'terminee';
+
+const groupRank: Record<TaskGroup, number> = { retard: 0, ouverte: 1, terminee: 2 };
+
+export function taskGroup(task: Task): TaskGroup {
+  if (task.status === 'fait') return 'terminee';
+  return lateDaysFor(task) > 0 ? 'retard' : 'ouverte';
+}
+
+/**
+ * Ordre d'affichage (D-11) : le retard épinglé, puis l'ordre manuel saisi
+ * (`priority_order`), puis un départage stable par `id`.
+ *
+ * L'échéance ne départage plus : c'est elle qui faisait rebondir la ligne
+ * déposée à chaque `refresh()` (WR-13), le dépôt n'écrivant que
+ * `priority_order`. Elle reste visible en badge. Le départage final par `id`
+ * rend le tri déterministe — deux rangs égaux ne s'échangent pas au gré des
+ * re-rendus.
+ */
 export function sortTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
-    const doneA = a.status === 'fait';
-    const doneB = b.status === 'fait';
-    if (doneA !== doneB) return doneA ? 1 : -1;
-    const dueA = a.dueDate ?? '9999-12-31';
-    const dueB = b.dueDate ?? '9999-12-31';
-    if (dueA !== dueB) return dueA < dueB ? -1 : 1;
-    return a.priorityOrder - b.priorityOrder;
+    const byGroup = groupRank[taskGroup(a)] - groupRank[taskGroup(b)];
+    if (byGroup !== 0) return byGroup;
+    if (a.priorityOrder !== b.priorityOrder) return a.priorityOrder - b.priorityOrder;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
 
