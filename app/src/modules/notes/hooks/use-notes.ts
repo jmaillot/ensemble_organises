@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { useResource } from '@/lib/data/useResource';
-import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
+import { householdMediaPathOf, isHouseholdMediaPath, removeHouseholdFile, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
 import { NOTES_TABLE, NOTE_FOLDERS_TABLE, createNoteAttachment, createNoteFolder, nowIso, removeNoteAttachment, renameNoteFolder, toNotePayload } from '../api';
@@ -22,6 +22,28 @@ import {
   type NoteFormValues,
   type NoteMetrics,
 } from '../types';
+
+/**
+ * Retrait des objets d'un média du foyer, APRÈS la disparition de leurs lignes
+ * (D-03, WR-10). La ligne part d'abord, l'objet ensuite : l'inverse laisserait
+ * une ligne pointant vers un objet disparu. Best-effort — un bucket
+ * indisponible est signalé, jamais transformé en échec d'une suppression de
+ * ligne déjà effective (l'utilisateur ne doit pas voir « la note n'a pas pu
+ * être supprimée » alors qu'elle est partie).
+ */
+async function removeStoredObjects(values: (string | null)[]): Promise<void> {
+  await Promise.all(
+    values.map(async (value) => {
+      const path = householdMediaPathOf(value);
+      if (!path) return;
+      try {
+        await removeHouseholdFile(path);
+      } catch (error) {
+        console.warn(`Objet de média non retiré du bucket : ${path}`, error);
+      }
+    }),
+  );
+}
 
 export interface UseNotesResult extends NoteMetrics {
   /** Toutes les notes du foyer, de la plus récente à la plus ancienne. */
@@ -204,7 +226,14 @@ export function useNotes(): UseNotesResult {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       await update(note.id, { ...toNotePayload(values), updated_at: nowIso() });
       for (const attachmentId of removedAttachmentIds) {
+        // La pièce jointe retirée emporte son objet (D-03, WR-10) : la ligne
+        // porte le chemin, on le lit AVANT de la supprimer, sinon orphelin en
+        // bucket. Les pièces jointes conservées ne sont jamais touchées.
+        const removed = await data
+          .list<NoteAttachmentRow>('note_attachments', { id: attachmentId })
+          .catch(() => [] as NoteAttachmentRow[]);
         await removeNoteAttachment(attachmentId);
+        await removeStoredObjects(removed.map((row) => row.file_url));
       }
       if (files.length > 0) {
         try {
@@ -222,11 +251,17 @@ export function useNotes(): UseNotesResult {
   const removeNote = useCallback(
     async (note: Note) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      // Les objets suivent leurs lignes (D-03, WR-10) : les chemins sont lus
+      // AVANT la suppression des lignes, les objets retirés APRÈS.
+      const attachments = await data
+        .list<NoteAttachmentRow>('note_attachments', { note_id: note.id })
+        .catch(() => [] as NoteAttachmentRow[]);
       // En ligne la cascade SQL emporte les pièces jointes ; en local
       // l'adaptateur n'a pas de cascade implicite, on retire explicitement.
       // Une note sans pièce jointe n'en supprime aucune : tolérance déclarée.
       await data.removeWhere('note_attachments', { note_id: note.id }, { ifMissing: 'ignore' });
       await remove(note.id);
+      await removeStoredObjects(attachments.map((row) => row.file_url));
       await refresh();
     },
     [canWrite, refresh, remove],
