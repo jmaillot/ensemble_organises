@@ -113,21 +113,24 @@ test.describe('Espace voyage — création et onglets étanches', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Lisbonne' })).toBeVisible();
 
     await openTripTab(page, 'Paramètres');
-    const toggle = page.getByRole('checkbox', { name: 'Afficher la rubrique Notes' });
-    // La case est cochée par défaut même avant chargement : l'onglet visible
+    // Le contrôle est un `Switch` Radix (primitives.tsx) : Radix le rend en
+    // `<button role="switch" aria-checked>`, jamais en `role="checkbox"`.
+    const toggle = page.getByRole('switch', { name: 'Afficher la rubrique Notes' });
+    // La bascule est active par défaut même avant chargement : l'onglet visible
     // prouve que le `tab_state` est chargé (sinon le clic part dans le vide).
     await expect(page.getByRole('tab', { name: 'Notes' })).toBeVisible();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
-    // `click()` + assertions auto-réessayées plutôt que `uncheck()` : la case
-    // est contrôlée par le `tab_state` serveur (écriture + relecture), et le
-    // cycle natif→serveur→rendu dépasse la vérification unique de `uncheck`.
+    // `click()` + assertions auto-réessayées plutôt que `uncheck()` : la
+    // bascule est contrôlée par le `tab_state` serveur (écriture + relecture),
+    // et le cycle natif→serveur→rendu dépasse la vérification unique de
+    // `uncheck`.
     await toggle.click();
-    await expect(toggle).not.toBeChecked();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
     await expect(page.getByRole('tab', { name: 'Notes' })).toHaveCount(0);
 
     await toggle.click();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
     const notesTab = page.getByRole('tab', { name: 'Notes' });
     await expect(notesTab).toBeVisible();
     await notesTab.click();
