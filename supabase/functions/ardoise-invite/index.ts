@@ -600,6 +600,56 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
   return buildGuestView(admin, guest.ardoise_id, guest.display_name ?? null, { ticketHash });
 }
 
+// ---------------------------------------------------------------------------
+// Chemin sans session : la couverture invitée est signée par le serveur.
+// ---------------------------------------------------------------------------
+//
+// D-01 (19-09) a aligné `ardoises.cover_url` sur le CHEMIN du bucket : la
+// colonne ne porte plus une URL signée. La lecture invitée doit donc signer
+// elle-même — un invité anonyme n'a pas de session, et le bucket
+// `household-media` est privé (AGENTS.md §2.6) : il ne peut pas signer. Rendre
+// la colonne brute enverrait un chemin dans un `<img src>`, donc une image
+// cassée à coup sûr (régression introduite par 19-09, fermée ici). Le motif est
+// copié de `recipe-invite` (`resolveGuestCoverUrl`) et de `gift-list-invite`
+// (`resolveGuestPhotoUrl`) : mêmes TTL, même échec fermé, même refus de rendre
+// autre chose qu'une URL servable.
+
+/** Bucket privé des fichiers du foyer : seul nom que les politiques connaissent. */
+const HOUSEHOLD_MEDIA_BUCKET = 'household-media';
+/** Validité de l'URL de couverture invitée : courte (une heure), forgée par requête. */
+const GUEST_PHOTO_TTL_SECONDS = 3600;
+
+/** Chaîne non vide telle quelle, sinon null (échec fermé, jamais ''). */
+function asTextOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Résout la valeur brute `cover_url` de la colonne en URL servable : une URL
+ * `http(s)` héritée passe telle quelle ; un chemin relatif au bucket
+ * `household-media` (forme actuelle de la colonne, D-01) reçoit une URL signée
+ * courte ; TOUT le reste (absent, forme inconnue, erreur de signature) rend
+ * null — échec fermé, sans erreur, sans journaliser la valeur (T-19-41 : rien
+ * de sensible ne fuite dans les journaux).
+ */
+async function resolveGuestCoverUrl(admin: AdminClient, raw: unknown): Promise<string | null> {
+  const value = asTextOrNull(raw);
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    const path = value.replace(/^\/+/, '');
+    const { data, error } = await admin.storage
+      .from(HOUSEHOLD_MEDIA_BUCKET)
+      .createSignedUrl(path, GUEST_PHOTO_TTL_SECONDS);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Vue invité partagée (`guest-view` ticket, `link-view` code vérifié) :
  * ardoise, dépenses nommées, soldes. Lecture seule, aucune écriture.
@@ -681,12 +731,17 @@ async function buildGuestView(
   const { data: settlement, error: settlementError } = await admin.rpc('ardoise_settlement', settlementArgs);
   if (settlementError) throw translateRpcError(settlementError);
 
+  // Le nom dit la nature de la valeur : la colonne porte un CHEMIN de bucket
+  // (`cover_url`), la charge utile porte une URL servable (`coverUrl`). Un
+  // invité anonyme ne peut pas signer lui-même, c'est le serveur qui le fait.
+  const coverUrl = await resolveGuestCoverUrl(admin, (ardoise as { cover_url: string | null }).cover_url);
+
   return json({
     ardoise: {
       id: (ardoise as { id: string }).id,
       name: (ardoise as { name: string }).name,
       description: (ardoise as { description: string | null }).description,
-      cover_url: (ardoise as { cover_url: string | null }).cover_url,
+      coverUrl,
       is_active: (ardoise as { is_active: boolean }).is_active,
     },
     guest: guestDisplayName ? { display_name: guestDisplayName } : null,

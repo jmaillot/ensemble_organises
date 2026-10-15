@@ -16,7 +16,7 @@ vi.mock('@/lib/supabase/client', () => ({
 const CODE = 'code-partage-12345678901234';
 
 const viewPayload = {
-  ardoise: { id: 'ardoise-1', name: 'Week-end', description: null, cover_url: null, is_active: true },
+  ardoise: { id: 'ardoise-1', name: 'Week-end', description: null, coverUrl: null, is_active: true },
   guest: null,
   expenses: [
     {
@@ -37,14 +37,14 @@ const viewPayload = {
   },
 };
 
-function mockViewFetch(calls: string[], ok = true) {
+function mockViewFetch(calls: string[], ok = true, payload: unknown = viewPayload) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation(async (_url: unknown, init?: RequestInit) => {
       const body = (JSON.parse((init?.body as string) ?? '{}') as { action?: string; code?: string }) ?? {};
       calls.push(`${body.action ?? '?'}`);
       if (!ok) return { ok: false, json: async () => ({ error: 'Lien invalide.' }) };
-      return { ok: true, json: async () => viewPayload };
+      return { ok: true, json: async () => payload };
     }),
   );
 }
@@ -72,6 +72,39 @@ describe('GuestArdoisePage', () => {
       expect(await screen.findByText('Courses')).toBeInTheDocument();
       expect(screen.getByText('Participer ?')).toBeInTheDocument();
       expect(screen.queryByLabelText(/pseudonyme/i)).not.toBeInTheDocument();
+      expect(calls).toEqual(['link-view']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /**
+   * Le cas qui manquait à la phase 19 : le cas existant ne posait que
+   * `coverUrl: null`, donc une couverture cassée passait inaperçue. La charge
+   * utile invitée porte une URL **servable** (signée par le serveur), jamais le
+   * chemin de bucket — la page doit la rendre telle quelle, sans rien
+   * reconstruire.
+   */
+  it('rend la couverture servable de la charge utile, pas un chemin reconstruit', async () => {
+    const calls: string[] = [];
+    const signed = 'https://api.example/storage/v1/object/sign/household-media/foyer-1/ardoises/plage.webp?token=abc.def';
+    mockViewFetch(calls, true, {
+      ...viewPayload,
+      ardoise: { ...viewPayload.ardoise, coverUrl: signed },
+    });
+    try {
+      renderGuest(CODE);
+      const cover = await screen.findByAltText('Couverture de Week-end');
+      // La page rend la valeur de la charge utile TELLE QUELLE : ni un chemin
+      // de bucket, ni une URL re-signée côté client (impossible pour un invité
+      // anonyme) ne produiraient ce `src`.
+      expect(cover).toHaveAttribute('src', signed);
+      // L'assertion qui dit la PROPRIÉTÉ, et non un motif : la valeur est
+      // servable parce qu'elle est absolue. Un chemin de bucket ne commence pas
+      // par `https://`. (On ne peut pas interdire `household-media/…` dans le
+      // `src` : une URL signée de Supabase contient légitimement ce chemin dans
+      // son propre segment — AGENTS.md §2.7D.6.)
+      expect(cover.getAttribute('src')).toMatch(/^https:\/\//);
       expect(calls).toEqual(['link-view']);
     } finally {
       vi.unstubAllGlobals();

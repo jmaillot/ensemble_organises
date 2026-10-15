@@ -358,7 +358,13 @@ export interface GuestExpenseView {
 }
 
 export interface GuestArdoiseView {
-  ardoise: { id: string; name: string; description: string | null; cover_url: string | null; is_active: boolean };
+  /**
+   * URL servable signée par le serveur (`ardoise-invite`), jamais le chemin de
+   * bucket : un invité anonyme ne peut pas signer lui-même (bucket privé,
+   * AGENTS.md §2.6). Ne PAS appliquer `resolveHouseholdMediaUrl` ici — la
+   * valeur est déjà prête à servir.
+   */
+  ardoise: { id: string; name: string; description: string | null; coverUrl: string | null; is_active: boolean };
   /** NULL en accès anonyme par lien (aucun nom demandé). */
   guest: { display_name: string } | null;
   expenses: GuestExpenseView[];

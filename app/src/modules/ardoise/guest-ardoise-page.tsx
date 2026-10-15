@@ -97,9 +97,9 @@ export default function GuestArdoisePage() {
           />
         ) : (
           <div className="grid gap-[18px]">
-            {view.ardoise.cover_url ? (
+            {view.ardoise.coverUrl ? (
               <img
-                src={view.ardoise.cover_url}
+                src={view.ardoise.coverUrl}
                 alt={`Couverture de ${view.ardoise.name}`}
                 className="h-36 w-full rounded-[12px] object-cover"
               />
