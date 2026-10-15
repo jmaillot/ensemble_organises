@@ -85,6 +85,31 @@ export function placePhotoPathOf(stored: string | null): string | null {
 }
 
 /**
+ * Faut-il retirer l'objet de bucket de la photo précédente ? Décision pure,
+ * extraite de `editPlace` pour être prouvable (WR-05).
+ *
+ * Le défaut d'origine : `editPlace` comparait `previous` (la valeur **stockée**,
+ * un chemin bucket) au `photoUrl` du formulaire, qui était l'**URL signée
+ * résolue** — deux grandeurs jamais égales sur un lieu photographié en mode
+ * Supabase. La suppression se déclenchait donc à chaque enregistrement, même
+ * sans toucher à la photo, et la colonne recevait l'URL signée.
+ *
+ * Verdict vrai seulement si la valeur précédente est un chemin bucket ET
+ * diffère de la valeur suivante — un retrait (`nextStored` nul ou vide) en
+ * fait partie, une valeur non-chemin (URL signée héritée, `data:`, `/…`,
+ * `blob:`) n'est jamais un objet de bucket à retirer.
+ */
+export function shouldRemovePreviousPlacePhoto(
+  previousStored: string | null,
+  nextStored: string | null,
+): boolean {
+  const previous = placePhotoPathOf(previousStored);
+  if (!previous) return false;
+  const next = (nextStored ?? '').trim();
+  return next.length === 0 || next !== previous;
+}
+
+/**
  * Forge la photo affichable (forme invité 06-04 : échec fermé). Les formes
  * non-chemin rendent telles quelles — y compris les `data:` hérités — ; un
  * chemin se forge en URL courte ; tout échec de forge donne `null`.

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useResource } from '@/lib/data/useResource';
 import type { PlaceRow } from '@/types';
-import { PLACES_TABLE, deletePlacePhoto, isPlacePhotoPath, placeMetrics, resolvePlacePhotoUrls, toEditPlacePayload, toPlacePayload, toVisitedPayload, uploadPlacePhoto, type PlaceMetrics } from '../api';
+import { PLACES_TABLE, deletePlacePhoto, isPlacePhotoPath, placeMetrics, resolvePlacePhotoUrls, shouldRemovePreviousPlacePhoto, toEditPlacePayload, toPlacePayload, toVisitedPayload, uploadPlacePhoto, type PlaceMetrics } from '../api';
 import {
   emptyPlaceFilters,
   filterPlaces,
@@ -99,6 +99,8 @@ export function useAdresses(): UseAdressesResult {
           const stored = row.photo_url;
           // Non-chemin : valeur affichable telle quelle (synchrone) ; chemin :
           // URL forgée par l'effet, `null` en attendant ou en échec fermé.
+          // L'écrasement ne porte QUE sur `photoUrl` : `photoStored` reste la
+          // valeur de colonne, seule comparable d'une édition à l'autre (D-06).
           const photoUrl = !stored || !isPlacePhotoPath(stored) ? stored : (photoUrls[row.id] ?? null);
           return { ...toPlace(row), photoUrl };
         })
@@ -129,12 +131,16 @@ export function useAdresses(): UseAdressesResult {
   const editPlace = useCallback(
     async (place: Place, input: PlaceInput) => {
       const householdId = requireHousehold();
+      // `previous` est la valeur STOCKÉE (colonne), pas l'URL forgée à la
+      // lecture : c'est la seule comparable au `photoUrl` transporté par le
+      // dialogue, qui est désormais cette même valeur stockée tant que la
+      // photo n'est pas touchée (D-06, WR-05).
       const previous = rows.find((row) => row.id === place.id)?.photo_url ?? null;
       const photoUrl = input.photoFile ? await uploadPlacePhoto(householdId, input.photoFile) : input.photoUrl;
       // `visited` est omis de la charge (D-06) : l'édition ne le touche plus.
       await update(place.id, toEditPlacePayload({ ...input, photoUrl }, householdId));
       // Photo remplacée ou retirée : l'ancien fichier part avec (pas d'orphelin).
-      if (previous && previous !== photoUrl) await deletePlacePhoto(previous);
+      if (shouldRemovePreviousPlacePhoto(previous, photoUrl)) await deletePlacePhoto(previous);
       refresh.current();
     },
     [requireHousehold, rows, update],

@@ -57,6 +57,11 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
+  // L'aperçu affiche la valeur RÉSOLUE (URL signée) ; la valeur transportée
+  // par le champ, elle, est la valeur STOCKÉE (D-06, WR-05) — voir
+  // `defaultValues.photoUrl` plus bas. Le dialogue est remonté par lieu
+  // (`key` sur l'identifiant côté page), donc ces deux états suivent la cible
+  // sans effet de synchronisation.
   const [photoPreview, setPhotoPreview] = useState<string | null>(place?.photoUrl ?? null);
   // Fichier choisi mais pas encore déposé (D-04) : le dépôt a lieu à
   // l'enregistrement, jamais à la sélection — annuler ne laisse aucun orphelin.
@@ -78,7 +83,10 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
       city: place?.city ?? '',
       phone: place?.phone ?? '',
       note: place?.note ?? '',
-      photoUrl: place?.photoUrl ?? '',
+      // Valeur STOCKÉE, jamais l'URL signée : c'est ce qui rend la comparaison
+      // « photo changée ou retirée » de `editPlace` possible (D-06, WR-05).
+      // Une photo non touchée resoumet donc exactement la valeur de colonne.
+      photoUrl: place?.photoStored ?? '',
     },
   });
 

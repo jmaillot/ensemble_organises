@@ -37,7 +37,19 @@ export interface Place {
   id: string;
   type: PlaceType;
   typeLabel: string;
+  /**
+   * Valeur **affichable** : URL signée forgée à la lecture pour un chemin
+   * bucket, la valeur stockée telle quelle pour les autres formes, `null` en
+   * échec fermé. Éphémère — ne jamais la confondre avec `photoStored`.
+   */
   photoUrl: string | null;
+  /**
+   * Valeur de la colonne `photo_url` (D-06) : chemin bucket pour les dépôts
+   * récents, `data:`/`http(s)` hérités, `null` sinon. C'est la seule grandeur
+   * comparable d'une édition à l'autre ; c'est donc elle que le formulaire
+   * transporte quand la photo n'est pas touchée.
+   */
+  photoStored: string | null;
   name: string;
   street: string | null;
   postalCode: string | null;
@@ -95,6 +107,7 @@ export function toPlace(row: PlaceRow): Place {
     type,
     typeLabel: placeTypeLabel[type],
     photoUrl: toNullable(row.photo_url),
+    photoStored: toNullable(row.photo_url),
     name: row.name,
     street: toNullable(row.street),
     postalCode: toNullable(row.postal_code),
