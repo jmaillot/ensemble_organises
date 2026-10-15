@@ -1,3 +1,4 @@
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import { addDays, todayIso } from '@/lib/utils';
 import type {
   ArdoiseGuestRow,
@@ -79,7 +80,19 @@ export const DEMO_MEMBERS = {
   maya: memberId('maya'),
 } as const;
 
+/** Heure **murale** du jour (`events`, `created_at`) : ce que le calendrier relit par `slice`. */
 const at = (time: string) => `${day(0)}T${time}:00`;
+
+/**
+ * Instant du jour pour une heure locale annoncée. Un rappel est un
+ * `timestamptz` : la graine doit donc dire un instant, et non une chaîne naïve
+ * que le serveur interpréterait à son propre fuseau (WR-07, AGENTS.md §2.7I).
+ */
+const atInstant = (time: string, offset = 0) => {
+  const iso = instantOfDatetimeLocal(`${day(offset)}T${time}`);
+  if (iso === null) throw new Error(`Heure de graine illisible : ${time}`);
+  return iso;
+};
 
 export const demoProfile: ProfileRow = {
   id: DEMO_USER_ID,
@@ -238,8 +251,8 @@ export const demoEvents: EventRow[] = [
 ];
 
 export const demoEventReminders: EventReminderRow[] = [
-  { id: 'event-reminder-1', event_id: 'event-1', remind_at: at('18:30') },
-  { id: 'event-reminder-2', event_id: 'event-2', remind_at: at('17:00') },
+  { id: 'event-reminder-1', event_id: 'event-1', remind_at: atInstant('18:30') },
+  { id: 'event-reminder-2', event_id: 'event-2', remind_at: atInstant('17:00') },
 ];
 
 /** Seed des 4 catégories du foyer de démonstration (miroir du seed SQL). */
@@ -348,8 +361,8 @@ export const demoTaskAssignees: TaskAssigneeRow[] = [
 ];
 
 export const demoTaskReminders: TaskReminderRow[] = [
-  { id: 'task-reminder-1', task_id: 'task-1', remind_at: at('18:30') },
-  { id: 'task-reminder-2', task_id: 'task-2', remind_at: `${day(1)}T18:00:00` },
+  { id: 'task-reminder-1', task_id: 'task-1', remind_at: atInstant('18:30') },
+  { id: 'task-reminder-2', task_id: 'task-2', remind_at: atInstant('18:00', 1) },
 ];
 
 export const demoRoutines: RoutineRow[] = [
