@@ -7,8 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, isHouseholdMediaPath, storedValueOf } from '@/lib/storage';
 import { findLikelyDuplicates, formatFrDate, parseFrDate, type Contact, type ContactFormValues, type ContactList } from '../types';
+
+/**
+ * Le champ transporte la valeur de COLONNE (chemin du bucket pour un dépôt,
+ * URL héritée sinon) : un chemin est admis au même titre que les formes
+ * affichables. La règle est celle du dépôt partagé, jamais une copie locale.
+ */
+const isAcceptablePhoto = (value: string) => /^(\/|https?:\/\/|blob:)/.test(value) || isHouseholdMediaPath(value);
 
 const contactSchema = z.object({
   name: z.string().trim().min(1, 'Le nom est obligatoire.'),
@@ -21,7 +28,7 @@ const contactSchema = z.object({
   photoUrl: z
     .string()
     .trim()
-    .refine((value) => value === '' || /^(\/|https?:\/\/|blob:)/.test(value), 'Indiquez une adresse de photo valide.'),
+    .refine((value) => value === '' || isAcceptablePhoto(value), 'Indiquez une adresse de photo valide.'),
 });
 
 const defaultValues = (contact: Contact | null, lists: ContactList[]): ContactFormValues =>
@@ -31,7 +38,9 @@ const defaultValues = (contact: Contact | null, lists: ContactList[]): ContactFo
         birthDate: contact.birthDate ? formatFrDate(contact.birthDate) : '',
         listId: contact.listId,
         linkedMemberId: contact.linkedMemberId ?? '',
-        photoUrl: contact.photoUrl ?? '',
+        // Valeur stockée, jamais l'URL affichée : la re-signer puis la
+        // réenregistrer persisterait une URL signée éphémère (D-01, WR-08).
+        photoUrl: contact.photoStored ?? '',
       }
     : { name: '', birthDate: '', listId: lists[0]?.id ?? '', linkedMemberId: '', photoUrl: '' };
 
@@ -99,7 +108,9 @@ export function ContactFormDialog({
     setUploadError(null);
     try {
       const deposited = await depositHouseholdFile({ householdId, folder: 'contacts', file });
-      setValue('photoUrl', deposited.url, { shouldDirty: true });
+      // Valeur de COLONNE (chemin du bucket, point unique de 19-01) : elle seule
+      // part en `contacts.photo_url` (D-01, WR-08).
+      setValue('photoUrl', storedValueOf(deposited), { shouldDirty: true });
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'La photo n’a pas pu être déposée.');
     } finally {

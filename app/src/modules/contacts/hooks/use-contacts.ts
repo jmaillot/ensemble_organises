@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { invalidateTables } from '@/modules/calendrier/hooks/use-calendrier';
 import { toContact, toContactList, type Contact, type ContactFormValues, type ContactList } from '../types';
@@ -70,12 +71,31 @@ export function useContacts(): ContactsResource {
     [listsResource.rows, members],
   );
 
+  // Les fiches portent des chemins (D-01) : on forge les photos affichables à
+  // la lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
+  // formes non-chemin rendent en synchrone — seul un chemin passe par l'effet.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const contactRows = contactsResource.rows;
+  useEffect(() => {
+    const pending = contactRows
+      .filter((row) => row.photo_url !== null && isHouseholdMediaPath(row.photo_url))
+      .map((row) => ({ id: row.id, file_url: row.photo_url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [contactRows]);
+
   const contacts = useMemo(
     () =>
       contactsResource.rows
-        .map((row) => toContact(row, members))
+        .map((row) => toContact(row, members, photoUrls))
         .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
-    [contactsResource.rows, members],
+    [contactsResource.rows, members, photoUrls],
   );
 
   const contactsOfList = useCallback(

@@ -1,6 +1,12 @@
 import { initials } from '@/lib/utils';
 import type { ContactListRow, ContactRow, HouseholdMemberRow } from '@/types';
-import { formatFrDate, normalizePersonName, parseFrDate, personFusionKey } from '@/modules/anniversaires/types';
+import {
+  displayablePhoto,
+  formatFrDate,
+  normalizePersonName,
+  parseFrDate,
+  personFusionKey,
+} from '@/modules/anniversaires/types';
 
 export { formatFrDate, parseFrDate };
 
@@ -21,7 +27,14 @@ export interface Contact {
   householdId: string;
   name: string;
   birthDate: string | null;
+  /** Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01). */
   photoUrl: string | null;
+  /**
+   * Valeur de la colonne `photo_url` (chemin du bucket, URL héritée sinon) :
+   * seule grandeur comparable d'une édition à l'autre, donc celle que le
+   * dialogue transporte quand la photo n'est pas touchée (D-01, WR-08).
+   */
+  photoStored: string | null;
   linkedMemberId: string | null;
   initials: string;
   linkedMember: HouseholdMemberRow | null;
@@ -40,14 +53,21 @@ export function toContactList(row: ContactListRow, members: readonly HouseholdMe
   };
 }
 
-export function toContact(row: ContactRow, members: readonly HouseholdMemberRow[] = []): Contact {
+export function toContact(
+  row: ContactRow,
+  members: readonly HouseholdMemberRow[] = [],
+  resolved: Record<string, string> = {},
+): Contact {
   return {
     id: row.id,
     listId: row.list_id,
     householdId: row.household_id,
     name: row.name,
     birthDate: row.birth_date,
-    photoUrl: row.photo_url,
+    // D-01 : un chemin se forge à la lecture (échec fermé), une forme
+    // non-chemin (URL externe héritée) se rend telle quelle.
+    photoUrl: displayablePhoto(row.photo_url, resolved, row.id),
+    photoStored: row.photo_url,
     linkedMemberId: row.linked_member_id,
     initials: initials(row.name),
     linkedMember: row.linked_member_id
