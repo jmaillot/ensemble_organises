@@ -187,6 +187,65 @@ describe('valeur de colonne et résolution des médias du foyer (D-01)', () => {
   });
 });
 
+describe('type de fichier : déduit par l’extension, jamais inventé (WR-16 / D-04)', () => {
+  beforeEach(() => {
+    state.configured = true;
+    state.upload.mockReset().mockResolvedValue({ error: null });
+    state.createSignedUrl
+      .mockReset()
+      .mockResolvedValue({ data: { signedUrl: 'https://stockage/signe' }, error: null });
+    // jsdom n'implémente pas `URL.createObjectURL` (aperçus locaux).
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:apercu-test') });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Fichier à `type` vide, comme le déclarent certains mobiles. */
+  const mobile = (name: string) => new File(['x'], name);
+
+  it('un JPEG mobile (type vide) part en image/jpeg, jamais en application/pdf', async () => {
+    const deposited = await depositHouseholdFile({ householdId: 'foyer-a', folder: 'notes/n', file: mobile('ordonnance.JPG') });
+
+    expect(state.upload).toHaveBeenCalledOnce();
+    const [path, , options] = state.upload.mock.calls[0] as [string, Blob, { contentType: string }];
+    expect(options.contentType).toBe('image/jpeg');
+    expect(path.endsWith('.jpg')).toBe(true);
+    expect(deposited.mime).toBe('image/jpeg');
+    expect(isImageMime(deposited.mime)).toBe(true);
+  });
+
+  it('un PDF mobile (type vide) reste un PDF', async () => {
+    await depositHouseholdFile({ householdId: 'foyer-a', folder: 'notes/n', file: mobile('scan.pdf') });
+
+    const [path, , options] = state.upload.mock.calls[0] as [string, Blob, { contentType: string }];
+    expect(options.contentType).toBe('application/pdf');
+    expect(path.endsWith('.pdf')).toBe(true);
+  });
+
+  it('le type déclaré par le navigateur reste prioritaire', async () => {
+    await depositHouseholdFile({
+      householdId: 'foyer-a',
+      folder: 'notes/n',
+      file: new File(['x'], 'capture.png', { type: 'image/png' }),
+    });
+
+    const [, , options] = state.upload.mock.calls[0] as [string, Blob, { contentType: string }];
+    expect(options.contentType).toBe('image/png');
+  });
+
+  it('un type indéterminé est refusé avant tout envoi, jamais deviné', async () => {
+    await expect(
+      depositHouseholdFile({ householdId: 'foyer-a', folder: 'notes/n', file: mobile('sans-extension') }),
+    ).rejects.toThrow(/indéterminé/i);
+    await expect(
+      depositHouseholdFile({ householdId: 'foyer-a', folder: 'notes/n', file: mobile('rapport.docx') }),
+    ).rejects.toThrow(/indéterminé/i);
+    expect(state.upload).not.toHaveBeenCalled();
+  });
+});
+
 describe('libellés de pièces jointes', () => {
   it('formate les tailles à la française', () => {
     expect(formatBytes(0)).toBe('0 Ko');
