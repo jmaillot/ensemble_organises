@@ -6,6 +6,7 @@ import { getLocalAdapter } from '@/lib/data/local-adapter';
 import { DEMO_USER_ID } from '@/lib/data/seed';
 import { useSessionStore } from '@/stores/session-store';
 import { RequireAttestation } from './router';
+import type { RowFilter } from '@/types';
 
 vi.mock('@/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
@@ -76,6 +77,24 @@ describe('RequireAttestation', () => {
   it('laisse passer un compte déjà attesté', async () => {
     const adapter = getLocalAdapter();
     await adapter.update('profiles', DEMO_USER_ID, { age_attested_at: new Date().toISOString() });
+    signIn();
+    renderGate();
+
+    expect(await screen.findByText('Contenu protégé')).toBeInTheDocument();
+    expect(screen.queryByText('Une dernière étape avant de commencer')).not.toBeInTheDocument();
+  });
+
+  it('laisse passer quand la lecture du profil échoue (D-12)', async () => {
+    const adapter = getLocalAdapter();
+    const originalList = adapter.list.bind(adapter);
+    // Lecture en échec : la garde n'apprend rien sur l'attestation. Conclure
+    // « non attesté » placerait un utilisateur déjà attesté devant une modale
+    // dont l'action naturelle le déconnecte.
+    vi.spyOn(adapter, 'list').mockImplementation(((table: string, filter?: RowFilter) =>
+      table === 'profiles'
+        ? Promise.reject(new Error('réseau indisponible'))
+        : originalList(table, filter)) as never);
+
     signIn();
     renderGate();
 

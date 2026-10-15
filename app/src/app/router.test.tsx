@@ -135,3 +135,29 @@ describe('Garde /foyer', () => {
     expect(await screen.findByRole('heading', { name: /pas encore de foyer/i })).toBeInTheDocument();
   });
 });
+
+/**
+ * Ces deux écrans ÉCRIVENT (créer un foyer, en consommer un jeton) : ils
+ * doivent exiger une session comme `/foyer`, sans quoi l'écriture part d'un
+ * visiteur anonyme. La RLS reste la frontière serveur ; la garde de route
+ * évite d'y arriver.
+ */
+describe('Garde des écrans de foyer en écriture', () => {
+  it.each(['/foyer/nouveau', '/foyer/rejoindre'])(
+    'redirige un visiteur anonyme de %s vers /connexion',
+    async (path) => {
+      useHouseholdStore.getState().reset();
+      useSessionStore.setState({ status: 'guest', user: null });
+      renderAt(path);
+
+      // La redirection est synchrone : sans garde, l'URL reste celle de l'écran
+      // d'écriture et l'assertion échoue avant même de charger un morceau.
+      await waitFor(() => expect(window.location.pathname).toBe('/connexion'));
+      expect(await screen.findByRole('heading', { name: 'Ravi de vous revoir' }, { timeout: 5000 })).toBeInTheDocument();
+      // La redirection porte l'origine, exactement comme `/foyer` : après
+      // connexion, l'utilisateur retrouve l'écran qu'il visait.
+      expect(window.history.state?.usr).toEqual({ from: path });
+    },
+    15_000,
+  );
+});
