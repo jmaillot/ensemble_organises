@@ -5,7 +5,7 @@
  */
 
 import { data } from '@/lib/data';
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import type { NoteRow, PlaceRow, ShoppingListItemRow, ShoppingListRow, TaskRow, TripGuestRow, TripMemberRow, TripRow } from '@/types';
 import { randomId } from '@/lib/utils';
@@ -104,16 +104,9 @@ export function tripCoverPathOf(stored: string | null): string | null {
  */
 export async function resolveTripCoverUrl(stored: string | null): Promise<string | null> {
   if (!stored || !isTripCoverPath(stored)) return stored;
-  if (!isSupabaseConfigured || !supabase) return null;
-  try {
-    const { data: signed, error } = await supabase.storage
-      .from(TRIP_COVERS_BUCKET)
-      .createSignedUrl(stored, TRIP_COVER_URL_TTL);
-    if (error || !signed) return null;
-    return signed.signedUrl;
-  } catch {
-    return null;
-  }
+  // La signature passe par le point unique de la lecture (D-01) : seul l'appel
+  // change de propriétaire, la TTL courte reste celle du module.
+  return resolveHouseholdMediaUrl(stored, TRIP_COVER_URL_TTL);
 }
 
 /** Forge chaque couverture en URL affichable, en une passe (échec fermé par voyage). */
@@ -133,7 +126,7 @@ export async function resolveTripCoverUrls(rows: { id: string; cover_photo: stri
  */
 export async function uploadTripCover(householdId: string, tripId: string, file: File): Promise<string> {
   const deposited = await depositHouseholdFile({ householdId, folder: `trips/${tripId}`, file });
-  return deposited.path ?? deposited.url;
+  return storedValueOf(deposited);
 }
 
 /** Supprime le fichier d'une couverture (no-op pour les autres formes). */

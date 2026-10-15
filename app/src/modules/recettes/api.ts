@@ -1,6 +1,6 @@
 import { data } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import type {
   RecipeCategoryRow,
   RecipeFavoriteRow,
@@ -254,7 +254,7 @@ export function recipeCoverPathOf(stored: string | null | undefined): string | n
 /** Depose la couverture (`recipes/<id>`, compression native partagee). */
 export async function uploadRecipeCover(householdId: string, recipeId: string, file: File): Promise<string> {
   const deposited = await depositHouseholdFile({ householdId, folder: `recipes/${recipeId}`, file });
-  return deposited.path ?? deposited.url;
+  return storedValueOf(deposited);
 }
 
 /** Supprime le fichier d'une couverture (no-op hors chemin bucket). */
@@ -275,16 +275,9 @@ export async function resolveRecipeCoverUrl(stored: string | null): Promise<stri
   if (!isRecipeCoverPath(stored)) {
     return /^blob:|^https?:|^data:|^\/assets\//i.test(stored) ? stored : null;
   }
-  if (!isSupabaseConfigured || !supabase) return null;
-  try {
-    const { data: signed, error } = await supabase.storage
-      .from('household-media')
-      .createSignedUrl(stored, RECIPE_COVER_URL_TTL);
-    if (error || !signed) return null;
-    return signed.signedUrl;
-  } catch {
-    return null;
-  }
+  // La signature passe par le point unique de la lecture (D-01) : seul l'appel
+  // change de propriétaire, la TTL courte reste celle du module.
+  return resolveHouseholdMediaUrl(stored, RECIPE_COVER_URL_TTL);
 }
 
 /** Forge chaque couverture en une passe (echec ferme par recette). */

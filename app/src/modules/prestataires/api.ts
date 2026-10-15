@@ -1,6 +1,5 @@
 import { data } from '@/lib/data';
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { depositHouseholdFile, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import { randomId } from '@/lib/utils';
 import type { ProviderAttachmentRow, ProviderRow, ProviderTypeRow } from '@/types';
 import type { ProviderDraft } from './types';
@@ -63,7 +62,7 @@ export async function createProviderAttachment(
   const deposited = await depositHouseholdFile({ householdId, folder: `providers/${providerId}`, file });
   // Chemin persisté, jamais l'URL : en démo (`path: null`) l'aperçu local
   // éphémère reste la valeur, comme pour le Cercle.
-  const stored = deposited.path ?? deposited.url;
+  const stored = storedValueOf(deposited);
   try {
     return await data.create<ProviderAttachmentRow>('provider_attachments', {
       id: randomId('provider-attachment'),
@@ -103,16 +102,9 @@ export function attachmentPathOf(stored: string | null): string | null {
  */
 export async function resolveAttachmentUrl(stored: string): Promise<string | null> {
   if (!isAttachmentPath(stored)) return stored;
-  if (!isSupabaseConfigured || !supabase) return null;
-  try {
-    const { data: signed, error } = await supabase.storage
-      .from(PROVIDER_ATTACHMENTS_BUCKET)
-      .createSignedUrl(stored, ATTACHMENT_URL_TTL);
-    if (error || !signed) return null;
-    return signed.signedUrl;
-  } catch {
-    return null;
-  }
+  // La signature passe par le point unique de la lecture (D-01) : seul l'appel
+  // change de propriétaire, la TTL courte reste celle du module.
+  return resolveHouseholdMediaUrl(stored, ATTACHMENT_URL_TTL);
 }
 
 /** Forge chaque pièce en URL affichable, en une passe (échec fermé par ligne). */

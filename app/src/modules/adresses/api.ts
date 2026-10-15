@@ -1,5 +1,4 @@
-import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath } from '@/lib/storage';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import type { PlaceRow } from '@/types';
 import type { Place, PlaceInput } from './types';
 
@@ -112,16 +111,9 @@ export function shouldRemovePreviousPlacePhoto(
  */
 export async function resolvePlacePhotoUrl(stored: string | null): Promise<string | null> {
   if (!stored || !isPlacePhotoPath(stored)) return stored;
-  if (!isSupabaseConfigured || !supabase) return null;
-  try {
-    const { data: signed, error } = await supabase.storage
-      .from(PLACES_BUCKET)
-      .createSignedUrl(stored, PLACE_PHOTO_URL_TTL);
-    if (error || !signed) return null;
-    return signed.signedUrl;
-  } catch {
-    return null;
-  }
+  // La signature passe par le point unique de la lecture (D-01) : seul l'appel
+  // change de propriétaire, la TTL courte reste celle du module.
+  return resolveHouseholdMediaUrl(stored, PLACE_PHOTO_URL_TTL);
 }
 
 /** Forge chaque photo en URL affichable, en une passe (échec fermé par lieu). */
@@ -141,7 +133,7 @@ export async function resolvePlacePhotoUrls(rows: { id: string; photo_url: strin
  */
 export async function uploadPlacePhoto(householdId: string, file: File): Promise<string> {
   const deposited = await depositHouseholdFile({ householdId, folder: 'places', file });
-  return deposited.path ?? deposited.url;
+  return storedValueOf(deposited);
 }
 
 /** Supprime le fichier d'une photo de lieu (no-op pour les autres formes). */
