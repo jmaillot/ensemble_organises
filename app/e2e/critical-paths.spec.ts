@@ -260,6 +260,13 @@ test.describe('Mises en page', () => {
   test('les pages du parcours foyer démarrent en haut sur mobile', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'le centrage vertical ne gêne que sous 650 px');
 
+    // Ces deux écrans ÉCRIVENT : depuis 19-04 (`4da252a`) ils sont sous
+    // `RequireAuth` (router.tsx), et un visiteur anonyme est renvoyé vers
+    // /connexion — la garde est couverte par `router.test.tsx`. Sans session,
+    // le test mesurait donc le haut de l'écran de connexion, pas celui de
+    // l'écran visé : il faut s'authentifier pour l'atteindre.
+    await openDemoSession(page);
+
     // `place-items-center` sur un viewport `min-h-screen` au contenu court
     // laissait ~40 % de vide en haut : le contenu doit démarrer près du haut.
     for (const [path, name] of [
