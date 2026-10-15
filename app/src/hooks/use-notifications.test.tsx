@@ -10,6 +10,8 @@ import { useSessionStore } from '@/stores/session-store';
 import { demoUser } from '@/hooks/use-auth';
 import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
+import { setTaskAssignees } from '@/modules/taches/api';
+import { queryKeys } from '@/lib/data/useResource';
 import { useNotifications } from './use-notifications';
 
 // Fichier temps réel (émission → invalidation → relecture Dexie) : sur
@@ -443,6 +445,45 @@ describe('centre de notifications — fils inédits (UAT phase 9)', () => {
     } finally {
       await data.remove('posts', created.id).catch(() => undefined);
     }
+  });
+});
+
+/**
+ * WR-19 : `items` lit `assigneesByTask` et `currentMember` mais ne déclarait que
+ * `tasksResource.rows`. Réassigner une tâche change `task_assignees` sans
+ * toucher `tasks.rows` : la cloche ne se recalculait donc jamais, alors que le
+ * compteur « à faire » du module Tâches, lui, suivait — deux nombres qui se
+ * contredisaient pour la même donnée.
+ */
+describe('centre de notifications — réassignation (WR-19)', () => {
+  it('retire de la cloche une tâche réassignée, et le compteur décroît d’autant', async () => {
+    localStorage.removeItem('eo-notifications-masquees-v1');
+    seedHouseholdStore();
+    const queryClient = createTestQueryClient();
+    const ownWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>{children}</ToastProvider>
+      </QueryClientProvider>
+    );
+    const { result } = renderHook(() => useNotifications(), { wrapper: ownWrapper });
+
+    // task-1 est assignée à Camille, le membre courant : elle est dans la cloche.
+    await waitFor(() => expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(true));
+    const totalBefore = result.current.total;
+    const tasksBefore = result.current.items.filter((item) => item.kind === 'tache').length;
+
+    // Réassignation réelle (même chemin que le module Tâches) : la table
+    // `task_assignees` change, la ligne `tasks` reste identique.
+    await setTaskAssignees('task-1', [DEMO_MEMBERS.thomas]);
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: queryKeys.tableAll('task_assignees') });
+    });
+
+    // Elle quitte la cloche, et le compteur de la barre décroît du même pas :
+    // les deux nombres s'accordent dans le même rendu.
+    expect(result.current.items.some((item) => item.id === 'tache:task-1')).toBe(false);
+    expect(totalBefore - result.current.total).toBe(1);
+    expect(tasksBefore - result.current.items.filter((item) => item.kind === 'tache').length).toBe(1);
   });
 });
 
