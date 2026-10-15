@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { queryKeys, useResource } from '@/lib/data/useResource';
-import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import { addDays, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
 import {
@@ -67,6 +67,13 @@ export interface UseRoutinesResult extends RoutineMetrics {
   setAssigneeFilter: (filter: RoutineAssigneeFilter) => void;
   /** Faux pour le rôle `enfant` (lecture seule). */
   canWrite: boolean;
+  /**
+   * Vrai pour le rôle `admin` du foyer. Capacité distincte de `canWrite` : la
+   * **suppression** (routine, dossier, occurrence) est admin-seule côté serveur
+   * (`routines_delete_admin`, `routine_completions_delete_admin`,
+   * `routine_folders_delete`), l'écriture ne l'est pas.
+   */
+  isAdmin: boolean;
   createFolder: (name: string, visibility: RoutineFolderRow['visibility']) => Promise<RoutineFolderRow>;
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
@@ -133,6 +140,7 @@ export function useRoutines(): UseRoutinesResult {
   );
 
   const canWrite = currentMember?.role !== 'enfant';
+  const isAdmin = useIsAdmin();
 
   const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<RoutineRow>(ROUTINES_TABLE);
@@ -242,11 +250,13 @@ export function useRoutines(): UseRoutinesResult {
   const removeRoutine = useCallback(
     async (routine: Routine) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      // `routines_delete_admin` (boucle de 0007:237-241) : admin seul.
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       // La ligne `routines` part par la ressource, ses tables enfants par l'API.
       await Promise.all([remove(routine.id), deleteRoutineChildren(routine.id)]);
       await refresh();
     },
-    [canWrite, refresh, remove],
+    [canWrite, isAdmin, refresh, remove],
   );
 
   const createFolder = useCallback(
@@ -272,19 +282,25 @@ export function useRoutines(): UseRoutinesResult {
   const deleteFolder = useCallback(
     async (id: string) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      // `routine_folders_delete` (0051:82-87) : admin seul.
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       await data.remove(ROUTINE_FOLDERS_TABLE, id);
       if (activeFolderId === id) setActiveFolderId(null);
       await refresh();
     },
-    [activeFolderId, canWrite, refresh, setActiveFolderId],
+    [activeFolderId, canWrite, isAdmin, refresh, setActiveFolderId],
   );
 
   const removeOccurrence = useCallback(
     async (entry: HistoryEntry) => {
+      // Seule action d'écriture du hook qui n'avait aucune garde : le serveur
+      // la réserve pourtant à l'admin (`routine_completions_delete_admin`).
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       await deleteOccurrenceRow(entry.routineId, entry.date);
       await refresh();
     },
-    [refresh],
+    [canWrite, isAdmin, refresh],
   );
 
   return {
@@ -301,6 +317,7 @@ export function useRoutines(): UseRoutinesResult {
     assigneeFilter,
     setAssigneeFilter,
     canWrite,
+    isAdmin,
     createFolder,
     renameFolder,
     deleteFolder,

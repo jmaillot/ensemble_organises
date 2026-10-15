@@ -9,7 +9,7 @@ import { Icon } from '@/components/shared/icon';
 import { FolderTabs } from '@/components/shared/folder-tabs';
 import { formatBytes, isImageMime } from '@/lib/storage';
 import { cn } from '@/lib/utils';
-import { useMembers } from '@/stores/household-store';
+import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { NoteFormDialog } from './components/note-form-dialog';
 import { useNotes } from './hooks/use-notes';
 import {
@@ -32,6 +32,10 @@ const toneDot: Record<NoteTone, string> = {
 export default function NotesPage() {
   const toast = useToast();
   const members = useMembers();
+  // Les dossiers de notes suivent la même politique que tâches et routines
+  // (la boucle de 0051 couvre `task_lists`, `note_folders`, `routine_folders`) :
+  // les traiter ensemble est le point de D-03 (« corriger la classe »).
+  const isAdmin = useIsAdmin();
   const {
     notes,
     visibleNotes,
@@ -122,6 +126,7 @@ export default function NotesPage() {
             }
           }}
           canManage={canWrite}
+          canDelete={isAdmin}
           label="Dossiers de notes"
         />
       </div>

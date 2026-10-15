@@ -192,6 +192,7 @@ export default function TachesPage() {
             }
           }}
           canManage={canWrite}
+          canDelete={isAdmin}
           label="Dossiers de tâches"
         />
       </div>

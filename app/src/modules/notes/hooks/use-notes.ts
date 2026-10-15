@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { useResource } from '@/lib/data/useResource';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
 import { NOTES_TABLE, NOTE_FOLDERS_TABLE, createNoteAttachment, createNoteFolder, nowIso, removeNoteAttachment, renameNoteFolder, toNotePayload } from '../api';
 import {
@@ -97,6 +97,7 @@ export function useNotes(): UseNotesResult {
   );
 
   const canWrite = currentMember?.role !== 'enfant';
+  const isAdmin = useIsAdmin();
 
   const attachmentsByNote = useMemo(() => {
     const grouped = new Map<string, NoteAttachment[]>();
@@ -232,11 +233,15 @@ export function useNotes(): UseNotesResult {
   const deleteFolder = useCallback(
     async (id: string) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      // `note_folders_delete` (0051:82-87) est admin-seul, alors que créer et
+      // renommer un dossier reste ouvert au membre : même classe de défaut que
+      // `task_lists_delete` et `routine_folders_delete`.
+      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
       await data.remove(NOTE_FOLDERS_TABLE, id);
       if (activeFolderId === id) setActiveFolderId(null);
       await refresh();
     },
-    [activeFolderId, canWrite, refresh, setActiveFolderId],
+    [activeFolderId, canWrite, isAdmin, refresh, setActiveFolderId],
   );
 
   return {

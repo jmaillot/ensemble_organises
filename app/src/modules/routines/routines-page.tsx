@@ -34,6 +34,7 @@ export default function RoutinesPage() {
     assigneeFilter,
     setAssigneeFilter,
     canWrite,
+    isAdmin,
     createFolder,
     renameFolder,
     deleteFolder,
@@ -130,6 +131,7 @@ export default function RoutinesPage() {
             }
           }}
           canManage={canWrite}
+          canDelete={isAdmin}
           label="Dossiers de routines"
         />
       </div>
@@ -284,24 +286,24 @@ export default function RoutinesPage() {
 
                         <div className="ml-auto flex items-center gap-1">
                           {canWrite ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => openEdit(routine)}
-                                aria-label={`Modifier la routine ${routine.name}`}
-                                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
-                              >
-                                <Icon name="edit" size="sm" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPendingDelete(routine)}
-                                aria-label={`Supprimer la routine ${routine.name}`}
-                                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
-                              >
-                                <Icon name="trash" size="sm" />
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(routine)}
+                              aria-label={`Modifier la routine ${routine.name}`}
+                              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+                            >
+                              <Icon name="edit" size="sm" />
+                            </button>
+                          ) : null}
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              onClick={() => setPendingDelete(routine)}
+                              aria-label={`Supprimer la routine ${routine.name}`}
+                              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                            >
+                              <Icon name="trash" size="sm" />
+                            </button>
                           ) : null}
                         </div>
                       </div>

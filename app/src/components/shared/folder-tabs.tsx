@@ -26,6 +26,16 @@ export interface FolderTabsProps {
   onDelete: (folder: FolderLike) => Promise<void>;
   /** Faux pour le rôle `enfant` (lecture seule) : masque création/gestion. */
   canManage: boolean;
+  /**
+   * Capacité **distincte** de `canManage` : créer et renommer un dossier est
+   * ouvert au membre, mais le supprimer est admin-seul (`task_lists_delete`,
+   * `note_folders_delete`, `routine_folders_delete` — 0051:82-87). Une seule
+   * capacité `canManage` ne peut pas porter les deux.
+   *
+   * Défaut `canManage` : un appelant qui n'a pas encore migré conserve
+   * exactement son rendu antérieur.
+   */
+  canDelete?: boolean;
   label: string;
 }
 
@@ -34,7 +44,17 @@ export interface FolderTabsProps {
  * persos, création/renommage/suppression avec confirmation (la suppression
  * range le contenu dans Général, elle ne le détruit pas).
  */
-export function FolderTabs({ folders, activeId, onSelect, onCreate, onRename, onDelete, canManage, label }: FolderTabsProps) {
+export function FolderTabs({
+  folders,
+  activeId,
+  onSelect,
+  onCreate,
+  onRename,
+  onDelete,
+  canManage,
+  canDelete = canManage,
+  label,
+}: FolderTabsProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   // Le bouton « Général » ci-dessous couvre les items sans dossier (`null`) :
@@ -106,6 +126,7 @@ export function FolderTabs({ folders, activeId, onSelect, onCreate, onRename, on
         folders={sorted}
         onRename={onRename}
         onDelete={onDelete}
+        canDelete={canDelete}
       />
     </div>
   );
@@ -182,12 +203,15 @@ function FolderManageDialog({
   folders,
   onRename,
   onDelete,
+  canDelete,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   folders: readonly FolderLike[];
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (folder: FolderLike) => Promise<void>;
+  /** Seule la corbeille en dépend ; le renommage suit `canManage`. */
+  canDelete: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -244,14 +268,16 @@ function FolderManageDialog({
                     >
                       <Icon name="edit" size="sm" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(folder)}
-                      aria-label={`Supprimer ${folder.name}`}
-                      className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted hover:text-coral"
-                    >
-                      <Icon name="trash" size="sm" />
-                    </button>
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(folder)}
+                        aria-label={`Supprimer ${folder.name}`}
+                        className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted hover:text-coral"
+                      >
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
