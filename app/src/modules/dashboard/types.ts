@@ -61,6 +61,16 @@ export function toWidgetPreferences(rows: DashboardWidgetRow[]): WidgetPreferenc
       seen.add(row.widget_type);
       return true;
     })
+    // Contrat de lecture : `visible = width > 0`. La largeur 0 n'est pas une
+    // largeur dégénérée mais l'ENCODAGE de « widget masqué » (l'écriture est
+    // dans `hooks/use-dashboard.ts` : `width: preference.visible ? 1|2 : 0`) ;
+    // l'échelle utile va de 1 à 4, `routines` occupant toute la largeur.
+    //
+    // Ce contrat répond à la contrainte serveur `check (width between 0 and 4)`
+    // posée par `supabase/migrations/0123_dashboard_widget_width_zero.sql` :
+    // la borne basse était 1, donc écrire 0 levait 23514 et le masquage
+    // échouait en silence en mode Supabase (CR-01). Changer l'encodage ici
+    // sans changer la contrainte — ou l'inverse — casserait le masquage.
     .map((row) => ({ kind: row.widget_type, visible: row.width > 0 }));
 }
 

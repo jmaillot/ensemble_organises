@@ -3,9 +3,11 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
-import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { data } from '@/lib/data';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoHousehold, demoMembers } from '@/lib/data/seed';
+import type { DashboardWidgetRow } from '@/types';
 import DashboardPage from './dashboard-page';
-import { layoutWidgets, reorderPreferences, resetPreferences, toggleWidget } from './types';
+import { layoutWidgets, reorderPreferences, resetPreferences, toWidgetPreferences, toggleWidget } from './types';
 
 describe('Accueil — preferences de widgets', () => {
   it('ordonne les widgets visibles en grille de deux colonnes', () => {
@@ -113,6 +115,53 @@ describe('Accueil — rendu', () => {
     // …et peut être réactivé depuis le panneau.
     expect(await within(panel).findByRole('button', { name: 'Masqué' })).toBeInTheDocument();
     expect(screen.getByRole('article', { name: 'Widget Tâches' })).toBeInTheDocument();
+  });
+
+  it('persiste width: 0 en masquant un widget et le relit comme masqué (CR-01)', async () => {
+    // Ce test tourne en mode démo (Dexie/IndexedDB), qui n'a NI contrainte
+    // `CHECK` NI RLS : « masquer un widget » y réussissait donc déjà avant la
+    // migration 0123 — c'est précisément pourquoi CR-01 a franchi la CI sans
+    // être vu. Ce qui est pinné ici, c'est le contrat que 0123 rend légal côté
+    // serveur : l'encodage `width: 0` (et non la suppression de la ligne) et
+    // la lecture `visible = width > 0`.
+    //
+    // Membre Thomas : les autres tests de ce fichier travaillent sur Camille,
+    // et les écritures que la page lance en « void » peuvent se poser APRÈS le
+    // nettoyage d'`afterEach`. Thomas n'a aucun widget semé, donc le panneau
+    // suit l'ordre par défaut (Calendrier en premier) et les lignes lues sont
+    // exactement celles que ce test écrit.
+    useHouseholdStore.setState({
+      householdId: DEMO_HOUSEHOLD_ID,
+      householdName: demoHousehold.name,
+      householdColor: demoHousehold.avatar_color,
+      members: demoMembers,
+      currentMemberId: DEMO_MEMBERS.thomas,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />, { withHousehold: false });
+    await screen.findByRole('heading', { level: 1, name: /Bonjour/ });
+
+    await user.click(screen.getByRole('button', { name: 'Personnaliser l’accueil' }));
+    const panel = screen.getByRole('region', { name: 'Personnalisation des widgets' });
+    // Ordre par défaut : le premier bouton « Visible » est celui du Calendrier.
+    await user.click(within(panel).getAllByRole('button', { name: 'Visible' })[0]);
+
+    const readWidgets = () =>
+      data.list<DashboardWidgetRow>('dashboard_widgets', { member_id: DEMO_MEMBERS.thomas });
+
+    await waitFor(async () => {
+      const rows = await readWidgets();
+      expect(rows.find((row) => row.widget_type === 'calendrier')?.width).toBe(0);
+    });
+
+    const rows = await readWidgets();
+    // Masqué, pas supprimé : la préférence existe toujours, une seule fois.
+    expect(rows.filter((row) => row.widget_type === 'calendrier')).toHaveLength(1);
+    // La lecture du client reste `visible = width > 0`.
+    expect(toWidgetPreferences(rows).find((preference) => preference.kind === 'calendrier')?.visible).toBe(false);
+    // Les widgets visibles, eux, gardent une largeur > 0 : la même écriture
+    // n'a pas fait basculer toute la table à 0.
+    expect(rows.find((row) => row.widget_type === 'taches')?.width).toBeGreaterThan(0);
   });
 
   it('liste les tâches du jour avec une case à cocher étiquetée', async () => {
