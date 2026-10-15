@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { data } from '@/lib/data';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
 import TachesPage from './taches-page';
@@ -125,6 +126,101 @@ describe('TachesPage — compteur À faire personnel', () => {
     await findTaskList();
     // Camille connectée : task-1 à elle, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
     expect(screen.getByText('pour moi ou sans assigné').previousSibling).toHaveTextContent('1');
+  });
+});
+
+/**
+ * WR-13 : le glisser-déposer doit changer ce que l'utilisateur voit (D-11).
+ *
+ * dnd-kit mesure pour de vrai : jsdom rend des rectangles nuls, donc aucune
+ * cible n'est désignable et le dépôt n'a lieu nulle part. Chaque ligne reçoit
+ * ici une bande verticale distincte (60 px), ce qui rend le geste clavier
+ * déterministe : Espace saisit, la flèche descend d'un cran, Espace dépose.
+ */
+const ROW_HEIGHT = 60;
+
+function stubRowRects() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function stub(this: Element) {
+    const element = this as HTMLElement;
+    const isRow = element.getAttribute('role') === 'listitem';
+    const index = element.parentElement ? Array.from(element.parentElement.children).indexOf(element) : 0;
+    const height = isRow ? ROW_HEIGHT : 600;
+    const top = isRow ? 100 + index * ROW_HEIGHT : 0;
+    return {
+      x: 0,
+      y: top,
+      width: 300,
+      height,
+      top,
+      left: 0,
+      right: 300,
+      bottom: top + height,
+      toJSON: () => ({}),
+    } as DOMRect;
+  });
+}
+
+/** Saisit la poignée, descend d'un cran, dépose. */
+async function dragDownOne(user: ReturnType<typeof userEvent.setup>, taskName: string) {
+  const grip = screen.getByRole('button', { name: `Réordonner : ${taskName}` });
+  grip.focus();
+  await user.keyboard(' ');
+  await user.keyboard('{ArrowDown}');
+  await user.keyboard(' ');
+}
+
+/** Les noms des lignes affichées, dans l'ordre où l'utilisateur les voit. */
+function visibleNames() {
+  return within(screen.getByRole('list', { name: LIST_NAME }))
+    .getAllByRole('listitem')
+    .map((row) => row.textContent ?? '');
+}
+
+describe('TachesPage — le dépôt tient la promesse du tri (WR-13, D-11)', () => {
+  it('un dépôt dans le même groupe persiste l’ordre affiché, même après le refresh', async () => {
+    stubRowRects();
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // Ordre de départ : retard épinglé, puis rangs 0 et 1.
+    expect(visibleNames().map((name) => name.slice(0, 12))).toEqual([
+      'Choisir le m',
+      'Valider les ',
+      'Ajouter le l',
+    ]);
+
+    await dragDownOne(user, 'Valider les rendez-vous du carnet');
+
+    // La ligne reste là où elle a été déposée : c'est le défaut d'origine, où
+    // le tri par échéance la ramenait sous « Ajouter le lait d'agne ».
+    await waitFor(() => {
+      expect(visibleNames()[1]).toContain('Ajouter le lait d’agne');
+      expect(visibleNames()[2]).toContain('Valider les rendez-vous du carnet');
+    });
+    expect(visibleNames()[0]).toContain('Choisir le menu du week-end');
+  });
+
+  it('refuse un dépôt qui franchit la frontière d’un groupe, sans rien écrire', async () => {
+    stubRowRects();
+    const updateSpy = vi.spyOn(data, 'update');
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // La tâche en retard (1re ligne) est déposée sur une tâche à jour : le tri
+    // la réépinglerait aussitôt, la position promise n'arriverait jamais.
+    await dragDownOne(user, 'Choisir le menu du week-end');
+
+    // Le refus est dit à l'écran, avec la frontière en cause.
+    const toastRegion = () => within(screen.getByRole('region', { name: 'Notifications de l’application' }));
+    expect(await toastRegion().findByText(/Les tâches en retard restent en tête/)).toBeInTheDocument();
+    // Aucune écriture de rang : ni par le dépôt, ni après coup.
+    expect(updateSpy.mock.calls.filter(([table]) => table === 'tasks')).toHaveLength(0);
+    // Et l'annonce lecteur d'écran ne prétend pas que la tâche a été déposée.
+    expect(screen.queryByText(/déposée à la place de/)).not.toBeInTheDocument();
+    // L'ordre affiché est inchangé.
+    expect(visibleNames()[0]).toContain('Choisir le menu du week-end');
   });
 });
 

@@ -20,7 +20,7 @@ import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
-import { memberFirstName, isOpenForMe, taskFilters, type Task } from './types';
+import { memberFirstName, isOpenForMe, taskFilters, taskGroup, type Task, type TaskGroup } from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
 import { useTaches } from './hooks/use-taches';
@@ -29,6 +29,20 @@ const screenReaderInstructions = {
   draggable:
     'Pour réordonner une tâche, appuyez sur Espace puis sur les flèches haut ou bas, puis Espace pour déposer, ou Échap pour annuler.',
 };
+
+/**
+ * Un dépôt qui franchit une frontière de groupe est refusé : c'est la frontière
+ * que `sortTasks` ne franchit jamais, donc la position promise n'arriverait pas
+ * — la ligne reviendrait à sa place juste après l'écriture (D-11). Le message
+ * nomme la frontière en cause plutôt que de laisser le geste sans réponse.
+ */
+function groupBoundaryMessage(active: TaskGroup, over: TaskGroup): string | null {
+  if (active === over) return null;
+  if (active === 'retard' || over === 'retard') {
+    return 'Les tâches en retard restent en tête ; déplacez la tâche dans son groupe.';
+  }
+  return 'Les tâches terminées restent en dernier ; déplacez la tâche dans son groupe.';
+}
 
 export default function TachesPage() {
   const toast = useToast();
@@ -110,12 +124,29 @@ export default function TachesPage() {
   const names = useRef<Map<string, string>>(new Map());
   names.current = new Map(visibleTasks.map((task) => [task.id, task.name]));
   const nameOf = (id: string | number) => names.current.get(String(id)) ?? String(id);
+
+  /**
+   * Message de refus d'un dépôt, `null` quand il est permis. Écrit une seule
+   * fois : l'annonce lecteur d'écran et l'écriture effective lisent la même
+   * décision, sans quoi elles pourraient se contredire.
+   */
+  const refusalFor = (activeId: string, overId: string): string | null => {
+    const activeTask = visibleTasks.find((task) => task.id === activeId);
+    const overTask = visibleTasks.find((task) => task.id === overId);
+    if (!activeTask || !overTask) return null;
+    return groupBoundaryMessage(taskGroup(activeTask), taskGroup(overTask));
+  };
+
   const announcements = {
     onDragStart: ({ active }: { active: { id: string | number } }) => `${nameOf(active.id)} saisie.`,
     onDragOver: ({ over }: { over: { id: string | number } | null }) =>
       over ? `Position de ${nameOf(over.id)} atteinte.` : 'Position hors liste.',
-    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-      over ? `${nameOf(active.id)} déposée à la place de ${nameOf(over.id)}.` : 'Déplacement annulé.',
+    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) => {
+      if (!over) return 'Déplacement annulé.';
+      // Un dépôt refusé ne s'annonce pas comme « déposée à la place de … » :
+      // l'annonce dit ce qui s'est réellement passé.
+      return refusalFor(String(active.id), String(over.id)) ?? `${nameOf(active.id)} déposée à la place de ${nameOf(over.id)}.`;
+    },
     onDragCancel: () => 'Déplacement annulé.',
   };
 
@@ -131,6 +162,14 @@ export default function TachesPage() {
     const from = ids.indexOf(String(active.id));
     const to = ids.indexOf(String(over.id));
     if (from < 0 || to < 0) return;
+    // Frontière de groupe : on refuse au lieu d'écrire un ordre que le
+    // `refresh()` déferait aussitôt (le dépôt n'écrit que `priority_order`,
+    // l'échéance et le retard n'en dépendent pas).
+    const refusal = refusalFor(String(active.id), String(over.id));
+    if (refusal !== null) {
+      toast(refusal, 'error');
+      return;
+    }
     const next = [...ids];
     next.splice(to, 0, next.splice(from, 1)[0]);
     void reorder(next)
