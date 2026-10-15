@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { getDaysInMonth } from 'date-fns';
 import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
 import { useSessionUser } from '@/hooks/use-auth';
@@ -328,14 +329,25 @@ export function useDashboard(): DashboardData {
 /* Utilitaires locaux                                                 */
 /* ------------------------------------------------------------------ */
 
-/** Prochain anniversaire, 29 février inclus. */
+/**
+ * Prochain anniversaire, 29 février inclus. Le jour est borné par le mois de
+ * l'année visée (`getDaysInMonth`) : un 29 février tombe sur le 28 en année non
+ * bissextile. La concaténation d'origine rendait une date qui n'existe pas,
+ * relue par `Date` comme le 1er mars (et `NaN` dans les moteurs qui la refusent) —
+ * l'écart que WR-12 décrit.
+ */
 export function nextBirthdayIso(birthDate: string, fromYear: number) {
   const [month, day] = birthDate.split('-').slice(1).map(Number);
   const today = todayIso();
-  const inThisYear = `${fromYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const inThisYear = birthdayInYear(fromYear, month, day);
   if (inThisYear >= today) return inThisYear;
-  const next = `${fromYear + 1}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  return next;
+  return birthdayInYear(fromYear + 1, month, day);
+}
+
+/** `AAAA-MM-JJ` du jour d'anniversaire, borné par la longueur réelle du mois. */
+function birthdayInYear(year: number, month: number, day: number) {
+  const bounded = Math.min(day, getDaysInMonth(new Date(year, month - 1, 1)));
+  return `${year}-${String(month).padStart(2, '0')}-${String(bounded).padStart(2, '0')}`;
 }
 
 function relativeWhen(iso: string) {
