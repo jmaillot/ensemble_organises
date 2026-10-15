@@ -33,6 +33,7 @@ import { SpendingPie } from '@/modules/ardoise/ardoise-detail-page';
 import {
   applyFreePayerShare,
   computeSpent,
+  splitEqual,
   type Expense,
   type MemberOption,
   type NewExpenseInput,
@@ -343,10 +344,22 @@ function TripGuestExpenseForm({
     const parsed = Number(amount.replace(',', '.'));
     const sharers = selectedMembers.length + selectedGuests.length;
     if (saving || title.trim() === '' || !(parsed > 0) || sharers === 0) return;
-    const share = Math.round((parsed / sharers) * 100) / 100;
+    // Partage égal par la MÊME règle que le chemin membre (D-10) : centimes
+    // entiers, reliquat absorbé par le dernier participant. Chaque part reçoit
+    // l'indice correspondant dans la liste concaténée, donc la part majorée
+    // revient à un participant réellement sélectionné.
+    const shares = splitEqual(parsed, sharers);
     const parts: TripGuestExpensePart[] = [
-      ...selectedMembers.map((memberId) => ({ participantType: 'membre' as const, memberId, shareAmount: share })),
-      ...selectedGuests.map((guestId) => ({ participantType: 'guest' as const, guestId, shareAmount: share })),
+      ...selectedMembers.map((memberId, index) => ({
+        participantType: 'membre' as const,
+        memberId,
+        shareAmount: shares[index]!,
+      })),
+      ...selectedGuests.map((guestId, index) => ({
+        participantType: 'guest' as const,
+        guestId,
+        shareAmount: shares[selectedMembers.length + index]!,
+      })),
     ];
     try {
       // Valide le libellé, le montant et les parts avant l'appel réseau.

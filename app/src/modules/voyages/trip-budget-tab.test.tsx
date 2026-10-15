@@ -15,7 +15,7 @@ import { renderWithProviders, seedHouseholdStore } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 import { guestKey, memberKey } from '@/modules/ardoise/types';
-import type { ArdoiseRow } from '@/types';
+import type { ArdoiseRow, TripGuestRow } from '@/types';
 import { TripBudgetTab } from './components/trip-budget-tab';
 import {
   fetchTripArdoise,
@@ -23,6 +23,18 @@ import {
   toTripGuestExpenseBody,
   tripTicketStorageKey,
 } from './api';
+
+/**
+ * WR-20/D-10 — la soumission invité doit répartir par `splitEqual` (le même
+ * calcul que le chemin membre). L'appel Edge est doublé pour observer les parts
+ * réellement transmises ; le reste de `./api` (validation, résolution) reste réel.
+ */
+const { createGuestExpenseMock } = vi.hoisted(() => ({ createGuestExpenseMock: vi.fn(async (_args: unknown) => ({})) }));
+
+vi.mock('./api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./api')>();
+  return { ...actual, createTripGuestExpense: createGuestExpenseMock };
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -258,5 +270,107 @@ describe('TripBudgetTab — édition et camembert (0121)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('spending-pie')).toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * WR-20 (D-10) — le partage égal invité doit suivre EXACTEMENT la règle du
+ * chemin membre : `splitEqual` (centimes entiers, reliquat absorbé par le
+ * dernier participant). Sans cela, 50 € entre 6 donnait 6 × 8,33 = 49,98, un
+ * écart d'un centime rejeté par le RPC `create_trip_guest_expense`.
+ */
+const formGuests: TripGuestRow[] = [
+  { id: 'g-ana', trip_id: 'trip-1', display_name: 'Ana', ticket_hash: null, created_at: '2027-01-01T00:00:00.000Z' },
+  { id: 'g-bruno', trip_id: 'trip-1', display_name: 'Bruno', ticket_hash: null, created_at: '2027-01-01T00:00:00.000Z' },
+  { id: 'g-chloe', trip_id: 'trip-1', display_name: 'Chloé', ticket_hash: null, created_at: '2027-01-01T00:00:00.000Z' },
+  { id: 'g-david', trip_id: 'trip-1', display_name: 'David', ticket_hash: null, created_at: '2027-01-01T00:00:00.000Z' },
+];
+
+describe('TripGuestExpenseForm — partage égal par splitEqual (WR-20, D-10)', () => {
+  function renderGuestForm() {
+    try {
+      window.localStorage.setItem(tripTicketStorageKey('trip-1'), 'ticket-brut-mamie');
+    } catch {
+      return;
+    }
+    renderWithProviders(
+      <TripBudgetTab
+        tripId="trip-1"
+        householdId={DEMO_HOUSEHOLD_ID}
+        members={tripMembers}
+        guests={formGuests}
+        currentMemberId={DEMO_MEMBERS.camille}
+      />,
+    );
+  }
+
+  async function submitGuestExpense(user: ReturnType<typeof userEvent.setup>, names: string[], amount: string) {
+    await screen.findByText('Dépense d’invité');
+    for (const name of names) {
+      await user.click(await screen.findByLabelText(`Partager avec ${name}`));
+    }
+    await user.type(screen.getByLabelText(/Libellé/), 'Marché');
+    await user.type(screen.getByLabelText(/Montant/), amount);
+    await user.click(screen.getByRole('button', { name: 'Ajouter comme invité' }));
+  }
+
+  function lastParts(): { shareAmount: number }[] {
+    const args = createGuestExpenseMock.mock.calls.at(-1)?.[0] as { parts: { shareAmount: number }[] };
+    return args.parts;
+  }
+
+  it('50 € entre 6 : la somme des parts vaut exactement 50,00 (reliquat reporté)', async () => {
+    const user = userEvent.setup();
+    renderGuestForm();
+
+    await submitGuestExpense(user, ['Camille Martin', 'Thomas Martin', 'Ana', 'Bruno', 'Chloé', 'David'], '50');
+
+    await waitFor(() => expect(createGuestExpenseMock).toHaveBeenCalled());
+    const parts = lastParts();
+    expect(parts).toHaveLength(6);
+    const sum = parts.reduce((total, part) => total + part.shareAmount, 0);
+    expect(Math.round(sum * 100) / 100).toBe(50);
+  });
+
+  it('10 € entre 3 : aucun centime non alloué', async () => {
+    const user = userEvent.setup();
+    renderGuestForm();
+
+    await submitGuestExpense(user, ['Camille Martin', 'Thomas Martin', 'Ana'], '10');
+
+    await waitFor(() => expect(createGuestExpenseMock).toHaveBeenCalled());
+    const parts = lastParts();
+    expect(parts).toHaveLength(3);
+    const sum = parts.reduce((total, part) => total + part.shareAmount, 0);
+    expect(Math.round(sum * 100) / 100).toBe(10);
+  });
+
+  it('cas mixte membres + invités : somme = montant, reliquat au dernier participant', async () => {
+    const user = userEvent.setup();
+    renderGuestForm();
+
+    await submitGuestExpense(user, ['Camille Martin', 'Thomas Martin', 'Ana'], '25');
+
+    await waitFor(() => expect(createGuestExpenseMock).toHaveBeenCalled());
+    const parts = lastParts();
+    expect(parts).toHaveLength(3);
+    // L'indice suit la liste concaténée : le reliquat revient à l'invité
+    // sélectionné, jamais à un index hors liste.
+    expect(parts[0].shareAmount).toBe(8.33);
+    expect(parts[1].shareAmount).toBe(8.33);
+    expect(parts[2].shareAmount).toBe(8.34);
+    const sum = parts.reduce((total, part) => total + part.shareAmount, 0);
+    expect(Math.round(sum * 100) / 100).toBe(25);
+  });
+
+  it('montant indivisible (0,01 € entre 2) : refusé par la validation, aucune part inventée', async () => {
+    const user = userEvent.setup();
+    createGuestExpenseMock.mockClear();
+    renderGuestForm();
+
+    await submitGuestExpense(user, ['Camille Martin', 'Thomas Martin'], '0,01');
+
+    expect(await screen.findByText('Part invalide.')).toBeInTheDocument();
+    expect(createGuestExpenseMock).not.toHaveBeenCalled();
   });
 });
