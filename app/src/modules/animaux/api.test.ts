@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
-import { createPet, createPetAttachment, depositPetPhoto, removePet, updatePet, updatePetRecord } from './api';
+import { createPet, createPetAttachment, depositPetPhoto, removePet, removePetAttachment, updatePet, updatePetRecord } from './api';
 import { isLegacySummaryRow, petSummaryOf, toPet, toPetAttachment, toPetRecord } from './types';
 
-const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl } = vi.hoisted(() => {
+const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl, mockRemoveFile } = vi.hoisted(() => {
   const mockCreate = vi.fn(async (_table: string, values: Record<string, unknown>) => ({
     id: 'pet-echo',
     household_id: 'hh-1',
@@ -16,7 +16,7 @@ const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDepos
     created_at: '2026-10-12T00:00:00Z',
     ...values,
   }));
-  const mockList = vi.fn(async () => []);
+  const mockList = vi.fn(async (_table?: string, _filter?: Record<string, unknown>): Promise<unknown[]> => []);
   const mockRemove = vi.fn(async () => {});
   const mockRemoveWhere = vi.fn(async () => {});
   // Dépôt simulé : le Storage rend une URL signée éphémère par ailleurs, mais la
@@ -30,7 +30,10 @@ const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDepos
   }));
   // Témoin : l'écriture ne signe jamais elle-même (WR-08).
   const mockCreateSignedUrl = vi.fn(async () => ({ data: { signedUrl: 'https://signe.example/x.jpg' }, error: null }));
-  return { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl };
+  // Témoin du retrait d'objet (D-03, WR-10) : c'est le chemin réellement
+  // transmis au Storage qui est observé, pas l'intention de l'appelant.
+  const mockRemoveFile = vi.fn(async () => ({ data: [], error: null }));
+  return { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl, mockRemoveFile };
 });
 
 vi.mock('@/lib/data', async (importOriginal) => {
@@ -54,7 +57,11 @@ vi.mock('@/lib/storage', async (importOriginal) => {
 
 vi.mock('@/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
-  supabase: { storage: { from: () => ({ createSignedUrl: mockCreateSignedUrl, upload: vi.fn() }) } },
+  supabase: {
+    storage: {
+      from: () => ({ createSignedUrl: mockCreateSignedUrl, upload: vi.fn(), remove: mockRemoveFile }),
+    },
+  },
 }));
 
 beforeEach(() => {
@@ -236,5 +243,101 @@ describe('toPet / toPetAttachment — chemin résolu à la lecture (D-01)', () =
       'https://signe.example/ordonnance.pdf',
     );
     expect(toPetAttachment(attachmentRow(), {}).url).toBeNull();
+  });
+});
+
+/**
+ * D-03, WR-10 — « la ligne et son objet meurent ensemble ». Les objets du bucket
+ * suivent la vie de leur ligne : suppression de fiche (portrait ET documents),
+ * remplacement de portrait, suppression d'une pièce jointe. L'ordre est imposé :
+ * la ligne part d'abord, l'objet ensuite.
+ */
+describe('suppression compensée — les objets suivent leurs lignes (D-03, WR-10)', () => {
+  const PET_PORTRAIT = 'hh-1/pets/pet-1/portrait.jpg';
+  const DOCUMENT = 'hh-1/pets/pet-1/ordonnance.pdf';
+
+  const servingRows = (tables: Record<string, unknown[]>) =>
+    mockList.mockImplementation(async (table?: string) => tables[table ?? ''] ?? []);
+
+  beforeEach(() => {
+    mockList.mockImplementation(async () => []);
+  });
+
+  it('removePet retire le portrait ET chaque document, après les lignes', async () => {
+    servingRows({
+      pets: [{ id: 'pet-1', household_id: 'hh-1', photo_url: PET_PORTRAIT }],
+      pet_attachments: [
+        { id: 'att-1', pet_id: 'pet-1', household_id: 'hh-1', file_url: DOCUMENT },
+        { id: 'att-2', pet_id: 'pet-1', household_id: 'hh-1', file_url: 'hh-1/pets/pet-1/carnet.pdf' },
+      ],
+    });
+
+    await removePet('pet-1');
+
+    // Le portrait et les deux documents partent du volume.
+    expect(mockRemoveFile).toHaveBeenCalledTimes(3);
+    expect(mockRemoveFile).toHaveBeenCalledWith([PET_PORTRAIT]);
+    expect(mockRemoveFile).toHaveBeenCalledWith([DOCUMENT]);
+    expect(mockRemoveFile).toHaveBeenCalledWith(['hh-1/pets/pet-1/carnet.pdf']);
+    // D-03 : la ligne part d'abord, l'objet ensuite.
+    expect(mockRemove.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRemoveFile.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('removePet d’une fiche nue ne déclenche aucun retrait d’objet', async () => {
+    servingRows({ pets: [], pet_attachments: [] });
+
+    await removePet('pet-1');
+
+    expect(mockRemoveFile).not.toHaveBeenCalled();
+    expect(mockRemove).toHaveBeenCalledWith('pets', 'pet-1');
+  });
+
+  it('removePet ignore une URL signée héritée (pas un objet de bucket)', async () => {
+    servingRows({
+      pets: [{ id: 'pet-1', household_id: 'hh-1', photo_url: 'https://signe.example/portrait.jpg?token=x' }],
+      pet_attachments: [],
+    });
+
+    await removePet('pet-1');
+
+    expect(mockRemoveFile).not.toHaveBeenCalled();
+  });
+
+  it('depositPetPhoto retire l’ancien portrait quand il en remplace un', async () => {
+    servingRows({ pets: [{ id: 'pet-1', household_id: 'hh-1', photo_url: PET_PORTRAIT }] });
+
+    const stored = await depositPetPhoto('hh-1', 'pet-1', new File(['x'], 'nouveau.jpg', { type: 'image/jpeg' }));
+
+    expect(stored).toBe('hh-1/pets/pet-1/file_abc.jpg');
+    expect(mockRemoveFile).toHaveBeenCalledTimes(1);
+    expect(mockRemoveFile).toHaveBeenCalledWith([PET_PORTRAIT]);
+    // L'écriture précède le retrait : la colonne pointe déjà vers le neuf.
+    expect(mockUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRemoveFile.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('depositPetPhoto sans changement de valeur ne retire rien', async () => {
+    // Le dépôt simulé rend toujours `hh-1/pets/pet-1/file_abc.jpg` : la valeur
+    // précédente est identique, donc il n'y a pas d'ancien objet à retirer.
+    servingRows({ pets: [{ id: 'pet-1', household_id: 'hh-1', photo_url: 'hh-1/pets/pet-1/file_abc.jpg' }] });
+
+    await depositPetPhoto('hh-1', 'pet-1', new File(['x'], 'nouveau.jpg', { type: 'image/jpeg' }));
+
+    expect(mockRemoveFile).not.toHaveBeenCalled();
+  });
+
+  it('removePetAttachment retire l’objet de la pièce jointe, après sa ligne', async () => {
+    servingRows({ pet_attachments: [{ id: 'att-1', pet_id: 'pet-1', household_id: 'hh-1', file_url: DOCUMENT }] });
+
+    await removePetAttachment('att-1');
+
+    expect(mockRemove).toHaveBeenCalledWith('pet_attachments', 'att-1');
+    expect(mockRemoveFile).toHaveBeenCalledWith([DOCUMENT]);
+    expect(mockRemove.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRemoveFile.mock.invocationCallOrder[0],
+    );
   });
 });
