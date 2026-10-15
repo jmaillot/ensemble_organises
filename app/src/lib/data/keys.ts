@@ -2,9 +2,15 @@ import type { Row } from '@/types';
 
 /**
  * Tables de jointure dépourvues de colonne `id` : leur clé est composite
- * (colonnes parentes). Aucun identifiant ne doit être injecté à l'écriture.
+ * (colonnes parentes). La règle tient en une ligne — **table de jointure ⇒ clé
+ * composite ⇒ aucun `id` injecté** — et `keys.test.ts` la rapproche des
+ * migrations dans les deux sens.
+ *
+ * WR-03 : `ardoise_members` portait une clé composite `(ardoise_id, member_id)`
+ * et manquait ici ; l'adaptateur y injectait un `id` inexistant, PostgREST
+ * rejetait l'insertion, et le repli silencieux de l'appelant masquait l'échec.
  */
-export const KEYLESS_TABLES = new Set(['task_assignees', 'routine_assignees', 'conversation_members', 'trip_members', 'recipe_tag_links', 'recipe_favorites']);
+export const KEYLESS_TABLES = new Set(['task_assignees', 'routine_assignees', 'conversation_members', 'trip_members', 'recipe_tag_links', 'recipe_favorites', 'ardoise_members']);
 
 export const isKeylessTable = (table: string) => KEYLESS_TABLES.has(table);
 

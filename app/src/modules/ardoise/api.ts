@@ -156,7 +156,9 @@ export async function createArdoise(householdId: string, input: NewArdoiseInput)
     description: input.description?.trim() || null,
     cover_url: input.coverUrl ?? null,
   });
-  // Seed local : les écrivains du foyer (même règle que le serveur).
+  // Seed local : les écrivains du foyer (même règle que le serveur). Aucun
+  // repli silencieux : `ardoise_members` est sans `id` (KEYLESS_TABLES) et un
+  // échec Dexie doit être vu, pas avalé (WR-03).
   const members = await data.list<HouseholdMemberRow>('household_members', { household_id: householdId }).catch(() => []);
   const wanted = input.memberIds === undefined ? null : new Set(input.memberIds);
   await Promise.all(
@@ -164,7 +166,7 @@ export async function createArdoise(householdId: string, input: NewArdoiseInput)
       .filter((member) => member.role === 'admin' || member.role === 'membre')
       .filter((member) => (wanted === null ? true : wanted.has(member.id)))
       .map((member) =>
-        data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: created.id, member_id: member.id }).catch(() => undefined),
+        data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: created.id, member_id: member.id }),
       ),
   );
   return created;
@@ -190,17 +192,23 @@ export async function fetchArdoiseMemberIds(ardoiseId: string): Promise<string[]
 
 /**
  * Ajout ultérieur de membres (admin du foyer : politique
- * `ardoise_members_admin`, doublons ignorés).
+ * `ardoise_members_admin`, doublons ignorés). Un refus résiduel remonte :
+ * l'action utilisateur ne se présente plus comme réussie quand rien n'a été
+ * écrit (WR-03).
  */
 export async function addArdoiseMembers(ardoiseId: string, memberIds: string[]): Promise<void> {
   await Promise.all(
     memberIds.map((memberId) =>
-      data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }).catch(() => undefined),
+      data.create<ArdoiseMemberRow>('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }),
     ),
   );
 }
 
-/** Retrait d'un membre (l'historique — dépenses, parts — est conservé). */
+/**
+ * Retrait d'un membre (l'historique — dépenses, parts — est conservé). L'appel
+ * est désormais **bruyant** : `removeWhere` lève si aucune ligne n'est retirée,
+ * donc un refus RLS ne passe plus pour un succès.
+ */
 export async function removeArdoiseMember(ardoiseId: string, memberId: string): Promise<void> {
   await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId });
 }
