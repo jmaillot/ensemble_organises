@@ -290,6 +290,56 @@ describe('CalendrierPage', () => {
     expect(screen.queryAllByRole('button', { name: 'Ajouter une tâche' })).toEqual([]);
   });
 
+  it('borne aussi l’édition des événements existants pour un enfant (D-13)', async () => {
+    const user = userEvent.setup();
+    await data.create('events', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      title: 'Réunion parents',
+      description: null,
+      start_at: `${today}T18:00:00`,
+      end_at: `${today}T19:00:00`,
+      all_day: false,
+      location: null,
+      color: 'accent',
+      category_id: null,
+      calendar_id: 'calendar-commun',
+      created_by: DEMO_MEMBERS.camille,
+    } as never);
+
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    // Admin d'abord : sans ce versant, l'assertion négative de l'enfant serait
+    // un test qui ne peut pas échouer pour la bonne raison.
+    expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
+
+    // La liste des 30 jours est la seconde surface de l'agenda : même garde.
+    await user.click(screen.getByRole('tab', { name: 'Liste' }));
+    expect(await screen.findByRole('button', { name: 'Modifier Réunion parents' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Supprimer Réunion parents' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Mois' }));
+
+    act(() => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+    });
+
+    // Agenda du jour : plus aucune action d'édition ou de suppression.
+    expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
+    expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
+    // Les tâches restent consultables : seul l'événement perd ses commandes.
+    expect(
+      screen.getByRole('button', { name: 'Ouvrir Choisir le menu du week-end dans les tâches' }),
+    ).toBeInTheDocument();
+
+    // Liste des 30 jours : idem, la seconde surface tient le même garde.
+    await user.click(screen.getByRole('tab', { name: 'Liste' }));
+    expect(await screen.findByRole('button', { name: /Ouvrir Choisir le menu du week-end dans les tâches/ })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /^Modifier / })).toEqual([]);
+    expect(screen.queryAllByRole('button', { name: /^Supprimer Réunion parents/ })).toEqual([]);
+
+    await user.click(screen.getByRole('tab', { name: 'Mois' }));
+  });
+
   it('colore la pastille du jour avec la catégorie, couleur membre inchangée (D-07)', async () => {
     await data.create('events', {
       household_id: DEMO_HOUSEHOLD_ID,
