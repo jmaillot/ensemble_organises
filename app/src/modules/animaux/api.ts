@@ -1,6 +1,6 @@
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, storedValueOf } from '@/lib/storage';
 import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
 import type { PetDraft, PetRecordDraft } from './types';
 
@@ -71,8 +71,11 @@ export async function removePetRecord(id: string): Promise<void> {
  */
 export async function depositPetPhoto(householdId: string, petId: string, file: File): Promise<string> {
   const deposited = await depositHouseholdFile({ householdId, folder: `pets/${petId}`, file });
-  await data.update<PetRow>('pets', petId, { photo_url: deposited.url });
-  return deposited.url;
+  // D-01, WR-08 : la colonne porte le CHEMIN du bucket, jamais l'URL signée
+  // (éphémère, inexploitable après expiration).
+  const stored = storedValueOf(deposited);
+  await data.update<PetRow>('pets', petId, { photo_url: stored });
+  return stored;
 }
 
 export async function createPetAttachment(
@@ -85,7 +88,8 @@ export async function createPetAttachment(
     id: randomId('pet-attachment'),
     pet_id: petId,
     household_id: householdId,
-    file_url: deposited.url,
+    // D-01, WR-08 : chemin du bucket dans `file_url`, l'URL se forge à la lecture.
+    file_url: storedValueOf(deposited),
     file_name: deposited.name,
     mime_type: deposited.mime,
     size_bytes: deposited.size,

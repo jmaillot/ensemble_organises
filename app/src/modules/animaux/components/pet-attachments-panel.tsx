@@ -77,7 +77,7 @@ export function PetAttachmentsPanel({
               key={attachment.id}
               className="flex items-center gap-3 rounded-[11px] bg-bg px-3 py-2.5"
             >
-              {isImageMime(attachment.mime) ? (
+              {isImageMime(attachment.mime) && attachment.url ? (
                 <img
                   src={attachment.url}
                   alt={`Aperçu de ${attachment.fileName}`}
@@ -92,15 +92,17 @@ export function PetAttachmentsPanel({
                 <strong className="block truncate text-xs">{attachment.fileName}</strong>
                 <small className="text-[11px] text-muted">{formatBytes(attachment.size)}</small>
               </span>
-              <a
-                href={attachment.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong"
-                aria-label={`Ouvrir ${attachment.fileName}`}
-              >
-                <Icon name="link" size="sm" />
-              </a>
+              {attachment.url ? (
+                <a
+                  href={attachment.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong"
+                  aria-label={`Ouvrir ${attachment.fileName}`}
+                >
+                  <Icon name="link" size="sm" />
+                </a>
+              ) : null}
               {onDelete ? (
                 <Button
                   variant="ghost"

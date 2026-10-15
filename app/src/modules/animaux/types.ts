@@ -1,5 +1,6 @@
 import type { IconName } from '@/components/shared/icon';
 import { daysBetween, todayIso } from '@/lib/utils';
+import { displayablePhoto } from '@/modules/anniversaires/types';
 import type { PetAttachmentRow, PetRecordRow, PetRecordType, PetRow } from '@/types';
 
 /** Espèces proposées par le formulaire, dans l'ordre de l'export de design. */
@@ -41,7 +42,14 @@ export interface Pet {
   weightKg: number | null;
   birthDate: string | null;
   identificationNumber: string | null;
+  /** Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01). */
   photoUrl: string | null;
+  /**
+   * Valeur de la colonne `photo_url` (chemin du bucket, URL héritée sinon) :
+   * seule grandeur comparable d'une édition à l'autre, donc celle que le
+   * formulaire transporte quand la photo n'est pas retouchée (D-01, WR-08).
+   */
+  photoStored: string | null;
   /** Informations libres de la fiche (`pets.notes`, 0111). */
   notes: string | null;
   /** Prochain rappel de la fiche (`pets.next_reminder_date`, 0111). */
@@ -63,7 +71,7 @@ export interface PetDraft {
   nextReminderDate: string | null;
 }
 
-export function toPet(row: PetRow): Pet {
+export function toPet(row: PetRow, resolved: Record<string, string> = {}): Pet {
   return {
     id: row.id,
     name: row.name,
@@ -72,7 +80,10 @@ export function toPet(row: PetRow): Pet {
     weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
     birthDate: row.birth_date,
     identificationNumber: row.identification_number,
-    photoUrl: row.photo_url,
+    // D-01 : un chemin se forge à la lecture (échec fermé), une forme
+    // non-chemin (URL externe héritée) se rend telle quelle.
+    photoUrl: displayablePhoto(row.photo_url, resolved, row.id),
+    photoStored: row.photo_url,
     notes: row.notes,
     nextReminderDate: row.next_reminder_date,
     createdAt: row.created_at,
@@ -182,18 +193,22 @@ export function petSummaryOf(pet: Pet | null): PetSummary {
 export interface PetAttachment {
   id: string;
   petId: string;
-  url: string;
+  /**
+   * Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01).
+   * `null` en échec fermé — jamais le chemin brut, jamais un lien mort.
+   */
+  url: string | null;
   fileName: string;
   mime: string;
   size: number;
   createdAt: string;
 }
 
-export function toPetAttachment(row: PetAttachmentRow): PetAttachment {
+export function toPetAttachment(row: PetAttachmentRow, resolved: Record<string, string> = {}): PetAttachment {
   return {
     id: row.id,
     petId: row.pet_id,
-    url: row.file_url,
+    url: displayablePhoto(row.file_url, resolved, row.id),
     fileName: row.file_name,
     mime: row.mime_type,
     size: row.size_bytes,

@@ -31,7 +31,7 @@ const schema = z.object({
 
 type PetFormValues = z.infer<typeof schema>;
 
-function toDraft(values: PetFormValues, currentPhotoUrl: string | null, photoFile: File | null): PetDraft {
+function toDraft(values: PetFormValues, photoStored: string | null, photoFile: File | null): PetDraft {
   return {
     name: values.name,
     species: values.species,
@@ -39,7 +39,11 @@ function toDraft(values: PetFormValues, currentPhotoUrl: string | null, photoFil
     weightKg: values.weightKg ? Number(values.weightKg) : null,
     birthDate: values.birthDate || null,
     identificationNumber: values.identificationNumber || null,
-    photoUrl: currentPhotoUrl,
+    // Valeur de COLONNE (chemin du bucket, URL héritée sinon), jamais l'URL
+    // affichée : éditer sans retoucher la photo doit renvoyer la même référence
+    // durable. Re-soumettre `photoUrl` (résolue à la lecture) persisterait une
+    // URL signée éphémère (D-01, WR-08).
+    photoUrl: photoStored,
     photoFile,
     notes: values.notes || null,
     nextReminderDate: values.nextReminderDate || null,
@@ -175,7 +179,7 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
             Les informations de santé et de suivi restent accessibles au foyer.
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3.5" noValidate onSubmit={handleSubmit((values) => onSubmit(toDraft(values, pet?.photoUrl ?? null, photoFile)))}>
+        <form className="grid gap-3.5" noValidate onSubmit={handleSubmit((values) => onSubmit(toDraft(values, pet?.photoStored ?? null, photoFile)))}>
           <FormSection title="Identité" description="Le minimum pour reconnaître l’animal dans le foyer.">
             <Field label="Nom" error={errors.name?.message}>
               {(props) => <Input placeholder="Ex. Nala" {...props} {...register('name')} />}

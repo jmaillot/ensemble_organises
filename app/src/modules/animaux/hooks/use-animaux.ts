@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { useResource } from '@/lib/data/useResource';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useHouseholdStore } from '@/stores/household-store';
 import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
 import {
@@ -55,9 +56,29 @@ export function usePets(): UsePetsResult {
   const resource = useResource<PetRow>('pets');
   const queryClient = useQueryClient();
 
+  // Les lignes portent des chemins (D-01) : on forge les portraits affichables
+  // à la lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
+  // formes non-chemin (aperçus démo, http(s)/`data:` hérités) rendent en
+  // synchrone — aucun rendu ajouté ; seuls les chemins passent par l'effet.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const petRows = resource.rows;
+  useEffect(() => {
+    const pending = petRows
+      .filter((row) => row.photo_url !== null && isHouseholdMediaPath(row.photo_url))
+      .map((row) => ({ id: row.id, file_url: row.photo_url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [petRows]);
+
   const pets = useMemo(
-    () => resource.rows.map(toPet).sort((left, right) => left.name.localeCompare(right.name, 'fr')),
-    [resource.rows],
+    () => resource.rows.map((row) => toPet(row, photoUrls)).sort((left, right) => left.name.localeCompare(right.name, 'fr')),
+    [resource.rows, photoUrls],
   );
 
   const invalidate = useCallback(async () => {
@@ -69,8 +90,12 @@ export function usePets(): UsePetsResult {
   // reste en renfort.
   useEffect(() => data.subscribe('pets', () => void invalidate()), [invalidate]);
 
-  const savePet = useCallback(
-    async (id: string | null, draft: PetDraft) => {
+  // D-09 : les écritures passent par les mutations du hook (et non plus par
+  // `../api` en direct) pour que `isMutating` dise la vérité pendant l'envoi —
+  // `resource.isMutating` ne bouge jamais, puisque rien n'y passe par ses propres
+  // mutations. C'est ce qui rend `saving` réel dans `animaux-page.tsx:365`.
+  const saveMutation = useMutation({
+    mutationFn: async ({ id, draft }: { id: string | null; draft: PetDraft }) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
       const { photoFile, ...values } = draft;
       const saved = id ? await updatePet(id, values) : await createPet(householdId, values);
@@ -89,16 +114,14 @@ export function usePets(): UsePetsResult {
       // `pets.next_reminder_date`, 0111) : plus de ligne magique.
       await invalidate();
     },
-    [householdId, invalidate],
-  );
+  });
 
-  const deletePet = useCallback(
-    async (id: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       await removePetRow(id);
       await invalidate();
     },
-    [invalidate],
-  );
+  });
 
   return {
     pets,
@@ -106,9 +129,9 @@ export function usePets(): UsePetsResult {
     isError: resource.isError,
     error: resource.error,
     refetch: resource.refetch,
-    isMutating: resource.isMutating,
-    savePet,
-    deletePet,
+    isMutating: saveMutation.isPending || deleteMutation.isPending,
+    savePet: (id, draft) => saveMutation.mutateAsync({ id, draft }),
+    deletePet: (id) => deleteMutation.mutateAsync(id),
   };
 }
 
@@ -154,23 +177,22 @@ export function usePetRecords(petId: string | null): UsePetRecordsResult {
   // sans rechargement manuel ; l'invalidation apres mutation reste en renfort.
   useEffect(() => data.subscribe('pet_records', () => void invalidate()), [invalidate]);
 
-  const saveRecord = useCallback(
-    async (id: string | null, draft: PetRecordDraft) => {
+  // D-09 : mêmes mutations que `usePets`, pour que `isMutating` du carnet soit vrai.
+  const saveMutation = useMutation({
+    mutationFn: async ({ id, draft }: { id: string | null; draft: PetRecordDraft }) => {
       if (!petId) throw new Error('Aucun animal sélectionné.');
       if (id) await updatePetRecord(id, draft);
       else if (householdId) await createPetRecord(householdId, petId, draft);
       await invalidate();
     },
-    [householdId, invalidate, petId],
-  );
+  });
 
-  const deleteRecord = useCallback(
-    async (id: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       await removePetRecordRow(id);
       await invalidate();
     },
-    [invalidate],
-  );
+  });
 
   return {
     records,
@@ -178,9 +200,9 @@ export function usePetRecords(petId: string | null): UsePetRecordsResult {
     isError: resource.isError,
     error: resource.error,
     refetch: resource.refetch,
-    isMutating: resource.isMutating,
-    saveRecord,
-    deleteRecord,
+    isMutating: saveMutation.isPending || deleteMutation.isPending,
+    saveRecord: (id, draft) => saveMutation.mutateAsync({ id, draft }),
+    deleteRecord: (id) => deleteMutation.mutateAsync(id),
   };
 }
 
@@ -199,40 +221,68 @@ export function usePetAttachments(petId: string | null): UsePetAttachmentsResult
   const resource = useResource<PetAttachmentRow>('pet_attachments', { filter, enabled: Boolean(petId) });
   const queryClient = useQueryClient();
 
+  // Les pièces jointes portent des chemins (D-01) : on forge les URL affichables
+  // à la lecture, en échec fermé (annulation stricte, jamais d'état éventé).
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const attachmentRows = resource.rows;
+  useEffect(() => {
+    const pending = attachmentRows
+      .filter((row) => isHouseholdMediaPath(row.file_url))
+      .map((row) => ({ id: row.id, file_url: row.file_url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setAttachmentUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentRows]);
+
   const attachments = useMemo(
-    () => resource.rows.map(toPetAttachment).sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    [resource.rows],
+    () => resource.rows.map((row) => toPetAttachment(row, attachmentUrls)).sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [resource.rows, attachmentUrls],
   );
 
   const invalidate = useCallback(async () => {
     await invalidateTables(queryClient, ['pet_attachments']);
   }, [queryClient]);
 
-  const addFiles = useCallback(
-    async (files: File[]) => {
+  // D-09 : un envoi partiel se dit partiel. On tente TOUS les fichiers, on
+  // rafraîchit la liste dans tous les cas (les fichiers valides restent
+  // visibles), puis on remonte le nombre d'échecs — jamais un échec total
+  // trompeur, jamais une liste laissée périmée.
+  const addMutation = useMutation({
+    mutationFn: async (files: File[]) => {
       if (!petId) throw new Error('Aucun animal sélectionné.');
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      const failures: unknown[] = [];
       for (const file of files) {
-        await createPetAttachment(householdId, petId, file);
+        try {
+          await createPetAttachment(householdId, petId, file);
+        } catch (error) {
+          failures.push(error);
+        }
       }
       await invalidate();
+      if (failures.length > 0) {
+        throw new Error(`${failures.length} pièce(s) jointe(s) sur ${files.length} n’ont pas pu être envoyées.`);
+      }
     },
-    [householdId, invalidate, petId],
-  );
+  });
 
-  const removeAttachment = useCallback(
-    async (id: string) => {
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
       await removePetAttachmentRow(id);
       await invalidate();
     },
-    [invalidate],
-  );
+  });
 
   return {
     attachments,
     isLoading: resource.isLoading,
-    isMutating: resource.isMutating,
-    addFiles,
-    removeAttachment,
+    isMutating: addMutation.isPending || removeMutation.isPending,
+    addFiles: (files) => addMutation.mutateAsync(files),
+    removeAttachment: (id) => removeMutation.mutateAsync(id),
   };
 }

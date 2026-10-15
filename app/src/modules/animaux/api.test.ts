@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PetRecordRow, PetRow } from '@/types';
-import { createPet, removePet, updatePet, updatePetRecord } from './api';
-import { isLegacySummaryRow, petSummaryOf, toPet, toPetRecord } from './types';
+import type { PetAttachmentRow, PetRecordRow, PetRow } from '@/types';
+import { createPet, createPetAttachment, depositPetPhoto, removePet, updatePet, updatePetRecord } from './api';
+import { isLegacySummaryRow, petSummaryOf, toPet, toPetAttachment, toPetRecord } from './types';
 
-const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere } = vi.hoisted(() => {
+const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl } = vi.hoisted(() => {
   const mockCreate = vi.fn(async (_table: string, values: Record<string, unknown>) => ({
     id: 'pet-echo',
     household_id: 'hh-1',
@@ -19,7 +19,18 @@ const { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere } = vi.hoi
   const mockList = vi.fn(async () => []);
   const mockRemove = vi.fn(async () => {});
   const mockRemoveWhere = vi.fn(async () => {});
-  return { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere };
+  // Dépôt simulé : le Storage rend une URL signée éphémère par ailleurs, mais la
+  // colonne doit recevoir le CHEMIN (`path`) — c'est `storedValueOf` qui tranche.
+  const mockDeposit = vi.fn(async () => ({
+    url: 'https://signe.example/ordonnance.jpg',
+    path: 'hh-1/pets/pet-1/file_abc.jpg',
+    name: 'ordonnance.jpg',
+    mime: 'image/jpeg',
+    size: 2048,
+  }));
+  // Témoin : l'écriture ne signe jamais elle-même (WR-08).
+  const mockCreateSignedUrl = vi.fn(async () => ({ data: { signedUrl: 'https://signe.example/x.jpg' }, error: null }));
+  return { mockCreate, mockUpdate, mockList, mockRemove, mockRemoveWhere, mockDeposit, mockCreateSignedUrl };
 });
 
 vi.mock('@/lib/data', async (importOriginal) => {
@@ -35,6 +46,16 @@ vi.mock('@/lib/data', async (importOriginal) => {
     },
   };
 });
+
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storage')>();
+  return { ...actual, depositHouseholdFile: mockDeposit };
+});
+
+vi.mock('@/lib/supabase/client', () => ({
+  isSupabaseConfigured: true,
+  supabase: { storage: { from: () => ({ createSignedUrl: mockCreateSignedUrl, upload: vi.fn() }) } },
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -127,5 +148,93 @@ describe('animaux api (D-10)', () => {
 
     expect(mockRemoveWhere).toHaveBeenCalledWith('pet_records', { pet_id: 'pet-1' }, { ifMissing: 'ignore' });
     expect(mockRemove).toHaveBeenCalledWith('pets', 'pet-1');
+  });
+});
+
+/**
+ * D-01, WR-08 : les colonnes média d'Animaux portent le CHEMIN du bucket, jamais
+ * l'URL signée éphémère que le dépôt rend par ailleurs — et l'écriture ne signe
+ * rien elle-même (la signature n'existe qu'à la lecture).
+ */
+describe('dépôt média — le chemin part en colonne (D-01, WR-08)', () => {
+  it('depositPetPhoto écrit le chemin dans `pets.photo_url` et le rend', async () => {
+    const stored = await depositPetPhoto('hh-1', 'pet-1', new File(['x'], 'ordonnance.jpg', { type: 'image/jpeg' }));
+
+    expect(stored).toBe('hh-1/pets/pet-1/file_abc.jpg');
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const [table, id, values] = mockUpdate.mock.calls[0] as [string, string, Record<string, unknown>];
+    expect(table).toBe('pets');
+    expect(id).toBe('pet-1');
+    expect(values.photo_url).toBe('hh-1/pets/pet-1/file_abc.jpg');
+    expect(String(values.photo_url)).not.toMatch(/^https?:/);
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('createPetAttachment écrit le chemin dans `pet_attachments.file_url`', async () => {
+    await createPetAttachment('hh-1', 'pet-1', new File(['x'], 'ordonnance.jpg', { type: 'image/jpeg' }));
+
+    const [table, values] = mockCreate.mock.calls[0] as [string, Record<string, unknown>];
+    expect(table).toBe('pet_attachments');
+    expect(values.file_url).toBe('hh-1/pets/pet-1/file_abc.jpg');
+    expect(String(values.file_url)).not.toMatch(/^https?:/);
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * D-01 : la lecture forge l'URL affichable depuis le chemin, en échec fermé —
+ * le DOM ne reçoit jamais un chemin brut (lien mort) ni une URL éphémère
+ * persistée. La valeur de colonne reste disponible pour l'édition (`photoStored`).
+ */
+describe('toPet / toPetAttachment — chemin résolu à la lecture (D-01)', () => {
+  const petRow = (overrides: Partial<PetRow> = {}): PetRow => ({
+    id: 'pet-1',
+    household_id: 'hh-1',
+    name: 'Nala',
+    species: 'Chien',
+    breed: null,
+    weight_kg: null,
+    birth_date: null,
+    identification_number: null,
+    photo_url: 'hh-1/pets/pet-1/x.jpg',
+    notes: null,
+    next_reminder_date: null,
+    created_at: '2026-10-12T00:00:00Z',
+    ...overrides,
+  });
+
+  const attachmentRow = (overrides: Partial<PetAttachmentRow> = {}): PetAttachmentRow => ({
+    id: 'att-1',
+    pet_id: 'pet-1',
+    household_id: 'hh-1',
+    file_url: 'hh-1/pets/pet-1/ordonnance.pdf',
+    file_name: 'ordonnance.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 2048,
+    created_at: '2026-10-12T00:00:00Z',
+    ...overrides,
+  });
+
+  it('résout un portrait et conserve la valeur de colonne comme `photoStored`', () => {
+    const pet = toPet(petRow(), { 'pet-1': 'https://signe.example/x.jpg' });
+
+    expect(pet.photoUrl).toBe('https://signe.example/x.jpg');
+    expect(pet.photoStored).toBe('hh-1/pets/pet-1/x.jpg');
+  });
+
+  it('rend `null` pour un chemin non résolu (échec fermé, jamais le chemin brut)', () => {
+    expect(toPet(petRow(), {}).photoUrl).toBeNull();
+  });
+
+  it('rend telle quelle une forme non-chemin (URL externe héritée, jamais re-signée)', () => {
+    const pet = toPet(petRow({ photo_url: 'https://externe.example/x.jpg' }), {});
+    expect(pet.photoUrl).toBe('https://externe.example/x.jpg');
+  });
+
+  it('résout l’URL d’une pièce jointe, `null` en échec fermé', () => {
+    expect(toPetAttachment(attachmentRow(), { 'att-1': 'https://signe.example/ordonnance.pdf' }).url).toBe(
+      'https://signe.example/ordonnance.pdf',
+    );
+    expect(toPetAttachment(attachmentRow(), {}).url).toBeNull();
   });
 });
