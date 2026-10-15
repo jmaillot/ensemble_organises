@@ -1,6 +1,6 @@
 import { getDatabase, type StoredRow } from './dexie';
 import { seedRows, DEMO_HOUSEHOLD_ID } from './seed';
-import { DataError, type DataAdapter } from './adapter';
+import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable, rowKey } from './keys';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
@@ -155,18 +155,33 @@ export class LocalAdapter implements DataAdapter {
     return row;
   }
 
-  async remove(table: string, id: string) {
+  /**
+   * Le mode démo doit se comporter comme le serveur : une ligne absente est
+   * un échec bruyant, pas une réussite muette. Sans cette symétrie, le défaut
+   * resterait invisible en CI — Vitest tourne en Dexie, sans RLS (constat
+   * structurel de la phase).
+   */
+  async remove(table: string, id: string, options?: RemoveOptions) {
     await this.ensureSeeded();
-    await getDatabase().rows.delete(rowKey(table, { id }));
+    const db = getDatabase();
+    const key = rowKey(table, { id });
+    const existing = await db.rows.get(key);
+    if (!existing && options?.ifMissing !== 'ignore') {
+      throw new DataError(REMOVE_MISSING_MESSAGE, { table, id });
+    }
+    await db.rows.delete(key);
     this.emit(table);
   }
 
   /** Jointures : les lignes sont repérées par la valeur de leurs clés parentes. */
-  async removeWhere(table: string, filter: RowFilter) {
+  async removeWhere(table: string, filter: RowFilter, options?: RemoveOptions) {
     await this.ensureSeeded();
     const db = getDatabase();
     const entries = await db.rows.where('table').equals(table).toArray();
     const targets = entries.filter((entry) => matchesFilter(entry.data, filter));
+    if (targets.length === 0 && options?.ifMissing !== 'ignore') {
+      throw new DataError(REMOVE_WHERE_MISSING_MESSAGE, { table, filter });
+    }
     await db.rows.bulkDelete(targets.map((entry) => entry.key));
     this.emit(table);
   }

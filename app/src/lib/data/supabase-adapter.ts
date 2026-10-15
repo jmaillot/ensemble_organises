@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
-import { DataError, type DataAdapter } from './adapter';
+import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable } from './keys';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
@@ -132,14 +132,29 @@ export class SupabaseAdapter implements DataAdapter {
     return row as T;
   }
 
-  async remove(table: string, id: string) {
+  /**
+   * Suppression d'une ligne avec **représentation** : `.select()` demande les
+   * lignes réellement retirées, et c'est ce compte qui rend le refus visible.
+   * Sans lui, PostgREST répond 204 que 0 ou N lignes soient parties, et un
+   * refus RLS (`*_delete_admin` pour un membre) se présente comme un succès
+   * (WR-01). On ne demande pas `count: 'exact'` : c'est la représentation qui
+   * compte, et une seconde requête de comptage serait une fenêtre de course.
+   */
+  async remove(table: string, id: string, options?: RemoveOptions) {
     const client = this.client();
-    const { error } = await client.from(table).delete().eq('id', id);
+    const { data: removed, error } = await client.from(table).delete().eq('id', id).select();
     if (error) throw new DataError(error.message, error);
+    if ((removed ?? []).length === 0 && options?.ifMissing !== 'ignore') {
+      throw new DataError(REMOVE_MISSING_MESSAGE, { table, id });
+    }
   }
 
-  /** Jointures (lignes sans `id`) : suppression par filtre, erreur directe. */
-  async removeWhere(table: string, filter: RowFilter) {
+  /**
+   * Jointures (lignes sans `id`) : suppression par filtre, comptée comme
+   * `remove`. `.select()` est appelé **sans** nom de colonne : la table peut
+   * ne pas porter d'`id`, et un `select('id')` y échouerait.
+   */
+  async removeWhere(table: string, filter: RowFilter, options?: RemoveOptions) {
     const client = this.client();
     let query = client.from(table).delete();
     for (const [key, value] of Object.entries(filter)) {
@@ -148,8 +163,11 @@ export class SupabaseAdapter implements DataAdapter {
       else if (Array.isArray(value)) query = query.in(key, value as string[]);
       else query = query.eq(key, value);
     }
-    const { error } = await query;
+    const { data: removed, error } = await query.select();
     if (error) throw new DataError(error.message, error);
+    if ((removed ?? []).length === 0 && options?.ifMissing !== 'ignore') {
+      throw new DataError(REMOVE_WHERE_MISSING_MESSAGE, { table, filter });
+    }
   }
 
   subscribe(table: string, onChange: () => void) {
