@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { User } from '@supabase/supabase-js';
 
 /**
@@ -210,6 +210,52 @@ describe("chemin d'authentification", () => {
     // précédent, visible quand `setReady` partait sans attendre).
     expect(seen.some((state) => state.ready && state.status !== 'authenticated')).toBe(false);
     unmount();
+  });
+
+  it("rend un échec d'amorçage visible au lieu d'un chargement sans issue", async () => {
+    // Avant le correctif, `setReady(true)` n'était atteint que sur le chemin de
+    // succès : un `getSession` rejeté laissait `ready` à faux pour toujours,
+    // donc « Chargement de votre foyer… » à l'écran, sans message ni reprise.
+    auth.getSession.mockRejectedValue(new Error('réseau indisponible'));
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.error).not.toBeNull();
+  });
+
+  it("relance réellement l'amorçage à la reprise, jusqu'à la session", async () => {
+    auth.getSession
+      .mockRejectedValueOnce(new Error('réseau indisponible'))
+      .mockResolvedValueOnce({ data: { session: { user } } })
+      .mockResolvedValue({ data: { session: null } });
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    act(() => result.current.retry());
+
+    // La reprise ne se contente pas d'effacer le message : elle rejoue
+    // l'amorçage, et celui-ci établit la session.
+    await waitFor(() => expect(useSessionStore.getState().status).toBe('authenticated'));
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.ready).toBe(true);
+    expect(auth.getSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("porte l'objet d'erreur dans l'état, jamais son message dans le rendu", async () => {
+    // Le message reconnaissable reste côté hook ; le rendu est verrouillé par
+    // `main.test.tsx`, qui affirme le texte fixe et l'absence de fuite (T-18-11).
+    auth.getSession.mockRejectedValue(new Error('réseau : jeton sb_publishable_secret'));
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error?.message).toBe('réseau : jeton sb_publishable_secret');
   });
 
   it('déconnecte sur SIGNED_OUT', async () => {
