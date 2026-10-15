@@ -38,6 +38,16 @@ export interface RoutineHistoryProps {
   onPeriodChange: (period: HistoryPeriod) => void;
   isLoading?: boolean;
   onDeleteOccurrence: (entry: HistoryEntry) => void;
+  /**
+   * Capacité liée au **rôle** ; défaut `true` pour ne pas changer le rendu d'un
+   * appelant qui l'omettrait. La corbeille obéit à la **conjonction** de ce prop
+   * et de `entry.canDelete` : ce dernier porte une règle propre à l'occurrence
+   * (seule une occurrence réellement enregistrée est supprimable), que le rôle
+   * admin ne doit pas contourner. Substituer l'un à l'autre ferait apparaître une
+   * corbeille sur une occurrence « en retard » ou « à venir », qui n'a pas de
+   * ligne à supprimer.
+   */
+  canDelete?: boolean;
 }
 
 const subtitle = (entry: HistoryEntry) => {
@@ -46,7 +56,14 @@ const subtitle = (entry: HistoryEntry) => {
 };
 
 /** Historique du foyer : dernières occurrences, retards et prochaines échéances. */
-export function RoutineHistory({ entries, period, onPeriodChange, isLoading = false, onDeleteOccurrence }: RoutineHistoryProps) {
+export function RoutineHistory({
+  entries,
+  period,
+  onPeriodChange,
+  isLoading = false,
+  onDeleteOccurrence,
+  canDelete = true,
+}: RoutineHistoryProps) {
   const past = entries.filter((entry) => entry.state !== 'a_venir');
   const upcoming = entries.filter((entry) => entry.state === 'a_venir');
 
@@ -91,7 +108,7 @@ export function RoutineHistory({ entries, period, onPeriodChange, isLoading = fa
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Badge tone={occurrenceTones[entry.state]}>{occurrenceLabels[entry.state]}</Badge>
-                  {entry.canDelete ? (
+                  {canDelete && entry.canDelete ? (
                     <button
                       type="button"
                       onClick={() => onDeleteOccurrence(entry)}

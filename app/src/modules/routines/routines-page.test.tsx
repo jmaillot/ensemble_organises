@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { addDays, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import { data } from '@/lib/data';
-import { renderWithProviders } from '@/test/render';
-import type { RoutineAssigneeRow, RoutineRow } from '@/types';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { createTestQueryClient, renderWithProviders, seedHouseholdStore } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
+import type { RoutineAssigneeRow, RoutineFolderRow, RoutineRow } from '@/types';
 import RoutinesPage from './routines-page';
+import { useRoutines } from './hooks/use-routines';
+import type { HistoryEntry } from './types';
 import {
   MAX_OCCURRENCE_DAYS,
   buildMonthlyNthRule,
@@ -311,5 +317,97 @@ describe('RoutinesPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const rows = await data.list<RoutineRow>('routines');
     expect(rows.find((row) => row.name === MONDAY)?.recurrence_rule).toBe('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
+  });
+});
+
+/**
+ * WR-02 / D-03 : les corbeilles de Routines suivent le rôle. Le rôle sans
+ * droit ne voit pas l'action ; l'édition et la création restent.
+ *
+ * Le mode démo (Dexie) ne porte ni RLS ni contrainte : ce qui est vérifié ici
+ * est l'affichage et les gardes du hook, pas l'autorisation serveur — portée
+ * par `routines_delete_admin`, `routine_completions_delete_admin` (0007:237-241)
+ * et `routine_folders_delete` (0051:82-87).
+ */
+describe('RoutinesPage — corbeilles réservées à l’administrateur', () => {
+  const FOLDER = 'Maison';
+
+  /** Sans dossier, « Gérer » n’est pas rendu : il n’y a rien à gérer. */
+  async function seedFolder() {
+    return data.create<RoutineFolderRow>('routine_folders', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: FOLDER,
+      visibility: 'foyer',
+      owner_member_id: DEMO_MEMBERS.camille,
+      is_default: false,
+    });
+  }
+
+  const occurrenceTrash = () => screen.queryAllByRole('button', { name: /Supprimer l’occurrence de/ });
+
+  it('expose routine, occurrence et dossier à un administrateur', async () => {
+    const user = userEvent.setup();
+    await seedFolder();
+    renderWithProviders(<RoutinesPage />, { route: '/routines' });
+
+    await findTodayList();
+    expect(screen.getByRole('button', { name: `Supprimer la routine ${DAILY}` })).toBeInTheDocument();
+    expect(occurrenceTrash().length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
+    expect(await screen.findByRole('dialog', { name: 'Gérer les dossiers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Supprimer ${FOLDER}` })).toBeInTheDocument();
+  });
+
+  it('masque les trois corbeilles à un membre, sans retirer édition ni création', async () => {
+    const user = userEvent.setup();
+    await seedFolder();
+    renderWithProviders(<RoutinesPage />, { route: '/routines' });
+
+    await findTodayList();
+    // Thomas est un `membre` : il écrit, mais ne supprime pas.
+    await act(async () => {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    });
+
+    expect(screen.queryByRole('button', { name: `Supprimer la routine ${DAILY}` })).not.toBeInTheDocument();
+    expect(occurrenceTrash()).toHaveLength(0);
+    // L'écriture et la gestion de ses propres dossiers restent ouvertes.
+    expect(screen.getByRole('button', { name: `Modifier la routine ${DAILY}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nouvelle routine' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nouveau dossier' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
+    expect(await screen.findByRole('dialog', { name: 'Gérer les dossiers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Renommer ${FOLDER}` })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: `Supprimer ${FOLDER}` })).not.toBeInTheDocument();
+  });
+
+  it('removeOccurrence rejette un non-admin (la garde absente est comblée)', async () => {
+    seedHouseholdStore();
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(() => useRoutines(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    });
+
+    const entry: HistoryEntry = {
+      key: 'routine-1-completion-0',
+      date: TODAY,
+      routineId: 'routine-1',
+      routineName: DAILY,
+      state: 'fait',
+      authorName: null,
+      canDelete: true,
+    };
+
+    await expect(result.current.removeOccurrence(entry)).rejects.toThrow(
+      'Seul un administrateur du foyer peut supprimer.',
+    );
+    // La garde tombe avant l'I/O : la trace est toujours là.
+    const rows = await data.list('routine_completions', { id: entry.key });
+    expect(rows).toHaveLength(1);
   });
 });

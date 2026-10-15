@@ -321,6 +321,7 @@ export default function RoutinesPage() {
               onPeriodChange={setPeriod}
               isLoading={isLoading}
               onDeleteOccurrence={setPendingOccurrence}
+              canDelete={isAdmin}
             />
             <HistoryCalendar
               days={grid.days}
