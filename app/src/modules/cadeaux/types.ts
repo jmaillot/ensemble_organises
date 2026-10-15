@@ -1,5 +1,5 @@
 import type { BirthdayRow, ContactRow, GiftIdeaRow, GiftItemRow, GiftListRow, GiftListShareRow, HouseholdMemberRow, MemberColorTag } from '@/types';
-import { nextBirthdayDate } from '@/modules/anniversaires/types';
+import { displayablePhoto, nextBirthdayDate } from '@/modules/anniversaires/types';
 
 export type GiftVisibility = 'privee' | 'foyer' | 'partagee';
 export type GiftPermission = 'lecture' | 'reservation';
@@ -45,7 +45,15 @@ export interface GiftItem {
   name: string;
   price: number | null;
   comment: string | null;
+  /** Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01). */
   photoUrl: string | null;
+  /**
+   * Valeur de la colonne `photo_url` : chemin du bucket pour un dépôt, URL
+   * héritée ou `data:` sinon. Seule grandeur comparable d'une édition à
+   * l'autre — c'est elle que le dialogue transporte quand la photo n'est pas
+   * touchée (re-déposer `photoUrl` persisterait une URL signée, D-01).
+   */
+  photoStored: string | null;
   url: string | null;
   reservedBy: string | null;
   reservedByName: string | null;
@@ -95,7 +103,10 @@ export interface GiftIdea {
   price: number | null;
   url: string | null;
   comment: string | null;
+  /** Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01). */
   photoUrl: string | null;
+  /** Valeur de la colonne `photo_url` (chemin du bucket pour un dépôt, D-01). */
+  photoStored: string | null;
   status: GiftIdeaStatus;
   gifteeText: string | null;
   gifteeContactId: string | null;
@@ -135,6 +146,7 @@ export function toGiftIdea(
   row: GiftIdeaRow,
   contacts: readonly ContactRow[],
   today: string,
+  resolved: Record<string, string> = {},
 ): GiftIdea {
   const contact = row.giftee_contact_id
     ? contacts.find((entry) => entry.id === row.giftee_contact_id)
@@ -145,7 +157,8 @@ export function toGiftIdea(
     price: row.price === null ? null : Number(row.price),
     url: row.url,
     comment: row.comment,
-    photoUrl: row.photo_url,
+    photoUrl: displayablePhoto(row.photo_url, resolved, row.id),
+    photoStored: row.photo_url,
     status: row.status,
     gifteeText: row.giftee_text,
     gifteeContactId: row.giftee_contact_id,
@@ -210,7 +223,7 @@ export function toGiftList(
   };
 }
 
-export function toGiftItem(row: GiftItemRow, members: HouseholdMemberRow[]): GiftItem {
+export function toGiftItem(row: GiftItemRow, members: HouseholdMemberRow[], resolved: Record<string, string> = {}): GiftItem {
   const reserver = row.reserved_by ? members.find((member) => member.id === row.reserved_by) : undefined;
   // L'une ou l'autre forme d'auteur vaut « réservé » (CR-01) : un article
   // tenu anonymement n'est jamais proposé comme libre, et le nom déclaré ne
@@ -222,7 +235,8 @@ export function toGiftItem(row: GiftItemRow, members: HouseholdMemberRow[]): Gif
     name: row.name,
     price: row.price === null ? null : Number(row.price),
     comment: row.comment,
-    photoUrl: row.photo_url,
+    photoUrl: displayablePhoto(row.photo_url, resolved, row.id),
+    photoStored: row.photo_url,
     url: row.url,
     reservedBy: row.reserved_by,
     reservedByName: reserver?.display_name ?? null,

@@ -2,12 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { data } from '@/lib/data';
-import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 import { nextBirthdayDate } from '@/modules/anniversaires/types';
 import { renderWithProviders } from '@/test/render';
-import type { GiftItemRow, HouseholdMemberRow } from '@/types';
+import type { GiftIdeaRow, GiftItemRow, HouseholdMemberRow } from '@/types';
 import CadeauxPage from './cadeaux-page';
-import { nextAnniversary, nextIdeaOccasion, toGiftItem } from './types';
+import { nextAnniversary, nextIdeaOccasion, toGiftIdea, toGiftItem } from './types';
+
+/**
+ * La démo locale ne dépose rien (`path: null`) : pour prouver que la COLONNE
+ * reçoit le CHEMIN du bucket (D-01, WR-10) et que le remplacement retire
+ * l'objet (D-03), on mocke le seul point de dépôt/suppression en gardant les
+ * helpers purs (`storedValueOf`, `replacedMediaPath`, résolution) réels.
+ */
+vi.mock('@/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage')>()),
+  depositHouseholdFile: vi.fn(),
+  removeHouseholdFile: vi.fn(),
+}));
+
+const depositMock = vi.mocked(depositHouseholdFile);
+const removeMock = vi.mocked(removeHouseholdFile);
 
 const TEST_CODE = 'CODECADEAU22CHARS012345';
 
@@ -690,3 +706,157 @@ describe('CadeauxPage — décocher Reçu (G-06-20)', () => {
     expect(scope.queryByRole('button', { name: /Libérer/ })).not.toBeInTheDocument();
   });
 });
+
+describe('CadeauxPage — photos en colonne (D-01, D-03, WR-10)', () => {
+  beforeEach(() => {
+    // jsdom n'implémente pas `URL.createObjectURL` : l'aperçu du formulaire
+    // d'idée l'appelle à la sélection du fichier (aperçu local, jamais persisté).
+    Object.assign(URL, { createObjectURL: () => 'blob:photo-test', revokeObjectURL: () => undefined });
+    removeMock.mockResolvedValue(undefined);
+  });
+
+  it('toGiftItem : photoStored porte la colonne, photoUrl la valeur affichable', () => {
+    const item = toGiftItem(
+      { ...itemRowBase(), photo_url: 'foyer/cadeaux/x.webp' },
+      [],
+      { 'gift-x': 'https://signed.example/x.webp' },
+    );
+    // La colonne est le chemin : c'est elle que l'édition transporte (D-01).
+    expect(item.photoStored).toBe('foyer/cadeaux/x.webp');
+    expect(item.photoUrl).toBe('https://signed.example/x.webp');
+  });
+
+  it('toGiftIdea : un chemin se signe, un data: hérité passe tel quel (D-01)', () => {
+    const idea = toGiftIdea(
+      { ...ideaRowBase(), photo_url: 'foyer/cadeaux/idee.webp' },
+      [],
+      '2026-01-01',
+      { 'idea-x': 'https://signed.example/idee.webp' },
+    );
+    expect(idea.photoStored).toBe('foyer/cadeaux/idee.webp');
+    expect(idea.photoUrl).toBe('https://signed.example/idee.webp');
+
+    const legacy = toGiftIdea({ ...ideaRowBase(), photo_url: 'data:image/webp;base64,AAAA' }, [], '2026-01-01');
+    expect(legacy.photoStored).toBe('data:image/webp;base64,AAAA');
+    expect(legacy.photoUrl).toBe('data:image/webp;base64,AAAA');
+  });
+
+  it('ajouter une idée avec photo : gift_ideas.photo_url porte le CHEMIN du bucket', async () => {
+    const user = userEvent.setup();
+    depositMock.mockResolvedValue({
+      url: 'https://signed.example/household-martin/cadeaux/fichier.webp',
+      path: 'household-martin/cadeaux/fichier.webp',
+      name: 'photo.jpg',
+      mime: 'image/webp',
+      size: 18,
+    });
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(await screen.findByRole('tab', { name: /Idées/ }));
+    await user.click(await screen.findByRole('button', { name: 'Noter une idée' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Nom de l’idée/), 'Vélo de course');
+    await user.upload(
+      within(dialog).getByLabelText(/^Photo/),
+      new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’idée' }));
+
+    await waitFor(async () => {
+      const ideas = await data.list<GiftIdeaRow>('gift_ideas', { household_id: DEMO_HOUSEHOLD_ID });
+      const created = ideas.find((idea) => idea.name === 'Vélo de course');
+      expect(created).toBeDefined();
+      // Jamais l'URL signée éphémère du dépôt (D-01, WR-10).
+      expect(created?.photo_url).toBe('household-martin/cadeaux/fichier.webp');
+      expect(created?.photo_url).not.toMatch(/^https?:/);
+    });
+    expect(depositMock).toHaveBeenCalledWith(expect.objectContaining({ folder: 'cadeaux' }));
+  });
+
+  it('changer la photo d’une idée pose le nouveau chemin et retire l’objet précédent (D-03)', async () => {
+    const user = userEvent.setup();
+    await data.update<GiftIdeaRow>('gift_ideas', 'idea-2', { photo_url: 'household-martin/cadeaux/ancienne.webp' });
+    depositMock.mockResolvedValue({
+      url: 'https://signed.example/household-martin/cadeaux/nouvelle.webp',
+      path: 'household-martin/cadeaux/nouvelle.webp',
+      name: 'photo.jpg',
+      mime: 'image/webp',
+      size: 18,
+    });
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(await screen.findByRole('tab', { name: /Idées/ }));
+    await user.click(await screen.findByRole('button', { name: 'Modifier l’idée Stage de poterie' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.upload(
+      within(dialog).getByLabelText(/^Photo/),
+      new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    // L'ancien objet est retiré une fois l'écriture acquise, jamais le nouveau (D-03).
+    await waitFor(() => expect(removeMock).toHaveBeenCalledWith('household-martin/cadeaux/ancienne.webp'));
+    const rows = (await data.list<GiftIdeaRow>('gift_ideas', { id: 'idea-2' })) as GiftIdeaRow[];
+    expect(rows[0].photo_url).toBe('household-martin/cadeaux/nouvelle.webp');
+    expect(removeMock).not.toHaveBeenCalledWith('household-martin/cadeaux/nouvelle.webp');
+  });
+
+  it('promouvoir une idée à photo copie le CHEMIN en article, pas l’URL affichée (D-01, D-05)', async () => {
+    const user = userEvent.setup();
+    await data.update<GiftIdeaRow>('gift_ideas', 'idea-2', { photo_url: 'household-martin/cadeaux/idee.webp' });
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(await screen.findByRole('tab', { name: /Idées/ }));
+    await user.click(await screen.findByRole('button', { name: 'Ajouter l’idée Stage de poterie à une liste' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Liste destinataire'), 'gift-list-noe');
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’article' }));
+
+    await waitFor(async () => {
+      const linked = await data.list<GiftItemRow>('gift_items', { idea_id: 'idea-2' });
+      expect(linked).toHaveLength(1);
+      // La copie idée→article garde la même nature : un chemin (D-01, D-05).
+      expect(linked[0].photo_url).toBe('household-martin/cadeaux/idee.webp');
+      expect(linked[0].photo_url).not.toMatch(/^https?:/);
+    });
+  });
+});
+
+function itemRowBase(): GiftItemRow {
+  return {
+    id: 'gift-x',
+    list_id: 'gift-list-noe',
+    household_id: DEMO_HOUSEHOLD_ID,
+    name: 'Puzzle',
+    price: 20,
+    comment: null,
+    photo_url: null,
+    url: null,
+    reserved_by: null,
+    reserved_by_name: null,
+    purchased: false,
+    idea_id: null,
+    created_at: '2026-01-01T00:00:00Z',
+  };
+}
+
+function ideaRowBase(): GiftIdeaRow {
+  return {
+    id: 'idea-x',
+    household_id: DEMO_HOUSEHOLD_ID,
+    name: 'Idée',
+    price: 20,
+    url: null,
+    comment: null,
+    photo_url: null,
+    status: 'a_offrir',
+    giftee_text: null,
+    giftee_contact_id: null,
+    created_by: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  };
+}

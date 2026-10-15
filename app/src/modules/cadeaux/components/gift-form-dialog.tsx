@@ -72,7 +72,11 @@ export function GiftFormDialog({
   onSubmit,
   isPending = false,
 }: GiftFormDialogProps) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(item?.photoUrl ?? null);
+  // `photoUrl` porte la valeur de COLONNE soumise (chemin de bucket pour un
+  // dépôt promu, `data:`/`blob:` sinon) ; `photoPreview` n'est que l'aperçu
+  // affichable (URL signée forgée à la lecture pour un chemin, D-01).
+  const [photoUrl, setPhotoUrl] = useState<string | null>(item?.photoStored ?? null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(item?.photoUrl ?? null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
@@ -95,7 +99,8 @@ export function GiftFormDialog({
       url: item?.url ?? '',
       comment: item?.comment ?? '',
     });
-    setPhotoUrl(item?.photoUrl ?? null);
+    setPhotoUrl(item?.photoStored ?? null);
+    setPhotoPreview(item?.photoUrl ?? null);
     setFileName(null);
     setPhotoError(null);
   }, [defaultListId, item, lists, open, reset]);
@@ -104,10 +109,14 @@ export function GiftFormDialog({
     if (!file) return;
     setFileName(file.name);
     try {
-      setPhotoUrl(await readPhoto(file));
+      const encoded = await readPhoto(file);
+      setPhotoUrl(encoded);
+      setPhotoPreview(encoded);
       setPhotoError(null);
     } catch {
-      setPhotoUrl(URL.createObjectURL(file));
+      const objectUrl = URL.createObjectURL(file);
+      setPhotoUrl(objectUrl);
+      setPhotoPreview(objectUrl);
       setPhotoError('Photo conservée sans compression sur ce navigateur.');
     }
   };
@@ -162,8 +171,8 @@ export function GiftFormDialog({
           <Field label="Photo" optional hint="Compression automatique en WebP">
             {(props) => (
               <div className="flex flex-wrap items-center gap-3">
-                {photoUrl ? (
-                  <img src={photoUrl} alt="" className="h-14 w-14 rounded-[11px] object-cover" />
+                {photoPreview ? (
+                  <img src={photoPreview} alt="" className="h-14 w-14 rounded-[11px] object-cover" />
                 ) : (
                   <span className="grid h-14 w-14 place-items-center rounded-[11px] bg-bg text-muted">
                     <Icon name="image" />

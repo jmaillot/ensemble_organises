@@ -9,7 +9,7 @@ import { Badge, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/compo
 import { useToast } from '@/components/ui/toast';
 import { MetricRow, ModuleShell, SectionHeading } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
-import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
 import { formatEuro, formatShortDate, pluralize } from '@/lib/utils';
 import { useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import {
@@ -188,14 +188,21 @@ export default function CadeauxPage() {
   const handleSubmitIdea = async ({ values, photoFile }: GiftIdeaFormResult) => {
     let photoUrl = values.photoUrl;
     let depositedPath: string | null = null;
+    let previousPath: string | null = null;
     try {
       if (photoFile) {
         if (!householdId) throw new Error('Aucun foyer sélectionné.');
         const deposited = await depositHouseholdFile({ householdId, folder: 'cadeaux', file: photoFile });
-        photoUrl = deposited.url;
+        // Valeur de COLONNE (chemin du bucket, point unique de 19-01) : c'est
+        // elle qui part en `gift_ideas.photo_url`. Persister l'URL du dépôt
+        // enverrait une URL signée éphémère (D-01, WR-10).
+        photoUrl = storedValueOf(deposited);
         depositedPath = deposited.path;
       }
       if (editedIdea) {
+        // Remplacement (D-03) : décidé AVANT l'écriture, sur la valeur de
+        // colonne (jamais l'URL affichée), et retiré en best-effort après succès.
+        previousPath = replacedMediaPath(editedIdea.photoStored, photoUrl);
         await updateIdea.mutateAsync({
           id: editedIdea.id,
           values: {
@@ -214,6 +221,8 @@ export default function CadeauxPage() {
         await addIdea.mutateAsync({ ...values, photoUrl });
         toast('Idée ajoutée.');
       }
+      // Objet remplacé : best-effort, jamais un succès d'écriture transformé en échec.
+      if (previousPath) await removeHouseholdFile(previousPath).catch(() => {});
       setIdeaFormOpen(false);
       setEditedIdea(null);
     } catch (creationError) {
@@ -270,7 +279,9 @@ export default function CadeauxPage() {
           price: promotedIdea.price,
           url: promotedIdea.url,
           comment: promotedIdea.comment,
-          photo_url: promotedIdea.photoUrl,
+          // Valeur de COLONNE (chemin du bucket), jamais l'URL affichée :
+          // la copie idée→article reste de même nature (D-01, D-05).
+          photo_url: promotedIdea.photoStored,
         },
       });
       setPromotedIdea(null);

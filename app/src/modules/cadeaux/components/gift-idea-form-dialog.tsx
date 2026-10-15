@@ -104,7 +104,9 @@ export function GiftIdeaFormDialog({
         price: values.price === '' ? null : roundPrice(parsePrice(values.price)),
         url: values.url === '' ? null : values.url,
         comment: values.comment === '' ? null : values.comment,
-        photoUrl: photoRemoved ? null : (idea?.photoUrl ?? null),
+        // Valeur de COLONNE si la photo n'est pas touchée (chemin du bucket,
+        // D-01) : re-déposer `photoUrl` persisterait l'URL signée affichée.
+        photoUrl: photoRemoved ? null : (idea?.photoStored ?? null),
         status: values.status as GiftIdeaStatus,
         gifteeText: values.gifteeText === '' ? null : values.gifteeText,
         gifteeContactId: values.gifteeContactId === '' ? null : values.gifteeContactId,

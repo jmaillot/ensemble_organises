@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { todayIso } from '@/lib/utils';
 import type { ContactListRow, ContactRow, GiftIdeaRow, GiftItemRow, GiftListShareRow, HouseholdMemberRow } from '@/types';
 import { useCurrentMember, useHouseholdStore, useMembers } from '@/stores/household-store';
@@ -72,6 +73,27 @@ export function useCadeaux(): CadeauxData {
     queryFn: () => fetchCadeauxSnapshot(householdId as string),
   });
 
+  // Les lignes articles ET idées portent des CHEMINS de bucket (D-01, WR-10) :
+  // on forge les photos affichables à la lecture, en échec fermé (annulation
+  // stricte, jamais d'état éventé). Les formes non-chemin rendent en synchrone
+  // — seuls les chemins passent par l'effet.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const itemRows = query.data?.items;
+  const ideaRows = query.data?.ideas;
+  useEffect(() => {
+    const pending = [...(itemRows ?? []), ...(ideaRows ?? [])]
+      .filter((row) => row.photo_url !== null && isHouseholdMediaPath(row.photo_url))
+      .map((row) => ({ id: row.id, file_url: row.photo_url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemRows, ideaRows]);
+
   const visibleListIds = useMemo(() => {
     const snapshot = query.data;
     if (!snapshot) return new Set<string>();
@@ -126,8 +148,8 @@ export function useCadeaux(): CadeauxData {
     if (!snapshot) return [];
     return snapshot.items
       .filter((row) => visibleListIds.has(row.list_id))
-      .map((row) => toGiftItem(row, members));
-  }, [members, query.data, visibleListIds]);
+      .map((row) => toGiftItem(row, members, photoUrls));
+  }, [members, photoUrls, query.data, visibleListIds]);
 
   const shares = useMemo<GiftShare[]>(() => {
     const snapshot = query.data;
@@ -157,9 +179,9 @@ export function useCadeaux(): CadeauxData {
     );
     return snapshot.ideas
       .filter((row) => !(row.giftee_contact_id && ownContactIds.has(row.giftee_contact_id)))
-      .map((row) => toGiftIdea(row, snapshot.contacts, today))
+      .map((row) => toGiftIdea(row, snapshot.contacts, today, photoUrls))
       .sort((a, b) => (a.nextOccasionDate ?? 'z').localeCompare(b.nextOccasionDate ?? 'z'));
-  }, [currentMemberId, query.data]);
+  }, [currentMemberId, photoUrls, query.data]);
 
   return {
     lists,
