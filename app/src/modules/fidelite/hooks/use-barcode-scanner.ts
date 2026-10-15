@@ -78,6 +78,11 @@ function hasCamera(): boolean {
   return typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 }
 
+/** Libère explicitement un flux caméra — sûr même si le flux a déjà été coupé. */
+function stopStream(stream: MediaStream | null | undefined): void {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
 export function isBarcodeScannerSupported(): boolean {
   if (typeof window === 'undefined') return false;
   return nativeDetectorCtor() !== null || hasCamera();
@@ -116,6 +121,11 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detectedRef = useRef(false);
   const fallbackRef = useRef<{ stop: () => Promise<void> | void } | null>(null);
+  // WR-15c : une génération d'ouverture. `start` la capture et la compare
+  // après chaque `await` ; `stop` l'incrémente. Un flux qui arrive après une
+  // fermeture (ou une nouvelle ouverture) porte une génération périmée et est
+  // coupé immédiatement, au lieu de rester allumé jusqu'au départ de la page.
+  const generationRef = useRef(0);
   const onDetectedRef = useRef(onDetected);
 
   useEffect(() => {
@@ -123,14 +133,16 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
   }, [onDetected]);
 
   const stop = useCallback(() => {
+    generationRef.current += 1;
     if (frameRef.current !== null) {
       if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     }
     const fallback = fallbackRef.current;
+    // Mis à `null` AVANT l'appel : un second `stop()` ne rappelle pas le repli.
     fallbackRef.current = null;
     if (fallback) void Promise.resolve(fallback.stop()).catch(() => undefined);
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    stopStream(streamRef.current);
     streamRef.current = null;
     const video = videoRef.current;
     if (video) {
@@ -154,6 +166,7 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
 
   const start = useCallback(
     async (video: HTMLVideoElement) => {
+      const generation = ++generationRef.current;
       videoRef.current = video;
       detectedRef.current = false;
       setResult(null);
@@ -171,6 +184,12 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
           video: { facingMode: { ideal: 'environment' } },
           audio: false,
         });
+        // WR-15c : un `stop()` a pu passer pendant l'ouverture. On coupe le
+        // flux qui vient d'arriver et on sort sans rien allumer.
+        if (generationRef.current !== generation) {
+          stopStream(stream);
+          return;
+        }
         streamRef.current = stream;
         video.srcObject = stream;
         video.setAttribute('playsinline', 'true');
@@ -187,15 +206,22 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
           // supporte — sinon `new BarcodeDetector` lève, et l'ancien `catch`
           // externe concluait `'error'` au lieu du repli promis.
           const formats = await supportedNativeFormats(Ctor);
+          if (generationRef.current !== generation) {
+            stopStream(stream);
+            return;
+          }
           if (formats.length > 0) {
             try {
               const detector = new Ctor({ formats });
               setEngine('native');
               setStatus('scanning');
               const pump = async () => {
-                if (detectedRef.current || !streamRef.current) return;
+                // WR-15c : la génération empêche une frame en vol après
+                // `stop()` de relancer la boucle.
+                if (detectedRef.current || !streamRef.current || generationRef.current !== generation) return;
                 try {
                   const codes = await detector.detect(video);
+                  if (generationRef.current !== generation) return;
                   const first = codes[0];
                   if (first?.rawValue) handleValue(first.rawValue, first.format);
                 } catch {
@@ -216,6 +242,10 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
         const host = video.parentElement;
         if (!host?.id) throw new Error('Conteneur de scan sans identifiant.');
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+        if (generationRef.current !== generation) {
+          stopStream(stream);
+          return;
+        }
         const scanner = new Html5Qrcode(host.id, {
           verbose: false,
           useBarCodeDetectorIfSupported: true,
@@ -234,6 +264,12 @@ export function useBarcodeScanner(onDetected: (result: ScanResult) => void): Bar
           (decodedText, decodedResult) => handleValue(decodedText, decodedResult?.result?.format?.formatName),
           () => undefined,
         );
+        if (generationRef.current !== generation) {
+          fallbackRef.current = null;
+          void Promise.resolve(scanner.stop()).catch(() => undefined);
+          stopStream(stream);
+          return;
+        }
         setEngine('fallback');
         setStatus('scanning');
       } catch (caught) {

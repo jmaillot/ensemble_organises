@@ -273,6 +273,131 @@ describe('useBarcodeScanner — un format non supporté bascule sur le repli (WR
   });
 });
 
+describe('useBarcodeScanner — fermer pendant l’ouverture coupe la caméra (WR-15c)', () => {
+  it('arrête le flux résolu APRÈS un stop pendant l’ouverture, sans play ni detect', async () => {
+    let resolveStream!: (stream: MediaStream) => void;
+    const pending = new Promise<MediaStream>((resolve) => {
+      resolveStream = resolve;
+    });
+    const detect = vi.fn(async () => []);
+    class NativeDetector {
+      constructor(_options: { formats: string[] }) {
+        void _options;
+      }
+      detect = detect;
+    }
+    setBarcodeDetector(NativeDetector);
+    setMediaDevices(vi.fn(() => pending));
+    const onDetected = vi.fn();
+    const view = renderHook(() => useBarcodeScanner(onDetected));
+    const video = makeVideo();
+    await act(async () => {
+      void view.result.current.start(video);
+    });
+    expect(view.result.current.status).toBe('starting');
+
+    act(() => {
+      view.result.current.stop();
+    });
+
+    const { stream, tracks } = makeStream(2);
+    await act(async () => {
+      resolveStream(stream);
+      await pending;
+    });
+
+    expect(tracks[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(tracks[1]?.stop).toHaveBeenCalledTimes(1);
+    expect(video.play).not.toHaveBeenCalled();
+    expect(detect).not.toHaveBeenCalled();
+    expect(onDetected).not.toHaveBeenCalled();
+    expect(view.result.current.status).toBe('idle');
+  });
+
+  it('stop() après un démarrage complet libère le flux, annule la frame et remet l’état à idle', async () => {
+    const { stream, tracks } = makeStream();
+    setMediaDevices(vi.fn(async () => stream));
+    clearBarcodeDetector();
+    const view = renderHook(() => useBarcodeScanner(vi.fn()));
+    const video = makeVideo();
+    await act(async () => {
+      await view.result.current.start(video);
+    });
+    expect(view.result.current.engine).toBe('fallback');
+
+    act(() => {
+      view.result.current.stop();
+    });
+
+    expect(tracks[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(video.pause).toHaveBeenCalled();
+    expect(view.result.current.status).toBe('idle');
+    expect(view.result.current.engine).toBeNull();
+  });
+
+  it('le démontage pendant l’ouverture coupe le flux qui arrive ensuite', async () => {
+    let resolveStream!: (stream: MediaStream) => void;
+    const pending = new Promise<MediaStream>((resolve) => {
+      resolveStream = resolve;
+    });
+    setMediaDevices(vi.fn(() => pending));
+    clearBarcodeDetector();
+    const view = renderHook(() => useBarcodeScanner(vi.fn()));
+    await act(async () => {
+      void view.result.current.start(makeVideo());
+    });
+
+    view.unmount();
+
+    const { stream, tracks } = makeStream();
+    await act(async () => {
+      resolveStream(stream);
+      await pending;
+    });
+
+    expect(tracks[0]?.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('stop() est idempotent : deux appels ne rappellent pas le repli', async () => {
+    const { result, scanner } = await startFallback();
+    act(() => {
+      result.current.stop();
+    });
+    act(() => {
+      result.current.stop();
+    });
+    expect(scanner.stopCalls).toBe(1);
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('un detect() qui résout après stop() n’appelle jamais onDetected', async () => {
+    let resolveDetect!: (codes: Array<{ rawValue?: string; format?: string }>) => void;
+    const pending = new Promise<Array<{ rawValue?: string; format?: string }>>((resolve) => {
+      resolveDetect = resolve;
+    });
+    class SlowDetector {
+      constructor(_options: { formats: string[] }) {
+        void _options;
+      }
+      detect = () => pending;
+    }
+    const { result, onDetected } = await startWithDetector(SlowDetector);
+    expect(result.current.engine).toBe('native');
+
+    act(() => {
+      result.current.stop();
+    });
+
+    await act(async () => {
+      resolveDetect([{ rawValue: 'APRES-STOP', format: 'qr_code' }]);
+      await pending;
+      await Promise.resolve();
+    });
+
+    expect(onDetected).not.toHaveBeenCalled();
+  });
+});
+
 describe('toScanFormat — une seule table de correspondance', () => {
   it('lit le nom stable', () => {
     expect(toScanFormat('QR_CODE')).toBe('qr_code');
