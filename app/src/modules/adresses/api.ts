@@ -103,7 +103,9 @@ export function shouldRemovePreviousPlacePhoto(
   previousStored: string | null,
   nextStored: string | null,
 ): boolean {
-  const previous = placePhotoPathOf(previousStored);
+  // Une valeur précédente blanche n'est pas un objet de bucket : le reste du
+  // module normalise déjà par `toNullable`, la décision fait de même.
+  const previous = placePhotoPathOf(previousStored ? previousStored.trim() : null);
   if (!previous) return false;
   const next = (nextStored ?? '').trim();
   return next.length === 0 || next !== previous;

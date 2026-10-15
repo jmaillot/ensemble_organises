@@ -4,6 +4,7 @@ import {
   isPlacePhotoPath,
   placePhotoPathOf,
   resolvePlacePhotoUrl,
+  shouldRemovePreviousPlacePhoto,
   toEditPlacePayload,
   toPlacePayload,
   uploadPlacePhoto,
@@ -128,5 +129,48 @@ describe('photos de lieux — hygiène des fichiers (D-04)', () => {
     await deletePlacePhoto('/assets/adresses.jpg');
     await deletePlacePhoto(null);
     expect(removeFileMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * WR-05 : la décision « retirer l'ancienne photo » est extraite en fonction
+ * pure, parce que c'est son verdict — et non la comparaison en ligne du hook —
+ * qui détruit (ou épargne) un objet du bucket. Le défaut ne se reproduit qu'en
+ * mode Supabase (en démo, la valeur stockée est un aperçu, donc non-chemin) :
+ * la preuve est donc unitaire, ici.
+ */
+describe('shouldRemovePreviousPlacePhoto — décision de retrait (WR-05)', () => {
+  const stored = 'foyer-1/places/photo.webp';
+  const signed = 'https://signe.example/foyer-1/places/photo.webp';
+
+  it('(a) même chemin stocké des deux côtés : rien à retirer (le cas du défaut)', () => {
+    expect(shouldRemovePreviousPlacePhoto(stored, stored)).toBe(false);
+  });
+
+  it('(b) chemin remplacé par un autre chemin : retrait', () => {
+    expect(shouldRemovePreviousPlacePhoto(stored, 'foyer-1/places/autre.webp')).toBe(true);
+  });
+
+  it('(c) retrait explicite : chemin suivi de rien (nul ou vide) : retrait', () => {
+    expect(shouldRemovePreviousPlacePhoto(stored, null)).toBe(true);
+    expect(shouldRemovePreviousPlacePhoto(stored, '')).toBe(true);
+    expect(shouldRemovePreviousPlacePhoto(stored, '   ')).toBe(true);
+  });
+
+  it('(d) aucune valeur précédente : rien à retirer', () => {
+    expect(shouldRemovePreviousPlacePhoto(null, null)).toBe(false);
+    expect(shouldRemovePreviousPlacePhoto(null, stored)).toBe(false);
+    expect(shouldRemovePreviousPlacePhoto('  ', stored)).toBe(false);
+  });
+
+  it('(e) URL signée : une valeur non-chemin n’est jamais un objet de bucket', () => {
+    expect(shouldRemovePreviousPlacePhoto(signed, signed)).toBe(false);
+    expect(shouldRemovePreviousPlacePhoto(signed, stored)).toBe(false);
+    expect(shouldRemovePreviousPlacePhoto(signed, null)).toBe(false);
+  });
+
+  it('intégration : une URL signée ne déclenche aucun nettoyage bucket', async () => {
+    await deletePlacePhoto(signed);
+    expect(removeFileMock).not.toHaveBeenCalled();
   });
 });
