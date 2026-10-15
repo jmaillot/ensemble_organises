@@ -8,9 +8,17 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { useMembers } from '@/stores/household-store';
 import { useHouseholdStore } from '@/stores/household-store';
-import { depositHouseholdFile } from '@/lib/storage';
+import { depositHouseholdFile, isHouseholdMediaPath, storedValueOf } from '@/lib/storage';
 import type { Birthday, BirthdayFormValues } from '../types';
 import { formatDayMonth, formatFrDate, parseFrDate } from '../types';
+
+/**
+ * Le champ transporte la valeur de COLONNE (chemin du bucket pour un dépôt,
+ * URL héritée sinon) : un chemin n'est pas une URL saisissable, il est donc
+ * admis au même titre que les formes affichables. La règle est celle du dépôt
+ * partagé, jamais une copie locale.
+ */
+const isAcceptablePhoto = (value: string) => /^(\/|https?:\/\/|blob:)/i.test(value) || isHouseholdMediaPath(value);
 
 const birthdaySchema = z.object({
   name: z.string().trim().min(1, 'Le nom est obligatoire.'),
@@ -23,7 +31,7 @@ const birthdaySchema = z.object({
   photoUrl: z
     .string()
     .trim()
-    .refine((value) => value === '' || /^(\/|https?:\/\/|blob:)/.test(value), 'Indiquez une adresse de photo valide.'),
+    .refine((value) => value === '' || isAcceptablePhoto(value), 'Indiquez une adresse de photo valide.'),
   createContact: z.boolean(),
 });
 
@@ -33,7 +41,9 @@ const defaultValues = (birthday: Birthday | null): BirthdayFormValues =>
         name: birthday.name,
         birthDate: formatFrDate(birthday.birthDate),
         linkedMemberId: birthday.linkedMemberId ?? '',
-        photoUrl: birthday.photoUrl ?? '',
+        // Valeur stockée, jamais l'URL affichée : la re-signer puis la
+        // réenregistrer persisterait une URL signée éphémère (D-01, WR-08).
+        photoUrl: birthday.photoStored ?? '',
         createContact: false,
       }
     : { name: '', birthDate: '', linkedMemberId: '', photoUrl: '', createContact: true };
@@ -75,7 +85,10 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
     setUploadError(null);
     try {
       const deposited = await depositHouseholdFile({ householdId, folder: 'anniversaires', file });
-      setValue('photoUrl', deposited.url, { shouldDirty: true });
+      // Valeur de COLONNE (chemin du bucket, point unique de 19-01) : c'est elle
+      // qui part en `birthdays.photo_url`. Persister l’URL du dépôt enverrait une
+      // URL signée éphémère (D-01, WR-08).
+      setValue('photoUrl', storedValueOf(deposited), { shouldDirty: true });
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'La photo n’a pas pu être déposée.');
     } finally {

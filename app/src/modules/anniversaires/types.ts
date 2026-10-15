@@ -1,7 +1,30 @@
 import { getDaysInMonth } from 'date-fns';
+import { isHouseholdMediaPath } from '@/lib/storage';
 import { daysBetween, initials, pad, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import { toColorTag } from '@/modules/calendrier/types';
 import type { BirthdayRow, ContactRow, HouseholdMemberRow, MemberColorTag } from '@/types';
+
+/**
+ * Valeur AFFICHABLE d'une colonne média du foyer (D-01, WR-08).
+ *
+ * Le chemin de bucket se forge à la lecture (`resolved[key]`), toute autre
+ * forme rend telle quelle (URL externe héritée, `data:`, aperçu `blob:` du mode
+ * démo), une valeur blanche rend `null`. Échec fermé : quand la signature n'a
+ * pas abouti, le DOM reçoit `null` — jamais un chemin brut, jamais un lien mort.
+ *
+ * La règle n'existe qu'ici : contacts, animaux et cadeaux l'importent plutôt que
+ * de la réécrire (même doctrine que `normalizePersonName`).
+ */
+export function displayablePhoto(
+  stored: string | null,
+  resolved: Record<string, string>,
+  key: string,
+): string | null {
+  const value = (stored ?? '').trim();
+  if (value === '') return null;
+  if (!isHouseholdMediaPath(value)) return value;
+  return resolved[key] ?? null;
+}
 
 const dayMonth = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 
@@ -16,7 +39,15 @@ export interface Birthday {
   householdId: string;
   name: string;
   birthDate: string;
+  /** Valeur affichable : URL signée forgée à la lecture pour un chemin (D-01). */
   photoUrl: string | null;
+  /**
+   * Valeur de la colonne `photo_url` : chemin du bucket pour un dépôt récent,
+   * URL héritée sinon. C'est la seule grandeur comparable d'une édition à
+   * l'autre — c'est donc elle que le dialogue transporte quand la photo n'est
+   * pas touchée (le re-dépôt de `photoUrl` persisterait une URL signée, D-01).
+   */
+  photoStored: string | null;
   linkedMemberId: string | null;
   initials: string;
   colorTag: MemberColorTag;
@@ -46,7 +77,11 @@ export function nextBirthdayDate(birthDate: string, from = todayIso()): string {
   return toIsoDate(new Date(nextYear, month, clampDay(nextYear, month, day)));
 }
 
-export function toBirthday(row: BirthdayRow, members: readonly HouseholdMemberRow[] = []): Birthday {
+export function toBirthday(
+  row: BirthdayRow,
+  members: readonly HouseholdMemberRow[] = [],
+  resolved: Record<string, string> = {},
+): Birthday {
   const member = members.find((entry) => entry.id === row.linked_member_id) ?? null;
   const nextDate = nextBirthdayDate(row.birth_date);
   return {
@@ -54,7 +89,8 @@ export function toBirthday(row: BirthdayRow, members: readonly HouseholdMemberRo
     householdId: row.household_id,
     name: row.name,
     birthDate: row.birth_date,
-    photoUrl: row.photo_url,
+    photoUrl: displayablePhoto(row.photo_url, resolved, row.id),
+    photoStored: row.photo_url,
     linkedMemberId: row.linked_member_id,
     initials: initials(row.name),
     colorTag: toColorTag(member?.color_tag, 'coral'),
@@ -176,6 +212,7 @@ export function aggregateBirthdays(
   birthdayRows: readonly BirthdayRow[],
   contactRows: readonly ContactRow[],
   members: readonly HouseholdMemberRow[] = [],
+  resolved: Record<string, string> = {},
 ): AggregatedBirthday[] {
   const contactsById = new Map(contactRows.map((row) => [row.id, row]));
   const consumedContacts = new Set<string>();
@@ -183,7 +220,7 @@ export function aggregateBirthdays(
   const leftovers: Array<{ birthday: Birthday; contactId: string | null; contactBirthDate: string | null }> = [];
 
   for (const row of birthdayRows) {
-    const birthday = toBirthday(row, members);
+    const birthday = toBirthday(row, members, resolved);
     const source = row.contact_id ? contactsById.get(row.contact_id) : undefined;
     if (source && source.birth_date) {
       consumedContacts.add(source.id);
@@ -193,8 +230,9 @@ export function aggregateBirthdays(
           twoSources: false,
           contactId: source.id,
           contactBirthDate: source.birth_date,
-          // Photo contact prioritaire, repli photo birthday (D-13).
-          displayPhotoUrl: source.photo_url ?? birthday.photoUrl,
+          // Photo contact prioritaire, repli photo birthday (D-13) — les deux
+          // valeurs comparées sont AFFICHABLES (résolues à la lecture, D-01).
+          displayPhotoUrl: displayablePhoto(source.photo_url, resolved, source.id) ?? birthday.photoUrl,
         }),
       );
     } else {
@@ -222,13 +260,15 @@ export function aggregateBirthdays(
     if (group.birthdays.length > 0) {
       const [first, ...rest] = group.birthdays;
       const linked = group.contacts[0] ?? null;
+      // Même priorité que la paire miroir, sur des valeurs résolues (D-13).
+      const linkedPhoto = linked ? displayablePhoto(linked.photo_url, resolved, linked.id) : null;
       merged.push(
         toAggregated(first, {
           origin: 'birthday',
           twoSources: linked !== null,
           contactId: linked?.id ?? null,
           contactBirthDate: linked?.birth_date ?? null,
-          displayPhotoUrl: linked?.photo_url ?? first.photoUrl,
+          displayPhotoUrl: linkedPhoto ?? first.photoUrl,
         }),
       );
       // Doublons résiduels du même côté (jamais des miroirs) : une ligne chacun.
@@ -246,13 +286,16 @@ export function aggregateBirthdays(
           linked_member_id: contact.linked_member_id,
           contact_id: null,
         };
+        // La clé de résolution est celle du CONTACT (`row.id` de la ligne
+        // d'origine) : la ligne de synthèse n'a pas d'identité de bucket propre.
+        const photo = displayablePhoto(contact.photo_url, resolved, contact.id);
         merged.push(
-          toAggregated(toBirthday(synthetic, members), {
+          toAggregated(toBirthday(synthetic, members, resolved), {
             origin: 'contact',
             twoSources: false,
             contactId: contact.id,
             contactBirthDate: contact.birth_date,
-            displayPhotoUrl: contact.photo_url,
+            displayPhotoUrl: photo,
           }),
         );
       }

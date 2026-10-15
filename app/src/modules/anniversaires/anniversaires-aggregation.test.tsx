@@ -81,12 +81,15 @@ describe('aggregateBirthdays', () => {
   });
 
   it('priorise la photo du contact, avec repli sur la photo birthday', () => {
-    const [merged] = aggregateBirthdays([birthday()], [contact()], []);
+    // D-13 sur valeurs RÉSOLUES (D-01) : la colonne porte un chemin, l'URL
+    // affichable vient de la carte de résolution.
+    const resolved = { b1: 'https://signe.example/birthday.jpg', c1: 'https://signe.example/contact.jpg' };
+    const [merged] = aggregateBirthdays([birthday()], [contact()], [], resolved);
     expect(merged.twoSources).toBe(true);
-    expect(merged.displayPhotoUrl).toBe('contact.jpg');
+    expect(merged.displayPhotoUrl).toBe('https://signe.example/contact.jpg');
 
-    const [fallback] = aggregateBirthdays([birthday()], [contact({ photo_url: null })], []);
-    expect(fallback.displayPhotoUrl).toBe('birthday.jpg');
+    const [fallback] = aggregateBirthdays([birthday()], [contact({ photo_url: null })], [], resolved);
+    expect(fallback.displayPhotoUrl).toBe('https://signe.example/birthday.jpg');
   });
 
   it('ne fusionne jamais deux foyers par la clé homonyme', () => {

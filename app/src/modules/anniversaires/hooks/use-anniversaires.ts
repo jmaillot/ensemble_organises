@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { invalidateTables } from '@/modules/calendrier/hooks/use-calendrier';
 import { createContactFromBirthday } from '@/modules/contacts/api';
@@ -49,6 +50,30 @@ export function useAnniversaires(): AnniversairesResource {
 
   const contactLists = useMemo(() => listsResource.rows, [listsResource.rows]);
 
+  // Les lignes portent des chemins (D-01) : on forge les photos affichables à
+  // la lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
+  // valeurs non-chemin (`/assets`, aperçus `blob:` du mode démo) rendent en
+  // synchrone — aucun rendu ajouté ; seuls les chemins passent par l'effet.
+  // Les deux tables partagent la carte : leurs identifiants de ligne sont
+  // distincts, et la vue agrégée lit la photo des deux côtés (D-13).
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const birthdayRows = resource.rows;
+  const contactRows = contactsResource.rows;
+  useEffect(() => {
+    const pending = [
+      ...birthdayRows.map((row) => ({ id: row.id, file_url: row.photo_url })),
+      ...contactRows.map((row) => ({ id: row.id, file_url: row.photo_url })),
+    ].filter((row) => row.file_url !== null && isHouseholdMediaPath(row.file_url));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setPhotoUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [birthdayRows, contactRows]);
+
   const saveMutation = useMutation({
     mutationFn: async ({ id, values }: { id: string | null; values: BirthdayFormValues }) => {
       const row = id
@@ -85,13 +110,13 @@ export function useAnniversaires(): AnniversairesResource {
   const removeMutation = useMutation({ mutationFn: (id: string) => deleteBirthday(id), onSuccess: refresh });
 
   const birthdays = useMemo(
-    () => resource.rows.map((row) => toBirthday(row, members)).sort((a, b) => a.daysUntil - b.daysUntil),
-    [resource.rows, members],
+    () => resource.rows.map((row) => toBirthday(row, members, photoUrls)).sort((a, b) => a.daysUntil - b.daysUntil),
+    [resource.rows, members, photoUrls],
   );
 
   const aggregated = useMemo(
-    () => aggregateBirthdays(resource.rows, contactsResource.rows, members),
-    [resource.rows, contactsResource.rows, members],
+    () => aggregateBirthdays(resource.rows, contactsResource.rows, members, photoUrls),
+    [resource.rows, contactsResource.rows, members, photoUrls],
   );
 
   return {
