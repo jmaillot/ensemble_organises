@@ -5,6 +5,7 @@
 
 import { daysBetween, formatMediumDate, todayIso, toIsoDate } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
+import { displayablePhoto } from '@/modules/anniversaires/types';
 import type { HouseholdMemberRow, PostCommentRow, PostMediaRow, PostReactionRow, PostRow } from '@/types';
 import type { CompressedImage } from './lib/media';
 
@@ -14,7 +15,12 @@ export interface PostMedia {
   id: string;
   postId: string;
   kind: PostMediaKind;
-  url: string;
+  /**
+   * URL affichable (signée à la lecture), `null` en échec fermé — jamais le
+   * chemin brut du bucket dans le DOM (D-01, WR-08). Une forme non-chemin
+   * (aperçu `blob:` du mode démo, URL http(s) héritée) est rendue telle quelle.
+   */
+  url: string | null;
 }
 
 export interface PostComment {
@@ -74,8 +80,15 @@ export const ROLE_LABELS: Record<HouseholdMemberRow['role'], string> = {
   enfant: 'Enfant',
 };
 
-export function toPostMedia(row: PostMediaRow): PostMedia {
-  return { id: row.id, postId: row.post_id, kind: row.media_type, url: row.url };
+/**
+ * Média du fil (D-01) : la colonne porte le chemin du bucket, l'URL affichable
+ * est forgée à la lecture par la carte de résolution (`displayablePhoto`, point
+ * unique de 19-07). Une forme non-chemin — URL externe héritée, aperçu `blob:`
+ * de la publication optimiste — est rendue telle quelle ; un chemin non résolu
+ * rend `null` (échec fermé, jamais un lien mort).
+ */
+export function toPostMedia(row: PostMediaRow, resolved: Record<string, string> = {}): PostMedia {
+  return { id: row.id, postId: row.post_id, kind: row.media_type, url: displayablePhoto(row.url, resolved, row.id) };
 }
 
 export function toPostComment(row: PostCommentRow): PostComment {
@@ -128,13 +141,19 @@ export interface FeedInput {
   currentMemberId: string;
   /** Lecture par publication : les commentaires plus récents sont « non lus ». */
   readAt: (postId: string) => string;
+  /**
+   * Médias résolus à la lecture, indexés par `post_media.id` (D-01) : un chemin
+   * de bucket y trouve son URL signée ; absent, la résolution est un échec
+   * fermé (`null`).
+   */
+  resolvedMedia?: Record<string, string>;
 }
 
 /**
  * Assemble le fil à partir des quatre tables. Les publications sont triées du
  * plus récent au plus ancien ; les commentaires restent en ordre chronologique.
  */
-export function composeFeed({ posts, media, comments, reactions, members, currentMemberId, readAt }: FeedInput): FeedPost[] {
+export function composeFeed({ posts, media, comments, reactions, members, currentMemberId, readAt, resolvedMedia = {} }: FeedInput): FeedPost[] {
   const memberById = new Map(members.map((member) => [member.id, member]));
   const mediaByPost = groupBy(media, (row) => row.post_id);
   const commentsByPost = groupBy(comments, (row) => row.post_id);
@@ -150,7 +169,7 @@ export function composeFeed({ posts, media, comments, reactions, members, curren
       return {
         ...toPost(row),
         author: memberById.get(row.author_id) ?? null,
-        media: (mediaByPost.get(row.id) ?? []).map(toPostMedia),
+        media: (mediaByPost.get(row.id) ?? []).map((mediaRow) => toPostMedia(mediaRow, resolvedMedia)),
         comments: postComments.map((comment) => ({
           ...comment,
           author: memberById.get(comment.authorId) ?? null,

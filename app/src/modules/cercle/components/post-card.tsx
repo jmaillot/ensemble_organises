@@ -216,7 +216,10 @@ function PostCardComponent({
         ) : null}
 
         {post.media.map((media) =>
-          media.kind === 'video' ? (
+          // `url` est nulle en échec fermé (signature refusée, D-01) : on
+          // n'insère ni `<img src="null">` ni `<video src="null">` — l'image
+          // manque, elle ne devient pas un lien mort.
+          media.url === null ? null : media.kind === 'video' ? (
             <video
               key={media.id}
               className="mb-[13px] max-h-[420px] w-full rounded-[13px] bg-bg object-contain"

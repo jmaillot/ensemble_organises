@@ -7,6 +7,7 @@
 
 import { data } from '@/lib/data';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import { householdMediaPathOf, removeHouseholdFile } from '@/lib/storage';
 import { randomId } from '@/lib/utils';
 import type { PostCommentRow, PostMediaRow, PostReactionRow, PostRow } from '@/types';
 import type { CompressedImage } from './lib/media';
@@ -22,8 +23,27 @@ export const cercleTables = {
  * les politiques Storage connaissent. Le chemin d'objet commence par le foyer,
  * comme elles l'exigent. */
 export const CERCLES_BUCKET = 'household-media';
-/** Durée de validité des URL signées servies par le Storage. */
-const SIGNED_URL_TTL = 60 * 60 * 24 * 30;
+
+/**
+ * Retrait des objets d'un média, APRÈS la disparition de leurs lignes (D-03,
+ * WR-10). La ligne part d'abord, l'objet ensuite : l'inverse laisserait une
+ * ligne pointant vers un objet disparu. Best-effort — un bucket indisponible
+ * est signalé, jamais transformé en échec d'une suppression de ligne déjà
+ * effective.
+ */
+async function removeStoredObjects(values: (string | null)[]): Promise<void> {
+  await Promise.all(
+    values.map(async (value) => {
+      const path = householdMediaPathOf(value);
+      if (!path) return;
+      try {
+        await removeHouseholdFile(path);
+      } catch (error) {
+        console.warn(`Objet de média non retiré du bucket : ${path}`, error);
+      }
+    }),
+  );
+}
 
 function requireHousehold(householdId: string | null): string {
   if (!householdId) throw new Error('Aucun foyer sélectionné.');
@@ -57,8 +77,12 @@ export interface CreatePostInput {
 }
 
 /**
- * Dépôt du média : bucket privé en mode Supabase (URL signée), aperçu local en
- * mode démo. La compression a déjà été appliquée côté navigateur.
+ * Dépôt du média : bucket privé en mode Supabase (le CHEMIN est rendu, D-01),
+ * aperçu local en mode démo. La compression a déjà été appliquée côté
+ * navigateur (`cercle/lib/media`), donc on n'emprunte pas `depositHouseholdFile`
+ * qui recompresserait une image déjà compressée. La valeur écrite en colonne est
+ * le chemin ; l'URL signée est forgée à la lecture, jamais persistée (WR-08) —
+ * une URL de 30 jours est une donnée qui pourrit.
  */
 async function depositMedia(input: { householdId: string; postId: string; image: CompressedImage }): Promise<string> {
   const { householdId, postId, image } = input;
@@ -69,11 +93,7 @@ async function depositMedia(input: { householdId: string; postId: string; image:
     upsert: false,
   });
   if (error) throw new Error(error.message);
-  const { data: signed, error: signError } = await supabase.storage
-    .from(CERCLES_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL);
-  if (signError) throw new Error(signError.message);
-  return signed.signedUrl;
+  return path;
 }
 
 export async function createPost({
@@ -126,6 +146,11 @@ export async function removePostCascade(input: { householdId: string; postId: st
     ...reactions.map((row) => data.remove(cercleTables.reactions, row.id)),
     data.remove(cercleTables.posts, postId),
   ]);
+  // Les objets suivent leurs lignes (D-03, WR-10) : les chemins sont lus AVANT
+  // (médias ci-dessus), les objets retirés APRÈS — jamais une ligne pointant
+  // vers un objet disparu. Best-effort : un bucket indisponible est signalé, la
+  // publication reste supprimée.
+  await removeStoredObjects(media.map((row) => row.url));
 }
 
 export async function createComment(input: {

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { queryKeys } from '@/lib/data/useResource';
+import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import type { HouseholdMemberRow, PostCommentRow, PostMediaRow, PostReactionRow, PostRow } from '@/types';
 import { useToast } from '@/components/ui/toast';
@@ -106,6 +107,27 @@ export function useCercleFeed(): CercleFeed {
     queryFn: () => listPostReactions(householdId),
   });
 
+  // Les médias portent des CHEMINS (D-01) : on forge les URL signées à la
+  // lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
+  // formes non-chemin (aperçu `blob:` de la publication optimiste, URL
+  // héritée) ne passent pas par l'effet — `displayablePhoto` les rend telles
+  // quelles, ce qui garde la publication instantanée.
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const mediaRows = media.data;
+  useEffect(() => {
+    const pending = (mediaRows ?? [])
+      .filter((row) => isHouseholdMediaPath(row.url))
+      .map((row) => ({ id: row.id, file_url: row.url }));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void resolveHouseholdMediaUrls(pending).then((resolved) => {
+      if (!cancelled) setMediaUrls(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaRows]);
+
   /**
    * Rafraîchit le fil : la clé globale `tableAll` (contrat de la couche data)
    * est invalidée en plus des clés du module, pour rester interopérable avec
@@ -145,8 +167,9 @@ export function useCercleFeed(): CercleFeed {
         members,
         currentMemberId,
         readAt,
+        resolvedMedia: mediaUrls,
       }),
-    [posts.data, media.data, comments.data, reactions.data, members, currentMemberId, readAt],
+    [posts.data, media.data, comments.data, reactions.data, members, currentMemberId, readAt, mediaUrls],
   );
 
   const unreadTotal = useMemo(

@@ -1,14 +1,61 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
-import type { PostCommentRow } from '@/types';
+import type { PostCommentRow, PostMediaRow, PostRow } from '@/types';
 import CerclePage from './cercle-page';
 import { PostCard } from './components/post-card';
 import { CommentsDialog } from './components/comments-dialog';
 import type { FeedPost } from './types';
+
+/**
+ * D-01/WR-08 — la lecture forge l'URL affichable depuis le CHEMIN de colonne
+ * (`resolveHouseholdMediaUrls`, point unique de 19-01). On l'observe au niveau
+ * du fil : un chemin rend l'URL du faux Storage, un échec laisse l'image
+ * absente — jamais le chemin brut ni un `src="null"`. Le retrait d'objet
+ * (`removeHouseholdFile`) est doublé pour prouver la compensation de
+ * suppression (D-03/WR-10).
+ */
+const { resolveMock, removeFileMock } = vi.hoisted(() => ({
+  resolveMock: vi.fn(),
+  removeFileMock: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storage')>();
+  return { ...actual, resolveHouseholdMediaUrls: resolveMock, removeHouseholdFile: removeFileMock };
+});
+
+/** Ce que le Storage rendrait : une URL signée par ligne de média. */
+function signEveryRow(rows: { id: string }[]): Record<string, string> {
+  const resolved: Record<string, string> = {};
+  for (const row of rows) resolved[row.id] = `https://signe.example/${row.id}`;
+  return resolved;
+}
+
+/** Publication de Camille (l'auteur courant) portant un média à la `url` donnée. */
+async function seedPostWithMedia(id: string, url: string): Promise<void> {
+  await data.create<PostRow>('posts', {
+    id,
+    household_id: DEMO_HOUSEHOLD_ID,
+    author_id: DEMO_MEMBERS.camille,
+    text: `Média ${id}`,
+    created_at: new Date().toISOString(),
+  });
+  await data.create<PostMediaRow>('post_media', {
+    id: `${id}-media`,
+    post_id: id,
+    household_id: DEMO_HOUSEHOLD_ID,
+    media_type: 'photo',
+    url,
+  });
+}
+
+function mediaImageOf(container: HTMLElement, postId: string): HTMLImageElement | null {
+  return container.querySelector(`article[data-post-id="${postId}"] img`);
+}
 
 describe('Cercle', () => {
   it('publie un moment depuis le composeur et l’ajoute en tête du fil', async () => {
@@ -525,5 +572,80 @@ describe('Cercle', () => {
     await user.type(screen.getByLabelText(/Répondre à/), 'Bien reçu !');
     await user.click(screen.getByRole('button', { name: /Envoyer la réponse/ }));
     await waitFor(() => expect(sent).toEqual([{ postId: 'post-inline', content: 'Bien reçu !' }]));
+  });
+});
+
+/**
+ * D-01, WR-08 — la colonne porte le CHEMIN, l'URL se forge à la lecture. Un
+ * chemin non résolu (signature refusée) laisse l'image absente : le DOM ne
+ * reçoit jamais le chemin brut ni un `src="null"`. L'aperçu optimiste (`blob:`)
+ * n'est pas un chemin, donc il traverse la lecture tel quel — c'est ce qui garde
+ * la publication instantanée.
+ */
+describe('Cercle — média en chemin, URL signée à la lecture (D-01, WR-08)', () => {
+  beforeEach(() => {
+    resolveMock.mockReset();
+    resolveMock.mockImplementation(async (rows: { id: string }[]) => signEveryRow(rows));
+    removeFileMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('affiche l’URL signée forgée depuis le chemin, jamais le chemin brut', async () => {
+    await seedPostWithMedia('post-resolu', 'hh-1/posts/post-resolu/photo.webp');
+    const { container } = renderWithProviders(<CerclePage />);
+
+    await screen.findByText('Média post-resolu', {}, { timeout: 5000 });
+
+    await waitFor(() =>
+      expect(mediaImageOf(container, 'post-resolu')?.getAttribute('src')).toBe(
+        'https://signe.example/post-resolu-media',
+      ),
+    );
+    // Le chemin du bucket n'est jamais écrit dans le DOM.
+    expect(container.innerHTML).not.toContain('hh-1/posts/post-resolu/photo.webp');
+  });
+
+  it('laisse l’image absente quand la signature échoue (échec fermé)', async () => {
+    resolveMock.mockImplementation(async () => ({}));
+    await seedPostWithMedia('post-echec', 'hh-1/posts/post-echec/photo.webp');
+    const { container } = renderWithProviders(<CerclePage />);
+
+    await screen.findByText('Média post-echec', {}, { timeout: 5000 });
+
+    await waitFor(() => expect(mediaImageOf(container, 'post-echec')).toBeNull());
+    // Ni chemin brut, ni lien mort : la carte reste, l'image simplement manque.
+    expect(container.innerHTML).not.toContain('hh-1/posts/post-echec/photo.webp');
+    expect(container.innerHTML).not.toContain('src="null"');
+  });
+
+  it('affiche tel quel l’aperçu `blob:` d’une publication optimiste, sans le re-signer', async () => {
+    await seedPostWithMedia('post-apercu', 'blob:apercu-optimiste');
+    const { container } = renderWithProviders(<CerclePage />);
+
+    await screen.findByText('Média post-apercu', {}, { timeout: 5000 });
+
+    await waitFor(() =>
+      expect(mediaImageOf(container, 'post-apercu')?.getAttribute('src')).toBe('blob:apercu-optimiste'),
+    );
+    // Un aperçu local n'est pas un objet de bucket : rien à signer pour lui.
+    expect(resolveMock).not.toHaveBeenCalledWith([
+      { id: 'post-apercu-media', file_url: 'blob:apercu-optimiste' },
+    ]);
+  });
+
+  it('supprime la publication en retirant du bucket l’objet de son média', async () => {
+    const user = userEvent.setup();
+    await seedPostWithMedia('post-suppr', 'hh-1/posts/post-suppr/photo.webp');
+    const { container } = renderWithProviders(<CerclePage />);
+
+    const card = (await screen.findByText('Média post-suppr', {}, { timeout: 5000 })).closest(
+      'article',
+    ) as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: /Supprimer la publication de Camille Martin/ }));
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() => expect(removeFileMock).toHaveBeenCalledWith('hh-1/posts/post-suppr/photo.webp'));
+    expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('article[data-post-id="post-suppr"]')).toBeNull());
   });
 });
