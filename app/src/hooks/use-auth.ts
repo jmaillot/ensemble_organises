@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { User, UserIdentity } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { data } from '@/lib/data';
@@ -74,14 +74,42 @@ export async function applySession(user: User): Promise<void> {
   await store.signIn(sessionUser);
 }
 
+/** Contrat d'amorçage rendu par `useAuthBootstrap`. */
+export interface AuthBootstrap {
+  /** L'application peut être affichée : l'amorçage a abouti, succès ou échec. */
+  ready: boolean;
+  /**
+   * Échec d'amorçage, ou `null`. L'objet est conservé pour l'observabilité mais
+   * n'est jamais rendu : `main.tsx` affiche un message fixe, un message réseau
+   * pouvant transporter une URL, un jeton ou un détail serveur.
+   */
+  error: Error | null;
+  /** Relance l'amorçage. */
+  retry: () => void;
+}
+
 /** Restaure la session Supabase au chargement et le foyer de l'utilisateur. */
-export function useAuthBootstrap() {
+export function useAuthBootstrap(): AuthBootstrap {
   const setStatus = useSessionStore((state) => state.setStatus);
   // Tant que la session n'est pas restaurée, l'application affiche un état de
   // chargement : sinon une route protégée redirigerait vers la connexion.
   const [ready, setReady] = useState(false);
+  // Un échec d'amorçage (réseau, backend indisponible, jeton rejeté) était
+  // auparavant invisible : `setReady(true)` n'était atteint qu'en cas de
+  // succès, et l'application restait sur « Chargement… » indéfiniment (WR-04).
+  const [error, setError] = useState<Error | null>(null);
+  // La reprise RELANCE l'effet plutôt que de rejouer l'amorçage dans une
+  // seconde fonction : deux copies du même chemin divergent — c'est
+  // exactement comment la branche d'échec a disparu de la première.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    // Chaque tentative repart d'un état neutre. `ready` retombe aussi : sinon
+    // une reprise laisserait le routeur s'afficher avec le statut laissé par
+    // la tentative précédente, et la garde renverrait vers `/connexion`.
+    setError(null);
+    setReady(false);
+
     if (!supabase) {
       const persisted = useSessionStore.getState().user;
       if (persisted) {
@@ -112,26 +140,42 @@ export function useAuthBootstrap() {
     }
 
     let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
+
+    // Branche d'échec unique : elle pose l'erreur ET `setReady(true)`, sans
+    // quoi l'écran de chargement resterait affiché pour toujours. Le garde
+    // `active` est respecté : un démontage ne pose aucun état.
+    const fail = (cause: unknown) => {
       if (!active) return;
-      const session = data.session;
-      if (!session) {
-        setStatus('guest');
-        setReady(true);
-        return;
-      }
-      // La session ET le foyer sont posés avant le premier rendu : `setReady`
-      // sans attendre laissait `status` à `initialising` pendant que le
-      // routeur affichait déjà les routes, et la garde renvoyait vers
-      // `/connexion` un utilisateur pourtant connecté (rechargement).
-      // La session ET le foyer sont posés avant le premier rendu : `setReady`
-      // sans attendre laissait `status` à `initialising` pendant que le
-      // routeur affichait déjà les routes, et la garde renvoyait vers
-      // `/connexion` un utilisateur pourtant connecté (rechargement).
-      await applySession(session.user);
-      if (!active) return;
+      setError(cause instanceof Error ? cause : new Error('Amorçage de session impossible.'));
       setReady(true);
-    });
+    };
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!active) return;
+        const session = data.session;
+        if (!session) {
+          setStatus('guest');
+          setReady(true);
+          return;
+        }
+        try {
+          // `applySession` lit le profil et charge le foyer : il rejette pour
+          // les mêmes causes réseau, et doit produire le même écran.
+          await applySession(session.user);
+        } catch (cause) {
+          fail(cause);
+          return;
+        }
+        if (!active) return;
+        // La session ET le foyer sont posés avant le premier rendu : `setReady`
+        // sans attendre laissait `status` à `initialising` pendant que le
+        // routeur affichait déjà les routes, et la garde renvoyait vers
+        // `/connexion` un utilisateur pourtant connecté (rechargement).
+        setReady(true);
+      })
+      .catch(fail);
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -150,9 +194,11 @@ export function useAuthBootstrap() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [setStatus]);
+  }, [setStatus, attempt]);
 
-  return ready;
+  const retry = useCallback(() => setAttempt((current) => current + 1), []);
+
+  return { ready, error, retry };
 }
 
 export async function signInWithProvider(provider: 'google') {

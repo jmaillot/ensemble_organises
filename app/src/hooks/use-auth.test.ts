@@ -196,10 +196,10 @@ describe("chemin d'authentification", () => {
 
     const seen: Array<{ ready: boolean; status: string }> = [];
     const { unmount } = renderHook(() => {
-      const ready = useAuthBootstrap();
+      const bootstrap = useAuthBootstrap();
       const status = store((state) => state.status);
-      seen.push({ ready, status });
-      return ready;
+      seen.push({ ready: bootstrap.ready, status });
+      return bootstrap.ready;
     });
 
     await waitFor(() => expect(store.getState().status).toBe('authenticated'), { timeout: 4000 });
