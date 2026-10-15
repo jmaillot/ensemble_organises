@@ -42,6 +42,13 @@ function RequireAuth({ children }: { children: ReactNode }) {
  * contournée en SSO resté en mode « connexion »). Horodaté dans
  * `profiles.age_attested_at`, une seule fois par compte. Refus = déconnexion.
  * En démo (backend absent), rien à attester : passage direct.
+ *
+ * D-12 (WR-17) : cette garde porte un **avis légal**, pas une frontière
+ * d'autorisation (la RLS reste la frontière). Elle ne conclut donc que sur une
+ * lecture qui a **réussi** : une lecture en échec ne dit pas « non attesté »,
+ * elle ne dit rien. Bloquer dessus placerait un utilisateur déjà attesté
+ * devant une modale dont l'action naturelle le déconnecte — l'erreur coûte
+ * alors plus cher que l'avis qu'elle protège.
  */
 export function RequireAttestation({ children }: { children: ReactNode }) {
   const user = useSessionUser();
@@ -64,6 +71,9 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
 
   if (!isSupabaseConfigured || !user) return <>{children}</>;
   if (profileQuery.isLoading) return <RouteFallback />;
+  // Une lecture en échec laisse passer (D-12) : voir le commentaire de la
+  // garde. Seule une lecture RÉUSSIE qui dit « non attesté » ouvre la modale.
+  if (profileQuery.isError) return <>{children}</>;
   if (profileQuery.data?.age_attested_at) return <>{children}</>;
 
   const confirm = () => {
@@ -111,9 +121,9 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
             />
             Je certifie avoir 15 ans ou plus.
           </label>
-          {saveError ?? profileQuery.isError ? (
+          {saveError ? (
             <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
-              {saveError ?? 'Profil introuvable, reconnectez-vous.'}
+              {saveError}
             </p>
           ) : null}
           <DialogActions>
@@ -205,13 +215,17 @@ export function AppRoutes() {
       <Route
         path="/foyer/nouveau"
         element={
-          <LazyRoute load={routeChunkLoaders.createHousehold} />
+          <RequireAuth>
+            <LazyRoute load={routeChunkLoaders.createHousehold} />
+          </RequireAuth>
         }
       />
       <Route
         path="/foyer/rejoindre"
         element={
-          <LazyRoute load={routeChunkLoaders.joinHousehold} />
+          <RequireAuth>
+            <LazyRoute load={routeChunkLoaders.joinHousehold} />
+          </RequireAuth>
         }
       />
       <Route
