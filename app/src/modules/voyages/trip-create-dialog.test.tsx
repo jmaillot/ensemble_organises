@@ -4,6 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, seedHouseholdStore } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
+import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import { TripCreateDialog, type TripCreateValues } from './components/trip-create-dialog';
 import {
@@ -15,8 +16,44 @@ import {
 } from './api';
 import { DEFAULT_TRIP_COVER } from './types';
 
+/**
+ * WR-09 — la couverture en échec doit emporter le voyage créé. Le mode Supabase
+ * est simulé par un drapeau LU À L'APPEL (`createTripFlow` lit
+ * `isSupabaseConfigured` à l'exécution), tandis que `data` reste l'adaptateur
+ * local — sa `remove('trips', id)` est alors observable et prouve la
+ * compensation, là où l'ancien code laissait le voyage.
+ */
+const { depositMock, supabaseState, authMock } = vi.hoisted(() => ({
+  depositMock: vi.fn(),
+  supabaseState: { configured: false },
+  authMock: { getSession: vi.fn(async () => ({ data: { session: { access_token: 'jeton-test' } } })) },
+}));
+
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storage')>();
+  return { ...actual, depositHouseholdFile: depositMock };
+});
+
+vi.mock('@/lib/supabase/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/supabase/client')>();
+  return {
+    ...actual,
+    get isSupabaseConfigured() {
+      return supabaseState.configured;
+    },
+    get supabase() {
+      return supabaseState.configured ? { auth: authMock } : null;
+    },
+    get supabaseFunctionsBase() {
+      return supabaseState.configured ? 'https://api.example/functions/v1' : null;
+    },
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  supabaseState.configured = false;
+  depositMock.mockReset();
 });
 
 async function fillInfos(user: ReturnType<typeof userEvent.setup>) {
@@ -153,5 +190,89 @@ describe('createTripFlow — repli démo (mêmes lignes que le serveur)', () => 
     writeTripTicket('trip-1', 'ticket-brut-1');
     expect(readTripTicket('trip-1')).toBe('ticket-brut-1');
     expect(readTripTicket('trip-2')).toBeNull();
+  });
+});
+
+/**
+ * WR-09 : le dépôt de couverture en échec, en mode Supabase, doit retirer le
+ * voyage créé par l'Edge (`deleteTrip`) avant de propager l'erreur d'origine.
+ * Sans compensation, une réédition créait un SECOND voyage — le doublon décrit.
+ */
+describe('createTripFlow — la couverture en échec emporte le voyage (WR-09)', () => {
+  it('retire le voyage créé (deleteTrip) et propage l’erreur d’origine', async () => {
+    seedHouseholdStore();
+    const householdId = useHouseholdStore.getState().householdId ?? DEMO_HOUSEHOLD_ID;
+    supabaseState.configured = true;
+    depositMock.mockRejectedValueOnce(new Error('stockage indisponible'));
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ trip_id: 'trip-supabase-nouveau', ardoise_id: 'ardoise-supabase-nouveau' }),
+    }));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const removeSpy = vi.spyOn(data, 'remove');
+    try {
+      await expect(
+        createTripFlow({
+          householdId,
+          input: {
+            name: 'Séjour à Porto',
+            destination: 'Porto',
+            startDate: '2027-09-10',
+            endDate: '2027-09-16',
+            coverPhoto: DEFAULT_TRIP_COVER,
+            notes: '',
+            participantIds: ['member-camille'],
+            enabledTabs: ['budget'],
+            coverFile: new File(['pixels'], 'porto.jpg', { type: 'image/jpeg' }),
+          },
+          createdByMemberId: 'member-camille',
+        }),
+      ).rejects.toThrow('stockage indisponible');
+
+      // L'Edge a bien été appelée puis le voyage retiré, dans cet ordre.
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.example/functions/v1/trip-invite',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(removeSpy).toHaveBeenCalledWith('trips', 'trip-supabase-nouveau');
+    } finally {
+      removeSpy.mockRestore();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('sans fichier de couverture, aucun retrait (rien à compenser)', async () => {
+    seedHouseholdStore();
+    const householdId = useHouseholdStore.getState().householdId ?? DEMO_HOUSEHOLD_ID;
+    supabaseState.configured = true;
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ trip_id: 'trip-supabase-sans-cover', ardoise_id: 'ardoise-sans-cover' }),
+    }));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const removeSpy = vi.spyOn(data, 'remove');
+    try {
+      const tripId = await createTripFlow({
+        householdId,
+        input: {
+          name: 'Séjour à Porto',
+          destination: 'Porto',
+          startDate: '2027-09-10',
+          endDate: '2027-09-16',
+          coverPhoto: DEFAULT_TRIP_COVER,
+          notes: '',
+          participantIds: ['member-camille'],
+          enabledTabs: ['budget'],
+        },
+        createdByMemberId: 'member-camille',
+      });
+      expect(tripId).toBe('trip-supabase-sans-cover');
+      expect(removeSpy).not.toHaveBeenCalled();
+    } finally {
+      removeSpy.mockRestore();
+      globalThis.fetch = originalFetch;
+    }
   });
 });

@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, type ReactNode } from 'react';
+import { renderHook } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { getLocalAdapter } from '@/lib/data/local-adapter';
+import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
+import { createTestQueryClient, seedHouseholdStore } from '@/test/render';
 import type { RecipeRow } from '@/types';
+import { toRecipe, type RecipeFormValues } from './types';
+import { useRecettes } from './hooks/use-recettes';
 import {
   deleteRecipe,
   deleteRecipeCover,
@@ -113,5 +120,72 @@ describe('Couverture recettes (R9)', () => {
   it('supprimer sans couverture ne touche pas le Storage', async () => {
     await deleteRecipeCover(null);
     expect(removeFileMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * WR-09 — le dépôt de couverture en échec, à l'enregistrement d'une recette
+ * NOUVELLE, doit supprimer la recette créée (D-08) : sans cela, une réédition
+ * créait une seconde ligne. En édition, la recette préexistante est conservée.
+ */
+describe('useRecettes.saveRecipe — la couverture en échec emporte la ligne (WR-09)', () => {
+  function renderRecettes() {
+    const queryClient = createTestQueryClient();
+    return renderHook(() => useRecettes(), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children),
+    });
+  }
+
+  function formValues(file: File | null): RecipeFormValues {
+    return {
+      title: 'Gratin raté',
+      categoryId: '',
+      newCategoryName: '',
+      servings: 4,
+      prepHours: null,
+      prepMins: null,
+      cookHours: null,
+      cookMins: null,
+      tags: [],
+      coverFile: file,
+      existingCover: null,
+    };
+  }
+
+  it('recette NOUVELLE : un dépôt en échec supprime la recette créée', async () => {
+    seedHouseholdStore();
+    const { result } = renderRecettes();
+    const file = new File(['pixels'], 'gratin.jpg', { type: 'image/jpeg' });
+    depositMock.mockRejectedValueOnce(new Error('stockage indisponible'));
+
+    await expect(result.current.saveRecipe(null, formValues(file))).rejects.toThrow('stockage indisponible');
+
+    const rows = await data.list<RecipeRow>('recipes', { household_id: DEMO_HOUSEHOLD_ID });
+    expect(rows.some((row) => row.title === 'Gratin raté')).toBe(false);
+  });
+
+  it('recette EXISTANTE : un dépôt en échec ne la supprime pas', async () => {
+    seedHouseholdStore();
+    const adapter = getLocalAdapter();
+    const saved = await adapter.create<RecipeRow>('recipes', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      title: 'Gratin conservé',
+      created_at: '2026-10-14T12:00:00.000Z',
+    });
+    const { result } = renderRecettes();
+    const file = new File(['pixels'], 'gratin.jpg', { type: 'image/jpeg' });
+    depositMock.mockRejectedValueOnce(new Error('stockage indisponible'));
+
+    try {
+      await expect(result.current.saveRecipe(toRecipe(saved, {}), formValues(file))).rejects.toThrow(
+        'stockage indisponible',
+      );
+
+      const rows = await data.list<RecipeRow>('recipes', { household_id: DEMO_HOUSEHOLD_ID });
+      expect(rows.some((row) => row.id === saved.id)).toBe(true);
+    } finally {
+      await adapter.remove('recipes', saved.id).catch(() => undefined);
+    }
   });
 });

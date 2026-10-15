@@ -209,11 +209,23 @@ export function useRecettes(filter: RecipeSearchFilter = EMPTY_RECIPE_FILTER): U
 
       let coverPhoto = (saved.cover_photo as string | null) ?? null;
       if (values.coverFile) {
-        const uploaded = await uploadRecipeCover(householdId ?? '', saved.id, values.coverFile);
-        const updated = await update(saved.id, { cover_photo: uploaded });
-        coverPhoto = (updated.cover_photo as string | null) ?? uploaded;
-        if (recipe?.coverPhoto && recipe.coverPhoto !== coverPhoto) {
-          await deleteRecipeCover(recipe.coverPhoto);
+        let uploaded: string | null = null;
+        try {
+          uploaded = await uploadRecipeCover(householdId ?? '', saved.id, values.coverFile);
+          const updated = await update(saved.id, { cover_photo: uploaded });
+          coverPhoto = (updated.cover_photo as string | null) ?? uploaded;
+          if (recipe?.coverPhoto && recipe.coverPhoto !== coverPhoto) {
+            await deleteRecipeCover(recipe.coverPhoto);
+          }
+        } catch (coverError) {
+          // Compensation (D-08) : un dépôt en échec ne doit laisser aucune
+          // ligne créée. Le dépôt neuf éventuellement déposé est retiré dans
+          // les deux cas ; en création seulement, la recette créée l'est aussi.
+          // En édition, la recette préexistante est celle que l'utilisateur
+          // modifie : jamais de suppression. L'erreur d'origine remonte intacte.
+          if (uploaded) await deleteRecipeCover(uploaded).catch(() => undefined);
+          if (!recipe) await deleteRecipe(saved.id, null).catch(() => undefined);
+          throw coverError instanceof Error ? coverError : new Error('Couverture impossible.');
         }
       }
 

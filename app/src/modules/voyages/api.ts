@@ -265,8 +265,13 @@ export async function createTripFlow({ householdId, input, createdByMemberId }: 
         const coverPhoto = await uploadTripCover(householdId, tripId, input.coverFile);
         await updateTripMeta(tripId, { cover_photo: coverPhoto });
       } catch (uploadError) {
+        // Compensation (D-08) : le dépôt a besoin de l'id, donc c'est le voyage
+        // créé qui est retiré — jamais de ligne orpheline à la réédition. Le
+        // retrait de l'objet et celui de la ligne sont tentés puis avalés : c'est
+        // l'erreur d'origine qui remonte, pas celle de la compensation.
         const path = tripCoverPathOf(input.coverPhoto);
         if (path) await deleteTripCover(path);
+        await deleteTrip(tripId).catch(() => undefined);
         throw uploadError instanceof Error ? uploadError : new Error('Couverture impossible.');
       }
     } else if (input.coverPhoto && input.coverPhoto !== DEFAULT_TRIP_COVER) {
@@ -315,7 +320,7 @@ export async function createTripFlow({ householdId, input, createdByMemberId }: 
     return tripId;
   } catch (error) {
     if (depositedPath) await deleteTripCover(depositedPath);
-    await data.remove('trips', tripId).catch(() => undefined);
+    await deleteTrip(tripId).catch(() => undefined);
     await data.removeWhere('trip_members', { trip_id: tripId }).catch(() => undefined);
     await data.removeWhere('ardoises', { trip_id: tripId }).catch(() => undefined);
     await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId }).catch(() => undefined);
