@@ -1,25 +1,35 @@
+import * as React from 'react';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/shared/icon';
 
-export function Switch({ className, ...rest }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+const SWITCH_TRACK_CLASSES =
+  'flex h-[22px] w-[38px] shrink-0 items-center rounded-full border-2 border-transparent bg-border p-0.5 transition-colors duration-[var(--duration-quick)] data-[state=checked]:bg-accent';
+// G-17-3 : piste w-[38px] border-box − border-2 (2px×2) − p-0.5 (2px×2)
+// = 30px utiles ; pastille 18px + translate-x-3 (12px) = 30px = contenue.
+// translate-x-4 (16px) donnait 34px > 30px, soit ~4px de dépassement à ON.
+// Taille visuelle 38px inchangée.
+const SWITCH_THUMB_CLASSES =
+  'pointer-events-none block size-[18px] rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform duration-[var(--duration-quick)] data-[state=checked]:translate-x-3';
+
+export function Switch({ className, children, ...rest }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+  const thumb = <SwitchPrimitive.Thumb className={SWITCH_THUMB_CLASSES} />;
+  if (rest.asChild && React.isValidElement(children)) {
+    // asChild (ex. cuisine-toggle : visuel seul dans un <button>, jamais de
+    // <button> imbriqué) : le Slot Radix fusionnerait les classes piste +
+    // pastille sur le seul enfant — plus de pastille distincte et tout le
+    // bloc glissait à ON. On y injecte la pastille pour garder piste > pastille.
+    return (
+      <SwitchPrimitive.Root className={cn(SWITCH_TRACK_CLASSES, className)} {...rest}>
+        {React.cloneElement(children as React.ReactElement<{ children?: React.ReactNode }>, {}, thumb)}
+      </SwitchPrimitive.Root>
+    );
+  }
   return (
-    <SwitchPrimitive.Root
-      className={cn(
-        'flex h-[22px] w-[38px] shrink-0 items-center rounded-full border-2 border-transparent bg-border p-0.5 transition-colors duration-[var(--duration-quick)] data-[state=checked]:bg-accent',
-        className,
-      )}
-      {...rest}
-    >
-      <SwitchPrimitive.Thumb
-        // G-17-3 : piste w-[38px] border-box − border-2 (2px×2) − p-0.5
-        // (2px×2) = 30px utiles ; pastille 18px + translate-x-3 (12px)
-        // = 30px = contenue. translate-x-4 (16px) donnait 34px > 30px,
-        // soit ~4px de dépassement à ON. Taille visuelle 38px inchangée.
-        className="pointer-events-none block size-[18px] rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform duration-[var(--duration-quick)] data-[state=checked]:translate-x-3"
-      />
+    <SwitchPrimitive.Root className={cn(SWITCH_TRACK_CLASSES, className)} {...rest}>
+      {thumb}
     </SwitchPrimitive.Root>
   );
 }
