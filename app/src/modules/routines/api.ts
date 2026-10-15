@@ -98,7 +98,9 @@ export async function listRoutineCompletions(routineIds: string[]): Promise<Rout
  * on repart donc de la liste existante au lieu d'alterner ajouts et retraits.
  */
 export async function setRoutineAssignees(routineId: string, memberIds: string[]): Promise<void> {
-  await data.removeWhere(ROUTINE_ASSIGNEES_TABLE, { routine_id: routineId });
+  // Remplacement en bloc : zéro ligne à supprimer (retrait du dernier
+  // assignataire) est normal — tolérance déclarée.
+  await data.removeWhere(ROUTINE_ASSIGNEES_TABLE, { routine_id: routineId }, { ifMissing: 'ignore' });
   await Promise.all(
     memberIds.map((memberId) => data.create<RoutineAssigneeRecord>(ROUTINE_ASSIGNEES_TABLE, { routine_id: routineId, member_id: memberId })),
   );
@@ -111,7 +113,9 @@ export async function setRoutineReminder(routineId: string, remindAt: string | n
 
 /** Remplace l'ensemble des rappels d'une routine. */
 export async function setRoutineReminders(routineId: string, remindAts: string[]): Promise<void> {
-  await data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: routineId });
+  // Remplacement : une routine sans rappel n'en a aucun à supprimer — tolérance
+  // déclarée.
+  await data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: routineId }, { ifMissing: 'ignore' });
   await Promise.all(
     remindAts.map((remindAt) =>
       data.create<RoutineReminderRecord>(ROUTINE_REMINDERS_TABLE, { routine_id: routineId, remind_at: remindAt }),
@@ -185,8 +189,10 @@ export async function deleteOccurrence(routineId: string, occurrenceDate: string
 export async function deleteRoutineChildren(id: string): Promise<void> {
   const completions = await listRoutineCompletions([id]);
   await Promise.all([
-    data.removeWhere(ROUTINE_ASSIGNEES_TABLE, { routine_id: id }),
-    data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: id }),
+    // Cascade : une routine sans assignataire ni rappel n'en supprime aucun —
+    // tolérance déclarée (le défaut strict en ferait une erreur).
+    data.removeWhere(ROUTINE_ASSIGNEES_TABLE, { routine_id: id }, { ifMissing: 'ignore' }),
+    data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: id }, { ifMissing: 'ignore' }),
     ...completions.map((completion) => data.remove(ROUTINE_COMPLETIONS_TABLE, completion.id)),
   ]);
 }

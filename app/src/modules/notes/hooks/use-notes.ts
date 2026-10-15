@@ -201,7 +201,8 @@ export function useNotes(): UseNotesResult {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       // En ligne la cascade SQL emporte les pièces jointes ; en local
       // l'adaptateur n'a pas de cascade implicite, on retire explicitement.
-      await data.removeWhere('note_attachments', { note_id: note.id }).catch(() => undefined);
+      // Une note sans pièce jointe n'en supprime aucune : tolérance déclarée.
+      await data.removeWhere('note_attachments', { note_id: note.id }, { ifMissing: 'ignore' });
       await remove(note.id);
       await refresh();
     },

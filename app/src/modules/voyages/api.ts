@@ -394,7 +394,8 @@ export async function removeTripMember(tripId: string, memberId: string): Promis
   const ardoises = await data.list<{ id: string }>('ardoises', { trip_id: tripId }).catch(() => []);
   const ardoiseId = ardoises[0]?.id;
   if (ardoiseId) {
-    await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }).catch(() => undefined);
+    // Le membre quitté n'a pas forcément de ligne d'ardoise : tolérance déclarée.
+    await data.removeWhere('ardoise_members', { ardoise_id: ardoiseId, member_id: memberId }, { ifMissing: 'ignore' });
   }
 }
 

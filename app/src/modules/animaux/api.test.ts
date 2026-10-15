@@ -125,7 +125,7 @@ describe('animaux api (D-10)', () => {
   it('supprime la fiche avec son carnet, sans toucher à la synthèse', async () => {
     await removePet('pet-1');
 
-    expect(mockRemoveWhere).toHaveBeenCalledWith('pet_records', { pet_id: 'pet-1' });
+    expect(mockRemoveWhere).toHaveBeenCalledWith('pet_records', { pet_id: 'pet-1' }, { ifMissing: 'ignore' });
     expect(mockRemove).toHaveBeenCalledWith('pets', 'pet-1');
   });
 });

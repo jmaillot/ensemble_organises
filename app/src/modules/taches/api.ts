@@ -48,7 +48,9 @@ export async function listTaskReminders(taskIds: string[]): Promise<TaskReminder
  * on repart donc de la liste existante au lieu d'alterner ajouts et retraits.
  */
 export async function setTaskAssignees(taskId: string, memberIds: string[]): Promise<void> {
-  await data.removeWhere(TASK_ASSIGNEES_TABLE, { task_id: taskId });
+  // Remplacement en bloc : partir d'une liste vide (tâche neuve, retrait du
+  // dernier assignataire) supprime légitimement zéro ligne — tolérance déclarée.
+  await data.removeWhere(TASK_ASSIGNEES_TABLE, { task_id: taskId }, { ifMissing: 'ignore' });
   await Promise.all(
     memberIds.map((memberId) => data.create<TaskAssigneeRecord>(TASK_ASSIGNEES_TABLE, { task_id: taskId, member_id: memberId })),
   );
@@ -56,7 +58,9 @@ export async function setTaskAssignees(taskId: string, memberIds: string[]): Pro
 
 /** Un seul rappel par tâche : il est remplacé plutôt qu'accumulé. */
 export async function setTaskReminder(taskId: string, remindAt: string | null): Promise<void> {
-  await data.removeWhere(TASK_REMINDERS_TABLE, { task_id: taskId });
+  // Remplacement : une tâche sans rappel n'en a aucun à supprimer — tolérance
+  // déclarée (le défaut strict transformerait ce no-op normal en erreur).
+  await data.removeWhere(TASK_REMINDERS_TABLE, { task_id: taskId }, { ifMissing: 'ignore' });
   if (remindAt !== null) {
     await data.create<TaskReminderRecord>(TASK_REMINDERS_TABLE, { task_id: taskId, remind_at: remindAt });
   }

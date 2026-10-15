@@ -86,7 +86,9 @@ export async function setRecipeTags(recipeId: string, householdId: string, tagNa
       tags.push(created);
     }
   }
-  await data.removeWhere(RECIPE_TAG_LINKS_TABLE, { recipe_id: recipeId });
+  // Remplacement en bloc des liens : partir d'un état vide (recette sans tag)
+  // supprime légitimement zéro ligne — tolérance déclarée.
+  await data.removeWhere(RECIPE_TAG_LINKS_TABLE, { recipe_id: recipeId }, { ifMissing: 'ignore' });
   await Promise.all(
     tags.map((tag) =>
       data.create<RecipeTagLinkRow>(RECIPE_TAG_LINKS_TABLE, {
@@ -156,7 +158,9 @@ export async function toggleRecipeFavorite(recipeId: string, householdId: string
       member_id: memberId,
     });
   } else {
-    await data.removeWhere(RECIPE_FAVORITES_TABLE, { recipe_id: recipeId, member_id: memberId });
+    // Éteindre un favori déjà absent (double-clic, deux onglets) reste un no-op
+    // volontaire : tolérance déclarée, pas une erreur.
+    await data.removeWhere(RECIPE_FAVORITES_TABLE, { recipe_id: recipeId, member_id: memberId }, { ifMissing: 'ignore' });
   }
 }
 

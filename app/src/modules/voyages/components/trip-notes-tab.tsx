@@ -133,7 +133,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
     if (!target) return;
     void (async () => {
       // L'adaptateur local n'a pas de cascade : on retire les pièces jointes.
-      await data.removeWhere('note_attachments', { note_id: target.id }).catch(() => undefined);
+      await data.removeWhere('note_attachments', { note_id: target.id }, { ifMissing: 'ignore' });
       await data.remove('notes', target.id);
       if (editing?.id === target.id) resetForm();
       refresh();

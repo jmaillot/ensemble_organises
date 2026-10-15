@@ -154,7 +154,7 @@ describe('pièces prestataires — hygiène des fichiers (D-03)', () => {
 
     await removeProvider('fiche-1');
 
-    expect(dataMocks.removeWhere).toHaveBeenCalledWith('provider_attachments', { provider_id: 'fiche-1' });
+    expect(dataMocks.removeWhere).toHaveBeenCalledWith('provider_attachments', { provider_id: 'fiche-1' }, { ifMissing: 'ignore' });
     expect(removeFileMock).toHaveBeenCalledWith('foyer/providers/fiche/a.pdf');
     expect(removeFileMock).not.toHaveBeenCalledWith('blob:apercu-demo');
     expect(dataMocks.remove).toHaveBeenCalledWith('providers', 'fiche-1');

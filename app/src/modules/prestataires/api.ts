@@ -44,7 +44,10 @@ export async function removeProvider(id: string): Promise<void> {
   // Dans les deux cas les FICHIERS partent avec leurs lignes : on lit les
   // chemins avant, sinon orphelins en bucket.
   const attachments = await data.list<ProviderAttachmentRow>('provider_attachments', { provider_id: id }).catch(() => []);
-  await data.removeWhere('provider_attachments', { provider_id: id }).catch(() => undefined);
+  // Cascade : un prestataire sans pièce jointe n'en supprime aucune — tolérance
+  // déclarée (le défaut strict en ferait une erreur, l'ancien repli silencieux
+  // l'aurait avalée sans le dire).
+  await data.removeWhere('provider_attachments', { provider_id: id }, { ifMissing: 'ignore' });
   await data.remove('providers', id);
   for (const attachment of attachments) {
     const path = attachmentPathOf(attachment.file_url);

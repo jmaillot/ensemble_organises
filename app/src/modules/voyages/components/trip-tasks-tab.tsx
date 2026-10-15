@@ -107,7 +107,8 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
         const trimmed = name.trim();
         if (trimmed.length === 0 || trimmed.length > 200) throw new Error('Nommez la tâche (1 à 200 caractères).');
         await data.update('tasks', editing.id, { name: trimmed, due_date: dueDate || null });
-        await data.removeWhere('task_assignees', { task_id: editing.id }).catch(() => undefined);
+        // Remplacement en bloc des assignataires : tolérance déclarée.
+        await data.removeWhere('task_assignees', { task_id: editing.id }, { ifMissing: 'ignore' });
         if (assigneeIds.length > 0) {
           await Promise.all(
             assigneeIds.map((memberId) =>
@@ -173,8 +174,8 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
     if (!target) return;
     void (async () => {
       // L'adaptateur local n'a pas de cascade : on nettoie les enfants.
-      await data.removeWhere('task_assignees', { task_id: target.id }).catch(() => undefined);
-      await data.removeWhere('task_reminders', { task_id: target.id }).catch(() => undefined);
+      await data.removeWhere('task_assignees', { task_id: target.id }, { ifMissing: 'ignore' });
+      await data.removeWhere('task_reminders', { task_id: target.id }, { ifMissing: 'ignore' });
       await data.remove('tasks', target.id);
       if (editing?.id === target.id) cancelEdit();
       refresh();

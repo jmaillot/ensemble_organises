@@ -39,10 +39,13 @@ export async function updatePet(id: string, draft: PetDraft): Promise<PetRow> {
 
 /** La suppression d'un animal emporte son carnet de santé et ses pièces jointes. */
 export async function removePet(id: string): Promise<void> {
-  await data.removeWhere('pet_records', { pet_id: id });
+  // Cascades : un animal sans carnet ni pièce jointe n'en supprime aucun —
+  // tolérance déclarée (le défaut strict en ferait une erreur). Le repli
+  // silencieux du second appel est remplacé par l'option explicite.
+  await data.removeWhere('pet_records', { pet_id: id }, { ifMissing: 'ignore' });
   // En ligne la cascade SQL suffit ; en local l'adaptateur n'a pas de cascade
   // implicite, on retire explicitement.
-  await data.removeWhere('pet_attachments', { pet_id: id }).catch(() => undefined);
+  await data.removeWhere('pet_attachments', { pet_id: id }, { ifMissing: 'ignore' });
   await data.remove('pets', id);
 }
 
