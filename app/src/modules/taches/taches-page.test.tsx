@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { data } from '@/lib/data';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { todayIso } from '@/lib/utils';
 import { useHouseholdStore } from '@/stores/household-store';
 import TachesPage from './taches-page';
 import { renderWithProviders } from '@/test/render';
@@ -116,6 +117,35 @@ describe('TachesPage', () => {
 
     await findTaskList();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * WR-14 côté panneau : la borne est posée par l'appelant (`use-taches` passe
+ * `new Date()`). L'horloge est figée à midi — le rappel du jour de la graine
+ * (18:30) est donc encore à venir, et celui de demain (18:00) reste dehors,
+ * quelle que soit l'heure d'exécution de la suite.
+ */
+describe('TachesPage — « Rappels du jour » borné à la journée (WR-14, D-07)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ne liste que le rappel du jour encore à venir', async () => {
+    // Seul `Date` est figé : les minuteries réelles restent en place, sans quoi
+    // React Query, Dexie et `waitFor` ne progresseraient plus.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${todayIso()}T12:00:00`));
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    const panelElement = document.getElementById('task-reminders-panel');
+    expect(panelElement).not.toBeNull();
+    const panel = within(panelElement as HTMLElement);
+
+    expect(panel.getByText('Valider les rendez-vous du carnet')).toBeInTheDocument();
+    // Rappel de demain : hors de la journée, donc hors du panneau.
+    expect(panel.queryByText('Ajouter le lait d’agne')).not.toBeInTheDocument();
   });
 });
 

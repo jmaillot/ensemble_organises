@@ -1,4 +1,4 @@
-import { daysBetween, relativeDayLabel, toLocalDate, todayIso } from '@/lib/utils';
+import { daysBetween, relativeDayLabel, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, TaskAssigneeRow, TaskPriority, TaskReminderRow, TaskRow, TaskStatus } from '@/types';
 
 export type { TaskPriority, TaskStatus };
@@ -285,9 +285,29 @@ export function isOpenForMe(task: Task, memberId: string): boolean {
   return task.assignees.some((assignee) => assignee.memberId === memberId);
 }
 
-/** Tâches accompagnées d'un rappel, de la plus proche à la plus lointaine. */
-export function reminderTasks(tasks: Task[]): Task[] {
+/**
+ * Rappels de la journée à venir, du plus proche au plus lointain (WR-14).
+ *
+ * Doctrine (D-07) : un rappel passé est **filtré de cette liste**, jamais
+ * supprimé ni remis à zéro. La ligne `task_reminders` garde sa valeur, le
+ * formulaire la réaffiche, et le badge de la tâche garde son heure — c'est un
+ * choix de filtrage, pas de nettoyage. Seuls les rappels du **même jour local**
+ * que `now` et encore à venir figurent ici : le panneau annonce « du jour », il
+ * ne peut donc pas promettre autre chose. Le paramètre `now` est explicite pour
+ * que la borne soit posable par un test.
+ */
+export function reminderTasks(tasks: Task[], now: Date): Task[] {
+  const today = toIsoDate(now);
+  const at = now.getTime();
   return tasks
-    .filter((task) => task.reminderAt !== null)
-    .sort((a, b) => (a.reminderAt ?? '').localeCompare(b.reminderAt ?? ''));
+    // Le tri ne voit que des instants **analysés** : un rappel illisible est
+    // écarté ici, jamais départagé sur `NaN`.
+    .flatMap((task) => {
+      if (task.reminderAt === null) return [];
+      const moment = toLocalDate(task.reminderAt).getTime();
+      if (Number.isNaN(moment) || moment < at || toIsoDate(toLocalDate(task.reminderAt)) !== today) return [];
+      return [{ task, moment }];
+    })
+    .sort((a, b) => a.moment - b.moment)
+    .map((entry) => entry.task);
 }

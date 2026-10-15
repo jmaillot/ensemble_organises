@@ -362,11 +362,11 @@ export default function TachesPage() {
           <Panel
             id="task-reminders-panel"
             title="Rappels du jour"
-            description="Ce qui mérite un petit rappel."
+            description="Ce qui mérite un petit rappel aujourd’hui."
           >
             {reminders.length === 0 ? (
               <p className="m-0 text-xs text-muted">
-                Aucun rappel programmé. Ajoutez-en un depuis le formulaire d’une tâche.
+                Aucun rappel aujourd’hui. Ajoutez-en un depuis le formulaire d’une tâche.
               </p>
             ) : (
               <div className="grid gap-2.5">

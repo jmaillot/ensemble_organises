@@ -154,7 +154,11 @@ export function useTaches(): UseTachesResult {
     () => sortTasks(filterByAssignee(filterByFolder(filterTasks(tasks, filter), activeFolderId), assigneeFilter)),
     [activeFolderId, assigneeFilter, filter, tasks],
   );
-  const reminders = useMemo(() => reminderTasks(tasks), [tasks]);
+  /**
+   * Rappels du jour (D-07) : la borne est l'instant du rendu, comme le reste de
+   * la page — le panneau ne se rafraîchit pas tout seul.
+   */
+  const reminders = useMemo(() => reminderTasks(tasks, new Date()), [tasks]);
   const metrics = useMemo(() => taskMetrics(tasks), [tasks]);
 
   /** Recharge les tables enfants après une écriture. */
