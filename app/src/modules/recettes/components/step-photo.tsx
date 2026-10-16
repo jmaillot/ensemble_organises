@@ -40,6 +40,11 @@ export function StepPhoto({ url, alt, className, onSelectPhoto }: StepPhotoProps
   if (url !== shownUrl) {
     setShownUrl(url);
     setDead(false);
+    // Le plein écran ne survit pas à la mort de l'aperçu (IN-02) : si le
+    // dialogue était ouvert quand l'aperçu est mort, il a été démonté sans
+    // repasser par `onOpenChange`, donc `open` est resté `true` et l'URL neuve
+    // rouvrirait le dialogue sans geste. On retombe explicitement à fermé.
+    setOpen(false);
   }
 
   const picker = (

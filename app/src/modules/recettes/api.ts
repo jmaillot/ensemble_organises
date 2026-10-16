@@ -258,14 +258,16 @@ export async function deleteRecipe(
 /* Couverture (R9) : bucket prive + URL signee TTL court + cleanup.     */
 /* ------------------------------------------------------------------ */
 
-function isRecipeCoverPath(value: string | null | undefined): value is string {
-  if (typeof value !== 'string' || value === '') return false;
-  return !/^(https?:|blob:|data:|\/)/i.test(value);
-}
-
-/** Chemin bucket d'une couverture stockee, `null` sinon (jamais d'URL). */
+/**
+ * Chemin bucket d'une couverture stockee, `null` sinon (jamais d'URL).
+ *
+ * Le prédicat est celui de `isHouseholdMediaPath` (D-01) : un seul verdict de
+ * forme de valeur de média fait foi pour le module, plutôt qu'une copie plus
+ * lâche qui dériverait de lui en silence (IN-03).
+ */
 export function recipeCoverPathOf(stored: string | null | undefined): string | null {
-  return isRecipeCoverPath(stored) ? stored : null;
+  if (typeof stored !== 'string' || stored === '') return null;
+  return isHouseholdMediaPath(stored) ? stored : null;
 }
 
 /** Depose la couverture (`recipes/<id>`, compression native partagee). */
@@ -289,7 +291,7 @@ export function deleteRecipeCover(stored: string | null): Promise<void> {
  */
 export async function resolveRecipeCoverUrl(stored: string | null): Promise<string | null> {
   if (!stored) return null;
-  if (!isRecipeCoverPath(stored)) {
+  if (!isHouseholdMediaPath(stored)) {
     return /^blob:|^https?:|^data:|^\/assets\//i.test(stored) ? stored : null;
   }
   // La signature passe par le point unique de la lecture (D-01) : seul l'appel
@@ -378,23 +380,26 @@ async function removeStepPhotoObject(stored: string | null): Promise<void> {
 }
 
 /**
- * Écrit la référence `photo_path` d'une étape, en absorbant le `DataError`
- * d'une ligne absente.
+ * Écrit la référence `photo_path` d'une étape et rend si l'écriture a atterri.
  *
  * L'étape visée peut avoir disparu par cascade (suppression de la recette) ou
  * par une autre session ; au niveau de l'adaptateur, « zéro ligne écrite » et
  * un échec transitoire produisent le même `DataError`, donc les distinguer par
  * motif serait une garde qui se périmerait en silence. Aucune lecture préalable
  * d'existence n'est faite : décider après une lecture serait la course proscrite
- * par `adapter.ts`. On écrit, et un `DataError` devient un no-op JOURNALISÉ —
- * jamais un succès muet (§2.7 F). L'erreur d'une autre nature remonte intacte.
+ * par `adapter.ts`. On écrit, et un `DataError` devient un no-op JOURNALISÉ
+ * (§2.7 F) qui rend `false` — c'est ce booléen, et non un motif d'erreur, qui
+ * décide si l'appelant peut nettoyer l'objet PRÉCÉDENT sans détruire une photo
+ * encore référencée (CR-01). L'erreur d'une autre nature remonte intacte.
  */
-async function writeStepPhoto(stepId: string, value: string | null): Promise<void> {
+async function writeStepPhoto(stepId: string, value: string | null): Promise<boolean> {
   try {
     await data.update<RecipeStepRow>(RECIPE_STEPS_TABLE, stepId, { photo_path: value });
+    return true;
   } catch (error) {
     if (!(error instanceof DataError)) throw error;
     console.warn(`Photo d’étape non écrite : ${stepId}`, error);
+    return false;
   }
 }
 
@@ -403,6 +408,11 @@ async function writeStepPhoto(stepId: string, value: string | null): Promise<voi
  * puis retire l'objet précédent s'il est un chemin de bucket distinct (D-04,
  * D-05). Le dépôt est committé d'abord ; le retrait de l'ancien objet ne
  * l'annule jamais.
+ *
+ * CR-01 : quand l'écriture n'atterrit pas (`writeStepPhoto` rend `false`), la
+ * ligne peut encore référencer `previous` — retirer l'ancien détruirait une
+ * photo encore affichée. On retire alors seulement l'objet NEUF, que personne
+ * ne référence, et on ne touche pas à l'ancien.
  */
 export async function replaceRecipeStepPhoto(input: {
   householdId: string;
@@ -412,7 +422,11 @@ export async function replaceRecipeStepPhoto(input: {
   file: File;
 }): Promise<void> {
   const next = await uploadRecipeStepPhoto(input.householdId, input.recipeId, input.stepId, input.file);
-  await writeStepPhoto(input.stepId, next);
+  const landed = await writeStepPhoto(input.stepId, next);
+  if (!landed) {
+    await removeStepPhotoObject(next);
+    return;
+  }
   await removeStepPhotoObject(replacedMediaPath(input.previous, next));
 }
 
@@ -420,9 +434,13 @@ export async function replaceRecipeStepPhoto(input: {
  * Retire la photo d'une étape : référence effacée par le helper gardé, objet
  * précédent nettoyé. Un retrait sur une étape disparue est un no-op, comme le
  * dépôt.
+ *
+ * CR-01 : l'objet précédent n'est retiré que si l'écriture a atterri ; sinon la
+ * ligne peut encore le référencer et le retrait serait destructeur.
  */
 export async function clearRecipeStepPhoto(stepId: string, previous: string | null): Promise<void> {
-  await writeStepPhoto(stepId, null);
+  const landed = await writeStepPhoto(stepId, null);
+  if (!landed) return;
   await removeStepPhotoObject(replacedMediaPath(previous, null));
 }
 

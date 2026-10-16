@@ -351,7 +351,7 @@ function StepRow(props: StepRowProps) {
             >
               <Icon name="edit" size="sm" />
             </button>
-            {step.photoPath ? (
+            {step.photoPath && props.photoUrl ? (
               <button
                 type="button"
                 onClick={props.onRemovePhoto}
