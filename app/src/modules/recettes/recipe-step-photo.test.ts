@@ -40,14 +40,57 @@ vi.mock('@/lib/supabase/client', async (importOriginal) => {
   };
 });
 
-import { depositHouseholdFile } from '@/lib/storage';
-import { resolveRecipeStepPhotoUrl, resolveRecipeStepPhotoUrls, uploadRecipeStepPhoto } from './api';
+import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+import { getLocalAdapter } from '@/lib/data/local-adapter';
+import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
+import type { RecipeRow, RecipeStepRow } from '@/types';
+import {
+  clearRecipeStepPhoto,
+  deleteRecipe,
+  deleteRecipeStep,
+  replaceRecipeStepPhoto,
+  resolveRecipeStepPhotoUrl,
+  resolveRecipeStepPhotoUrls,
+  uploadRecipeStepPhoto,
+} from './api';
 
 const depositMock = vi.mocked(depositHouseholdFile);
+const removeFileMock = vi.mocked(removeHouseholdFile);
+
+const OLD = 'foyer-1/recipes/r-1/steps/s-1/ancien.jpg';
+const NEW = 'foyer-1/recipes/r-1/steps/s-1/neuf.jpg';
+
+function deposited(path: string | null) {
+  return { url: 'https://signe.example/file.jpg', path, name: 'etape.jpg', mime: 'image/jpeg', size: 21 };
+}
+
+async function seedStep(photoPath: string | null): Promise<RecipeStepRow> {
+  const adapter = getLocalAdapter();
+  return adapter.create<RecipeStepRow>('recipe_steps', {
+    recipe_id: 'recipe-x',
+    household_id: DEMO_HOUSEHOLD_ID,
+    content: 'Éplucher les pommes de terre.',
+    position: 0,
+    photo_path: photoPath,
+  });
+}
+
+async function stepPhotoPath(id: string): Promise<string | null | undefined> {
+  const rows = await getLocalAdapter().list<RecipeStepRow>('recipe_steps', { recipe_id: 'recipe-x' });
+  return rows.find((row) => row.id === id)?.photo_path;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   supabaseState.configured = false;
+  depositMock.mockImplementation(async ({ file }: { file: File }) => ({
+    url: 'blob:apercu-etape',
+    path: null,
+    name: file.name,
+    mime: 'image/jpeg',
+    size: 21,
+  }));
+  removeFileMock.mockImplementation(async () => {});
 });
 
 describe('Photo d’étape (R1, D-02/D-03)', () => {
@@ -83,5 +126,158 @@ describe('Photo d’étape (R1, D-02/D-03)', () => {
     const stored = await uploadRecipeStepPhoto('foyer-1', 'recipe-9', 'step-3', file);
     expect(depositMock).toHaveBeenCalledWith({ householdId: 'foyer-1', folder: 'recipes/recipe-9/steps/step-3', file });
     expect(stored).toBe('blob:apercu-etape');
+  });
+});
+
+describe('Photo d’étape — ajouter, remplacer, retirer (R1, R2, R5, D-04/D-05)', () => {
+  it('remplacer dépose un chemin neuf, met à jour la ligne et retire l’ancien objet une fois', async () => {
+    const step = await seedStep(OLD);
+    depositMock.mockResolvedValueOnce(deposited(NEW));
+
+    await replaceRecipeStepPhoto({
+      householdId: DEMO_HOUSEHOLD_ID,
+      recipeId: 'r-1',
+      stepId: step.id,
+      previous: OLD,
+      file: new File(['p'], 'neuf.jpg', { type: 'image/jpeg' }),
+    });
+
+    expect(await stepPhotoPath(step.id)).toBe(NEW);
+    expect(removeFileMock).toHaveBeenCalledTimes(1);
+    expect(removeFileMock).toHaveBeenCalledWith(OLD);
+  });
+
+  it('un retrait en échec est journalisé sans annuler la nouvelle photo', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const step = await seedStep(OLD);
+    depositMock.mockResolvedValueOnce(deposited(NEW));
+    removeFileMock.mockRejectedValueOnce(new Error('bucket indisponible'));
+
+    await replaceRecipeStepPhoto({
+      householdId: DEMO_HOUSEHOLD_ID,
+      recipeId: 'r-1',
+      stepId: step.id,
+      previous: OLD,
+      file: new File(['p'], 'neuf.jpg', { type: 'image/jpeg' }),
+    });
+
+    expect(await stepPhotoPath(step.id)).toBe(NEW);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Objet de média non retiré du bucket'), expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('remplacer par le même chemin ne retire rien (l’objet neuf est protégé)', async () => {
+    const step = await seedStep(NEW);
+    depositMock.mockResolvedValueOnce(deposited(NEW));
+
+    await replaceRecipeStepPhoto({
+      householdId: DEMO_HOUSEHOLD_ID,
+      recipeId: 'r-1',
+      stepId: step.id,
+      previous: NEW,
+      file: new File(['p'], 'neuf.jpg', { type: 'image/jpeg' }),
+    });
+
+    expect(removeFileMock).not.toHaveBeenCalled();
+  });
+
+  it('retirer une photo absente est un no-op sans toucher au Storage', async () => {
+    const step = await seedStep(null);
+
+    await clearRecipeStepPhoto(step.id, null);
+
+    expect(await stepPhotoPath(step.id)).toBeNull();
+    expect(removeFileMock).not.toHaveBeenCalled();
+  });
+
+  it('retirer une photo efface la référence et retire l’objet', async () => {
+    const step = await seedStep(OLD);
+
+    await clearRecipeStepPhoto(step.id, OLD);
+
+    expect(await stepPhotoPath(step.id)).toBeNull();
+    expect(removeFileMock).toHaveBeenCalledTimes(1);
+    expect(removeFileMock).toHaveBeenCalledWith(OLD);
+  });
+
+  it('supprimer une étape sans photo ne touche pas au Storage', async () => {
+    const step = await seedStep(null);
+
+    await deleteRecipeStep(step.id, null);
+
+    const rows = await getLocalAdapter().list<RecipeStepRow>('recipe_steps', { recipe_id: 'recipe-x' });
+    expect(rows.some((row) => row.id === step.id)).toBe(false);
+    expect(removeFileMock).not.toHaveBeenCalled();
+  });
+
+  it('supprimer une étape photographiée retire son objet', async () => {
+    const step = await seedStep(OLD);
+
+    await deleteRecipeStep(step.id, OLD);
+
+    expect(removeFileMock).toHaveBeenCalledWith(OLD);
+  });
+
+  it('supprimer la recette tente tous les objets d’étape même si l’un échoue', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const adapter = getLocalAdapter();
+    const saved = await adapter.create<RecipeRow>('recipes', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      title: 'Recette à supprimer',
+      cover_photo: 'foyer-1/recipes/r-del/cover.jpg',
+      created_at: '2026-10-16T12:00:00.000Z',
+    });
+    const stepA = 'foyer-1/recipes/r-del/steps/s-1/a.jpg';
+    const stepB = 'foyer-1/recipes/r-del/steps/s-2/b.jpg';
+    // La couverture réussit ; le premier objet d’étape échoue ; le second doit
+    // tout de même être tenté.
+    removeFileMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('objet indisponible'));
+
+    await deleteRecipe(saved.id, 'foyer-1/recipes/r-del/cover.jpg', [stepA, stepB]);
+
+    expect(removeFileMock).toHaveBeenCalledTimes(3);
+    expect(removeFileMock).toHaveBeenCalledWith(stepB);
+    expect(await adapter.list('recipes', { household_id: DEMO_HOUSEHOLD_ID })).not.toContainEqual(
+      expect.objectContaining({ id: saved.id }),
+    );
+    warn.mockRestore();
+  });
+
+  it('deux remplacements concurrents : le dernier écrit gagne, une seule référence subsiste', async () => {
+    const step = await seedStep(OLD);
+    depositMock
+      .mockResolvedValueOnce(deposited('foyer-1/recipes/r-1/steps/s-1/un.jpg'))
+      .mockResolvedValueOnce(deposited('foyer-1/recipes/r-1/steps/s-1/deux.jpg'));
+
+    await Promise.all([
+      replaceRecipeStepPhoto({ householdId: DEMO_HOUSEHOLD_ID, recipeId: 'r-1', stepId: step.id, previous: OLD, file: new File(['p'], 'un.jpg', { type: 'image/jpeg' }) }),
+      replaceRecipeStepPhoto({ householdId: DEMO_HOUSEHOLD_ID, recipeId: 'r-1', stepId: step.id, previous: OLD, file: new File(['p'], 'deux.jpg', { type: 'image/jpeg' }) }),
+    ]);
+
+    const rows = await getLocalAdapter().list<RecipeStepRow>('recipe_steps', { recipe_id: 'recipe-x' });
+    const matching = rows.filter((row) => row.id === step.id);
+    expect(matching).toHaveLength(1);
+    expect(['foyer-1/recipes/r-1/steps/s-1/un.jpg', 'foyer-1/recipes/r-1/steps/s-1/deux.jpg']).toContain(matching[0]?.photo_path);
+  });
+
+  it('un dépôt qui se résout après la disparition de l’étape ne lève pas et avertit', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // L’étape n’existe pas (supprimée par cascade ou par une autre session) :
+    // l’écriture de la référence est abandonnée, jamais levée.
+    depositMock.mockResolvedValueOnce(deposited('foyer-1/recipes/r-1/steps/step-disparu/orphelin.jpg'));
+
+    await expect(
+      replaceRecipeStepPhoto({
+        householdId: DEMO_HOUSEHOLD_ID,
+        recipeId: 'r-1',
+        stepId: 'step-disparu',
+        previous: null,
+        file: new File(['p'], 'orphelin.jpg', { type: 'image/jpeg' }),
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Photo d’étape non écrite'), expect.any(Error));
+    expect(warn.mock.calls.some(([message]) => String(message).includes('step-disparu'))).toBe(true);
+    warn.mockRestore();
   });
 });
