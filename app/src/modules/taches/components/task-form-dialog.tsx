@@ -94,9 +94,9 @@ export function TaskFormDialog({
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(task, currentMemberId, initialDueDate, initialFolderId));
-    // `task` identifie une ouverture : le formulaire n'est pas réinitialisé à
-    // chaque frappe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `task` — objet recréé par la page à chaque rendu — identifie une ouverture
+    // par son `task?.id` stable : le formulaire n'est pas réinitialisé à chaque
+    // frappe, et `reset` (react-hook-form) est stable.
   }, [open, task?.id, currentMemberId, initialDueDate, initialFolderId]);
 
   return (

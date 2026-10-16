@@ -185,9 +185,11 @@ function ProductEditDialog({
       setPhotoPreview(null);
       if (photoInputRef.current) photoInputRef.current.value = '';
     }
-    // `product` identifie une ouverture ; l'aperçu dérivé suit `photoUrls` sans
-    // réinitialiser la saisie en cours.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `product` (la cible d'édition) et `reset` (stable, react-hook-form) sont
+    // les deux seuls points réactifs que l'effet lit ; `normalizeRayon` est
+    // importé, les setState et la ref sont stables. L'aperçu stocké
+    // (`storedPreview`) dérive de `photoUrls` HORS de cet effet : l'arrivée des
+    // photos re-signées ne remet donc pas à zéro la saisie en cours.
   }, [product, reset]);
 
   const submit = handleSubmit(async (values) => {

@@ -105,7 +105,9 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
       if (photoInputRef.current) photoInputRef.current.value = '';
     }
     // `suggestedRayon` dérive de `offProduct` : le watcher porte sur la source.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `lists` — tableau reconstruit à chaque rendu — est omis : l'effet ne s'en
+    // sert qu'à l'ouverture pour choisir la liste cible, et l'inclure relancerait
+    // la remise à zéro à chaque rendu.
   }, [open, offProduct, reset]);
 
   // Fuite d'URL objet à la fermeture et au démontage (WR-11) : le ref miroir

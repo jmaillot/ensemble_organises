@@ -96,8 +96,9 @@ export function useCuisineProgress(recipeId: string, steps: RecipeStep[]): Cuisi
       if (pruned) writeCuisineProgress(recipeId, next);
       return pruned ? next : current;
     });
-    // `steps` n'est lu que via sa clé d'ids stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `steps` est une liste recréée (map/filter) à chaque rendu : l'effet ne lit
+    // que sa clé d'ids stable `knownKey`, et l'inclure relancerait l'élagage à
+    // chaque rendu sans qu'aucun id n'ait changé.
   }, [recipeId, knownKey]);
 
   const toggle = useCallback(

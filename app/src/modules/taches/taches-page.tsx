@@ -99,8 +99,10 @@ export default function TachesPage() {
       setDialog({ open: true, task: null, dueDate: incoming });
       navigate('/taches', { replace: true });
     }
-    // Montage uniquement : l'état de navigation ne se rejoue pas.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Montage uniquement : l'état de navigation ne se rejoue pas (la ref
+    // `navStateConsumed` le garantit). `location.state`, `navigate` et
+    // `setDialog` sont donc omis volontairement — les inclure rejouerait
+    // l'ouverture du dialogue à chaque navigation.
   }, []);
 
   const sensors = useSensors(
