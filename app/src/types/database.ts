@@ -246,17 +246,6 @@ export interface NoteAttachmentRow {
   created_at: IsoDateTime;
 }
 
-export interface NoteAttachmentRow {
-  id: Uuid;
-  note_id: Uuid;
-  household_id: Uuid;
-  file_url: string;
-  file_name: string;
-  mime_type: string;
-  size_bytes: number;
-  created_at: IsoDateTime;
-}
-
 export type FolderVisibility = 'perso' | 'foyer';
 
 export interface TaskListRow {
@@ -596,17 +585,6 @@ export interface PetRecordRow {
   record_date: IsoDate;
   next_due_date: IsoDate | null;
   notes: string | null;
-}
-
-export interface PetAttachmentRow {
-  id: Uuid;
-  pet_id: Uuid;
-  household_id: Uuid;
-  file_url: string;
-  file_name: string;
-  mime_type: string;
-  size_bytes: number;
-  created_at: IsoDateTime;
 }
 
 export interface PetAttachmentRow {
