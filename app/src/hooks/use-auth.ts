@@ -55,8 +55,9 @@ export async function applySession(user: User): Promise<void> {
   if (store.status === 'authenticated' && store.householdLoaded && store.user?.id === sessionUser.id) {
     // Le nom de référence vit dans `profiles` (chemin complet ci-dessous) :
     // un renouvellement de jeton n'apporte que les métadonnées Auth et
-    // écraserait le nom du profil par l'email. On garde le nom déjà connu ;
-    // un nom vide persisté, lui, prend le frais.
+    // écraserait le nom du profil par l'email. On garde le nom déjà connu.
+    // Règle (énoncée ici, une seule fois dans ce fichier) : un nom vide
+    // persisté se répare, on ne redemande pas la saisie.
     if (store.user.displayName?.trim()) {
       sessionUser.displayName = store.user.displayName;
     }
@@ -126,9 +127,9 @@ export function useAuthBootstrap(): AuthBootstrap {
             demoMembers as HouseholdMemberRow[],
           );
         }
-        // Une session persistée par une ancienne version peut porter un nom
-        // vide : on la répare depuis la ligne membre (miroir du profil en
-        // local), sans exiger une resaisie du prénom et du nom.
+        // Le miroir local du profil est la ligne membre : c'est de là que se
+        // lit le nom à réparer. La règle qui commande cette réparation est
+        // énoncée une seule fois, dans `applySession` (cf. ci-dessus).
         if (!persisted.displayName?.trim()) {
           const ownName =
             useHouseholdStore.getState().members.find((member) => member.user_id === persisted.id)?.display_name?.trim() ||

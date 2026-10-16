@@ -272,7 +272,7 @@ export default function AnniversairesPage() {
 }
 
 interface BirthdayCalendarViewProps {
-  birthdays: Birthday[];
+  birthdays: AggregatedBirthday[];
   isLoading: boolean;
   onOpen: (birthday: Birthday) => void;
 }
@@ -285,7 +285,7 @@ function BirthdayCalendarView({ birthdays, isLoading, onOpen }: BirthdayCalendar
   const grid = useCalendarGrid(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const byDay = useMemo(() => {
-    const map: Record<string, Birthday[]> = {};
+    const map: Record<string, AggregatedBirthday[]> = {};
     birthdays.forEach((birthday) => {
       const key = monthDayKey(birthday.birthDate);
       map[key] = [...(map[key] ?? []), birthday];
@@ -354,15 +354,28 @@ function BirthdayCalendarView({ birthdays, isLoading, onOpen }: BirthdayCalendar
                   <span className="sr-only">{formatDayMonth(day.iso)}</span>
                   {dayBirthdays.length > 0 ? (
                     <span className="mt-1 flex flex-wrap gap-1">
-                      {dayBirthdays.map((birthday) => (
-                        <button
-                          key={birthday.id}
-                          type="button"
-                          onClick={() => onOpen(birthday)}
-                          aria-label={`Modifier l’anniversaire de ${birthday.name}`}
-                          className={cn('size-[7px] rounded-full', memberTagClass(birthday.colorTag))}
-                        />
-                      ))}
+                      {dayBirthdays.map((birthday) =>
+                        // D-13 : on n'édite pas ce qu'on ne possède pas. Un
+                        // anniversaire d'origine contact porte un id synthétique
+                        // (`contact-<uuid>`) : l'édition n'écrirait rien. Comme la
+                        // liste, il mène à sa fiche — même libellé, même icône.
+                        birthday.origin === 'contact' ? (
+                          <Link
+                            key={birthday.id}
+                            to="/contacts"
+                            aria-label={`Voir la fiche de ${birthday.name} dans les contacts`}
+                            className={cn('grid size-[7px] place-items-center rounded-full', memberTagClass(birthday.colorTag))}
+                          />
+                        ) : (
+                          <button
+                            key={birthday.id}
+                            type="button"
+                            onClick={() => onOpen(birthday)}
+                            aria-label={`Modifier l’anniversaire de ${birthday.name}`}
+                            className={cn('size-[7px] rounded-full', memberTagClass(birthday.colorTag))}
+                          />
+                        ),
+                      )}
                     </span>
                   ) : null}
                 </div>

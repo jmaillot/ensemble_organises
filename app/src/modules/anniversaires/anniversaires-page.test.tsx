@@ -75,4 +75,53 @@ describe('AnniversairesPage', () => {
     // Stockée en ISO, ressaisie en JJ/MM/AAAA.
     expect(within(dialog).getByLabelText(/^Date de naissance/)).toHaveValue('07/10/1992');
   });
+
+  it('mène à la fiche pour un anniversaire d’origine contact, sans ouvrir d’édition (D-13)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AnniversairesPage />, { route: '/anniversaires' });
+
+    await within(await list()).findByText('Maya Martin');
+    await user.click(screen.getByRole('tab', { name: 'Calendrier' }));
+
+    // Léa Moreau (14 mars) est le seul anniversaire d'origine contact des
+    // graines : on avance de mois en mois jusqu'à son point, borné à un an.
+    const contactLink = () => screen.queryByRole('link', { name: 'Voir la fiche de Léa Moreau dans les contacts' });
+    for (let attempt = 0; attempt < 12 && !contactLink(); attempt += 1) {
+      await user.click(screen.getByRole('button', { name: 'Mois suivant' }));
+    }
+    const link = contactLink();
+    expect(link).not.toBeNull();
+    // Le routeur de test est un MemoryRouter sans Routes : l'`href` EST la
+    // preuve de la destination.
+    expect(link).toHaveAttribute('href', '/contacts');
+
+    // Le point ne porte plus le libellé d'édition.
+    expect(
+      screen.queryByRole('button', { name: 'Modifier l’anniversaire de Léa Moreau' }),
+    ).not.toBeInTheDocument();
+
+    // Cliquer ne produit aucune écriture : aucun dialogue d'édition ne s'ouvre.
+    await user.click(link as HTMLElement);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('garde le point d’un anniversaire d’origine anniversaire comme bouton d’édition (D-13, pendant)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AnniversairesPage />, { route: '/anniversaires' });
+
+    await within(await list()).findByText('Maya Martin');
+    await user.click(screen.getByRole('tab', { name: 'Calendrier' }));
+
+    // Maya Martin (07/10) reste d'origine anniversaire : son point est un
+    // bouton qui ouvre l'édition — c'est le comportement que la bifurcation ne
+    // doit pas casser.
+    const mayaDot = () => screen.queryByRole('button', { name: 'Modifier l’anniversaire de Maya Martin' });
+    for (let attempt = 0; attempt < 2 && !mayaDot(); attempt += 1) {
+      await user.click(screen.getByRole('button', { name: 'Mois suivant' }));
+    }
+    const dot = mayaDot();
+    expect(dot).not.toBeNull();
+    await user.click(dot as HTMLElement);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
 });
