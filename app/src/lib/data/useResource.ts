@@ -5,7 +5,13 @@ import { useHouseholdStore } from '@/stores/household-store';
 import type { Row, RowFilter } from '@/types';
 
 export const queryKeys = {
-  table: (table: string, householdId: string | null, filter?: RowFilter) => [table, householdId, filter ?? {}] as const,
+  // Le quatrième élément est le `selectKey` (D-08) : deux `select` différents
+  // sur la même table et le même filtre ne partagent plus d'entrée. `null`
+  // quand aucun sélecteur n'est déclaré — les deux sites d'appel (`useResource`
+  // et `useLinkedRows`) gardent ainsi la même forme de clé, et l'invalidation
+  // par préfixe (`[table]`) continue de les atteindre.
+  table: (table: string, householdId: string | null, filter?: RowFilter, selectKey?: string) =>
+    [table, householdId, filter ?? {}, selectKey ?? null] as const,
   tableAll: (table: string) => ['all', table] as const,
 };
 
@@ -24,16 +30,33 @@ export interface ResourceResult<T> {
   mutate: (id: string | null, values: Partial<T>) => Promise<T>;
 }
 
-export interface UseResourceOptions {
+/** Options communes aux deux formes de `UseResourceOptions`. */
+interface ResourceOptionsBase {
   filter?: RowFilter;
   enabled?: boolean;
-  select?: (rows: Row[]) => Row[];
   optimistic?: boolean;
   /** Ajoute automatiquement le filtre `household_id` du foyer courant. */
   scoped?: boolean;
   /** Re-interroge la ressource à intervalle régulier (ms). `false` = désactivé. */
   refetchInterval?: number | false;
 }
+
+/**
+ * Options SANS sélecteur, ou options AVEC sélecteur — jamais l'un sans l'autre.
+ *
+ * D-08 : la clé de cache doit contenir tout ce qui change le résultat. `select`
+ * transforme les lignes, donc deux `select` différents sur la même table et le
+ * même filtre ne doivent pas partager d'entrée. Mais la FONCTION `select` ne
+ * peut **pas** entrer dans la clé : une flèche en ligne change d'identité à
+ * chaque rendu et ferait boucler le rechargement — le piège que la revue
+ * signale. C'est donc un `selectKey` **stable** (constante de module ou chaîne
+ * littérale, jamais une valeur recalculée) que l'appelant déclare, et que le
+ * type exige dès qu'un `select` est présent : l'oubli devient une erreur de
+ * compilation, pas un piège silencieux.
+ */
+export type UseResourceOptions =
+  | (ResourceOptionsBase & { select?: undefined; selectKey?: never })
+  | (ResourceOptionsBase & { select: (rows: Row[]) => Row[]; selectKey: string });
 
 const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'string';
 
@@ -43,7 +66,7 @@ const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'stri
  */
 export function useResource<T = Row>(
   table: string,
-  { filter, enabled = true, select, optimistic = true, scoped = true, refetchInterval = false }: UseResourceOptions = {},
+  { filter, enabled = true, select, selectKey, optimistic = true, scoped = true, refetchInterval = false }: UseResourceOptions = {},
 ): ResourceResult<T> {
   const queryClient = useQueryClient();
   const householdId = useHouseholdStore((state) => state.householdId);
@@ -51,7 +74,7 @@ export function useResource<T = Row>(
     () => (scoped && householdId && filter?.household_id === undefined ? { ...filter, household_id: householdId } : { ...filter }),
     [filter, householdId, scoped],
   );
-  const key = queryKeys.table(table, householdId, effectiveFilter);
+  const key = queryKeys.table(table, householdId, effectiveFilter, selectKey);
 
   const query = useQuery({
     queryKey: key,

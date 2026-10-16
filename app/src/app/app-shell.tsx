@@ -56,6 +56,10 @@ export function AppShell() {
     // Régime 15-01 : le badge « tâches ouvertes » ne compte que le module
     // Tâches — les lignes de voyage vivent dans leur fiche.
     select: (rows) => rows.filter((row) => (row as unknown as TaskRow).trip_id == null),
+    // `selectKey` stable (D-08) : le `select` ci-dessus change le résultat, donc
+    // il doit entrer dans la clé de cache — sous une forme stable, jamais la
+    // fonction elle-même (une flèche en ligne bouclerait le rechargement).
+    selectKey: 'tasks-open',
   });
   // Compteur personnel (comme la page Tâches) : ouvertes sans assigné (foyer)
   // ou assignées à moi — jamais celles des autres membres.
