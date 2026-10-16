@@ -7,6 +7,7 @@ interface FieldContextValue {
   descriptionId: string;
   errorId: string;
   invalid: boolean;
+  required: boolean;
   describedBy: string | undefined;
 }
 
@@ -18,12 +19,18 @@ export interface FieldProps {
   error?: string;
   optional?: boolean;
   className?: string;
-  children: (props: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }) => ReactNode;
+  children: (props: {
+    id: string;
+    'aria-describedby'?: string;
+    'aria-invalid'?: boolean;
+    'aria-required'?: boolean;
+  }) => ReactNode;
 }
 
 /**
  * Champ de formulaire : libellé lié au contrôle, aide et message d'erreur
- * reliés par `aria-describedby`.
+ * reliés par `aria-describedby`, caractère requis annoncé au contrôle par
+ * `aria-required` (le `*` visuel reste, il ne remplace pas l'attribut).
  */
 export function Field({ label, hint, error, optional, className, children }: FieldProps) {
   const uid = useId();
@@ -33,13 +40,20 @@ export function Field({ label, hint, error, optional, className, children }: Fie
   const describedBy = [descriptionId, errorId].filter(Boolean).join(' ') || undefined;
 
   return (
-    <FieldContext.Provider value={{ controlId, descriptionId: descriptionId ?? '', errorId: errorId ?? '', invalid: Boolean(error), describedBy }}>
+    <FieldContext.Provider value={{ controlId, descriptionId: descriptionId ?? '', errorId: errorId ?? '', invalid: Boolean(error), required: !optional, describedBy }}>
       <div className={cn('grid gap-1.5', className)}>
         <Label htmlFor={controlId} className="text-[11px] font-extrabold text-muted">
           {label}
           {optional ? <span className="ml-1 font-normal">· optionnel</span> : <span aria-hidden="true"> *</span>}
         </Label>
-        {children({ id: controlId, 'aria-describedby': describedBy, 'aria-invalid': Boolean(error) || undefined })}
+        {children({
+          id: controlId,
+          'aria-describedby': describedBy,
+          'aria-invalid': Boolean(error) || undefined,
+          // `true` rend `aria-required="true"` ; `undefined` omet l'attribut,
+          // ce qu'un champ optionnel doit produire.
+          'aria-required': !optional || undefined,
+        })}
         {hint ? (
           <p id={descriptionId} className="text-[10px] text-muted">
             {hint}
@@ -62,5 +76,6 @@ export function useFieldControl() {
     id: context.controlId,
     'aria-describedby': context.describedBy,
     'aria-invalid': context.invalid || undefined,
+    'aria-required': context.required || undefined,
   };
 }
