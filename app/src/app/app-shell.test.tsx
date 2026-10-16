@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
+import { queryKeys } from '@/lib/data/useResource';
+import { setTaskAssignees } from '@/modules/taches/api';
 import { catalogueModules, isChildHiddenModule } from '@/lib/modules';
 import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
@@ -247,5 +249,30 @@ describe('AppShell — badge À faire (15-01, personnel)', () => {
     // Graines (Camille connectée) : task-1 à moi, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
     const badge = await within(nav).findByLabelText('1 tâches ouvertes');
     expect(badge).toHaveTextContent('1');
+  });
+
+  it('retire le badge quand la tâche est réassignée (D-08)', async () => {
+    const { queryClient } = renderShell('/accueil');
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    await within(nav).findByLabelText('1 tâches ouvertes');
+    try {
+      // Réassignation réelle (même chemin que le module Tâches) : la table
+      // `task_assignees` change, la ligne `tasks` reste identique.
+      await setTaskAssignees('task-1', [DEMO_MEMBERS.thomas]);
+      await act(async () => {
+        await queryClient.refetchQueries({ queryKey: queryKeys.tableAll('task_assignees') });
+      });
+      // Le badge n'est rendu que si le compte est > 0 : sa disparition est
+      // l'observable. Avant correction, la clé du shell vivait sous le préfixe
+      // maison `['app-shell', …]`, qu'aucune invalidation ne touche, et le
+      // badge restait affiché.
+      await waitFor(() =>
+        expect(within(nav).queryByLabelText('1 tâches ouvertes')).not.toBeInTheDocument(),
+      );
+    } finally {
+      // L'adaptateur local partage son IndexedDB entre les cas du fichier :
+      // laisser task-1 chez Thomas ferait dépendre le test des graines.
+      await setTaskAssignees('task-1', [DEMO_MEMBERS.camille]);
+    }
   });
 });

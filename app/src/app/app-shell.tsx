@@ -21,7 +21,7 @@ import { useInstallPrompt } from '@/hooks/use-pwa';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
-import { useResource } from '@/lib/data/useResource';
+import { queryKeys, useResource } from '@/lib/data/useResource';
 import { useQuery } from '@tanstack/react-query';
 import { listTaskAssignees } from '@/modules/taches/api';
 import type { TaskRow } from '@/types';
@@ -66,7 +66,13 @@ export function AppShell() {
   const currentMember = useCurrentMember();
   const openTaskIds = useMemo(() => openTasks.map((row) => row.id), [openTasks]);
   const taskAssigneesQuery = useQuery({
-    queryKey: ['app-shell', 'task-assignees', openTaskIds],
+    // La clé vit sous `['all', 'task_assignees', …]` — le préfixe que les
+    // invalidations d'assignation touchent réellement (`use-notifications.ts`
+    // construit la même clé pour la même table et le même `queryFn` : la
+    // requête est partagée, c'est voulu). Un préfixe maison (`['app-shell', …]`)
+    // n'était atteint par aucune d'elles, et le badge restait faux après une
+    // réassignation (D-08).
+    queryKey: [...queryKeys.tableAll('task_assignees'), openTaskIds],
     enabled: openTaskIds.length > 0,
     queryFn: () => listTaskAssignees(openTaskIds),
   });
