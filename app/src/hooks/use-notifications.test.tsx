@@ -28,9 +28,10 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe('centre de notifications', () => {
-  // Horloge relative (anti-flake heure-du-jour) : les graines à heures fixes
-  // (09:18, 18:10) inversaient les assertions le soir. message-4 reste un
-  // vieux non-lu soldable, message-5 reste postérieur à tout marquage.
+  // Horloge relative : la graine est déjà datée en instants relatifs, mais ce
+  // banc fige explicitement message-4 dans le passé (vieux non-lu soldable) et
+  // message-5 dans le futur (postérieur à tout marquage), pour que la
+  // répartition soldable / encore-marquable ne dépende pas de l'heure.
   beforeEach(async () => {
     const { getLocalAdapter } = await import('@/lib/data/local-adapter');
     const adapter = getLocalAdapter();
@@ -73,8 +74,8 @@ describe('centre de notifications', () => {
     });
     const marks = JSON.parse(localStorage.getItem('ensemble-organises-messages-read') ?? '{}') as Record<string, string>;
     expect(Object.keys(marks).sort()).toEqual(['conversation-1', 'conversation-2', 'conversation-3']);
-    // Seule la conversation-3 peut rester marquable : son message seed est
-    // daté de 18h10, après le marquage (il se soldera à 18h10).
+    // Seule la conversation-3 peut rester marquable : le `beforeEach` recale
+    // son dernier message dans le futur, donc « tout marquer » ne le solde pas.
     await waitFor(() => {
       const remaining = result.current.items.filter((item) => item.markable).map((item) => item.id);
       expect(remaining.every((id) => id === 'message:conversation-3')).toBe(true);
@@ -94,9 +95,8 @@ describe('centre de notifications', () => {
 
     // Écarter un message non lu le solde ET le cache : il disparaît des deux
     // onglets (ni pastille, ni lu récent). On vise le dernier message le plus
-    // ancien (conversation-2, 09h18) : comme pour conversation-3 dans le test
-    // précédent, un message seed encore futur à l'heure d'exécution resterait
-    // non soldable.
+    // ancien (conversation-2) : le `beforeEach` l'a recalé dans le passé, donc
+    // il est soldable — là où conversation-3, calée dans le futur, ne l'est pas.
     const unreadMessage = result.current.items
       .filter((item) => item.markable && item.kind === 'message')
       .sort((a, b) => a.at.localeCompare(b.at))[0];
@@ -126,8 +126,8 @@ describe('centre de notifications', () => {
 
     // Tout marquer comme lu cache les lignes marquables partout : ni pastille,
     // ni lus récents (auto-masquage dérivé des transitions — même magasin et
-    // même horizon que la croix). Seule conversation-3 peut survivre : son
-    // message seed est daté de 18h10, après le marquage.
+    // même horizon que la croix). Seule conversation-3 peut survivre : le
+    // `beforeEach` recale son message dans le futur, après le marquage.
     await act(async () => {
       result.current.markAllRead();
     });

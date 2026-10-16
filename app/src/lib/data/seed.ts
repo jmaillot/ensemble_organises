@@ -66,6 +66,13 @@ import type { Row } from '@/types';
 
 const now = () => new Date().toISOString();
 const day = (offset: number) => addDays(todayIso(), offset);
+/**
+ * Instant à `n` minutes dans le passé. Un message a été **envoyé** : son
+ * `created_at` est donc un instant révolu, jamais une heure murale. Une heure
+ * murale fixe (`at`) daterait du futur toute la matinée — le mode démo
+ * montrerait alors un message « envoyé demain ».
+ */
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
 export const DEMO_USER_ID = 'user-camille';
 export const DEMO_HOUSEHOLD_ID = 'household-martin';
@@ -80,7 +87,12 @@ export const DEMO_MEMBERS = {
   maya: memberId('maya'),
 } as const;
 
-/** Heure **murale** du jour (`events`, `created_at`) : ce que le calendrier relit par `slice`. */
+/**
+ * Heure **murale** du jour (`events`) : ce que le calendrier relit par `slice`.
+ * Un événement « à 19 h 30 » peut être à venir, donc une heure murale y est
+ * légitime — contrairement à un `created_at`, qui est un instant révolu
+ * (`now`, `minutesAgo`) : un message envoyé ne peut pas être daté du futur.
+ */
 const at = (time: string) => `${day(0)}T${time}:00`;
 
 /**
@@ -1266,7 +1278,7 @@ export const demoMessages: MessageRow[] = [
     sender_id: DEMO_MEMBERS.lina,
     content: 'Tu as vu le nouveau parc ?',
     media_url: null,
-    created_at: `${at('10:42')}`,
+    created_at: minutesAgo(40),
   },
   {
     id: 'message-2',
@@ -1275,7 +1287,7 @@ export const demoMessages: MessageRow[] = [
     sender_id: DEMO_MEMBERS.camille,
     content: 'Pas encore, tu me donneras l’adresse ?',
     media_url: null,
-    created_at: `${at('10:44')}`,
+    created_at: minutesAgo(38),
   },
   {
     id: 'message-3',
@@ -1284,7 +1296,7 @@ export const demoMessages: MessageRow[] = [
     sender_id: DEMO_MEMBERS.lina,
     content: 'Oui, je te l’envoie dans Adresses.',
     media_url: null,
-    created_at: `${at('10:45')}`,
+    created_at: minutesAgo(37),
   },
   {
     id: 'message-4',
@@ -1293,7 +1305,7 @@ export const demoMessages: MessageRow[] = [
     sender_id: DEMO_MEMBERS.thomas,
     content: 'Je peux prendre le pain.',
     media_url: null,
-    created_at: `${at('09:18')}`,
+    created_at: minutesAgo(180),
   },
   {
     id: 'message-5',
@@ -1302,7 +1314,7 @@ export const demoMessages: MessageRow[] = [
     sender_id: DEMO_MEMBERS.maya,
     content: 'Merci pour la liste !',
     media_url: null,
-    created_at: `${at('18:10')}`,
+    created_at: minutesAgo(12),
   },
 ];
 
