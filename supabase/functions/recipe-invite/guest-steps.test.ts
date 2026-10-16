@@ -164,3 +164,64 @@ describe('toGuestSteps (R4, D-15)', () => {
     ]);
   });
 });
+
+describe('Contrat de réponse : le chemin brut ne sort jamais (T-21-02, R4)', () => {
+  it('la projection ne porte aucune valeur égale au chemin brut, seulement l’URL signée', async () => {
+    const { signer } = makeSigner({ signedUrl: () => SIGNED });
+
+    const steps = await toGuestSteps(signer, [
+      { id: 's-1', content: 'Éplucher les pommes de terre.', position: 0, photo_path: RAW_PATH },
+    ]);
+
+    // Le chemin brut n'apparaît sous AUCUNE clé, et `photo_path` n'est pas
+    // recopié : la valeur signée le remplace, elle ne l'accompagne pas.
+    expect(steps[0]).not.toHaveProperty('photo_path');
+    expect(Object.values(steps[0]!)).not.toContain(RAW_PATH);
+    expect(steps[0]!.photoUrl).toBe(SIGNED);
+  });
+
+  it('la charge sérialisée ne contient aucune sous-chaîne du chemin brut', async () => {
+    const { signer } = makeSigner({ signedUrl: () => SIGNED });
+
+    const steps = await toGuestSteps(signer, [
+      { id: 's-1', content: 'Éplucher les pommes de terre.', position: 0, photo_path: RAW_PATH },
+    ]);
+    const serialized = JSON.stringify(steps);
+
+    expect(serialized).not.toContain(RAW_PATH);
+    expect(serialized).not.toContain('recipes/r-1/steps');
+  });
+
+  it('un échec de signature sur une étape n’empêche pas les autres d’être projetées', async () => {
+    const failingPath = 'foyer-1/recipes/r-1/steps/s-1/file.jpg';
+    const { signer } = makeSigner({
+      fail: (path) => path === failingPath,
+      signedUrl: () => SIGNED,
+    });
+
+    const steps = await toGuestSteps(signer, [
+      { id: 's-1', content: 'Éplucher.', position: 0, photo_path: failingPath },
+      {
+        id: 's-2',
+        content: 'Cuire.',
+        position: 1,
+        photo_path: 'foyer-1/recipes/r-1/steps/s-2/file.jpg',
+      },
+    ]);
+
+    // Un null LOCAL, pas une exception globale : la seconde étape garde son URL.
+    expect(steps[0]!.photoUrl).toBeNull();
+    expect(steps[1]!.photoUrl).toBe(SIGNED);
+  });
+
+  it('le TTL passé au signeur est exactement la constante exportée', async () => {
+    const { signer, calls } = makeSigner();
+
+    await resolveGuestMediaUrl(signer, 'foyer-1/recipes/r-1/steps/s-1/file.jpg');
+
+    // Jamais le littéral 3600 recopié : le test suit la constante, donc un
+    // changement de constante se propage sans qu'aucun autre site ne le décide.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.expiresIn).toBe(GUEST_PHOTO_TTL_SECONDS);
+  });
+});
