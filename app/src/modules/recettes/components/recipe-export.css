@@ -4,10 +4,12 @@
  *
  * La fiche membre rend son écran dans `.recipe-screen` et le modèle
  * d'impression (`toRecipePrintModel` : nom + ingrédients à l'échelle
- * courante + étapes numérotées) dans `.recipe-print`, masqué à l'écran.
- * À l'impression, l'écran, le chrome applicatif (barre latérale, haut de
- * page, navigation) et les toasts sont masqués : seule la recette sort,
- * lisible même sans photo (le modèle n'en porte aucune).
+ * courante + étapes numérotées + photo affichable par étape) dans
+ * `.recipe-print`, masqué à l'écran. À l'impression, l'écran, le chrome
+ * applicatif (barre latérale, haut de page, navigation) et les toasts sont
+ * masqués : seule la recette sort. La ligne de texte reste la référence si
+ * l'image ne charge pas, et `.recipe-print img` borne l'image (largeur +
+ * hauteur en points) pour ne pas casser la pagination (D-09, CSS seul).
  */
 
 .recipe-print {
@@ -52,5 +54,11 @@
 
   .recipe-print li {
     margin-bottom: 4pt;
+  }
+
+  .recipe-print img {
+    max-width: 100%;
+    max-height: 120pt;
+    object-fit: contain;
   }
 }

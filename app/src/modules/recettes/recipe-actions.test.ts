@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalAdapter } from '@/lib/data/local-adapter';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
-import type { ShoppingListRow } from '@/types';
-import { sendRecipeIngredientsToCourses } from './api';
+import type { RecipeRow, RecipeStepRow, ShoppingListRow } from '@/types';
+import { deleteRecipe, deleteRecipeStep, sendRecipeIngredientsToCourses, uploadRecipeStepPhoto } from './api';
 import { agreeUnit, toRecipePrintModel } from './types';
 
 describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () => {
@@ -103,7 +103,7 @@ describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () 
     expect(stored).toHaveLength(3);
   });
 
-  it('le modèle print contient nom + ingrédients à l’échelle + étapes, sans photo', () => {
+  it('le modèle print contient nom + ingrédients à l’échelle + étapes, sans photo fournie', () => {
     const model = toRecipePrintModel({
       title: 'Gratin dauphinois',
       servings: 4,
@@ -125,7 +125,95 @@ describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () 
     expect(model.meta).toContain('1h15');
     expect(model.ingredientLines).toEqual(['Farine — 1000 g', 'Sel — au goût']);
     expect(model.stepLines).toEqual(['1. Mélanger.', '2. Enfourner.']);
-    expect(JSON.stringify(model)).not.toContain('photo');
+    // Sans carte d’URLs, une entrée par étape, toutes nulles : la recette reste
+    // imprimable sans photo et le tableau reste parallèle aux lignes.
+    expect(model.stepPhotos).toEqual([null, null]);
+    expect(model.stepPhotos).toHaveLength(model.stepLines.length);
+  });
+
+  it('le modèle print porte l’URL résolue de chaque étape, alignée sur les lignes', () => {
+    const model = toRecipePrintModel({
+      title: 'Gratin dauphinois',
+      servings: 4,
+      targetServings: 4,
+      prepMinutes: null,
+      cookMinutes: null,
+      ingredients: [],
+      steps: [
+        { id: 's1', content: 'Mélanger.', position: 0, photoPath: null },
+        { id: 's2', content: 'Enfourner.', position: 1, photoPath: null },
+        { id: 's3', content: 'Servir.', position: 2, photoPath: null },
+      ],
+      stepPhotoUrls: { s1: 'https://signe.example/s1.jpg', s3: 'https://signe.example/s3.jpg' },
+    });
+
+    expect(model.stepLines).toEqual(['1. Mélanger.', '2. Enfourner.', '3. Servir.']);
+    expect(model.stepPhotos).toEqual(['https://signe.example/s1.jpg', null, 'https://signe.example/s3.jpg']);
+    expect(model.stepPhotos).toHaveLength(model.stepLines.length);
+  });
+
+  it('un chemin de bucket dans step.photoPath n’entre jamais dans le modèle (T-21-05)', () => {
+    const model = toRecipePrintModel({
+      title: 'Recette',
+      servings: 4,
+      targetServings: 4,
+      prepMinutes: null,
+      cookMinutes: null,
+      ingredients: [],
+      steps: [{ id: 's1', content: 'Mélanger.', position: 0, photoPath: 'foyer-1/recipes/r-1/steps/s1/file.jpg' }],
+    });
+
+    // Le modèle ne lit que la carte résolue : sans elle, l’entrée est nulle et
+    // le chemin de bucket n’atteint jamais le DOM d’impression.
+    expect(model.stepPhotos).toEqual([null]);
+    expect(JSON.stringify(model)).not.toContain('foyer-1/');
+  });
+
+  it('le dépôt démo rend une valeur qui n’est pas une URL http(s) (critère négatif du SPEC)', async () => {
+    // jsdom n’implémente pas `URL.createObjectURL` (aperçus locaux) : on le
+    // remplace, comme `storage.test.ts`, sans mocker `depositHouseholdFile` —
+    // c’est la chaîne réelle `uploadRecipeStepPhoto` → `storedValueOf`.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:apercu-etape') });
+    const stored = await uploadRecipeStepPhoto(
+      DEMO_HOUSEHOLD_ID,
+      'recipe-x',
+      'step-1',
+      new File(['pixels'], 'etape.jpg', { type: 'image/jpeg' }),
+    );
+
+    expect(/^https?:\/\//i.test(stored)).toBe(false);
+    expect(stored.startsWith('blob:')).toBe(true);
+  });
+
+  it('les trois niveaux de nettoyage ne lèvent pas quand il n’y a rien à retirer (R5, arête vide)', async () => {
+    const adapter = getLocalAdapter();
+    const step = await adapter.create<RecipeStepRow>('recipe_steps', {
+      recipe_id: 'r-empty',
+      household_id: DEMO_HOUSEHOLD_ID,
+      content: 'Étape.',
+      position: 0,
+      photo_path: 'blob:apercu-etape',
+    });
+
+    // Niveau 1 : supprimer l’étape (aperçu `blob:` → rien à retirer du bucket).
+    await expect(deleteRecipeStep(step.id, 'blob:apercu-etape')).resolves.toBeUndefined();
+    expect(await adapter.list('recipe_steps', { recipe_id: 'r-empty' })).toHaveLength(0);
+
+    // Niveaux 2 et 3 : supprimer la recette (couverture + photos d’étapes).
+    const recipe = await adapter.create<RecipeRow>('recipes', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      title: 'Recette vide',
+      cover_photo: 'blob:apercu-cover',
+      created_at: '2026-10-16T12:00:00.000Z',
+    });
+    await expect(deleteRecipe(recipe.id, 'blob:apercu-cover', ['blob:apercu-1', null])).resolves.toBeUndefined();
+    expect(await adapter.list('recipes', { household_id: DEMO_HOUSEHOLD_ID })).not.toContainEqual(
+      expect.objectContaining({ id: recipe.id }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('les unités abrégées restent invariables à toutes les échelles', () => {

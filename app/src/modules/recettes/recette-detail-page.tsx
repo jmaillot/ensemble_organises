@@ -136,6 +136,7 @@ export default function RecetteDetailPage() {
         cookMinutes: recipe.cookMinutes,
         ingredients,
         steps,
+        stepPhotoUrls: photoUrls,
       })
     : null;
 
@@ -511,9 +512,15 @@ export default function RecetteDetailPage() {
         </ul>
         <h3>Étapes</h3>
         <ol>
-          {printModel.stepLines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
+          {printModel.stepLines.map((line, index) => {
+            const photo = printModel.stepPhotos[index] ?? null;
+            return (
+              <li key={line}>
+                {line}
+                {photo ? <img src={photo} alt={`Photo de l’étape ${index + 1}`} /> : null}
+              </li>
+            );
+          })}
         </ol>
       </div>
     ) : null}

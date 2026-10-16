@@ -234,12 +234,21 @@ export interface RecipePrintModel {
   meta: string;
   ingredientLines: string[];
   stepLines: string[];
+  /**
+   * URL affichable de la photo de chaque étape, **parallèle** à `stepLines`
+   * (même longueur, même index) ; `null` pour une étape sans photo.
+   */
+  stepPhotos: (string | null)[];
 }
 
 /**
  * Modèle de la vue print : nom + ingrédients recalculés à l'échelle
- * courante + étapes numérotées. Robuste sans photo : aucune URL requise,
- * la photo n'apparaît jamais dans le modèle.
+ * courante + étapes numérotées + photo affichable par étape. Robuste sans
+ * photo : `stepPhotos` reste parallèle à `stepLines` et vaut `null` quand
+ * aucune carte d'URLs n'est fournie. La fonction reste **pure et synchrone** :
+ * la résolution des chemins en URLs appartient à la fiche (`21-01`), qui passe
+ * `stepPhotoUrls`. Le modèle ne lit jamais `step.photoPath` (T-21-05) : un
+ * chemin de bucket n'entre pas dans le DOM d'impression.
  */
 export function toRecipePrintModel(args: {
   title: string;
@@ -249,6 +258,7 @@ export function toRecipePrintModel(args: {
   cookMinutes: number | null;
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
+  stepPhotoUrls?: Record<string, string | null>;
 }): RecipePrintModel {
   const total = formatTotalTime(args.prepMinutes, args.cookMinutes);
   const meta = [
@@ -263,5 +273,6 @@ export function toRecipePrintModel(args: {
     return `${ingredient.name} — ${qty}`;
   });
   const stepLines = args.steps.map((step, index) => `${index + 1}. ${step.content}`);
-  return { title: args.title, meta, ingredientLines, stepLines };
+  const stepPhotos = args.steps.map((step) => args.stepPhotoUrls?.[step.id] ?? null);
+  return { title: args.title, meta, ingredientLines, stepLines, stepPhotos };
 }
