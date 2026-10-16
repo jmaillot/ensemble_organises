@@ -146,12 +146,17 @@ test.describe('Recettes — mode cuisine (phase 17, démo)', () => {
 
   /** La graine démo ne fournit aucune étape : l'enfant ne voyant pas le formulaire, chaque test prépare ses étapes en membre. */
   async function seedTwoSteps(page: Page) {
+    const input = page.locator('#recette-etape-nouvelle');
     await page.goto('/recettes/recipe-1');
     await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
-    await page.locator('#recette-etape-nouvelle').fill('Éplucher les pommes de terre.');
+    await input.fill('Éplucher les pommes de terre.');
     await page.getByRole('button', { name: 'Ajouter une étape' }).click();
     await expect(page.getByText('Éplucher les pommes de terre.', { exact: true }).first()).toBeVisible();
-    await page.locator('#recette-etape-nouvelle').fill('Enfourner 45 minutes.');
+    // `submitAdd` remet le brouillon à vide APRÈS l'`await onAdd` : sans cette
+    // attente, la remise à zéro peut effacer le remplissage suivant (course
+    // mesurée sous `--repeat-each`). On attend le champ vide avant de saisir.
+    await expect(input).toHaveValue('');
+    await input.fill('Enfourner 45 minutes.');
     await page.getByRole('button', { name: 'Ajouter une étape' }).click();
     await expect(page.getByText('Enfourner 45 minutes.', { exact: true }).first()).toBeVisible();
   }
@@ -221,9 +226,13 @@ test.describe('Recettes — photos d’étapes (démo)', () => {
 
   /** La graine démo ne fournit aucune étape : le test prépare les siennes en membre. */
   async function addStep(page: Page, content: string) {
-    await page.locator('#recette-etape-nouvelle').fill(content);
+    const input = page.locator('#recette-etape-nouvelle');
+    await input.fill(content);
     await page.getByRole('button', { name: 'Ajouter une étape' }).click();
     await expect(page.getByText(content, { exact: true }).first()).toBeVisible();
+    // Même course que `seedTwoSteps` : `submitAdd` vide le brouillon APRÈS
+    // l'`await onAdd`, ce qui peut effacer le remplissage suivant.
+    await expect(input).toHaveValue('');
   }
 
   test('dépôt, image sur les trois surfaces, puis aperçu mort masqué après rechargement', async ({ page }) => {
@@ -261,6 +270,16 @@ test.describe('Recettes — photos d’étapes (démo)', () => {
     await expect(cuisineImage).toHaveCount(1);
     await expect(cuisineImage).toHaveAttribute('src', /^blob:/);
     await expect(list.getByRole('listitem').filter({ hasText: 'Enfourner 45 minutes.' }).locator('img')).toHaveCount(0);
+
+    // Chromium garde le magasin de `blob:` VIVANT à travers un rechargement :
+    // sans révocation, l'URL n'est pas morte après `page.reload()` et l'image
+    // reste rendue (sonde mesurée : 5 fois sur 6). Révoquer explicitement
+    // l'aperçu est ce qui rend la prémisse « aperçu mort » vraie, donc le
+    // masquage (onError, D-18) déterministe.
+    const previewUrl = await cuisineImage.getAttribute('src');
+    await page.evaluate((url) => {
+      if (url) URL.revokeObjectURL(url);
+    }, previewUrl);
 
     // Rechargement : l'aperçu `blob:` est mort, l'image est masquée et l'étape
     // se rend comme une étape nue, l'invitation d'ajout de retour (R6).
