@@ -156,6 +156,7 @@ declare
   v_alice uuid;
   v_recipe text;
   v_step2 text;
+  v_home_a text;
   v_home_b text;
   v_def text;
   v_view jsonb;
@@ -164,6 +165,7 @@ begin
   select user_id into v_alice from testkit.fx where key = 'alice';
   select row_id into v_recipe from testkit.fx where key = 'recipe_r1';
   select row_id into v_step2 from testkit.fx where key = 'step_r2';
+  select household_id into v_home_a from testkit.fx where key = 'home_a';
   select household_id into v_home_b from testkit.fx where key = 'home_b';
 
   select pg_get_constraintdef(c.oid) into v_def
@@ -189,6 +191,23 @@ begin
    where e ->> 'id' = v_step2;
   perform testkit.ok(v_step -> 'photo_path' = 'null'::jsonb,
     'une photo d''etape d''un autre foyer ne sort pas du RPC');
+
+  -- (c2) Segment `..` APRES un prefixe de foyer VALIDE : cette ligne heritee
+  --      satisfait `starts_with`, donc seule la clause `strpos(...) = 0` la
+  --      retient. Sans elle, le RPC rendrait le chemin et l'Edge signerait
+  --      l'objet d'un autre foyer : AR-21-02 rouvert par le chemin de LECTURE,
+  --      exactement ce que (a2) ferme cote ecriture.
+  update public.recipe_steps
+     set photo_path = v_home_a || '/../' || v_home_b || '/recipes/x/steps/y/photo.jpg'
+   where id = v_step2;
+
+  perform public.create_recipe_share(v_alice, v_recipe, repeat('c', 64), null, 5);
+  v_view := public.view_recipe_share(repeat('c', 64));
+  select e into v_step
+    from jsonb_array_elements(v_view -> 'steps') e
+   where e ->> 'id' = v_step2;
+  perform testkit.ok(v_step -> 'photo_path' = 'null'::jsonb,
+    'une photo d''etape qui remonte par `..` ne sort pas du RPC');
 
   -- Le pendant positif : l'etape (a1), du bon foyer, traverse toujours.
   select e into v_step
