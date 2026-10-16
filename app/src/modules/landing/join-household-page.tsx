@@ -8,6 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { redeemInviteToken } from '@/lib/invites';
+import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { joinHouseholdLocal, loadHousehold } from '@/stores/session-store';
 import { useToast } from '@/components/ui/toast';
 
@@ -44,7 +45,12 @@ export default function JoinHouseholdPage() {
     setError(null);
     try {
       await redeemInviteToken(values.token);
-      if (!import.meta.env.VITE_SUPABASE_URL) {
+      // La MÊME sonde que le reste de l'application (`lib/supabase/client.ts`) :
+      // URL ET clé publiable. Tester l'URL seule faisait croire à un backend
+      // présent alors que le client Supabase, lui, n'existait pas — la branche
+      // locale n'était pas prise, et l'appel serveur échouait au lieu de
+      // tourner en mode démonstration (D-10).
+      if (!isSupabaseConfigured) {
         await joinHouseholdLocal();
       }
       await loadHousehold();
