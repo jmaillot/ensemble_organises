@@ -54,6 +54,7 @@ export default function NotesPage() {
     filters,
     setFilters,
     resetFilters,
+    hasActiveFilters,
     isLoading,
     isError,
     error,
@@ -202,13 +203,31 @@ export default function NotesPage() {
           onAction={canWrite ? openCreate : undefined}
         />
       ) : visibleNotes.length === 0 ? (
-        <EmptyState
-          icon="search"
-          title="Aucune note ne correspond à votre recherche."
-          description="Essayez un autre mot-clé, ou affichez de nouveau toutes les catégories."
-          secondaryActionLabel="Réinitialiser les filtres"
-          onSecondaryAction={resetFilters}
-        />
+        // D-09 : trois états vides distincts. Une recherche ou une catégorie
+        // active rend légitime l'état « aucun résultat » ; sans filtre, c'est
+        // le dossier lui-même qui est vide, et lui proposer de « réinitialiser
+        // les filtres » ne le remplirait pas.
+        hasActiveFilters ? (
+          <EmptyState
+            icon="search"
+            title="Aucune note ne correspond à votre recherche."
+            description="Essayez un autre mot-clé, ou affichez de nouveau toutes les catégories."
+            secondaryActionLabel="Réinitialiser les filtres"
+            onSecondaryAction={resetFilters}
+          />
+        ) : (
+          <EmptyState
+            icon="archive"
+            title={activeFolderId === null ? 'Aucune note dans Général' : 'Ce dossier est vide'}
+            description={
+              activeFolderId === null
+                ? 'Toutes vos notes sont rangées dans des dossiers. Créez-en une ici pour la garder sous la main.'
+                : 'Ce dossier n’attend qu’une première note : rangez-y une idée pour la retrouver facilement.'
+            }
+            actionLabel={canWrite ? 'Créer une note' : undefined}
+            onAction={canWrite ? openCreate : undefined}
+          />
+        )
       ) : (
         <>
           <p className="sr-only" role="status">
