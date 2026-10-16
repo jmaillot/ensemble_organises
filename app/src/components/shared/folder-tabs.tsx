@@ -227,6 +227,14 @@ function FolderManageDialog({
     setIsSaving(true);
     void onRename(id, draft)
       .then(() => setEditingId(null))
+      // L'appelant a déjà annoncé l'échec : `notes-page.tsx` — comme
+      // `taches-page` et `routines` — affiche le message en toast PUIS relance
+      // l'erreur. Afficher ici un second message le doublerait, et un `catch`
+      // muet sans cette phrase serait un avaleur : ce gestionnaire constate que
+      // l'erreur a été dite, il ne la fait pas disparaître en silence. L'édition
+      // reste ouverte (`setEditingId(null)` n'est que dans le `then`) pour qu'un
+      // échec ne se fasse pas passer pour un renommage abouti.
+      .catch(() => undefined)
       .finally(() => setIsSaving(false));
   };
 
@@ -302,7 +310,15 @@ function FolderManageDialog({
           const target = pendingDelete;
           setPendingDelete(null);
           if (!target) return;
-          void onDelete(target).then(() => onOpenChange(false));
+          void onDelete(target)
+            .then(() => onOpenChange(false))
+            // Même division du travail que `submitRename` : l'appelant a déjà
+            // affiché l'erreur en toast puis relancé (`notes-page.tsx`,
+            // `taches-page`, `routines`). Ce `catch` constate que l'erreur a été
+            // dite, il ne l'avale pas ; la fermeture du dialogue de gestion
+            // (`onOpenChange(false)`) reste dans le `then` — un échec ne doit pas
+            // laisser croire que le dossier a été supprimé.
+            .catch(() => undefined);
         }}
       />
     </>

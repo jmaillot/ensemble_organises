@@ -92,3 +92,70 @@ describe('FolderTabs — canDelete distinct de canManage', () => {
     expect(screen.getByRole('button', { name: 'Supprimer Week-end' })).toBeInTheDocument();
   });
 });
+
+/**
+ * D-06 : un rejet de `onRename` ou `onDelete` se traite là où il naît. Les
+ * appelants (`notes-page`, `taches-page`, `routines`) affichent le message en
+ * toast PUIS relancent l'erreur ; le composant doit donc porter un `catch` qui
+ * la constate. Sans lui, la promesse rejetée traverse le `finally` et reste
+ * orpheline — c'est exactement ce que `unhandledRejection` observe ici, et
+ * c'est le défaut que ce `describe` verrouille.
+ */
+describe('FolderTabs — un rejet de promesse est traité là où il naît (D-06)', () => {
+  /**
+   * Écoute les rejets non traités pendant le corps du test. Node les signale sur
+   * la macrotâche suivante, donc un tour de boucle (`setTimeout 0`) suffit à les
+   * voir. Le `finally` retire l'écouteur pour ne pas fuir d'un test à l'autre.
+   */
+  async function withRejectionSpy(run: () => Promise<void>): Promise<unknown[]> {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', listener);
+    try {
+      await run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return unhandled;
+    } finally {
+      process.off('unhandledRejection', listener);
+    }
+  }
+
+  it('renommage refusé : aucun rejet non traité, l’édition reste ouverte', async () => {
+    const user = userEvent.setup();
+    const onRename = vi.fn().mockRejectedValue(new Error('Renommage refusé.'));
+    renderTabs({ onRename });
+
+    const unhandled = await withRejectionSpy(async () => {
+      await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
+      await user.click(screen.getByRole('button', { name: 'Renommer Week-end' }));
+      const field = screen.getByRole('textbox', { name: 'Renommer Week-end' });
+      await user.clear(field);
+      await user.type(field, 'Week-ends');
+      await user.click(screen.getByRole('button', { name: 'OK' }));
+    });
+
+    expect(unhandled).toHaveLength(0);
+    expect(onRename).toHaveBeenCalledWith('folder-weekend', 'Week-ends');
+    // L'édition n'est pas refermée sur un échec : le champ est toujours rendu.
+    expect(screen.getByRole('textbox', { name: 'Renommer Week-end' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK' })).toBeEnabled();
+  });
+
+  it('suppression refusée : aucun rejet non traité, le dialogue de gestion reste ouvert', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockRejectedValue(new Error('Suppression refusée.'));
+    renderTabs({ onDelete });
+
+    const unhandled = await withRejectionSpy(async () => {
+      await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
+      await user.click(screen.getByRole('button', { name: 'Supprimer Week-end' }));
+      await user.click(await screen.findByRole('button', { name: 'Supprimer le dossier' }));
+    });
+
+    expect(unhandled).toHaveLength(0);
+    expect(onDelete).toHaveBeenCalledOnce();
+    // Un échec ne donne pas l'impression que le dossier a été supprimé : le
+    // dialogue de gestion reste ouvert (la fermeture n'est que dans le `then`).
+    expect(screen.getByRole('dialog', { name: 'Gérer les dossiers' })).toBeInTheDocument();
+  });
+});
