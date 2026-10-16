@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import GuestRecipePage from './guest-recipe-page';
+import { fetchGuestRecipeView } from './api';
 
 vi.mock('@/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
@@ -199,6 +200,99 @@ describe('GuestRecipePage', () => {
       expect(
         await screen.findByText('Ce lien ne passe plus (lien révoqué ou expiré). Demandez un nouveau lien à l’organisateur.'),
       ).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /**
+   * Échec fermé (T-21-04) : le seul producteur d'URL d'affichage côté client
+   * est la valeur `photoUrl` servie par l'Edge. La page ne dérive jamais une
+   * URL d'un chemin, ne signe rien et ne complète aucune valeur absente.
+   */
+  it('une étape dont la charge porte photoUrl: null ne rend aucun élément média', async () => {
+    const calls: string[] = [];
+    // viewPayload : les deux étapes portent `photoUrl: null`.
+    mockViewFetch(calls);
+    try {
+      renderGuest(CODE);
+      await screen.findByRole('heading', { name: 'Gratin dauphinois' });
+      const list = screen.getByRole('list', { name: 'Étapes de la recette' });
+      // Compte exact : zéro image, pas une simple absence de vérification.
+      expect(within(list).queryAllByRole('img')).toHaveLength(0);
+      expectReadOnly();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('une charge qui ne porte que photo_path rend photoUrl: null, sans laisser le chemin dans le DOM', async () => {
+    const BUCKET_PATH = 'foyer-1/recipes/r-1/steps/s-1/file-a7f3.jpg';
+    const photoPathOnlyPayload = {
+      ...viewPayload,
+      steps: [
+        { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photo_path: BUCKET_PATH },
+        { id: 's2', content: 'Enfourner 45 minutes.', position: 1 },
+      ],
+    };
+    const calls: string[] = [];
+    mockViewFetch(calls, true, photoPathOnlyPayload);
+    try {
+      // La projection lit `photoUrl` (le nom de la charge servie), jamais
+      // `photo_path` (le nom de la colonne) : la clé absente rend `null`.
+      const projected = await fetchGuestRecipeView(CODE);
+      expect(projected.steps[0].photoUrl).toBeNull();
+      renderGuest(CODE);
+      await screen.findByRole('heading', { name: 'Gratin dauphinois' });
+      // Aucun `src` du DOM ne contient le chemin de bucket — le test tombe si
+      // la projection lisait la mauvaise clé.
+      expect(document.body.innerHTML).not.toContain(BUCKET_PATH);
+      expect(within(screen.getByRole('list', { name: 'Étapes de la recette' })).queryAllByRole('img')).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('une recette mêlant une étape photographiée et une étape nue rend exactement une image', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls, true, signedStepViewPayload);
+    try {
+      renderGuest(CODE);
+      await screen.findByRole('heading', { name: 'Gratin dauphinois' });
+      const list = screen.getByRole('list', { name: 'Étapes de la recette' });
+      const images = within(list).queryAllByRole('img');
+      // La présence de l'une n'entraîne pas l'autre.
+      expect(images).toHaveLength(1);
+      expect(images[0]).toHaveAttribute('src', 'https://signe.example/step-s1');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('la carte d’affichage porte une entrée par étape : l’étape nue reste null, aucune URL fabriquée', async () => {
+    const BUCKET_PATH = 'foyer-1/recipes/r-1/steps/s-2/file-b9e1.jpg';
+    const mixedRawPathPayload = {
+      ...viewPayload,
+      steps: [
+        { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photoUrl: 'https://signe.example/step-s1' },
+        // L'étape 2 porte un chemin brut et pas d'URL : la page ne doit RIEN
+        // en fabriquer (ni signature, ni complétion).
+        { id: 's2', content: 'Enfourner 45 minutes.', position: 1, photo_path: BUCKET_PATH },
+      ],
+    };
+    const calls: string[] = [];
+    mockViewFetch(calls, true, mixedRawPathPayload);
+    try {
+      renderGuest(CODE);
+      await screen.findByRole('heading', { name: 'Gratin dauphinois' });
+      const list = screen.getByRole('list', { name: 'Étapes de la recette' });
+      // Une entrée par étape : s1 photographiée, s2 nue → exactement une image.
+      const images = within(list).queryAllByRole('img');
+      expect(images).toHaveLength(1);
+      expect(images[0]).toHaveAttribute('src', 'https://signe.example/step-s1');
+      // La valeur absente n'a pas été complétée : le chemin brut n'apparaît
+      // dans aucun `src` du DOM.
+      expect(document.body.innerHTML).not.toContain(BUCKET_PATH);
     } finally {
       vi.unstubAllGlobals();
     }
