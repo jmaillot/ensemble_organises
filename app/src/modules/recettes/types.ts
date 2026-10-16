@@ -69,6 +69,8 @@ export interface RecipeStep {
   id: string;
   content: string;
   position: number;
+  /** Photo de l'etape (chemin de bucket ou apercu demo), `null` si absente. */
+  photoPath: string | null;
 }
 
 export interface RecipeFormValues {
@@ -220,6 +222,7 @@ export const toStep = (row: RecipeStepRow): RecipeStep => ({
   id: row.id,
   content: row.content,
   position: row.position,
+  photoPath: row.photo_path ?? null,
 });
 
 /* ------------------------------------------------------------------ */

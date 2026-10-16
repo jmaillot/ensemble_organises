@@ -16,12 +16,15 @@ import { Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { Checkbox } from '@/components/ui/primitives';
 import type { RecipeStep } from '../types';
+import { StepPhoto } from './step-photo';
 
 export interface RecipeStepsProps {
   steps: RecipeStep[];
   /** Faux pour le rôle `enfant` : saisie et drag masques, cases conservees. */
   readOnly?: boolean;
   isSaving?: boolean;
+  /** URL affichables des photos d'étape, par identifiant d'étape (D-06). */
+  photoUrls?: Record<string, string | null>;
   onAdd: (content: string) => Promise<void> | void;
   onUpdate: (step: RecipeStep, content: string) => Promise<void> | void;
   onDelete: (step: RecipeStep) => Promise<void> | void;
@@ -33,7 +36,7 @@ export interface RecipeStepsProps {
  * drag (dnd-kit, clavier via `sortableKeyboardCoordinates`) + boutons
  * monter/descendre ≥ 44px ; cases cuisson en etat local seul (D-12).
  */
-export function RecipeSteps({ steps, readOnly = false, isSaving = false, onAdd, onUpdate, onDelete, onReorder }: RecipeStepsProps) {
+export function RecipeSteps({ steps, readOnly = false, isSaving = false, photoUrls = {}, onAdd, onUpdate, onDelete, onReorder }: RecipeStepsProps) {
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -94,6 +97,7 @@ export function RecipeSteps({ steps, readOnly = false, isSaving = false, onAdd, 
           onToggleChecked={() => toggleChecked(step.id)}
           readOnly={readOnly}
           isSaving={isSaving}
+          photoUrl={photoUrls[step.id] ?? null}
           isEditing={editingId === step.id}
           editContent={editContent}
           onEditContentChange={setEditContent}
@@ -191,6 +195,7 @@ interface StepRowProps {
   onToggleChecked: () => void;
   readOnly: boolean;
   isSaving: boolean;
+  photoUrl: string | null;
   isEditing: boolean;
   editContent: string;
   onEditContentChange: (value: string) => void;
@@ -265,6 +270,7 @@ function StepRow(props: StepRowProps) {
             ) : (
               <p className={cn('m-0 text-[13px]', checked && 'text-muted line-through')}>{step.content}</p>
             )}
+            <StepPhoto url={props.photoUrl} alt={`Photo de l’étape ${number}`} />
           </div>
         </div>
         {!readOnly && !props.isEditing ? (

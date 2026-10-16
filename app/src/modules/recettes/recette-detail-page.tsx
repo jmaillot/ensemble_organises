@@ -16,6 +16,7 @@ import {
   deleteRecipeIngredient,
   deleteRecipeStep,
   resolveRecipeCoverUrl,
+  resolveRecipeStepPhotoUrls,
   sendRecipeIngredientsToCourses,
   updateRecipeIngredient,
   updateRecipeStep,
@@ -89,6 +90,15 @@ export default function RecetteDetailPage() {
     queryFn: () => resolveRecipeCoverUrl(recipe?.coverPhoto ?? null),
   });
   const coverUrl = coverQuery.data ?? null;
+  // Photos d'étape (D-06) : la clé porte la liste des chemins, donc un dépôt
+  // ou un retrait la renouvelle ; `steps` passe par un `useQuery` direct
+  // (`use-recettes.ts`), sans `selectKey` — D-08(a) de la phase 20 ne mord pas.
+  const stepPhotoQuery = useQuery({
+    queryKey: ['recettes', 'step-photos', recipe?.id, steps.map((step) => step.photoPath ?? '').join('|')],
+    enabled: Boolean(recipe) && steps.length > 0,
+    queryFn: () => resolveRecipeStepPhotoUrls(steps),
+  });
+  const photoUrls = stepPhotoQuery.data ?? {};
   const totalTime = recipe ? formatTotalTime(recipe.prepMinutes, recipe.cookMinutes) : null;
 
   const guard = () => {
@@ -309,6 +319,7 @@ export default function RecetteDetailPage() {
           steps={steps}
           readOnly={!canWrite}
           isSaving={isMutating}
+          photoUrls={photoUrls}
           onAdd={async (content) => {
             try {
               guard();

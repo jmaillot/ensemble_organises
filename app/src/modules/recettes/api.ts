@@ -1,6 +1,6 @@
 import { data } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import { depositHouseholdFile, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
+import { depositHouseholdFile, isHouseholdMediaPath, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import type {
   RecipeCategoryRow,
   RecipeFavoriteRow,
@@ -295,6 +295,54 @@ export async function resolveRecipeCoverUrls(
 }
 
 export type { RecipeRow };
+
+/* ------------------------------------------------------------------ */
+/* Photo d'étape (R1, D-02/D-03) : même régime que la couverture —      */
+/* chemin de bucket signé à la lecture, valeur produite par `storedValueOf`. */
+/* ------------------------------------------------------------------ */
+
+/** Dépose la photo d'une étape (`recipes/<recipeId>/steps/<stepId>`, compression partagée). */
+export async function uploadRecipeStepPhoto(
+  householdId: string,
+  recipeId: string,
+  stepId: string,
+  file: File,
+): Promise<string> {
+  const deposited = await depositHouseholdFile({ householdId, folder: `recipes/${recipeId}/steps/${stepId}`, file });
+  // Valeur de colonne par le point unique (D-02, D-03) : jamais un champ du
+  // dépôt lu à la main, qui persisterait une URL signée éphémère.
+  return storedValueOf(deposited);
+}
+
+/**
+ * Forge la photo d'étape affichable (échec fermé) : les formes non-chemin
+ * (aperçu démo `blob:`, URL héritée, actif `/assets`) rendent telles quelles ;
+ * un chemin se forge en URL signée sur le bucket du foyer ; tout échec donne
+ * `null`, jamais de lien mort.
+ */
+export async function resolveRecipeStepPhotoUrl(stored: string | null): Promise<string | null> {
+  if (!stored) return null;
+  if (!isHouseholdMediaPath(stored)) {
+    return /^blob:|^https?:|^data:|^\/assets\//i.test(stored) ? stored : null;
+  }
+  // La signature passe par le point unique de la lecture (D-01) : seul le
+  // propriétaire de l'appel change, la TTL courte reste celle du module.
+  return resolveHouseholdMediaUrl(stored, RECIPE_COVER_URL_TTL);
+}
+
+/** Forge chaque photo d'étape en une passe (échec fermé par étape). */
+export async function resolveRecipeStepPhotoUrls(
+  steps: { id: string; photoPath: string | null }[],
+): Promise<Record<string, string>> {
+  const entries = await Promise.all(
+    steps.map(async (step) => [step.id, await resolveRecipeStepPhotoUrl(step.photoPath)] as const),
+  );
+  const resolved: Record<string, string> = {};
+  for (const [id, url] of entries) {
+    if (url) resolved[id] = url;
+  }
+  return resolved;
+}
 
 /* ------------------------------------------------------------------ */
 /* Partage invité (Edge Function `recipe-invite`, R11, D-13/D-14)       */

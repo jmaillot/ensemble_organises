@@ -102,9 +102,9 @@ async function openCuisine() {
 }
 
 const VIEW_STEPS: RecipeStep[] = [
-  { id: 'v-1', content: 'Éplucher les pommes de terre.', position: 0 },
-  { id: 'v-2', content: 'Les couper en rondelles.', position: 1 },
-  { id: 'v-3', content: 'Enfourner 45 minutes.', position: 2 },
+  { id: 'v-1', content: 'Éplucher les pommes de terre.', position: 0, photoPath: null },
+  { id: 'v-2', content: 'Les couper en rondelles.', position: 1, photoPath: null },
+  { id: 'v-3', content: 'Enfourner 45 minutes.', position: 2, photoPath: null },
 ];
 
 describe('Mode cuisine — tracer fiche membre (R1, R2, R3)', () => {
@@ -282,7 +282,7 @@ describe('Mode cuisine — tracer fiche membre (R1, R2, R3)', () => {
   it('recette à 1 étape : 0/1 puis 1/1', async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <RecipeCuisineView steps={[{ id: 'solo', content: 'Saler.', position: 0 }]} recipeId="r-vue-solo" wakeLockSupported />,
+      <RecipeCuisineView steps={[{ id: 'solo', content: 'Saler.', position: 0, photoPath: null }]} recipeId="r-vue-solo" wakeLockSupported />,
     );
     expect(screen.getByText('0/1')).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Marquer l’étape 1 comme faite' }));
@@ -379,7 +379,7 @@ describe('Mode cuisine — prohibitions et robustesse (SPEC, plan 17-01 tâche 3
   it('edge : étape très longue non cochée rendue entière, jamais tronquée', () => {
     const long = `Faire fondre le beurre à feu doux, ajouter la farine en pluie, remuer sans cesse pendant dix minutes, verser le lait petit à petit, laisser épaissir, assaisonner, goûter, rectifier, réserver au chaud.`;
     renderWithProviders(
-      <RecipeCuisineView steps={[{ id: 'longue', content: long, position: 0 }]} recipeId="r-longue" wakeLockSupported />,
+      <RecipeCuisineView steps={[{ id: 'longue', content: long, position: 0, photoPath: null }]} recipeId="r-longue" wakeLockSupported />,
     );
     const text = screen.getByText(long);
     expect(text.className).not.toContain('line-clamp-2');

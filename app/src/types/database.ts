@@ -393,6 +393,8 @@ export interface RecipeStepRow {
   household_id: Uuid;
   content: string;
   position: number;
+  /** Chemin prive de la photo d'etape (`recipes/<id>/steps/<stepId>/…`, 0125). */
+  photo_path?: string | null;
 }
 
 export interface RecipeFavoriteRow {

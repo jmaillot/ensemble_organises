@@ -9,9 +9,9 @@ import { reorderRecipeSteps } from './api';
 import type { RecipeStep } from './types';
 
 const STEPS: RecipeStep[] = [
-  { id: 'step-1', content: 'Éplucher les pommes de terre.', position: 0 },
-  { id: 'step-2', content: 'Les couper en rondelles.', position: 1 },
-  { id: 'step-3', content: 'Enfourner 45 minutes.', position: 2 },
+  { id: 'step-1', content: 'Éplucher les pommes de terre.', position: 0, photoPath: null },
+  { id: 'step-2', content: 'Les couper en rondelles.', position: 1, photoPath: null },
+  { id: 'step-3', content: 'Enfourner 45 minutes.', position: 2, photoPath: null },
 ];
 
 function renderSteps(onReorder: (ids: string[]) => void = () => {}) {
@@ -83,5 +83,24 @@ describe('Étapes recettes (R7, D-11, D-12)', () => {
     expect(positions.get('step-3')).toBe(0);
     expect(positions.get('step-1')).toBe(1);
     expect(positions.get('step-2')).toBe(2);
+  });
+
+  it('rend l’image d’une étape photographiée, aucun média pour une étape nue', async () => {
+    renderWithProviders(
+      <RecipeSteps
+        steps={STEPS}
+        photoUrls={{ 'step-2': 'https://signe.example/etape-2.jpg' }}
+        onAdd={() => {}}
+        onUpdate={() => {}}
+        onDelete={() => {}}
+        onReorder={() => {}}
+      />,
+    );
+
+    const list = await screen.findByRole('list', { name: 'Étapes de la recette' });
+    const images = within(list).getAllByRole('img');
+    expect(images).toHaveLength(1);
+    expect(images[0]).toHaveAttribute('src', 'https://signe.example/etape-2.jpg');
+    expect(images[0]).toHaveAttribute('alt', 'Photo de l’étape 2');
   });
 });

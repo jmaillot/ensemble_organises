@@ -77,6 +77,9 @@ export default function GuestRecipePage() {
     id: entry.id,
     content: entry.content,
     position: entry.position,
+    // La surface invitée ne porte pas encore de photo (Edge 21-02, page 21-03) :
+    // l'étape invitée se rend comme une étape nue.
+    photoPath: null,
   }));
   const totalTime = view ? formatTotalTime(view.prepMinutes, view.cookMinutes) : null;
   // Mémoire sur l'appareil de l'invité, même clé que la fiche membre (D-17).

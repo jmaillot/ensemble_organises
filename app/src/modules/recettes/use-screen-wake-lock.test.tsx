@@ -32,8 +32,8 @@ function stubVisible() {
 }
 
 const STEPS = [
-  { id: 'w-1', content: 'Éplucher les pommes de terre.', position: 0 },
-  { id: 'w-2', content: 'Enfourner 45 minutes.', position: 1 },
+  { id: 'w-1', content: 'Éplucher les pommes de terre.', position: 0, photoPath: null },
+  { id: 'w-2', content: 'Enfourner 45 minutes.', position: 1, photoPath: null },
 ];
 
 describe('useScreenWakeLock (R4 amendé, D-10, D-11)', () => {

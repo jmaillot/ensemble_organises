@@ -115,8 +115,8 @@ describe('Actions fiche recette — export print + envoi Courses (R12/R14)', () 
         { id: 'i2', name: 'Sel', quantity: null, unit: 'au goût', position: 1 },
       ],
       steps: [
-        { id: 's1', content: 'Mélanger.', position: 0 },
-        { id: 's2', content: 'Enfourner.', position: 1 },
+        { id: 's1', content: 'Mélanger.', position: 0, photoPath: null },
+        { id: 's2', content: 'Enfourner.', position: 1, photoPath: null },
       ],
     });
 
