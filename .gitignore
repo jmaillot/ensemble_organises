@@ -54,5 +54,21 @@ Thumbs.db
 *.swp
 *~
 
+# ── Artefacts de workers (non versionnés) ────────────────────────────────────
+# Les worktrees produits par les agents de travail ne sont pas du produit : un
+# `git add -A` ne doit pas les embarquer. Le répertoire entier est ignoré, par
+# famille et non fichier par fichier, car la prochaine exécution produira un
+# autre identifiant de worker.
+.claude/worktrees/
+
+# ── État local de l'outillage (non versionné) ────────────────────────────────
+# L'état de dispatch de GSD est local à la machine, pas du produit.
+.gsd/
+
+# ── Script de debug ad hoc (non versionné) ───────────────────────────────────
+# `app/shot-toggle-on.mjs` n'est PAS supprimé : c'est du travail de l'auteur,
+# mis hors du champ de `git add -A` — on ne décide pas à sa place.
+app/shot-toggle-on.mjs
+
 # ── Planning local (non versionné) ───────────────────────────────────────────
 .planning/
