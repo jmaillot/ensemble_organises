@@ -24,8 +24,8 @@ import { isLocalMode } from '@/lib/data';
  *
  * ÉTAT PARTAGÉ
  *   Aucune écriture dans `localStorage` : l'état affiché vient du serveur, et
- *   `localStorage` ne faisait que这些问题 du serveur — l'onglet pouvait
- *   afficher « activé » pour un abonnement supprimé côté serveur.
+ *   `localStorage` ne faisait que doublonner l'état du serveur — l'onglet
+ *   pouvait afficher « activé » pour un abonnement supprimé côté serveur.
  */
 
 /**
@@ -152,7 +152,7 @@ function decodeVapidKey(value: string): Uint8Array {
  * Erreur remontée par l'Edge Function, avec son code HTTP.
  *
  * Le message vient du serveur et est écrit pour l'utilisateur ; le statut, lui,
- * décide de ce que l'interface doit faire — et distinguishes « réseau coupé »
+ * décide de ce que l'interface doit faire — et distingue « réseau coupé »
  * de « clé VAPID absente », deux situations qu'un même texte ne distingue pas.
  */
 export class PushRequestError extends Error {
