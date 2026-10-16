@@ -96,7 +96,6 @@ export interface AuthBootstrap {
 
 /** Restaure la session Supabase au chargement et le foyer de l'utilisateur. */
 export function useAuthBootstrap(): AuthBootstrap {
-  const setStatus = useSessionStore((state) => state.setStatus);
   // Tant que la session n'est pas restaurée, l'application affiche un état de
   // chargement : sinon une route protégée redirigerait vers la connexion.
   const [ready, setReady] = useState(false);
@@ -142,7 +141,11 @@ export function useAuthBootstrap(): AuthBootstrap {
         useSessionStore.setState({ status: 'authenticated', householdLoaded: true });
         setReady(true);
       } else {
-        setStatus('guest');
+        // Ce n'est pas `setStatus('guest')` : le statut seul laissait
+        // l'utilisateur ET le foyer persistés, et les deux stores étant
+        // persistés, ils revenaient au rechargement suivant. `signOut()` est le
+        // seul chemin qui vide réellement les deux (D-07).
+        void useSessionStore.getState().signOut();
         setReady(true);
       }
       return;
@@ -165,7 +168,11 @@ export function useAuthBootstrap(): AuthBootstrap {
         if (!active) return;
         const session = data.session;
         if (!session) {
-          setStatus('guest');
+          // Même chemin qu'en mode local : `setStatus('guest')` laissait
+          // l'utilisateur et le foyer persistés, donc une session expirée ou
+          // révoquée côté serveur laissait l'application *paraître* connectée
+          // au rechargement suivant. `signOut()` vide les deux stores (D-07).
+          void useSessionStore.getState().signOut();
           setReady(true);
           return;
         }
@@ -203,7 +210,7 @@ export function useAuthBootstrap(): AuthBootstrap {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [setStatus, attempt]);
+  }, [attempt]);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
 

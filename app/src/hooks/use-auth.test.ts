@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { User } from '@supabase/supabase-js';
+import type { HouseholdRow } from '@/types';
 
 /**
  * Régression : après une inscription ou une connexion réussie, l'application
@@ -60,6 +61,7 @@ vi.mock('@/lib/data', () => ({ data: { list: listMock, create: vi.fn(), update: 
 
 const { signInWithEmail, signUpWithEmail, applySession } = await import('./use-auth');
 const { useSessionStore } = await import('@/stores/session-store');
+const { useHouseholdStore } = await import('@/stores/household-store');
 
 describe("chemin d'authentification", () => {
   beforeEach(() => {
@@ -69,6 +71,9 @@ describe("chemin d'authentification", () => {
     auth.signInWithPassword.mockReset();
     listMock.mockClear();
     useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+    // Les deux stores sont persistés et partagés par le module : un cas qui
+    // sème un foyer ne doit pas le laisser derrière lui.
+    useHouseholdStore.getState().reset();
   });
 
   it("établit la session après une inscription confirmée automatiquement", async () => {
@@ -358,6 +363,63 @@ describe("chemin d'authentification", () => {
 
     expect(useSessionStore.getState().status).toBe('guest');
     expect(useSessionStore.getState().user).toBeNull();
+  });
+
+  it("vide la session ET le foyer persistés quand l'amorçage ne trouve aucune session (D-07)", async () => {
+    // La branche « pas de session » posait `setStatus('guest')`, qui ne touche
+    // que le statut. Les deux stores sont persistés : au rechargement suivant,
+    // une session expirée ou révoquée côté serveur laissait l'application
+    // « invitée » avec un foyer encore en mémoire. On sème donc un utilisateur
+    // ET un foyer AVANT de monter, et on exige que les DEUX soient vidés —
+    // l'assertion sur `householdId` est celle qui porte D-07 (sans elle, le
+    // test serait vert sur le code fautif).
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: user.id, email: 'alice@example.fr', displayName: 'Alice Martin', avatarUrl: null, provider: 'email' },
+      householdLoaded: true,
+    });
+    useHouseholdStore.getState().setHousehold(
+      { id: 'h-fantome', name: 'Foyer fantôme', avatar_color: 'accent' } as HouseholdRow,
+      [],
+    );
+    auth.getSession.mockResolvedValue({ data: { session: null } });
+    const { useAuthBootstrap } = await import('./use-auth');
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+
+    expect(useHouseholdStore.getState().householdId).toBeNull();
+    expect(useSessionStore.getState().user).toBeNull();
+    expect(useSessionStore.getState().status).toBe('guest');
+    expect(useSessionStore.getState().householdLoaded).toBe(false);
+  });
+
+  it('vide le foyer persisté sur SIGNED_OUT (verrou de non-régression)', async () => {
+    // La branche `SIGNED_OUT` de l'écouteur appelle DÉJÀ `signOut()` : ce test
+    // est donc vert AVANT le correctif autant qu'après. C'est un verrou de
+    // non-régression, pas une preuve rouge.
+    const { useAuthBootstrap } = await import('./use-auth');
+    const { result, unmount } = renderHook(() => useAuthBootstrap());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(listeners.length).toBeGreaterThan(0);
+
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: user.id, email: 'alice@example.fr', displayName: 'Alice Martin', avatarUrl: null, provider: 'email' },
+      householdLoaded: true,
+    });
+    useHouseholdStore.getState().setHousehold(
+      { id: 'h-fantome', name: 'Foyer fantôme', avatar_color: 'accent' } as HouseholdRow,
+      [],
+    );
+
+    await act(async () => {
+      for (const listener of listeners) listener('SIGNED_OUT', null);
+    });
+
+    expect(useHouseholdStore.getState().householdId).toBeNull();
+    expect(useSessionStore.getState().user).toBeNull();
+    unmount();
   });
 });
 
