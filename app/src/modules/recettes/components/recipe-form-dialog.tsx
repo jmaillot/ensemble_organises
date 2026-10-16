@@ -113,7 +113,10 @@ export function RecipeFormDialog({ open, onOpenChange, recipe, categories, allTa
     reset(defaultValues(recipe, categories));
     setTagDraft('');
     setCoverPreview(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // La recette éditée est un objet recréé à chaque rendu : `recipe?.id` en est
+    // la partie stable et identifie une ouverture. `categories` — tableau
+    // rechargé en asynchrone — est omis : l'inclure remettrait le formulaire à
+    // zéro à l'arrivée des catégories, effaçant une saisie en cours.
   }, [open, recipe?.id]);
 
   useEffect(() => {
@@ -125,7 +128,10 @@ export function RecipeFormDialog({ open, onOpenChange, recipe, categories, allTa
     const url = URL.createObjectURL(file);
     setCoverPreview(url);
     return () => URL.revokeObjectURL(url);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // L'effet suit la VALEUR du fichier choisi (`watch('coverFile')`), qui pilote
+    // la création puis la révocation de l'URL objet. `watch` est omis : sa
+    // fonction est stable par contrat de react-hook-form, l'inclure ne
+    // rejouerait rien de plus.
   }, [watch('coverFile')]);
 
   const toggleTag = (name: string) => {

@@ -78,9 +78,9 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
     reset(defaultValues(note, initialFolderId));
     setNewFiles([]);
     setRemovedIds([]);
-    // `note` identifie une ouverture : le formulaire n'est pas réinitialisé à
-    // chaque frappe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `note` — objet recréé par la page à chaque rendu — identifie une ouverture
+    // par son `note?.id` stable : le formulaire n'est pas réinitialisé à chaque
+    // frappe, et `reset` (react-hook-form) est stable.
   }, [open, note?.id, initialFolderId]);
 
   const existing: NoteAttachment[] = (note?.attachments ?? []).filter(

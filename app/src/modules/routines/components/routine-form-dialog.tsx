@@ -224,9 +224,9 @@ export function RoutineFormDialog({
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(routine, currentMemberId, initialFolderId));
-    // `routine` identifie une ouverture : le formulaire n'est pas réinitialisé à
-    // chaque frappe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `routine` — objet recréé par la page à chaque rendu — identifie une
+    // ouverture par son `routine?.id` stable : le formulaire n'est pas
+    // réinitialisé à chaque frappe, et `reset` (react-hook-form) est stable.
   }, [open, routine?.id, currentMemberId, initialFolderId]);
 
   return (

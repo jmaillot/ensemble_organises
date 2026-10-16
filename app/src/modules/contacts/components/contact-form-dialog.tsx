@@ -81,8 +81,11 @@ export function ContactFormDialog({
     if (!open) return;
     reset(defaultValues(contact, lists));
     setUploadError(null);
-    // L'identifiant de la fiche éditée identifie une ouverture.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // La fiche éditée est un objet recréé par le parent à chaque rendu :
+    // `contact?.id` en est la partie stable et suffit à identifier une
+    // ouverture. `lists` — tableau reconstruit à chaque rendu, et vide jusqu'à
+    // l'arrivée asynchrone — est omis : l'inclure relancerait la remise à zéro
+    // à chaque rendu et à l'arrivée des listes, effaçant une saisie en cours.
   }, [open, contact?.id]);
 
   // La liste par défaut dépend des listes chargées en asynchrone : si le
