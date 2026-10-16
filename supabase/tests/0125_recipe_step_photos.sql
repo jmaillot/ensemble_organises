@@ -88,13 +88,26 @@ select testkit.eq(testkit.count(format(
 -- ===========================================================================
 -- (b) Le cas QUI DOIT ECHOUER — l'enfant (hors `can_write_household`) :
 --     0 ligne affectee, insert refuse (R2, T-21-01).
+--
+--     La valeur ecrite est un CHEMIN DU FOYER, de MEME FORME que le cas (a)
+--     positif ci-dessus (`home_a/recipes/<recipe>/steps/<step>/photo.jpg`) :
+--     ce fichier tourne sur la base ENTIEREMENT MIGREE, ou la contrainte
+--     `recipe_steps_photo_path_household` (0126) rejette AUSSI un chemin d'un
+--     autre foyer. Un chemin etranger rendrait donc l'assertion verte sans
+--     rien prouver de la RLS : le refus pourrait venir de la FORME de la
+--     valeur, pas de l'absence de `can_write_household`. En gardant la forme
+--     du cas membre, la seule difference entre la valeur acceptee et la
+--     valeur refusee devient le ROLE : la contrainte ne peut plus etre la
+--     cause, la RLS seule peut l'etre.
 -- ===========================================================================
 select testkit.as_user(user_id, 'r21-nina@example.fr') from testkit.fx where key = 'nina';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
   'update public.recipe_steps set photo_path = %L where id = %L',
-  'foyer-x/recipes/r/steps/s/photo.jpg',
+  (select household_id from testkit.fx where key = 'home_a') || '/recipes/'
+    || (select row_id from testkit.fx where key = 'recipe_r1') || '/steps/'
+    || (select row_id from testkit.fx where key = 'step_r2') || '/photo.jpg',
   (select row_id from testkit.fx where key = 'step_r2'))), 0::bigint,
   'un enfant ne pose pas de photo sur une etape');
 
@@ -103,7 +116,9 @@ select testkit.expect_denied(format(
   (select row_id from testkit.fx where key = 'recipe_r1'),
   (select household_id from testkit.fx where key = 'home_a'),
   'Etape interdite', 3,
-  'foyer-x/recipes/r/steps/s/photo.jpg'),
+  (select household_id from testkit.fx where key = 'home_a') || '/recipes/'
+    || (select row_id from testkit.fx where key = 'recipe_r1') || '/steps/'
+    || (select row_id from testkit.fx where key = 'step_r2') || '/photo-2.jpg'),
   'un enfant n''insere pas d''etape portant une photo');
 
 reset role;
