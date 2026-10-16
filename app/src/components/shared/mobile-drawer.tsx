@@ -97,12 +97,16 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   // Une navigation referme le tiroir (filet de sécurité en plus du onClick).
   useEffect(() => {
     onOpenChange(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `onOpenChange` est omis volontairement : le parent recrée ce rappel à
+    // chaque rendu, donc l'inclure rejouerait la fermeture à chaque rendu au
+    // lieu de ne la déclencher qu'au changement de route.
   }, [pathname]);
 
   useEffect(() => {
     if (!isMobileLayout) onOpenChange(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `onOpenChange` est omis pour la même raison que l'effet précédent : son
+    // identité change à chaque rendu du parent, l'inclure rejouerait la
+    // fermeture à chaque rendu plutôt qu'au seul passage en vue étroite.
   }, [isMobileLayout]);
 
   useEffect(() => {

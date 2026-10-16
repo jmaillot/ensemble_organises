@@ -162,7 +162,9 @@ export function ExpenseFormDialog({
     setOptionsOpen(false);
     setIncludePayer(true);
     // Se rouvre avec une autre dépense : le pré-remplissage suit la cible.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `initialExpense` est omis volontairement — la page le recrée à chaque
+    // rendu — et `initialId` en est la partie stable qui identifie la cible ;
+    // l'inclure relancerait la remise à zéro à chaque rendu du parent.
   }, [open, initialId, reset]);
 
   const splitType = watch('splitType');

@@ -144,9 +144,11 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(event, defaultDate, memberId, remindAt));
-    // `event`, `defaultDate` et `remindAt` identifient une ouverture : on ne
-    // réinitialise pas le formulaire à chaque frappe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `defaultDate` et `remindAt` identifient une ouverture, et `event` — objet
+    // recréé à chaque rendu — l'est par son `event?.id` stable. `memberId` est
+    // omis : il dérive de `event` et des membres chargés, et vaut '' jusqu'à
+    // leur arrivée ; l'inclure réinitialiserait le formulaire à ce moment-là,
+    // effaçant une saisie en cours.
   }, [open, event?.id, defaultDate, remindAt]);
 
   // D-03 : présélection visible du Commun. Dès que les calendriers sont

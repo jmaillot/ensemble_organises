@@ -116,6 +116,17 @@ sh scripts/test-db.sh          # sur une machine qui a Docker
 sh scripts/test-dispatch-push.sh   # en plus, et ce n'est pas équivalent
 ```
 
+**Aucun linter n'est configuré dans ce dépôt** — ni ESLint, ni Biome, ni
+Prettier — et la chaîne ci-dessus est la seule vérification : elle ne change
+pas. Une directive de linter est donc **proscrite** : elle ne serait lue par
+personne, et elle escamoterait sous une formule creuse la raison d'un choix que
+le code doit dire en français. Un effet dont on omet volontairement une
+dépendance porte à sa place un commentaire qui **nomme la raison de
+l'omission** — l'identité d'un objet ou d'une fonction recréé à chaque rendu,
+une valeur dérivée recalculée — jamais « dépendances volontairement omises ».
+`app/src/lib/no-eslint-directive.test.ts` refuse la réintroduction d'une
+directive, et il a été vu rouge avant d'être vu vert (§2.7 B).
+
 `test-db.sh` vérifie que les fonctions sont **correctes**, et il s'arrête
 à la frontière HTTP : faute de pg_net, de Vault et d'un runtime
 `functions` dans la base. Un changement de migration, de Vault ou de la Edge

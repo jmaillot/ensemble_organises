@@ -75,8 +75,10 @@ export function BirthdayFormDialog({ open, onOpenChange, birthday, isSaving = fa
     if (!open) return;
     reset(defaultValues(birthday));
     setUploadError(null);
-    // L'identifiant de l'anniversaire edited identifie une ouverture.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // L'anniversaire édité est un objet recréé par la liste à chaque rendu :
+    // `birthday?.id` en est la partie stable et suffit à identifier une
+    // ouverture. Inclure `birthday` relancerait la remise à zéro à chaque rendu
+    // du parent ; `reset`, fourni par react-hook-form, est stable.
   }, [open, birthday?.id]);
 
   const handlePhotoFile = async (file: File | undefined) => {
