@@ -203,3 +203,71 @@ test.describe('Recettes — mode cuisine (phase 17, démo)', () => {
     await expect(page.getByRole('button', { name: 'Ajouter une étape' })).toHaveCount(0);
   });
 });
+
+/**
+ * PNG 1×1 RGBA valide (70 octets) : la compression native de
+ * `depositHouseholdFile` (`createImageBitmap`) refuse un tampon non décodable,
+ * donc la fixture doit être une vraie image.
+ */
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test.describe('Recettes — photos d’étapes (démo)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openDemoSession(page);
+  });
+
+  /** La graine démo ne fournit aucune étape : le test prépare les siennes en membre. */
+  async function addStep(page: Page, content: string) {
+    await page.locator('#recette-etape-nouvelle').fill(content);
+    await page.getByRole('button', { name: 'Ajouter une étape' }).click();
+    await expect(page.getByText(content, { exact: true }).first()).toBeVisible();
+  }
+
+  test('dépôt, image sur les trois surfaces, puis aperçu mort masqué après rechargement', async ({ page }) => {
+    await page.goto('/recettes/recipe-1');
+    await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
+
+    await addStep(page, 'Éplucher les pommes de terre.');
+    await addStep(page, 'Enfourner 45 minutes.');
+
+    const list = page.getByRole('list', { name: 'Étapes de la recette' });
+    const photographed = list.getByRole('listitem').filter({ hasText: 'Éplucher les pommes de terre.' });
+    const bare = list.getByRole('listitem').filter({ hasText: 'Enfourner 45 minutes.' });
+
+    // Dépôt : cliquer l'invitation de l'étape puis fournir le PNG minuscule.
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      photographed.getByRole('button', { name: 'Ajouter une photo' }).click(),
+    ]);
+    await chooser.setFiles({ name: 'etape.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG });
+
+    // Aperçu local `blob:` en mode démo (D-18) sous le texte de l'étape.
+    const ficheImage = photographed.locator('img');
+    await expect(ficheImage).toBeVisible();
+    await expect(ficheImage).toHaveAttribute('src', /^blob:/);
+    // L'étape laissée nue ne rend aucun élément média.
+    await expect(bare.locator('img')).toHaveCount(0);
+
+    // Le bloc d'impression porte une image sous sa ligne.
+    await expect(page.locator('.recipe-print').locator('img')).toHaveCount(1);
+
+    // Mode cuisine : la même image y est rendue, l'étape nue reste sans média.
+    await page.getByRole('button', { name: 'Mode cuisine', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Mode cuisine' })).toBeVisible();
+    const cuisineImage = list.getByRole('listitem').filter({ hasText: 'Éplucher les pommes de terre.' }).locator('img');
+    await expect(cuisineImage).toHaveCount(1);
+    await expect(cuisineImage).toHaveAttribute('src', /^blob:/);
+    await expect(list.getByRole('listitem').filter({ hasText: 'Enfourner 45 minutes.' }).locator('img')).toHaveCount(0);
+
+    // Rechargement : l'aperçu `blob:` est mort, l'image est masquée et l'étape
+    // se rend comme une étape nue, l'invitation d'ajout de retour (R6).
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Tartiflette de saison' })).toBeVisible();
+    const photographedAfter = list.getByRole('listitem').filter({ hasText: 'Éplucher les pommes de terre.' });
+    await expect(photographedAfter.locator('img')).toHaveCount(0);
+    await expect(photographedAfter.getByRole('button', { name: 'Ajouter une photo' })).toBeVisible();
+  });
+});
