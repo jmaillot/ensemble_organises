@@ -47,6 +47,12 @@ declare
   alice_m text := testkit.member(home_a, alice, 'Alice Martin', 'admin', 'accent');
   daily text := private.new_id('routine');
   weekly text := private.new_id('routine');
+  -- Une seule notion d'« aujourd'hui » dans ce fichier : celle de la doctrine
+  -- du projet, Europe/Paris — la même que `run_daily_routine_maintenance`.
+  -- `current_date` lit le fuseau de la SESSION (UTC dans ce conteneur) : entre
+  -- 22 h et 24 h UTC, il vaut v_today - 1, et la graine posait la complétion un
+  -- jour trop tôt par rapport à l'assertion (deferred-items.md §14).
+  v_today date := (now() at time zone 'Europe/Paris')::date;
 begin
   insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at)
   values
@@ -55,7 +61,7 @@ begin
 
   -- Une occurrence déjà validée ne doit jamais être écrasée.
   insert into public.routine_completions (id, routine_id, household_id, occurrence_date, status, completed_by, completed_at)
-  values (private.new_id('routine-completion'), daily, home_a, current_date - 20, 'fait', alice_m, now());
+  values (private.new_id('routine-completion'), daily, home_a, v_today - 20, 'fait', alice_m, now());
 
   perform testkit.eq(private.generate_routine_occurrences(current_date - 14, current_date) >= 15, true,
     'les occurrences des 14 derniers jours sont générées');
