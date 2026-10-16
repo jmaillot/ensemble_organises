@@ -48,15 +48,37 @@ const FALLBACK: PushPayload = {
  * conservées à la réinstallation…), cas où les push arrivent mais où rien ne
  * s'affiche, nulle part, sans aucune erreur.
  */
-const SW_VERSION = 'precache-push-v1';
+const SW_VERSION = 'precache-push-v2';
 
 /** Clé du reçu du dernier push, lisible par la page via l'API Cache. */
 const PUSH_RECEIPT_URL = '/__push_last__';
+
+/**
+ * Clé du reçu de la dernière rotation d'abonnement, lisible par la page.
+ *
+ * URL distincte du reçu de push, sur le MÊME cache `eo-push-log` : les deux
+ * constats sont indépendants et doivent pouvoir être lus séparément.
+ */
+const PUSH_ROTATION_RECEIPT_URL = '/__push_rotation__';
 
 interface PushReceipt {
   at: number;
   title: string;
   shown: boolean;
+  error: string | null;
+}
+
+/**
+ * Ce qu'une rotation d'abonnement a produit, du point de vue du worker.
+ *
+ * `ok` et `error` sont tous deux renseignés : un échec est une information,
+ * pas une absence d'information (AGENTS.md §2.7 F — un succès muet est un
+ * échec inexpliqué).
+ */
+interface PushRotationReceipt {
+  at: number;
+  endpoint: string;
+  ok: boolean;
   error: string | null;
 }
 
@@ -78,6 +100,26 @@ async function writePushReceipt(receipt: PushReceipt): Promise<void> {
     );
   } catch {
     // Stockage indisponible (navigation privée…) : tant pis pour le reçu.
+  }
+}
+
+/**
+ * Écrit le reçu de rotation, avec la MÊME tolérance que `writePushReceipt`.
+ *
+ * L'écriture est isolée pour la même raison : un stockage indisponible ne doit
+ * pas faire perdre l'information de rotation — c'est la seule trace qu'un
+ * endpoint connu du serveur est devenu caduc, et sans elle la page ne peut
+ * rien réparer.
+ */
+async function writePushRotationReceipt(receipt: PushRotationReceipt): Promise<void> {
+  try {
+    const cache = await caches.open('eo-push-log');
+    await cache.put(
+      new Request(PUSH_ROTATION_RECEIPT_URL),
+      new Response(JSON.stringify(receipt), { headers: { 'content-type': 'application/json' } }),
+    );
+  } catch {
+    // Stockage indisponible : tant pis pour le reçu, la rotation a eu lieu.
   }
 }
 
@@ -189,6 +231,54 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
  * traité ici, et `clients.openWindow` est la seule action possible — un
  * `postMessage` à la page n'aurait personne pour le recevoir.
  */
+
+// --- Rotation d'abonnement -------------------------------------------------
+
+/**
+ * Une rotation d'abonnement décidée par le navigateur.
+ *
+ * POURQUOI LE WORKER ÉCRIT AU LIEU D'APPELER LA FONCTION SERVEUR : il n'a
+ * aucun jeton — `push-subscribe` s'authentifie par la session de l'onglet — et
+ * ne peut donc pas enregistrer lui-même le nouvel endpoint. Le reçu dans l'API
+ * Cache est le seul canal qui survit à l'absence d'onglet : la page le relit à
+ * son prochain chargement et fait l'enregistrement à sa place.
+ *
+ * POURQUOI C'EST UN CAS À PART : le service Push peut invalider un abonnement
+ * et en fournir un autre sans prévenir personne. Sans ce gestionnaire, le
+ * serveur garde l'ancien endpoint et les rappels partent dans le vide — ni
+ * erreur, ni trace, nulle part.
+ */
+self.addEventListener('pushsubscriptionchange', (event: PushSubscriptionChangeEvent) => {
+  event.waitUntil(
+    (async () => {
+      const receipt: PushRotationReceipt = { at: Date.now(), endpoint: '', ok: false, error: null };
+      try {
+        // Le navigateur fournit souvent le remplaçant ; quand il invalide sans
+        // en fournir, on en crée un avec la clé de l'ancien abonnement — la
+        // seule clé dont dispose le worker.
+        const replacement =
+          event.newSubscription ??
+          (await self.registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: event.oldSubscription?.options?.applicationServerKey ?? null,
+          }));
+        receipt.endpoint = replacement.endpoint;
+        receipt.ok = true;
+      } catch (error) {
+        // L'échec est ÉCRIT, jamais avalé (AGENTS.md §2.7 F) : un reçu qui ne
+        // bouge pas et un reçu d'échec ne se distingueraient pas autrement.
+        receipt.error = error instanceof Error ? error.name : 'inconnue';
+      }
+      await writePushRotationReceipt(receipt);
+      // Le message part APRÈS l'écriture : un onglet qui se ferme entre les
+      // deux laisse quand même la trace durable, le canal de secours prévu.
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of windows) {
+        client.postMessage({ type: 'EO_PUSH_ROTATED', endpoint: receipt.endpoint, ok: receipt.ok });
+      }
+    })(),
+  );
+});
 
 // --- Diagnostic : la page ping pour savoir QUEL worker est actif ------------
 

@@ -24,6 +24,7 @@ import { NotificationsDialog } from '@/components/shared/notifications-dialog';
 import { queryKeys, useResource } from '@/lib/data/useResource';
 import { useQuery } from '@tanstack/react-query';
 import { listTaskAssignees } from '@/modules/taches/api';
+import { syncRotatedPushSubscription } from '@/modules/parametres/lib/push';
 import type { TaskRow } from '@/types';
 
 const homeIcon: IconName = 'home';
@@ -107,10 +108,26 @@ export function AppShell() {
     const container = navigator.serviceWorker;
     const onServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data as { type?: unknown; title?: unknown; body?: unknown } | null;
-      if (!data || data.type !== 'EO_PUSH') return;
-      const title = typeof data.title === 'string' ? data.title : '';
-      const body = typeof data.body === 'string' ? data.body : '';
-      toast([title, body].filter(Boolean).join(' — ') || 'Nouveau rappel du foyer.');
+      if (!data) return;
+      // Deux messages distincts, deux comportements distincts (D-04) : les
+      // fusionner ferait d'une rotation un rappel, ou l'inverse.
+      if (data.type === 'EO_PUSH') {
+        const title = typeof data.title === 'string' ? data.title : '';
+        const body = typeof data.body === 'string' ? data.body : '';
+        toast([title, body].filter(Boolean).join(' — ') || 'Nouveau rappel du foyer.');
+        return;
+      }
+      if (data.type === 'EO_PUSH_ROTATED') {
+        // Le worker a laissé un reçu durable ; c'est ici que l'abonnement est
+        // réellement enregistré auprès du serveur. Un échec est signalé à
+        // l'écran pendant que l'onglet est ouvert — le reçu, lui, survit à sa
+        // fermeture.
+        void syncRotatedPushSubscription().then((result) => {
+          if (result === 'failed') {
+            toast('Abonnement aux notifications expiré : réactivez-les dans les préférences.');
+          }
+        });
+      }
     };
     container.addEventListener('message', onServiceWorkerMessage);
     return () => container.removeEventListener('message', onServiceWorkerMessage);

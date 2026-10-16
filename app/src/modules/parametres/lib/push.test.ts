@@ -32,6 +32,7 @@ import {
   renamePushDevice,
   repairServiceWorker,
   resyncPush,
+  syncRotatedPushSubscription,
   toProfileColumns,
 } from './push';
 
@@ -118,6 +119,38 @@ function httpError(status: number, body: unknown) {
     error: new Error('Edge Function returned a non-2xx status code'),
     response: new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
   };
+}
+
+/**
+ * Double de l'API Cache du worker, pour les DEUX reçus qui la traversent : le
+ * reçu de push (`/__push_last__`) et le reçu de rotation (`/__push_rotation__`).
+ *
+ * Les `put` sont retenus, et non seulement les `match` : c'est la seule façon
+ * d'asserter ce que la page ÉCRIT — son acquittement de rotation — et non
+ * seulement ce qu'elle lit. jsdom n'implémente pas l'API Cache.
+ */
+function installCache(stored: unknown, rotation: unknown = undefined) {
+  const responses = new Map<string, { json: () => Promise<unknown> }>();
+  const jsonOf = (value: unknown) => ({
+    json: async () => {
+      if (typeof value === 'string') throw new Error('corps illisible');
+      return value;
+    },
+  });
+  if (stored !== undefined) responses.set('/__push_last__', jsonOf(stored));
+  if (rotation !== undefined) responses.set('/__push_rotation__', jsonOf(rotation));
+
+  const written = new Map<string, unknown>();
+  vi.stubGlobal('caches', {
+    open: vi.fn(async () => ({
+      match: vi.fn(async (url: string) => responses.get(url) ?? null),
+      put: vi.fn(async (request: unknown, response: unknown) => {
+        const key = typeof request === 'string' ? request : (request as { url: string }).url;
+        written.set(key, JSON.parse(await (response as { text: () => Promise<string> }).text()));
+      }),
+    })),
+  });
+  return written;
 }
 
 beforeEach(() => {
@@ -568,21 +601,6 @@ describe('réparation du service worker', () => {
 });
 
 describe('reçu du dernier push', () => {
-  function installCache(stored: unknown) {
-    const responses = new Map<string, { json: () => Promise<unknown> }>();
-    if (stored !== undefined) {
-      responses.set('/__push_last__', {
-        json: async () => {
-          if (typeof stored === 'string') throw new Error('corps illisible');
-          return stored;
-        },
-      });
-    }
-    vi.stubGlobal('caches', {
-      open: vi.fn(async () => ({ match: vi.fn(async () => responses.get('/__push_last__') ?? null) })),
-    });
-  }
-
   it('lit le reçu écrit par le worker', async () => {
     installCache({ at: 1720000000000, title: 'Rappel', shown: true, error: null });
     try {
@@ -609,6 +627,87 @@ describe('reçu du dernier push', () => {
     installCache('pas-du-json');
     try {
       expect(await readLastPushReceipt()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+/**
+ * D-04 : la rotation n'est pas seulement écrite par le worker, elle est
+ * ENREGISTRÉE par la page — et l'issue de cet enregistrement est écrite à son
+ * tour, dans les deux cas. Un échec avalé serait exactement le succès muet que
+ * §2.7 F interdit.
+ */
+describe('rotation d’abonnement (D-04)', () => {
+  const ROTATION_RECEIPT = {
+    at: 1720000000000,
+    endpoint: 'https://push.exemple.fr/neuf',
+    ok: true,
+    error: null,
+  };
+
+  function routeInvoke({ subscribeFails }: { subscribeFails: boolean }) {
+    invoke.mockImplementation(async (_name: string, options: { body: { action: string } }) => {
+      const action = options.body.action;
+      if (action === 'config') {
+        return { data: { vapid_public_key: VAPID_KEY, push_configured: true }, error: null };
+      }
+      if (subscribeFails) return httpError(500, { error: 'Enregistrement impossible.' });
+      return { data: { id: 'push_neuf' }, error: null };
+    });
+  }
+
+  it('sans reçu de rotation, ne fait rien et n’enregistre aucun abonnement', async () => {
+    // Sans Cache API non plus : le lecteur doit rendre `null`, pas lever.
+    expect(await syncRotatedPushSubscription()).toBe('none');
+
+    const written = installCache(undefined);
+    try {
+      expect(await syncRotatedPushSubscription()).toBe('none');
+      expect(invoke).not.toHaveBeenCalled();
+      expect(written.size).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('enregistre le nouvel abonnement via `push-subscribe` et acquitte `registered`', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    routeInvoke({ subscribeFails: false });
+    const written = installCache(undefined, ROTATION_RECEIPT);
+    try {
+      expect(await syncRotatedPushSubscription()).toBe('registered');
+
+      const subscribeCall = invoke.mock.calls.find(
+        (call) => (call[1] as { body?: { action?: string } })?.body?.action === 'subscribe',
+      );
+      expect(subscribeCall?.[0]).toBe('push-subscribe');
+      expect(subscribeCall?.[1]).toMatchObject({
+        body: { action: 'subscribe', endpoint: 'https://fcm.googleapis.com/fcm/send/neuf' },
+      });
+      expect(written.get('/__push_rotation_ack__')).toEqual({
+        at: ROTATION_RECEIPT.at,
+        result: 'registered',
+        error: null,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('sur échec d’enregistrement, rend `failed` ET écrit l’acquittement avec sa raison', async () => {
+    installBrowser({ current: null, permission: 'granted' });
+    routeInvoke({ subscribeFails: true });
+    const written = installCache(undefined, ROTATION_RECEIPT);
+    try {
+      expect(await syncRotatedPushSubscription()).toBe('failed');
+
+      // L'assertion qui porte §2.7 F : l'échec est ÉCRIT, avec sa raison.
+      const ack = written.get('/__push_rotation_ack__') as { result: string; error: string | null };
+      expect(ack.result).toBe('failed');
+      expect(ack.error).not.toBeNull();
+      expect(ack.error).not.toBe('');
     } finally {
       vi.unstubAllGlobals();
     }

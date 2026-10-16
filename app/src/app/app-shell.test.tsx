@@ -11,6 +11,18 @@ import { catalogueModules, isChildHiddenModule } from '@/lib/modules';
 import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
 
+/**
+ * D-04 : le shell doit relire le reçu de rotation quand le worker le lui dit.
+ * Le mock est partiel — le reste du module reste réel — pour n'observer que
+ * l'appel, sans réseau ni Cache API.
+ */
+const { syncRotatedPushSubscriptionMock } = vi.hoisted(() => ({ syncRotatedPushSubscriptionMock: vi.fn() }));
+
+vi.mock('@/modules/parametres/lib/push', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/parametres/lib/push')>();
+  return { ...actual, syncRotatedPushSubscription: syncRotatedPushSubscriptionMock };
+});
+
 function renderShell(route: string) {
   return renderWithProviders(
     <Routes>
@@ -189,6 +201,9 @@ describe('AppShell — catalogue des espaces', () => {
         handler!({ data: { type: 'EO_PUSH', title: 'Rappel', body: 'Dentiste à 18h' } } as MessageEvent);
       });
       expect(await screen.findByText('Rappel — Dentiste à 18h')).toBeInTheDocument();
+      // Le pendant (D-04) : un rappel n'est PAS une rotation — la branche
+      // ajoutée n'a pas remplacé l'ancienne, et l'ancienne ne la déclenche pas.
+      expect(syncRotatedPushSubscriptionMock).not.toHaveBeenCalled();
     } finally {
       // @ts-expect-error restauration de l'environnement jsdom
       delete window.navigator.serviceWorker;
@@ -273,6 +288,50 @@ describe('AppShell — badge À faire (15-01, personnel)', () => {
       // L'adaptateur local partage son IndexedDB entre les cas du fichier :
       // laisser task-1 chez Thomas ferait dépendre le test des graines.
       await setTaskAssignees('task-1', [DEMO_MEMBERS.camille]);
+    }
+  });
+});
+
+/**
+ * D-04 : après une rotation d'abonnement, le worker laisse un reçu durable et
+ * prévient les onglets ouverts. C'est le shell qui, à la réception du message,
+ * relit ce reçu et enregistre le nouvel endpoint — le worker n'a pas de jeton.
+ */
+describe('AppShell — rotation d’abonnement (D-04)', () => {
+  function installServiceWorkerListener() {
+    const listeners = new Map<string, Set<(event: MessageEvent) => void>>();
+    Object.defineProperty(window.navigator, 'serviceWorker', {
+      value: {
+        addEventListener: vi.fn((type: string, listener: (event: MessageEvent) => void) => {
+          const set = listeners.get(type) ?? new Set<(event: MessageEvent) => void>();
+          set.add(listener);
+          listeners.set(type, set);
+        }),
+        removeEventListener: vi.fn(),
+      },
+      configurable: true,
+    });
+    return listeners;
+  }
+
+  it('relit le reçu de rotation quand le worker signale `EO_PUSH_ROTATED`', async () => {
+    const listeners = installServiceWorkerListener();
+    syncRotatedPushSubscriptionMock.mockResolvedValue('registered');
+    try {
+      renderShell('/accueil');
+      const handler = [...(listeners.get('message') ?? [])][0];
+      expect(handler, 'le shell écoute le service worker').toBeDefined();
+
+      await act(async () => {
+        handler!({
+          data: { type: 'EO_PUSH_ROTATED', endpoint: 'https://push.exemple.fr/neuf', ok: true },
+        } as MessageEvent);
+      });
+
+      await waitFor(() => expect(syncRotatedPushSubscriptionMock).toHaveBeenCalledTimes(1));
+    } finally {
+      // @ts-expect-error restauration de l'environnement jsdom
+      delete window.navigator.serviceWorker;
     }
   });
 });

@@ -500,6 +500,128 @@ export async function readLastPushReceipt(): Promise<PushReceipt | null> {
   }
 }
 
+/** URL du reçu de rotation, écrit par le worker dans `eo-push-log`. */
+const PUSH_ROTATION_RECEIPT_URL = '/__push_rotation__';
+
+/** URL de l'acquittement de rotation, écrit par la page dans `eo-push-log`. */
+const PUSH_ROTATION_ACK_URL = '/__push_rotation_ack__';
+
+/**
+ * Ce que le worker a fait d'une rotation d'abonnement.
+ *
+ * `ok` dit si le nouvel endpoint a été retenu ; `error` porte la raison quand
+ * il ne l'a pas été — le worker n'écrit jamais un échec muet.
+ */
+export interface PushRotationReceipt {
+  at: number;
+  endpoint: string;
+  ok: boolean;
+  error: string | null;
+}
+
+/**
+ * Reçu de la dernière rotation traitée par le service worker, ou `null`.
+ *
+ * Même canal que `readLastPushReceipt` : le worker écrit dans l'API Cache, la
+ * page relit sans réseau. C'est la seule voie possible, le worker n'ayant
+ * aucun jeton pour appeler `push-subscribe`.
+ */
+export async function readPushRotationReceipt(): Promise<PushRotationReceipt | null> {
+  try {
+    if (typeof caches === 'undefined') return null;
+    const cache = await caches.open('eo-push-log');
+    const response = await cache.match(PUSH_ROTATION_RECEIPT_URL);
+    if (!response) return null;
+    const parsed = (await response.json()) as Partial<PushRotationReceipt>;
+    if (typeof parsed.at !== 'number' || typeof parsed.ok !== 'boolean') return null;
+    return {
+      at: parsed.at,
+      endpoint: typeof parsed.endpoint === 'string' ? parsed.endpoint : '',
+      ok: parsed.ok,
+      error: typeof parsed.error === 'string' ? parsed.error : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Écrit le résultat de l'enregistrement côté page, dans les DEUX issues.
+ *
+ * Un acquittement non écrit serait exactement le succès muet que §2.7 F
+ * interdit : la rotation aurait un reçu, et rien ne dirait si la page en a
+ * fait quelque chose.
+ */
+export async function acknowledgePushRotation(
+  at: number,
+  result: 'registered' | 'failed',
+  error: string | null,
+): Promise<void> {
+  try {
+    if (typeof caches === 'undefined') return;
+    const cache = await caches.open('eo-push-log');
+    await cache.put(
+      PUSH_ROTATION_ACK_URL,
+      new Response(JSON.stringify({ at, result, error }), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  } catch {
+    // Stockage indisponible : l'acquittement est une trace, pas une garantie.
+  }
+}
+
+/**
+ * Relit le reçu de rotation et enregistre le nouvel abonnement auprès du
+ * serveur — la seule partie que le worker ne peut pas faire (pas de jeton).
+ *
+ * `'none'` : rien à faire, aucun reçu de rotation n'a été écrit. Le mode
+ * démonstration et l'absence de clé VAPID sont des échecs DITS et acquittés,
+ * jamais des silences : la page ne peut pas enregistrer un endpoint sans
+ * serveur, et l'affirmer autrement serait faux.
+ */
+export async function syncRotatedPushSubscription(): Promise<'none' | 'registered' | 'failed'> {
+  const receipt = await readPushRotationReceipt();
+  if (!receipt) return 'none';
+
+  if (isLocalMode) {
+    await acknowledgePushRotation(receipt.at, 'failed', 'mode-demonstration');
+    return 'failed';
+  }
+
+  let vapidPublicKey: string | null = null;
+  try {
+    const config = await readPushConfig();
+    vapidPublicKey = config.pushConfigured ? config.vapidPublicKey : null;
+  } catch (error) {
+    await acknowledgePushRotation(receipt.at, 'failed', error instanceof Error ? error.name : 'inconnue');
+    return 'failed';
+  }
+  if (!vapidPublicKey) {
+    await acknowledgePushRotation(receipt.at, 'failed', 'vapid-absente');
+    return 'failed';
+  }
+
+  try {
+    // Réutilise les briques d'`enablePush` : la rotation n'ajoute aucune voie
+    // d'abonnement, elle emprunte la même.
+    const subscription = await ensureBrowserSubscription(vapidPublicKey);
+    await invoke(FUNCTION_NAME, {
+      action: 'subscribe',
+      endpoint: subscription.endpoint,
+      keys: subscription.keys,
+      expirationTime: subscription.expirationTime,
+      userAgent: navigator.userAgent,
+      label: friendlyDeviceName(navigator.userAgent ?? ''),
+    });
+    await acknowledgePushRotation(receipt.at, 'registered', null);
+    return 'registered';
+  } catch (error) {
+    await acknowledgePushRotation(receipt.at, 'failed', error instanceof Error ? error.name : 'inconnue');
+    return 'failed';
+  }
+}
+
 /**
  * Version fonctionnelle du service worker actif, ou `null`.
  *
