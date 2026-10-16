@@ -84,8 +84,8 @@ const viewPayload = {
   category: 'Recettes du foyer',
   ingredients: [{ id: 'i1', name: 'Pommes de terre', quantity: 500, unit: 'g', position: 0 }],
   steps: [
-    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0 },
-    { id: 's2', content: 'Enfourner 45 minutes.', position: 1 },
+    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photoUrl: null },
+    { id: 's2', content: 'Enfourner 45 minutes.', position: 1, photoUrl: null },
   ],
   tags: ['Plat'],
 };

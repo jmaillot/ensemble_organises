@@ -587,6 +587,15 @@ export interface GuestRecipeStep {
   id: string;
   content: string;
   position: number;
+  /**
+   * URL signée éphémère forgée par l'Edge `recipe-invite`, ou `null` (échec
+   * fermé). Même nom et même forme que `coverPhotoUrl` (D-15) : la projection
+   * cliente lit le nom de la CHARGE servie, jamais le nom de la colonne
+   * (`photo_path`) — une charge qui ne porterait que le chemin brut rend
+   * `null` (T-21-04). Requis, donc la chaîne de typage force chaque fixture à
+   * le renseigner.
+   */
+  photoUrl: string | null;
 }
 
 /** Fiche telle que la voit un visiteur : contenu seul, jamais d'auteur. */
@@ -628,6 +637,11 @@ function toGuestStep(entry: unknown): GuestRecipeStep {
     id: String(row.id ?? ''),
     content: String(row.content ?? ''),
     position: typeof row.position === 'number' ? row.position : 0,
+    // Projection symétrique de la couverture : on lit `photoUrl` (le nom de la
+    // charge servie), jamais `photo_path` (le nom de la colonne). Une charge
+    // qui ne porterait que le chemin brut rend donc `null` (échec fermé,
+    // T-21-04) — le client ne fabrique aucune URL d'un chemin.
+    photoUrl: asGuestText(row.photoUrl),
   };
 }
 

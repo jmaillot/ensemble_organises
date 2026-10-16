@@ -400,8 +400,8 @@ const GUEST_STICKY_VIEW: GuestRecipeView = {
   category: 'Recettes du foyer',
   ingredients: [],
   steps: [
-    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0 },
-    { id: 's2', content: 'Enfourner 45 minutes.', position: 1 },
+    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photoUrl: null },
+    { id: 's2', content: 'Enfourner 45 minutes.', position: 1, photoUrl: null },
   ],
   tags: ['Plat'],
 };

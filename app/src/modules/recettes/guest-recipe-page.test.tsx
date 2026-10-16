@@ -28,10 +28,22 @@ const viewPayload = {
     { id: 'i2', name: 'Sel', quantity: null, unit: 'au goût', position: 1 },
   ],
   steps: [
-    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0 },
-    { id: 's2', content: 'Enfourner 45 minutes.', position: 1 },
+    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photoUrl: null },
+    { id: 's2', content: 'Enfourner 45 minutes.', position: 1, photoUrl: null },
   ],
   tags: ['Plat'],
+};
+
+/**
+ * Même charge, mais l'étape 1 porte une URL signée (ce que sert l'Edge) :
+ * c'est le cas où la page DOIT afficher l'image. L'étape 2 reste nue.
+ */
+const signedStepViewPayload = {
+  ...viewPayload,
+  steps: [
+    { id: 's1', content: 'Éplucher les pommes de terre.', position: 0, photoUrl: 'https://signe.example/step-s1' },
+    { id: 's2', content: 'Enfourner 45 minutes.', position: 1, photoUrl: null },
+  ],
 };
 
 /**
@@ -39,7 +51,7 @@ const viewPayload = {
  * par `fetch`, donc tout appel direct y laisserait une trace. Le tableau
  * `calls` prouve l'isolement (T-16-10).
  */
-function mockViewFetch(calls: string[], ok = true) {
+function mockViewFetch(calls: string[], ok = true, payload: unknown = viewPayload) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation(async (_url: unknown, init?: RequestInit) => {
@@ -47,7 +59,7 @@ function mockViewFetch(calls: string[], ok = true) {
       const body = (JSON.parse((init?.body as string) ?? '{}') as { action?: string; code?: string }) ?? {};
       calls.push(`${body.action ?? '?'}`);
       if (!ok) return { ok: false, json: async () => ({ error: 'Ce lien est invalide.' }) };
-      return { ok: true, json: async () => viewPayload };
+      return { ok: true, json: async () => payload };
     }),
   );
 }
@@ -92,6 +104,25 @@ describe('GuestRecipePage', () => {
       // Seul appel réseau : `link-view` vers l'Edge, jamais PostgREST direct.
       expect(calls.filter((call) => !call.startsWith('http'))).toEqual(['link-view']);
       expect(calls.some((call) => call.includes('/functions/v1/recipe-invite'))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('affiche la photo signée d’une étape, sous son texte, en lecture seule', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls, true, signedStepViewPayload);
+    try {
+      renderGuest(CODE);
+      await screen.findByRole('heading', { name: 'Gratin dauphinois' });
+      // L'image de l'étape 1 porte EXACTEMENT l'URL signée servie par l'Edge,
+      // jamais un chemin de bucket.
+      const image = screen.getByRole('img', { name: 'Photo de l’étape 1' });
+      expect(image).toHaveAttribute('src', 'https://signe.example/step-s1');
+      // L'étape nue (2) ne rend aucun élément média.
+      expect(screen.queryByRole('img', { name: 'Photo de l’étape 2' })).not.toBeInTheDocument();
+      // Lecture seule : l'image est là, mais aucune commande d'édition.
+      expectReadOnly();
     } finally {
       vi.unstubAllGlobals();
     }

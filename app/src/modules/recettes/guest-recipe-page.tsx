@@ -77,10 +77,19 @@ export default function GuestRecipePage() {
     id: entry.id,
     content: entry.content,
     position: entry.position,
-    // La surface invitée ne porte pas encore de photo (Edge 21-02, page 21-03) :
-    // l'étape invitée se rend comme une étape nue.
+    // L'invité ne reçoit aucun chemin brut : l'étape invitée ne porte jamais de
+    // `photoPath`, la photo d'affichage vit dans la carte d'URLs ci-dessous.
     photoPath: null,
   }));
+  // Carte d'affichage (D-17, R3) : une entrée par étape, clé = identifiant,
+  // valeur = l'URL signée servie par l'Edge (`entry.photoUrl`), `null` compris.
+  // La page ne signe rien et ne complète aucune valeur absente : c'est le seul
+  // producteur d'URL d'affichage côté invité (T-21-04). Cette carte alimente
+  // LES DEUX surfaces (liste et mode cuisine), donc la page invitée et la fiche
+  // membre partagent littéralement le même rendu.
+  const photoUrls: Record<string, string | null> = Object.fromEntries(
+    (view?.steps ?? []).map((entry) => [entry.id, entry.photoUrl] as const),
+  );
   const totalTime = view ? formatTotalTime(view.prepMinutes, view.cookMinutes) : null;
   // Mémoire sur l'appareil de l'invité, même clé que la fiche membre (D-17).
   // Entrée locale orpheline (recette supprimée côté foyer) : inoffensive —
@@ -169,9 +178,22 @@ export default function GuestRecipePage() {
               action={<CuisineToggle active={cuisine} onToggle={() => setCuisine((current) => !current)} />}
             >
               {cuisine ? (
-                <RecipeCuisineView steps={steps} recipeId={cuisineRecipeId} wakeLockSupported={wakeLockSupported} />
+                <RecipeCuisineView
+                  steps={steps}
+                  recipeId={cuisineRecipeId}
+                  wakeLockSupported={wakeLockSupported}
+                  photoUrls={photoUrls}
+                />
               ) : (
-                <RecipeSteps steps={steps} readOnly onAdd={noop} onUpdate={noop} onDelete={noop} onReorder={noop} />
+                <RecipeSteps
+                  steps={steps}
+                  readOnly
+                  photoUrls={photoUrls}
+                  onAdd={noop}
+                  onUpdate={noop}
+                  onDelete={noop}
+                  onReorder={noop}
+                />
               )}
             </Panel>
             <Panel
