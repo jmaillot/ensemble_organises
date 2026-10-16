@@ -28,7 +28,19 @@ export interface StepPhotoProps {
  */
 export function StepPhoto({ url, alt, className, onSelectPhoto }: StepPhotoProps) {
   const [open, setOpen] = useState(false);
+  // Aperçu mort (D-18) : en mode démo, un `blob:` cesse de charger après
+  // rechargement. L'échec bascule le composant vers « pas de photo ».
+  const [dead, setDead] = useState(false);
+  const [shownUrl, setShownUrl] = useState(url);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Une URL neuve repart d'un état sain : sans cela, un remplacement resterait
+  // masqué après un premier échec. Ajustement pendant le rendu (idiome React
+  // documenté), plutôt qu'un effet qui laisserait passer un rendu de trop.
+  if (url !== shownUrl) {
+    setShownUrl(url);
+    setDead(false);
+  }
 
   const picker = (
     <input
@@ -47,7 +59,7 @@ export function StepPhoto({ url, alt, className, onSelectPhoto }: StepPhotoProps
     />
   );
 
-  if (url) {
+  if (url && !dead) {
     return (
       <>
         <button
@@ -60,6 +72,7 @@ export function StepPhoto({ url, alt, className, onSelectPhoto }: StepPhotoProps
             src={url}
             alt={alt}
             loading="lazy"
+            onError={() => setDead(true)}
             className={cn('max-h-[320px] w-full rounded-[10px] object-cover', className)}
           />
         </button>
@@ -80,6 +93,7 @@ export function StepPhoto({ url, alt, className, onSelectPhoto }: StepPhotoProps
     );
   }
 
+  // Aucune URL, ou aperçu mort : rien du tout — ni image cassée, ni cadre vide.
   if (!onSelectPhoto) return null;
 
   return (

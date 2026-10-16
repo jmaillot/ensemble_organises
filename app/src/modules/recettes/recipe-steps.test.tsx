@@ -14,6 +14,13 @@ const STEPS: RecipeStep[] = [
   { id: 'step-3', content: 'Enfourner 45 minutes.', position: 2, photoPath: null },
 ];
 
+/** Étape 2 photographiée : sa référence de bucket est posée (D-11, D-13). */
+const PHOTO_STEPS: RecipeStep[] = [
+  { id: 'step-1', content: 'Éplucher les pommes de terre.', position: 0, photoPath: null },
+  { id: 'step-2', content: 'Les couper en rondelles.', position: 1, photoPath: 'foyer-1/recipes/r-1/steps/step-2/file.jpg' },
+  { id: 'step-3', content: 'Enfourner 45 minutes.', position: 2, photoPath: null },
+];
+
 function renderSteps(onReorder: (ids: string[]) => void = () => {}) {
   return renderWithProviders(
     <RecipeSteps
@@ -102,5 +109,60 @@ describe('Étapes recettes (R7, D-11, D-12)', () => {
     expect(images).toHaveLength(1);
     expect(images[0]).toHaveAttribute('src', 'https://signe.example/etape-2.jpg');
     expect(images[0]).toHaveAttribute('alt', 'Photo de l’étape 2');
+  });
+
+  it('en lecture seule, l’image reste mais aucune commande de photo n’est rendue', async () => {
+    renderWithProviders(
+      <RecipeSteps
+        steps={PHOTO_STEPS}
+        readOnly
+        photoUrls={{ 'step-2': 'https://signe.example/etape-2.jpg' }}
+        onAdd={() => {}}
+        onUpdate={() => {}}
+        onDelete={() => {}}
+        onReorder={() => {}}
+        onAddPhoto={() => {}}
+        onReplacePhoto={() => {}}
+        onRemovePhoto={() => {}}
+      />,
+    );
+
+    const list = await screen.findByRole('list', { name: 'Étapes de la recette' });
+    expect(within(list).getAllByRole('img')).toHaveLength(1);
+    expect(within(list).queryByRole('button', { name: 'Ajouter une photo' })).toBeNull();
+    expect(within(list).queryByRole('button', { name: 'Modifier la photo' })).toBeNull();
+    expect(within(list).queryByRole('button', { name: 'Retirer la photo de l’étape 2' })).toBeNull();
+  });
+
+  it('en écriture, l’invitation et la modification sont offertes, le retrait exige la confirmation inline', async () => {
+    const user = userEvent.setup();
+    const onRemovePhoto = vi.fn();
+    renderWithProviders(
+      <RecipeSteps
+        steps={PHOTO_STEPS}
+        photoUrls={{ 'step-2': 'https://signe.example/etape-2.jpg' }}
+        onAdd={() => {}}
+        onUpdate={() => {}}
+        onDelete={() => {}}
+        onReorder={() => {}}
+        onAddPhoto={() => {}}
+        onReplacePhoto={() => {}}
+        onRemovePhoto={onRemovePhoto}
+      />,
+    );
+
+    const list = await screen.findByRole('list', { name: 'Étapes de la recette' });
+    // Étapes nues 1 et 3 : invitation d’ajout ; étape photographiée 2 : modification.
+    expect(within(list).getAllByRole('button', { name: 'Ajouter une photo' })).toHaveLength(2);
+    expect(within(list).getAllByRole('button', { name: 'Modifier la photo' })).toHaveLength(1);
+
+    // Le retrait n’agit qu’après la confirmation inline (D-13).
+    await user.click(within(list).getByRole('button', { name: 'Retirer la photo de l’étape 2' }));
+    expect(onRemovePhoto).not.toHaveBeenCalled();
+
+    const dialog = await screen.findByRole('alertdialog', { name: 'Retirer cette photo ?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Retirer' }));
+    expect(onRemovePhoto).toHaveBeenCalledTimes(1);
+    expect(onRemovePhoto).toHaveBeenCalledWith(expect.objectContaining({ id: 'step-2' }));
   });
 });

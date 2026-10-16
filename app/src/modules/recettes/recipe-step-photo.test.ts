@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { fireEvent } from '@testing-library/react';
+import { renderWithProviders } from '@/test/render';
 
 const { storageMocks, supabaseState } = vi.hoisted(() => {
   type SignResult = { data: { signedUrl: string } | null; error: { message: string } | null };
@@ -44,6 +47,7 @@ import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
 import { getLocalAdapter } from '@/lib/data/local-adapter';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import type { RecipeRow, RecipeStepRow } from '@/types';
+import { StepPhoto } from './components/step-photo';
 import {
   clearRecipeStepPhoto,
   deleteRecipe,
@@ -279,5 +283,41 @@ describe('Photo d’étape — ajouter, remplacer, retirer (R1, R2, R5, D-04/D-0
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Photo d’étape non écrite'), expect.any(Error));
     expect(warn.mock.calls.some(([message]) => String(message).includes('step-disparu'))).toBe(true);
     warn.mockRestore();
+  });
+});
+
+describe('Photo d’étape — rendu et aperçu mort (R6, D-18)', () => {
+  it('un aperçu blob: vivant est rendu', () => {
+    const { queryByRole } = renderWithProviders(
+      createElement(StepPhoto, { url: 'blob:apercu-vivant', alt: 'Photo de l’étape 1' }),
+    );
+    expect(queryByRole('img')).toHaveAttribute('src', 'blob:apercu-vivant');
+  });
+
+  it('un aperçu mort (onError) ne laisse aucun élément média et rouvre l’invitation', () => {
+    const { container, queryByRole, getByRole } = renderWithProviders(
+      createElement(StepPhoto, {
+        url: 'blob:apercu-mort',
+        alt: 'Photo de l’étape 1',
+        onSelectPhoto: () => {},
+      }),
+    );
+    const image = queryByRole('img');
+    expect(image).not.toBeNull();
+
+    fireEvent.error(image as Element);
+
+    // Ni image cassée, ni cadre vide : l’étape se rend comme sans photo.
+    expect(container.querySelector('img')).toBeNull();
+    expect(queryByRole('img')).toBeNull();
+    // Un membre qui écrit retrouve l’invitation d’ajout (il peut redéposer).
+    expect(getByRole('button', { name: 'Ajouter une photo' })).toBeInTheDocument();
+  });
+
+  it('en démo, le dépôt rend un blob: que la résolution laisse intact (D-18)', async () => {
+    const file = new File(['pixels'], 'etape.jpg', { type: 'image/jpeg' });
+    const stored = await uploadRecipeStepPhoto('foyer-1', 'r-1', 's-1', file);
+    expect(stored).toBe('blob:apercu-etape');
+    expect(await resolveRecipeStepPhotoUrl(stored)).toBe('blob:apercu-etape');
   });
 });
