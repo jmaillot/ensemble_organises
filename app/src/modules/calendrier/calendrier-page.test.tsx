@@ -181,20 +181,26 @@ describe('CalendrierPage', () => {
     expect(screen.queryByRole('button', { name: /^Supprimer/ })).not.toBeInTheDocument();
   });
 
-  it('ouvre le formulaire par appui long sur une date, sans casser le clic', async () => {    const user = userEvent.setup();
+  it('ouvre le formulaire par appui long sur une date, sans casser le clic', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
     const day = await screen.findByRole('button', { name: new RegExp(`^${dayLabel(freeDay)}`) });
 
     // Les minuteries ne sont simulées qu'autour de l'appui long, le chargement
-    // des données (IndexedDB) ayant besoin de vraies macrotâches.
+    // des données (IndexedDB) ayant besoin de vraies macrotâches. Le `finally`
+    // rend l'échec attribuable : sans lui, une assertion rouge laisserait les
+    // minuteries simulées en place et ferait expirer les tests suivants.
     vi.useFakeTimers();
-    fireEvent.pointerDown(day);
-    act(() => {
-      vi.advanceTimersByTime(800);
-    });
+    try {
+      fireEvent.pointerDown(day);
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(freeDay);
-    vi.useRealTimers();
 
     await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
 
@@ -288,6 +294,25 @@ describe('CalendrierPage', () => {
     expect(screen.queryByRole('button', { name: 'Ajouter une tâche' })).not.toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: 'Ajouter un événement' })).toEqual([]);
     expect(screen.queryAllByRole('button', { name: 'Ajouter une tâche' })).toEqual([]);
+
+    // L'appui long est la CINQUIÈME entrée de création : il doit être borné
+    // comme les quatre autres. Sans la garde `isChild`, le dialogue s'ouvre ici
+    // et l'assertion rougit (constat (b) du lot de la phase 22, §3 des
+    // `deferred-items` de la phase 19).
+    const day = screen.getByRole('button', { name: new RegExp(`^${dayLabel(freeDay)}`) });
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerDown(day);
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+    } finally {
+      // `useRealTimers` dans un `finally` : sans lui, une assertion rouge laisse
+      // les minuteries simulées en place et fait expirer les QUATRE tests
+      // suivants — l'échec cesse d'être attribuable à ce qu'il annonce.
+      vi.useRealTimers();
+    }
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('borne aussi l’édition des événements existants pour un enfant (D-13)', async () => {

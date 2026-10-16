@@ -61,6 +61,17 @@ export type UseResourceOptions =
 const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'string';
 
 /**
+ * Repli de `rows` quand la requête est désactivée ou n'a rien rendu.
+ *
+ * Constante de MODULE, jamais un littéral sur place : `query.data ?? []`
+ * fabrique un tableau neuf à chaque rendu, donc tout `useMemo` qui dépend de
+ * `rows` se recalcule sans qu'aucune donnée ait changé (constat (d) de la
+ * phase 19, fermé ici). `never[]` est assignable à n'importe quel `T[]` : le
+ * repli n'impose aucun type à l'appelant.
+ */
+const NO_ROWS: never[] = [];
+
+/**
  * Hook CRUD générique : une seule implémentation de cache, d'invalidation et
  * de mise à jour optimiste pour tous les modules.
  */
@@ -143,7 +154,7 @@ export function useResource<T = Row>(
   );
 
   return {
-    rows: query.data ?? [],
+    rows: query.data ?? NO_ROWS,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
@@ -200,7 +211,7 @@ export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): L
   );
 
   return {
-    rows: query.data ?? [],
+    rows: query.data ?? NO_ROWS,
     isLoading: query.isLoading,
     add,
     remove,

@@ -143,7 +143,9 @@ export function useNotifications(): NotificationsSummary {
       grouped.set(entry.task_id, list);
     }
     return grouped;
-  }, [taskAssigneesQuery.data]);  const profilesResource = useResource<ProfileRow>('profiles', {
+  }, [taskAssigneesQuery.data]);
+
+  const profilesResource = useResource<ProfileRow>('profiles', {
     scoped: false,
     filter: user?.id ? { id: user.id } : { id: '__aucun__' },
     enabled: Boolean(user?.id),

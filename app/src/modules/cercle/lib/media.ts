@@ -73,7 +73,13 @@ async function encode(canvas: HTMLCanvasElement, webp: boolean) {
  * est renvoyé tel quel : la publication reste possible.
  */
 export async function compressImage(file: File, options: { maxEdge?: number } = {}): Promise<CompressedImage> {
-  if (!file.type.startsWith('image/')) {
+  // Un type DÉCLARÉ doit être une image ; un type VIDE ne disqualifie rien :
+  // les JPEG et HEIC de mobile arrivent souvent reconnus par leur seule
+  // extension, et `depositHouseholdFile` résout déjà ce cas (`acceptedMimeOf`)
+  // avant de présenter un type au compresseur. Le refus d'un vrai non-image
+  // tombe donc au DÉCODAGE, avec le même message — jamais un `DOMException`
+  // brut (constat (a) de la phase 19, fermé ici).
+  if (file.type !== '' && !file.type.startsWith('image/')) {
     throw new Error('Sélectionnez une image (JPEG, PNG ou HEIC).');
   }
   if (!supportsImageBitmap() || typeof document === 'undefined') {
@@ -90,7 +96,14 @@ export async function compressImage(file: File, options: { maxEdge?: number } = 
   }
 
   const maxEdge = options.maxEdge ?? MAX_MEDIA_EDGE;
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Le fichier n'est pas décodable comme image : c'est ici, et pas sur le
+    // type déclaré, que le refus est prononcé (constat (a) de la phase 19).
+    throw new Error('Sélectionnez une image (JPEG, PNG ou HEIC).');
+  }
   const ratio = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * ratio));
   const height = Math.max(1, Math.round(bitmap.height * ratio));

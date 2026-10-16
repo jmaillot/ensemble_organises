@@ -86,3 +86,27 @@ describe('useResource — la clé contient le selectKey (D-08)', () => {
     expect(invalid).toBeDefined();
   });
 });
+
+/**
+ * Constat (d) des `deferred-items` de la phase 19 : `rows: query.data ?? []`
+ * fabriquait un tableau NEUF à chaque rendu quand la requête n'a rien rendu
+ * (désactivée, ou premier rendu). Tout `useMemo` qui dépend de `rows` se
+ * recalculait alors sans qu'aucune donnée ait changé.
+ */
+describe('useResource — `rows` a une identité stable quand la requête est désactivée', () => {
+  it('rend le MÊME tableau entre deux rendus', () => {
+    const queryClient = createTestQueryClient();
+    const { result, rerender } = renderHook(
+      () => useResource<TaskRow>('tasks', { scoped: false, enabled: false }),
+      { wrapper: wrapperFor(queryClient) },
+    );
+
+    // La requête est désactivée : rien n'est chargé, `query.data` est `undefined`.
+    expect(result.current.rows).toEqual([]);
+    expect(listMock).not.toHaveBeenCalled();
+
+    const first = result.current.rows;
+    rerender();
+    expect(result.current.rows).toBe(first);
+  });
+});

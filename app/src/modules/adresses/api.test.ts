@@ -9,6 +9,7 @@ import {
   toPlacePayload,
   uploadPlacePhoto,
 } from './api';
+import { isHouseholdMediaPath } from '@/lib/storage';
 import type { PlaceInput } from './types';
 
 const { storageMocks, supabaseState } = vi.hoisted(() => {
@@ -105,6 +106,19 @@ describe('photos de lieux — hygiène des fichiers (D-04)', () => {
     expect(isPlacePhotoPath('foyer-1/places/photo.webp')).toBe(true);
     expect(placePhotoPathOf('foyer-1/places/photo.webp')).toBe('foyer-1/places/photo.webp');
     expect(placePhotoPathOf('blob:apercu')).toBeNull();
+  });
+
+  it('verdict média : la valeur est rognée avant de juger, et le préfixe est ancré', () => {
+    // Constat §5 des `deferred-items` de la phase 18 : la copie locale ne
+    // rognait pas. Délègue au helper partagé, qui rogne.
+    expect(placePhotoPathOf('  foyer-1/places/photo.webp  ')).toBe('foyer-1/places/photo.webp');
+    expect(placePhotoPathOf('   ')).toBeNull();
+    expect(placePhotoPathOf('')).toBeNull();
+    // Le verdict est ANCRÉ : une forme média précédée d'un préfixe n'est pas un
+    // chemin (la copie locale, non ancrée, la laissait passer pour un chemin).
+    expect(isPlacePhotoPath('prefix/https://cdn.example/x.jpg')).toBe(true);
+    expect(isHouseholdMediaPath('prefix/https://cdn.example/x.jpg')).toBe(true);
+    expect(isPlacePhotoPath('https://cdn.example/x.jpg')).toBe(false);
   });
 
   it('lecture : un chemin se forge en URL courte, échec fermé sinon', async () => {

@@ -121,7 +121,7 @@ export default function LandingPage() {
 
         <section aria-labelledby="espaces" className="py-10">
           <h2 id="espaces" className="mb-2 text-[clamp(22px,2.4vw,30px)] leading-[1.08]">
-            Seize espaces, une seule cohérence du quotidien
+            {modules.length} espaces, une seule cohérence du quotidien
           </h2>
           <p className="lede mb-6 text-[15px]">Chaque module garde sa profondeur, tout en partageant membres, rappels et couleurs.</p>
           <ul className="m-0 grid list-none grid-cols-2 gap-2.5 p-0 sm:grid-cols-3 lg:grid-cols-4">

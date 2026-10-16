@@ -24,8 +24,14 @@ export interface CalendarGridProps {
   today: string;
   markers: DayMarkerMap;
   onSelect: (iso: string) => void;
-  /** Ouverture directe du formulaire : appui long sur une date. */
-  onLongPress: (iso: string) => void;
+  /**
+   * Ouverture directe du formulaire : appui long sur une date. FACULTATIF —
+   * un rôle qui n'a pas le droit de créer (l'`enfant`, D-06/D-13) ne reçoit
+   * rien : la grille reste sélectionnable, et l'indication d'appui long
+   * disparaît avec le geste (constat (b) du lot de la phase 22, §3 des
+   * `deferred-items` de la phase 19).
+   */
+  onLongPress?: (iso: string) => void;
   onPrevious: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -62,6 +68,9 @@ export function CalendarGrid({
 
   const startPress = useCallback(
     (iso: string) => {
+      // Aucun geste à armer quand la création n'est pas permise : le clic
+      // reste une sélection, et aucune minuterie ne s'arme pour rien.
+      if (!onLongPress) return;
       longPressFired.current = false;
       clearTimer();
       timer.current = window.setTimeout(() => {
@@ -202,7 +211,9 @@ export function CalendarGrid({
           <span aria-hidden="true" className="size-[6px] rounded-full bg-[oklch(55%_0.13_300)]" />
           Tâche
         </span>
-        <span className="basis-full text-[10px] text-muted sm:basis-auto">Maintenez une date pour créer un événement.</span>
+        {onLongPress ? (
+          <span className="basis-full text-[10px] text-muted sm:basis-auto">Maintenez une date pour créer un événement.</span>
+        ) : null}
       </div>
     </section>
   );

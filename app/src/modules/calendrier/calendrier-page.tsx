@@ -250,8 +250,8 @@ export default function CalendrierPage() {
       )}
       <p className="mt-3 text-[11px] text-muted">
         {pluralize(events.length, 'événement')}
-        {events.length > 1 ? 's' : ''} dans le foyer. Maintenez une date dans la grille pour créer un événement
-        directement.
+        {events.length > 1 ? 's' : ''} dans le foyer.
+        {isChild ? null : ' Maintenez une date dans la grille pour créer un événement directement.'}
       </p>
     </Panel>
   );
@@ -464,7 +464,7 @@ export default function CalendrierPage() {
             today={grid.isToday}
             markers={markers}
             onSelect={grid.setSelected}
-            onLongPress={openCreate}
+            onLongPress={isChild ? undefined : openCreate}
             onPrevious={() => handleShift(-1)}
             onNext={() => handleShift(1)}
             onToday={grid.goToToday}

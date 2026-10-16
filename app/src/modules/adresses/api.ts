@@ -1,4 +1,4 @@
-import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
+import { depositHouseholdFile, householdMediaPathOf, isHouseholdMediaPath, removeHouseholdFile, replacedMediaPath, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
 import type { PlaceRow } from '@/types';
 import type { Place, PlaceInput } from './types';
 
@@ -69,18 +69,25 @@ export function placeMetrics(places: Place[]): PlaceMetrics {
 }
 
 /**
- * Vrai quand la valeur stockée est un chemin bucket à forger : ni URL
- * http(s) (saisie manuelle ou signée héritée), ni `data:` hérité, ni aperçu
- * local `blob:`, ni ressource applicative `/…`.
+ * Vrai quand la valeur stockée est un chemin bucket à forger.
+ *
+ * Le verdict est celui du helper PARTAGÉ (`lib/storage.ts`), jamais une copie
+ * locale : la copie d'origine n'était pas ANCRÉE (`/(https?:\/\/|…)/` sans
+ * `^`), donc une valeur comme `prefix/https://…` passait pour un chemin. Une
+ * seule définition du verdict de forme média dans le dépôt (motif IN-03, déjà
+ * appliqué à `recipeCoverPathOf`).
  */
-export function isPlacePhotoPath(stored: string): boolean {
-  return !/^(https?:\/\/|blob:|data:|\/)/i.test(stored);
-}
+export const isPlacePhotoPath = isHouseholdMediaPath;
 
-/** Chemin bucket d'une valeur stockée, `null` pour les autres formes. */
+/**
+ * Chemin bucket d'une valeur stockée, `null` pour les autres formes.
+ *
+ * Délègue au helper partagé, qui ROGNE la valeur avant de juger : une chaîne
+ * exclusivement blanche n'est pas un chemin (constat §5 des `deferred-items`
+ * de la phase 18, annoncé fermé par 19-13 — il ne l'était pas).
+ */
 export function placePhotoPathOf(stored: string | null): string | null {
-  if (!stored) return null;
-  return isPlacePhotoPath(stored) ? stored : null;
+  return householdMediaPathOf(stored);
 }
 
 /**

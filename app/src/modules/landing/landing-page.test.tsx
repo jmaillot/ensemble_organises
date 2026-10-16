@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import LandingPage from './landing-page';
+import { modules } from '@/lib/modules';
 import SignInPage from './sign-in-page';
 import WelcomePage from './welcome-page';
 
@@ -35,6 +36,19 @@ describe('LandingPage', () => {
     await user.click(offlineQuestion);
     expect(screen.getByText(/sans connexion, impossible de charger une page/)).toBeInTheDocument();
     expect(screen.queryByText(/rejouées à la reconnexion/)).not.toBeInTheDocument();
+  });
+
+  it('annonce le nombre RÉEL d’espaces du catalogue, jamais un nombre écrit à la main', () => {
+    renderWithProviders(<LandingPage />, { withHousehold: false });
+    // Le titre lisait « Seize espaces » pour 17 entrées de `lib/modules.ts` :
+    // un nombre en toutes lettres est une affirmation qui dérive en silence
+    // (constat (f) du lot de la phase 22, §8 des `deferred-items` de la phase
+    // 19). Le titre lit `modules.length`, donc cette assertion rougit si
+    // quelqu'un réécrit un nombre à la main.
+    expect(
+      screen.getByRole('heading', { level: 2, name: new RegExp(`^${modules.length} espaces`) }),
+    ).toBeInTheDocument();
+    expect(modules.length).toBeGreaterThan(1);
   });
 });
 
