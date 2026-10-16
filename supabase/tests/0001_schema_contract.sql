@@ -49,7 +49,7 @@ begin
           ('recipe_tags', ARRAY['id', 'household_id', 'name', 'created_at']::text[]),
           ('recipe_tag_links', ARRAY['recipe_id', 'tag_id', 'household_id', 'created_at']::text[]),
           ('recipe_ingredients', ARRAY['id', 'recipe_id', 'household_id', 'name', 'quantity', 'unit', 'position', 'created_at']::text[]),
-          ('recipe_steps', ARRAY['id', 'recipe_id', 'household_id', 'content', 'position', 'created_at']::text[]),
+          ('recipe_steps', ARRAY['id', 'recipe_id', 'household_id', 'content', 'position', 'created_at', 'photo_path']::text[]),
           ('recipe_favorites', ARRAY['recipe_id', 'member_id', 'household_id', 'created_at']::text[]),
           ('recipe_shares', ARRAY['id', 'recipe_id', 'household_id', 'share_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('ardoises', ARRAY['id', 'household_id', 'name', 'description', 'cover_url', 'invite_hash', 'is_active', 'max_uses', 'use_count', 'expires_at', 'created_by', 'created_at', 'trip_id']::text[]),
