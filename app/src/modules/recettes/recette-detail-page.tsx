@@ -11,10 +11,12 @@ import type { ShoppingListRow } from '@/types';
 import { closestServingsStep, formatTotalTime, toRecipePrintModel, type Recipe, type RecipeFormValues } from './types';
 import { Icon } from '@/components/shared/icon';
 import {
+  clearRecipeStepPhoto,
   createRecipeIngredient,
   createRecipeStep,
   deleteRecipeIngredient,
   deleteRecipeStep,
+  replaceRecipeStepPhoto,
   resolveRecipeCoverUrl,
   resolveRecipeStepPhotoUrls,
   sendRecipeIngredientsToCourses,
@@ -341,10 +343,49 @@ export default function RecetteDetailPage() {
           onDelete={async (step) => {
             try {
               guard();
-              await deleteRecipeStep(step.id);
+              await deleteRecipeStep(step.id, step.photoPath);
               await refreshChildren();
             } catch (deleteError) {
               toast(deleteError instanceof Error ? deleteError.message : 'L’étape n’a pas pu être supprimée.', 'error');
+            }
+          }}
+          onAddPhoto={async (step, file) => {
+            try {
+              guard();
+              await replaceRecipeStepPhoto({
+                householdId: recipe.householdId,
+                recipeId: recipe.id,
+                stepId: step.id,
+                previous: step.photoPath,
+                file,
+              });
+              await refreshChildren();
+            } catch (photoError) {
+              toast(photoError instanceof Error ? photoError.message : 'La photo n’a pas pu être ajoutée.', 'error');
+            }
+          }}
+          onReplacePhoto={async (step, file) => {
+            try {
+              guard();
+              await replaceRecipeStepPhoto({
+                householdId: recipe.householdId,
+                recipeId: recipe.id,
+                stepId: step.id,
+                previous: step.photoPath,
+                file,
+              });
+              await refreshChildren();
+            } catch (photoError) {
+              toast(photoError instanceof Error ? photoError.message : 'La photo n’a pas pu être remplacée.', 'error');
+            }
+          }}
+          onRemovePhoto={async (step) => {
+            try {
+              guard();
+              await clearRecipeStepPhoto(step.id, step.photoPath);
+              await refreshChildren();
+            } catch (photoError) {
+              toast(photoError instanceof Error ? photoError.message : 'La photo n’a pas pu être retirée.', 'error');
             }
           }}
           onReorder={async (orderedIds) => {
@@ -417,7 +458,10 @@ export default function RecetteDetailPage() {
                   disabled={isMutating}
                   onClick={() => {
                     setConfirmDelete(false);
-                    void removeRecipe(recipe)
+                    void removeRecipe(
+                      recipe,
+                      steps.map((step) => step.photoPath ?? null),
+                    )
                       .then(() => {
                         toast('Recette supprimée.');
                         navigate('/recettes');

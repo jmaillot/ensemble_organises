@@ -29,6 +29,14 @@ export interface RecipeStepsProps {
   onUpdate: (step: RecipeStep, content: string) => Promise<void> | void;
   onDelete: (step: RecipeStep) => Promise<void> | void;
   onReorder: (orderedIds: string[]) => Promise<void> | void;
+  /**
+   * Photo d'une étape (D-11, D-12) : présents seulement quand le membre peut
+   * écrire. Absents en lecture seule (`enfant`), aucune commande de photo
+   * n'est alors rendue — la RLS reste la barrière finale côté serveur (§2.6).
+   */
+  onAddPhoto?: (step: RecipeStep, file: File) => Promise<void> | void;
+  onReplacePhoto?: (step: RecipeStep, file: File) => Promise<void> | void;
+  onRemovePhoto?: (step: RecipeStep) => Promise<void> | void;
 }
 
 /**
@@ -36,12 +44,13 @@ export interface RecipeStepsProps {
  * drag (dnd-kit, clavier via `sortableKeyboardCoordinates`) + boutons
  * monter/descendre ≥ 44px ; cases cuisson en etat local seul (D-12).
  */
-export function RecipeSteps({ steps, readOnly = false, isSaving = false, photoUrls = {}, onAdd, onUpdate, onDelete, onReorder }: RecipeStepsProps) {
+export function RecipeSteps({ steps, readOnly = false, isSaving = false, photoUrls = {}, onAdd, onUpdate, onDelete, onReorder, onAddPhoto, onReplacePhoto, onRemovePhoto }: RecipeStepsProps) {
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<RecipeStep | null>(null);
+  const [pendingPhotoRemoval, setPendingPhotoRemoval] = useState<RecipeStep | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -115,6 +124,9 @@ export function RecipeSteps({ steps, readOnly = false, isSaving = false, photoUr
           onMoveUp={() => move(index, -1)}
           onMoveDown={() => move(index, 1)}
           onDelete={() => setPendingDelete(step)}
+          onAddPhoto={onAddPhoto}
+          onReplacePhoto={onReplacePhoto}
+          onRemovePhoto={() => setPendingPhotoRemoval(step)}
         />
       ))}
     </ol>
@@ -183,6 +195,30 @@ export function RecipeSteps({ steps, readOnly = false, isSaving = false, photoUr
           </div>
         </div>
       ) : null}
+
+      {pendingPhotoRemoval ? (
+        <div role="alertdialog" aria-modal="true" aria-label="Retirer cette photo ?" className="mt-2 rounded-[10px] border border-border bg-bg p-3">
+          <p className="m-0 text-[13px]">
+            Retirer la photo de l’étape <strong>« {pendingPhotoRemoval.content.slice(0, 60)} »</strong> ?
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button variant="secondary" onClick={() => setPendingPhotoRemoval(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="danger"
+              disabled={isSaving}
+              onClick={() => {
+                const targetRemoval = pendingPhotoRemoval;
+                setPendingPhotoRemoval(null);
+                void onRemovePhoto?.(targetRemoval);
+              }}
+            >
+              Retirer
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -205,6 +241,9 @@ interface StepRowProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
+  onAddPhoto?: (step: RecipeStep, file: File) => Promise<void> | void;
+  onReplacePhoto?: (step: RecipeStep, file: File) => Promise<void> | void;
+  onRemovePhoto: () => void;
 }
 
 function StepRow(props: StepRowProps) {
@@ -270,7 +309,19 @@ function StepRow(props: StepRowProps) {
             ) : (
               <p className={cn('m-0 text-[13px]', checked && 'text-muted line-through')}>{step.content}</p>
             )}
-            <StepPhoto url={props.photoUrl} alt={`Photo de l’étape ${number}`} />
+            <StepPhoto
+              url={props.photoUrl}
+              alt={`Photo de l’étape ${number}`}
+              onSelectPhoto={
+                readOnly
+                  ? undefined
+                  : (file) => {
+                      // Le remplacement est direct, sans étape intermédiaire (D-14).
+                      if (props.photoUrl) void props.onReplacePhoto?.(step, file);
+                      else void props.onAddPhoto?.(step, file);
+                    }
+              }
+            />
           </div>
         </div>
         {!readOnly && !props.isEditing ? (
@@ -300,6 +351,16 @@ function StepRow(props: StepRowProps) {
             >
               <Icon name="edit" size="sm" />
             </button>
+            {step.photoPath ? (
+              <button
+                type="button"
+                onClick={props.onRemovePhoto}
+                aria-label={`Retirer la photo de l’étape ${number}`}
+                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+              >
+                <Icon name="close" size="sm" />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={props.onDelete}

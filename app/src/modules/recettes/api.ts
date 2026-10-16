@@ -1,6 +1,14 @@
-import { data } from '@/lib/data';
+import { DataError, data } from '@/lib/data';
 import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
-import { depositHouseholdFile, isHouseholdMediaPath, removeHouseholdFile, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
+import {
+  depositHouseholdFile,
+  householdMediaPathOf,
+  isHouseholdMediaPath,
+  removeHouseholdFile,
+  replacedMediaPath,
+  resolveHouseholdMediaUrl,
+  storedValueOf,
+} from '@/lib/storage';
 import type {
   RecipeCategoryRow,
   RecipeFavoriteRow,
@@ -215,8 +223,9 @@ export async function updateRecipeStep(id: string, content: string): Promise<Rec
   return data.update<RecipeStepRow>(RECIPE_STEPS_TABLE, id, { content: content.trim() });
 }
 
-export async function deleteRecipeStep(id: string): Promise<void> {
+export async function deleteRecipeStep(id: string, photoPath: string | null = null): Promise<void> {
   await data.remove(RECIPE_STEPS_TABLE, id);
+  await removeStepPhotoObject(photoPath);
 }
 
 /**
@@ -228,13 +237,21 @@ export async function reorderRecipeSteps(orderedIds: string[]): Promise<void> {
 }
 
 /**
- * Supprime une recette puis sa couverture : le SQL en cascade ne touche
- * pas le Storage (R9). Best-effort sans masquer l'erreur d'origine.
+ * Supprime une recette puis ses médias : le SQL en cascade ne touche pas le
+ * Storage (R9). La couverture est retirée en best-effort silencieux
+ * (comportement inchangé) ; les objets des étapes sont **tous** tentés, même
+ * si l'un échoue — l'échec d'un objet n'empêche ni les autres ni la remontée
+ * de l'erreur d'origine de `data.remove` (R5, arête ordering).
  */
-export async function deleteRecipe(id: string, coverPhoto: string | null): Promise<void> {
+export async function deleteRecipe(
+  id: string,
+  coverPhoto: string | null,
+  stepPhotoPaths: (string | null)[] = [],
+): Promise<void> {
   await data.remove(RECIPES_TABLE, id);
   const path = recipeCoverPathOf(coverPhoto);
   if (path) await removeHouseholdFile(path).catch(() => undefined);
+  await Promise.all(stepPhotoPaths.map((photoPath) => removeStepPhotoObject(photoPath)));
 }
 
 /* ------------------------------------------------------------------ */
@@ -342,6 +359,71 @@ export async function resolveRecipeStepPhotoUrls(
     if (url) resolved[id] = url;
   }
   return resolved;
+}
+
+/**
+ * Retire un objet de photo d'étape du bucket, en journalisant l'échec sans
+ * jamais le laisser remonter (motif `notes`/`cercle`/`animaux`, même message) :
+ * le retrait est best-effort — il n'annule jamais la nouvelle photo ni ne
+ * masque l'erreur d'origine de l'appelant.
+ */
+async function removeStepPhotoObject(stored: string | null): Promise<void> {
+  const path = householdMediaPathOf(stored);
+  if (!path) return;
+  try {
+    await removeHouseholdFile(path);
+  } catch (error) {
+    console.warn(`Objet de média non retiré du bucket : ${path}`, error);
+  }
+}
+
+/**
+ * Écrit la référence `photo_path` d'une étape, en absorbant le `DataError`
+ * d'une ligne absente.
+ *
+ * L'étape visée peut avoir disparu par cascade (suppression de la recette) ou
+ * par une autre session ; au niveau de l'adaptateur, « zéro ligne écrite » et
+ * un échec transitoire produisent le même `DataError`, donc les distinguer par
+ * motif serait une garde qui se périmerait en silence. Aucune lecture préalable
+ * d'existence n'est faite : décider après une lecture serait la course proscrite
+ * par `adapter.ts`. On écrit, et un `DataError` devient un no-op JOURNALISÉ —
+ * jamais un succès muet (§2.7 F). L'erreur d'une autre nature remonte intacte.
+ */
+async function writeStepPhoto(stepId: string, value: string | null): Promise<void> {
+  try {
+    await data.update<RecipeStepRow>(RECIPE_STEPS_TABLE, stepId, { photo_path: value });
+  } catch (error) {
+    if (!(error instanceof DataError)) throw error;
+    console.warn(`Photo d’étape non écrite : ${stepId}`, error);
+  }
+}
+
+/**
+ * Dépose une nouvelle photo d'étape, écrit la référence par le helper gardé,
+ * puis retire l'objet précédent s'il est un chemin de bucket distinct (D-04,
+ * D-05). Le dépôt est committé d'abord ; le retrait de l'ancien objet ne
+ * l'annule jamais.
+ */
+export async function replaceRecipeStepPhoto(input: {
+  householdId: string;
+  recipeId: string;
+  stepId: string;
+  previous: string | null;
+  file: File;
+}): Promise<void> {
+  const next = await uploadRecipeStepPhoto(input.householdId, input.recipeId, input.stepId, input.file);
+  await writeStepPhoto(input.stepId, next);
+  await removeStepPhotoObject(replacedMediaPath(input.previous, next));
+}
+
+/**
+ * Retire la photo d'une étape : référence effacée par le helper gardé, objet
+ * précédent nettoyé. Un retrait sur une étape disparue est un no-op, comme le
+ * dépôt.
+ */
+export async function clearRecipeStepPhoto(stepId: string, previous: string | null): Promise<void> {
+  await writeStepPhoto(stepId, null);
+  await removeStepPhotoObject(replacedMediaPath(previous, null));
 }
 
 /* ------------------------------------------------------------------ */

@@ -55,7 +55,7 @@ export interface UseRecettesResult {
   isMutating: boolean;
   refetch: () => void;
   saveRecipe: (recipe: Recipe | null, values: RecipeFormValues) => Promise<Recipe>;
-  removeRecipe: (recipe: Recipe) => Promise<void>;
+  removeRecipe: (recipe: Recipe, stepPhotoPaths?: (string | null)[]) => Promise<void>;
   toggleFavorite: (recipe: Recipe) => Promise<void>;
   reorderSteps: (recipeId: string, orderedIds: string[]) => Promise<void>;
   refreshChildren: () => Promise<void>;
@@ -241,9 +241,9 @@ export function useRecettes(filter: RecipeSearchFilter = EMPTY_RECIPE_FILTER): U
   );
 
   const removeRecipe = useCallback(
-    async (recipe: Recipe) => {
+    async (recipe: Recipe, stepPhotoPaths: (string | null)[] = []) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
-      await deleteRecipe(recipe.id, recipe.coverPhoto);
+      await deleteRecipe(recipe.id, recipe.coverPhoto, stepPhotoPaths);
       await refresh();
     },
     [canWrite, refresh],
