@@ -315,7 +315,7 @@ export default function RecetteDetailPage() {
         action={<CuisineToggle active={cuisine} onToggle={() => setCuisine((current) => !current)} />}
       >
         {cuisine ? (
-          <RecipeCuisineView steps={steps} recipeId={recipe.id} wakeLockSupported={wakeLockSupported} stickyTopClass="top-[76px] max-[650px]:top-14" />
+          <RecipeCuisineView steps={steps} recipeId={recipe.id} wakeLockSupported={wakeLockSupported} photoUrls={photoUrls} stickyTopClass="top-[76px] max-[650px]:top-14" />
         ) : (
         <RecipeSteps
           steps={steps}

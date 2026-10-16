@@ -3,11 +3,19 @@ import { Button } from '@/components/ui/button';
 import { Checkbox, Progress } from '@/components/ui/primitives';
 import { useCuisineProgress } from '../hooks/use-cuisine-progress';
 import type { RecipeStep } from '../types';
+import { StepPhoto } from './step-photo';
 
 export interface RecipeCuisineViewProps {
   steps: RecipeStep[];
   recipeId: string;
   wakeLockSupported: boolean;
+  /**
+   * URL affichables des photos d’étape, par identifiant d’étape (D-06). Même
+   * carte que la fiche édition (`21-01`) : une seule résolution, deux
+   * surfaces. Défaut `{}` : la page invitée compile inchangée jusqu’à
+   * `21-03`. Une étape absente de la carte ne rend aucun élément média (D-10).
+   */
+  photoUrls?: Record<string, string | null>;
   /**
    * Classe de collage de l’en-tête sticky (G-17-1) : `top-0` par défaut
    * (page invitée hors shell, zéro topbar). La fiche membre sous AppShell
@@ -23,7 +31,7 @@ export interface RecipeCuisineViewProps {
  * pastille XL statique + connecteur + case à gauche + compteur sticky N/M.
  * Reçoit `steps` déjà chargés par la fiche : zéro appel réseau.
  */
-export function RecipeCuisineView({ steps, recipeId, wakeLockSupported, stickyTopClass = 'top-0' }: RecipeCuisineViewProps) {
+export function RecipeCuisineView({ steps, recipeId, wakeLockSupported, photoUrls = {}, stickyTopClass = 'top-0' }: RecipeCuisineViewProps) {
   const { checked, toggle, reset } = useCuisineProgress(recipeId, steps);
   const done = steps.filter((step) => checked.has(step.id)).length;
   const total = steps.length;
@@ -62,6 +70,7 @@ export function RecipeCuisineView({ steps, recipeId, wakeLockSupported, stickyTo
           const isLast = index === steps.length - 1;
           const number = index + 1;
           const isChecked = checked.has(step.id);
+          const photoUrl = photoUrls[step.id] ?? null;
           return (
             <li key={step.id} className="relative flex gap-3 py-3 first:pt-0 last:pb-0">
               <span className="flex flex-col items-center">
@@ -89,6 +98,17 @@ export function RecipeCuisineView({ steps, recipeId, wakeLockSupported, stickyTo
                     <p className="m-0 text-[18px] leading-[1.5]">{step.content}</p>
                   )}
                 </div>
+                {photoUrl ? (
+                  // Image grande sous le texte (D-06), réduite une fois l’étape
+                  // cochée (D-08 : la réduction évite le saut de mise en page).
+                  // La hauteur bornée est une chaîne littérale complète au site
+                  // d’appel (scan statique Tailwind, jamais d’interpolation).
+                  <StepPhoto
+                    url={photoUrl}
+                    alt={`Photo de l’étape ${number}`}
+                    className={isChecked ? 'max-h-[120px]' : undefined}
+                  />
+                ) : null}
               </div>
             </li>
           );
