@@ -73,17 +73,21 @@ export function BarCode({ value, label, className }: BarCodeProps) {
     }
   }, [value]);
 
-  if (!value.trim() || failed) {
-    return (
-      <div className={className} role="img" aria-label={label}>
-        <div className="barcode-stripes" aria-hidden="true" />
-      </div>
-    );
-  }
+  // Le `<svg ref>` est monté dans TOUS les états (D-12) : sans lui,
+  // `svgRef.current` resterait `null` après un échec, et l'encodage suivant
+  // échouerait à nouveau sans que rien n'ait changé. Le repli rayé est un
+  // frère conditionnel, jamais une branche exclusive qui priverait le `<svg>`
+  // de son nœud.
+  const showFallback = !value.trim() || failed;
 
   return (
     <div className={className} role="img" aria-label={label}>
-      <svg ref={svgRef} className="h-[76px] w-full rounded-[7px] bg-white" aria-hidden="true" />
+      {showFallback ? <div className="barcode-stripes" aria-hidden="true" /> : null}
+      <svg
+        ref={svgRef}
+        className={showFallback ? 'sr-only' : 'h-[76px] w-full rounded-[7px] bg-white'}
+        aria-hidden="true"
+      />
     </div>
   );
 }

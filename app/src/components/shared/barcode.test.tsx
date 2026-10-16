@@ -34,6 +34,28 @@ describe('BarCode', () => {
 
   it('affiche un repli quand la valeur est vide', () => {
     render(<BarCode value="   " label="Vide" />);
-    expect(screen.getByLabelText('Vide').querySelector('.barcode-stripes')).not.toBeNull();
+    const target = screen.getByLabelText('Vide');
+    expect(target.querySelector('.barcode-stripes')).not.toBeNull();
+    // Le repli ne prive jamais le composant de son `<svg>` (D-12) : sans lui,
+    // `svgRef.current` resterait `null` et la valeur suivante ne s'encoderait pas.
+    expect(target.querySelector('svg')).not.toBeNull();
+  });
+
+  it('se rétablit sur le même composant monté après un échec d’encodage', () => {
+    // « é » sort de l'alphabet CODE128 (B_CHARS = [\x20-\x7F\xC8-\xCF]) : la
+    // valeur échoue à l'encodage, donc le repli rayé s'affiche.
+    const { container, rerender } = render(<BarCode value="CARTE-é" label="Carte" />);
+
+    const failedTarget = screen.getByLabelText('Carte');
+    expect(failedTarget.querySelector('.barcode-stripes')).not.toBeNull();
+    // Le `<svg ref>` est monté dans l'état `failed` : c'est ce qui rend le
+    // rétablissement possible sans que rien n'ait changé entre-temps.
+    expect(failedTarget.querySelector('svg')).not.toBeNull();
+
+    rerender(<BarCode value="LIB-4821-076" label="Carte" />);
+
+    const recoveredTarget = screen.getByLabelText('Carte');
+    expect(recoveredTarget.querySelector('.barcode-stripes')).toBeNull();
+    expect(container.querySelector('svg')?.innerHTML.length).toBeGreaterThan(0);
   });
 });
