@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -53,15 +53,37 @@ function nullable(value: string | undefined): string | null {
   return clean.length > 0 ? clean : null;
 }
 
+/**
+ * Valeurs par défaut du formulaire pour une cible donnée (`null` = ajout).
+ * Partagé entre `useForm` et l'effet de remise à zéro (D-14) : une seule
+ * définition de ce que « repartir de la cible » veut dire.
+ */
+function defaultsFor(target: Place | null): FormValues {
+  return {
+    name: target?.name ?? '',
+    type: target?.type ?? 'restaurant',
+    rating: target && target.rating > 0 ? target.rating : 4,
+    street: target?.street ?? '',
+    postalCode: target?.postalCode ?? '',
+    city: target?.city ?? '',
+    phone: target?.phone ?? '',
+    note: target?.note ?? '',
+    // Valeur STOCKÉE, jamais l'URL signée : c'est ce qui rend la comparaison
+    // « photo changée ou retirée » de `editPlace` possible (D-06, WR-05).
+    // Une photo non touchée resoumet donc exactement la valeur de colonne.
+    photoUrl: target?.photoStored ?? '',
+  };
+}
+
 export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit }: PlaceFormDialogProps) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   // L'aperçu affiche la valeur RÉSOLUE (URL signée) ; la valeur transportée
   // par le champ, elle, est la valeur STOCKÉE (D-06, WR-05) — voir
-  // `defaultValues.photoUrl` plus bas. Le dialogue est remonté par lieu
-  // (`key` sur l'identifiant côté page), donc ces deux états suivent la cible
-  // sans effet de synchronisation.
+  // `defaultsFor.photoUrl` plus bas. Le `key` de la page ne change pas quand la
+  // même cible est rouverte (D-14) : c'est l'effet ci-dessous, sur `open` et la
+  // cible, qui resynchronise ces états à chaque ouverture.
   const [photoPreview, setPhotoPreview] = useState<string | null>(place?.photoUrl ?? null);
   // Fichier choisi mais pas encore déposé (D-04) : le dépôt a lieu à
   // l'enregistrement, jamais à la sélection — annuler ne laisse aucun orphelin.
@@ -71,24 +93,32 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
     handleSubmit,
     setValue,
     getValues,
+    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: place?.name ?? '',
-      type: place?.type ?? 'restaurant',
-      rating: place && place.rating > 0 ? place.rating : 4,
-      street: place?.street ?? '',
-      postalCode: place?.postalCode ?? '',
-      city: place?.city ?? '',
-      phone: place?.phone ?? '',
-      note: place?.note ?? '',
-      // Valeur STOCKÉE, jamais l'URL signée : c'est ce qui rend la comparaison
-      // « photo changée ou retirée » de `editPlace` possible (D-06, WR-05).
-      // Une photo non touchée resoumet donc exactement la valeur de colonne.
-      photoUrl: place?.photoStored ?? '',
-    },
+    defaultValues: defaultsFor(place),
   });
+
+  // D-14 : le dialogue se rouvre parfois sur la MÊME cible — le `key` de la
+  // page (`adresses-page.tsx`) ne change pas quand `editing?.id` est inchangé —
+  // donc l'instance survit à la fermeture et l'état local reviendrait. L'effet
+  // repart de la cible à chaque ouverture.
+  //
+  // `place` lui-même n'est PAS une dépendance : la page reconstruit cet objet à
+  // chaque rendu (`adresses-page.tsx` le reforme depuis ses lignes), l'inclure
+  // rejouerait la remise à zéro pendant la saisie et effacerait ce que
+  // l'utilisateur est en train de taper. `place?.id ?? 'new'` identifie la
+  // cible de façon stable.
+  useEffect(() => {
+    if (!open) return;
+    reset(defaultsFor(place));
+    setPhotoPreview(place?.photoUrl ?? null);
+    setPickedFile(null);
+    // Le champ fichier garde la sélection d'une ouverture précédente : un
+    // fichier abandonné serait resoumis si on ne le vidait pas.
+    if (fileRef.current) fileRef.current.value = '';
+  }, [open, place?.id]);
 
   const submit = handleSubmit(async (values) => {
     await onSubmit({
