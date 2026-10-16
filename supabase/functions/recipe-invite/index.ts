@@ -36,9 +36,12 @@
  *   summary   -> { recipeId, isActive, hasCode, expiresAt, maxUses, useCount } | null
  *   link-view -> { recipeId, title, servings, prepMinutes, cookMinutes,
  *                  coverPhotoUrl, category, ingredients, steps, tags }
- *     (`coverPhotoUrl` est une URL signée ÉPHÉMÈRE (une heure) forgée par
- *     requête depuis la valeur brute `cover_photo`, ou null en échec fermé,
- *     jamais persistée ; `ingredients`/`steps` portent position + quantité
+ *     (`coverPhotoUrl` et `steps[].photoUrl` sont des URL signées ÉPHÉMÈRES
+ *     (une heure) forgées par requête depuis les valeurs brutes `cover_photo`
+ *     et `photo_path`, ou null en échec fermé, jamais persistées. Le chemin
+ *     brut de bucket n'est JAMAIS transmis : la valeur signée le REMPLACE, elle
+ *     ne l'accompagne pas (T-21-02). La ligne de texte reste la référence si
+ *     l'image ne charge pas. `ingredients`/`steps` portent position + quantité
  *     de référence, le scaler restant pur client — 16-02.)
  *
  * REFUS ENFANT (R10) : chaque action `user` résout le rôle du foyer côté
@@ -62,6 +65,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
 import { childRefusal, isChildRole } from './child-guard.ts';
 import type { ChildGuardAction } from './child-guard.ts';
+import { resolveGuestMediaUrl, toGuestSteps } from './guest-steps.ts';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -424,41 +428,6 @@ async function handleSummary(admin: AdminClient, userId: string, body: RequestBo
 // Chemin sans session (publishable) : invités externes uniquement.
 // ---------------------------------------------------------------------------
 
-/** Bucket privé des fichiers du foyer : seul nom que les politiques connaissent. */
-const HOUSEHOLD_MEDIA_BUCKET = 'household-media';
-/** Validité des URL photo invitées : courte (une heure), forgée par requête. */
-const GUEST_PHOTO_TTL_SECONDS = 3600;
-
-/** Chaîne non vide telle quelle, sinon null (échec fermé, jamais ''). */
-function asTextOrNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-/**
- * Résout la valeur brute `cover_photo` du RPC en URL servable : un chemin
- * relatif au bucket `household-media` (forme des dépôts) reçoit une URL
- * signée courte ; TOUT le reste (absent, forme inconnue, erreur de
- * signature) rend null — échec fermé, sans erreur, sans journaliser ni le
- * code ni l'URL (rien de sensible ne fuite dans les logs).
- */
-async function resolveGuestCoverUrl(admin: AdminClient, raw: unknown): Promise<string | null> {
-  const value = asTextOrNull(raw);
-  if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
-  try {
-    const path = value.replace(/^\/+/, '');
-    const { data, error } = await admin.storage
-      .from(HOUSEHOLD_MEDIA_BUCKET)
-      .createSignedUrl(path, GUEST_PHOTO_TTL_SECONDS);
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Lecture invitée sans compte : le code EST le contrôle d'accès. Ne rend
  * que la fiche lecture seule — projection défensive explicite : même si le
@@ -485,7 +454,7 @@ async function handleLinkView(admin: AdminClient, body: RequestBody & { action: 
     cover_photo?: string | null;
     category?: string | null;
     ingredients?: { id?: unknown; name?: unknown; quantity?: unknown; unit?: unknown; position?: unknown }[];
-    steps?: { id?: unknown; content?: unknown; position?: unknown }[];
+    steps?: { id?: unknown; content?: unknown; position?: unknown; photo_path?: unknown }[];
     tags?: unknown;
   };
 
@@ -498,13 +467,9 @@ async function handleLinkView(admin: AdminClient, body: RequestBody & { action: 
       position: typeof ing.position === 'number' ? ing.position : 0,
     }))
     : [];
-  const steps = Array.isArray(view.steps)
-    ? view.steps.map((step) => ({
-      id: String(step.id ?? ''),
-      content: String(step.content ?? ''),
-      position: typeof step.position === 'number' ? step.position : 0,
-    }))
-    : [];
+  // La projection signe désormais chaque étape : le chemin brut `photo_path`
+  // est consommé ici et remplacé par `photoUrl` (signée ou null), jamais recopié.
+  const steps = Array.isArray(view.steps) ? await toGuestSteps(admin, view.steps) : [];
   const tags = Array.isArray(view.tags) ? view.tags.map(String) : [];
 
   return json({
@@ -513,7 +478,7 @@ async function handleLinkView(admin: AdminClient, body: RequestBody & { action: 
     servings: view.servings ?? null,
     prepMinutes: view.prep_minutes ?? null,
     cookMinutes: view.cook_minutes ?? null,
-    coverPhotoUrl: await resolveGuestCoverUrl(admin, view.cover_photo),
+    coverPhotoUrl: await resolveGuestMediaUrl(admin, view.cover_photo),
     category: view.category ?? null,
     ingredients,
     steps,
