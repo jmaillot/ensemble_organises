@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,14 +22,22 @@ type FormValues = z.infer<typeof schema>;
 
 export default function JoinHouseholdPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Le lien partagé par les paramètres du foyer (`/foyer/rejoindre?token=…`,
+  // émis par `invitations-panel.tsx`) porte son jeton dans l'URL : il préremplit
+  // le champ pour éviter de retaper 22 caractères à la main. C'est une **valeur
+  // initiale**, jamais une action : rien n'est soumis au chargement, donc un
+  // aperçu de lien ne consomme pas un token à usage compté. La validation reste
+  // celle du schéma ci-dessous, la même que la saisie manuelle.
+  const initialToken = searchParams.get('token') ?? '';
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { token: '' } });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { token: initialToken } });
 
   const onSubmit = async (values: FormValues) => {
     setPending(true);
