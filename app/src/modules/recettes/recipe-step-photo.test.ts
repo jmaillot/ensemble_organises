@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 
 const { storageMocks, supabaseState } = vi.hoisted(() => {
@@ -284,6 +285,35 @@ describe('Photo d’étape — ajouter, remplacer, retirer (R1, R2, R5, D-04/D-0
     expect(warn.mock.calls.some(([message]) => String(message).includes('step-disparu'))).toBe(true);
     warn.mockRestore();
   });
+
+  it('une écriture non atterrie ne retire PAS l’ancien objet et nettoie le neuf (CR-01)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // L’écriture n’atterrit pas (ligne absente) : `previous` peut encore être
+    // référencé par la ligne réelle, donc le retirer serait destructeur. Seul
+    // l’objet neuf, que personne ne référence, est retiré.
+    depositMock.mockResolvedValueOnce(deposited(NEW));
+
+    await replaceRecipeStepPhoto({
+      householdId: DEMO_HOUSEHOLD_ID,
+      recipeId: 'r-1',
+      stepId: 'step-disparu',
+      previous: OLD,
+      file: new File(['p'], 'neuf.jpg', { type: 'image/jpeg' }),
+    });
+
+    expect(removeFileMock).not.toHaveBeenCalledWith(OLD);
+    expect(removeFileMock).toHaveBeenCalledWith(NEW);
+    warn.mockRestore();
+  });
+
+  it('un retrait dont l’écriture n’atterrit pas ne retire PAS l’ancien objet (CR-01)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await clearRecipeStepPhoto('step-disparu', OLD);
+
+    expect(removeFileMock).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe('Photo d’étape — rendu et aperçu mort (R6, D-18)', () => {
@@ -319,5 +349,25 @@ describe('Photo d’étape — rendu et aperçu mort (R6, D-18)', () => {
     const stored = await uploadRecipeStepPhoto('foyer-1', 'r-1', 's-1', file);
     expect(stored).toBe('blob:apercu-etape');
     expect(await resolveRecipeStepPhotoUrl(stored)).toBe('blob:apercu-etape');
+  });
+
+  it('le plein écran ne se rouvre pas après la mort de l’aperçu (IN-02)', async () => {
+    const user = userEvent.setup();
+    const { queryByRole, getByRole, rerender } = renderWithProviders(
+      createElement(StepPhoto, { url: 'blob:apercu-mort', alt: 'Photo de l’étape 1', onSelectPhoto: () => {} }),
+    );
+
+    // Le plein écran s’ouvre sur un geste explicite.
+    const thumbnail = getByRole('img');
+    await user.click(getByRole('button', { name: 'Agrandir : Photo de l’étape 1' }));
+    expect(await queryByRole('dialog')).not.toBeNull();
+
+    // L’aperçu meurt : le dialogue est démonté et l’état doit retomber.
+    fireEvent.error(thumbnail);
+    expect(queryByRole('dialog')).toBeNull();
+
+    // Une URL neuve arrive : le dialogue ne doit PAS se rouvrir sans geste.
+    rerender(createElement(StepPhoto, { url: 'blob:apercu-neuf', alt: 'Photo de l’étape 1', onSelectPhoto: () => {} }));
+    expect(queryByRole('dialog')).toBeNull();
   });
 });

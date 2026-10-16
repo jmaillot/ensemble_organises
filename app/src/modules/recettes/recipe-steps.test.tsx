@@ -165,4 +165,29 @@ describe('Étapes recettes (R7, D-11, D-12)', () => {
     expect(onRemovePhoto).toHaveBeenCalledTimes(1);
     expect(onRemovePhoto).toHaveBeenCalledWith(expect.objectContaining({ id: 'step-2' }));
   });
+
+  it('ne rend pas « Retirer la photo » pour une étape dont l’image n’est pas rendue (IN-01)', async () => {
+    // `photoPath` est posé sur l’étape 2, mais aucune URL n’est rendue
+    // (signature échouée ou aperçu démo mort) : la commande de retrait suit
+    // l’image RENDUE, pas la seule référence stockée. Sinon la ligne montre à
+    // la fois « Ajouter une photo » et « ✕ Retirer » pour une étape sans image.
+    renderWithProviders(
+      <RecipeSteps
+        steps={PHOTO_STEPS}
+        onAdd={() => {}}
+        onUpdate={() => {}}
+        onDelete={() => {}}
+        onReorder={() => {}}
+        onAddPhoto={() => {}}
+        onReplacePhoto={() => {}}
+        onRemovePhoto={() => {}}
+      />,
+    );
+
+    const list = await screen.findByRole('list', { name: 'Étapes de la recette' });
+    expect(within(list).queryByRole('button', { name: 'Retirer la photo de l’étape 2' })).toBeNull();
+    // L’invitation d’ajout reste offerte sur les trois étapes : un remplacement
+    // reste possible par cette affordance (elle nettoie l’ancien objet).
+    expect(within(list).getAllByRole('button', { name: 'Ajouter une photo' })).toHaveLength(3);
+  });
 });
