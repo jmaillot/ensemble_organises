@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 26 septembre 2026.
+Dernière mise à jour : 17 octobre 2026.
 
 ---
 
@@ -177,6 +177,52 @@ toast d'erreur. Reste le vrai manque, en #10.
 `create_household` sème Médecin, Dentiste, Pharmacie, Plombier,
 Électricien, Garagiste, Coiffeur, Vétérinaire, Assurance, Banque (0027,
 rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
+
+---
+
+- [ ] **11. Les correctifs de liens invités (phases 21 à 23) ne sont pas en production**
+
+**Ce qui est fait.** Les phases 21 (photos d'étapes de recette), 22 (durcissement
+des liens invités) et 23 (signature média invitée bornée au foyer) sont
+exécutées, vérifiées et **poussées sur `main`** (`d36359c`…`77f074b`). Aucune
+n'a été appliquée à la pile en service : le dépôt est prêt, l'exploitation ne
+l'est pas encore.
+
+**Ce qu'il faut.** Migrations `0127` et `0128` (et toute autre non appliquée),
+puis redéploiement des Edge `gift-list-invite` et `ardoise-invite` — les deux
+signeurs changent —, puis **rebuild** de l'image frontend, les surfaces invitées
+ayant changé. La séquence ordonnée, ses points de contrôle et son retour
+arrière sont dans `docs/DEPLOIEMENT-PROD.md`.
+
+**Qui peut le faire : l'opérateur.** C'est un geste d'exploitation, pas de code.
+
+**Terminé quand** `sh scripts/migrate.sh --status` nomme `0128` comme appliquée,
+que `sh run.sh recreate functions` a rechargé les deux Edge, et qu'un parcours
+invité réel (liste de cadeaux partagée **et** ardoise partagée) rend une image
+signée ou `null` — jamais un chemin brut, jamais une forme `http(s)` relayée.
+
+---
+
+- [ ] **12. Quatre UAT de phase ne sont pas tenues (05, 09, 16, 17)**
+
+**Ce qui est fait.** Le code de ces quatre phases est livré et vérifié, mais
+leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
+
+- **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6) ;
+- **09 PWA offline** — 5 tests en attente (1 passé, 1 sauté, sur 7) ;
+- **16 Recettes du foyer** — 2 tests en attente (0 passé sur 5 ; 4 constats
+  consignés dans `## Gaps`) ;
+- **17 Mode cuisine** — 1 test en attente (3 passés sur 4).
+
+**Ce qu'il faut.** Jouer les scénarios restants sur un vrai appareil, puis
+passer chaque fichier en `complete`. Les deux étapes opérateur **M-01** (preuve
+push prod) et **M-02** (clés VAPID en production) se jouent dans le même
+mouvement ; leur checklist est dans `docs/PWA.md` §« Exploitation push ».
+
+**Qui peut le faire : l'utilisateur.** C'est le seul point bloquant, avec #11.
+
+**Terminé quand** les quatre `NN-UAT.md` sont clos et que `M-01`/`M-02` sont
+faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être cochées.
 
 ---
 
