@@ -1,7 +1,10 @@
 -- supabase/tests/0032_guest_view_details.sql
 -- Contenu invité (0092, gap G-06-1a, D-05/D-07) : la charge invitée porte le
--- lien `url` et la valeur brute `photo_url` de chaque article, en plus du
+-- lien `url` et le chemin `photo_url` de chaque article, en plus du
 -- nom/prix/commentaire/booléen `reserved` — sans aucun identifiant d'auteur.
+-- Depuis 0128, `photo_url` n'est rendu que s'il est BORNÉ au foyer de la
+-- liste : un chemin d'un autre foyer, un segment `..` ou une forme `http(s)`
+-- héritée rendent `null` (R3 de `21-SECURITY.md`, D-03).
 --
 -- Preuves : exposition exacte des valeurs semées (égalité stricte, jamais de
 -- tautologie), article sans photo ni lien (clés présentes, valeurs nulles,
@@ -39,15 +42,16 @@ begin
          ('gl32_exh', home_a, bob_m, 'Noel 32 Epuisee', 'partagee'),
          ('gl32_aux', home_a, bob_m, 'Noel 32 Auxiliaire', 'partagee');
 
-  -- gitem32_a : contenu complet (lien + chemin bucket relatif, forme
-  -- actuelle des dépôts `depositHouseholdFile`).
+  -- gitem32_a : contenu complet (lien + chemin bucket BORNÉ au foyer de la
+  -- liste, forme actuelle des dépôts `depositHouseholdFile` et du verdict
+  -- 0128) — le cas positif de lecture.
   -- gitem32_b : nu (ni lien ni photo — dégradation vers null, sans erreur).
-  -- gitem32_c : contenu complet, forme URL http(s) héritée (l'Edge la laisse
-  -- passer telle quelle, la base la rend telle que stockée).
+  -- gitem32_c : contenu complet, forme URL http(s) héritée : 0128 ne la rend
+  -- plus (verdict de lecture borné au foyer, D-03), l'article sort à null.
   insert into public.gift_items (id, list_id, household_id, name, price, comment, url, photo_url)
   values ('gitem32_a', 'gl32_part', home_a, 'Puzzle Lumineux 32-aaaa', 25, 'Bois naturel',
           'https://boutique32.example.fr/puzzle-lumineux-32-aaaa',
-          'maison32/cadeaux/puzzle32-aaaa.jpg'),
+          home_a || '/cadeaux/puzzle32-aaaa.jpg'),
          ('gitem32_b', 'gl32_part', home_a, 'Chaussettes 32-bbbb', 9, null, null, null),
          ('gitem32_c', 'gl32_part', home_a, 'Livre 32-cccc', 15, 'Dédicacé',
           'https://boutique32.example.fr/livre-32-cccc',
@@ -206,22 +210,22 @@ select testkit.eq(
   'la vue invitée expose le lien exact de l''article forme héritée');
 
 -- ===========================================================================
--- 3. Exposition exacte de la valeur brute photo (G-06-1a) : la base rend tel
---    que stocké (chemin bucket OU url héritée) ; l'article nu porte les clés
---    avec des valeurs nulles — présent, jamais d'erreur (échec fermé).
+-- 3. Exposition exacte de la photo (G-06-1a, bornee par 0128) : le chemin du
+--    foyer de la liste traverse tel quel ; une forme `http(s)` heritee rend
+--    `null` (verdict de lecture borne au foyer, D-03) ; l'article nu porte les
+--    cles avec des valeurs nulles — present, jamais d'erreur (echec ferme).
 -- ===========================================================================
 select testkit.eq(
   (select e ->> 'photo_url'
      from jsonb_array_elements(public.guest_view_gift_list((select h1 from testkit.hashes)) -> 'items') e
     where e ->> 'id' = 'gitem32_a'),
-  'maison32/cadeaux/puzzle32-aaaa.jpg',
-  'la vue invitée expose la valeur brute du chemin bucket');
-select testkit.eq(
-  (select e ->> 'photo_url'
+  (select household_id from testkit.fx where key = 'alice') || '/cadeaux/puzzle32-aaaa.jpg',
+  'la vue invitée expose le chemin borné au foyer de la liste');
+select testkit.ok(
+  (select e -> 'photo_url' = 'null'::jsonb
      from jsonb_array_elements(public.guest_view_gift_list((select h1 from testkit.hashes)) -> 'items') e
     where e ->> 'id' = 'gitem32_c'),
-  'https://cdn32.example.fr/photos/livre32-cccc.jpg',
-  'la vue invitée expose la valeur brute de la forme héritée');
+  'la vue invitée rend null sur une forme http(s) héritée (bornage 0128)');
 select testkit.ok(
   (select (e ? 'url') and (e ? 'photo_url')
      from jsonb_array_elements(public.guest_view_gift_list((select h1 from testkit.hashes)) -> 'items') e
