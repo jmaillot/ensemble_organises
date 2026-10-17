@@ -54,6 +54,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
 import { childRefusal, isChildRole } from './child-guard.ts';
 import type { ChildGuardAction } from './child-guard.ts';
+import { resolveGuestCoverUrl } from './guest-media.ts';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -609,46 +610,15 @@ async function handleGuestView(admin: AdminClient, body: RequestBody & { action:
 // elle-même — un invité anonyme n'a pas de session, et le bucket
 // `household-media` est privé (AGENTS.md §2.6) : il ne peut pas signer. Rendre
 // la colonne brute enverrait un chemin dans un `<img src>`, donc une image
-// cassée à coup sûr (régression introduite par 19-09, fermée ici). Le motif est
-// copié de `recipe-invite` (`resolveGuestCoverUrl`) et de `gift-list-invite`
-// (`resolveGuestPhotoUrl`) : mêmes TTL, même échec fermé, même refus de rendre
-// autre chose qu'une URL servable.
-
-/** Bucket privé des fichiers du foyer : seul nom que les politiques connaissent. */
-const HOUSEHOLD_MEDIA_BUCKET = 'household-media';
-/** Validité de l'URL de couverture invitée : courte (une heure), forgée par requête. */
-const GUEST_PHOTO_TTL_SECONDS = 3600;
-
-/** Chaîne non vide telle quelle, sinon null (échec fermé, jamais ''). */
-function asTextOrNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-/**
- * Résout la valeur brute `cover_url` de la colonne en URL servable : une URL
- * `http(s)` héritée passe telle quelle ; un chemin relatif au bucket
- * `household-media` (forme actuelle de la colonne, D-01) reçoit une URL signée
- * courte ; TOUT le reste (absent, forme inconnue, erreur de signature) rend
- * null — échec fermé, sans erreur, sans journaliser la valeur (T-19-41 : rien
- * de sensible ne fuite dans les journaux).
- */
-async function resolveGuestCoverUrl(admin: AdminClient, raw: unknown): Promise<string | null> {
-  const value = asTextOrNull(raw);
-  if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
-  try {
-    const path = value.replace(/^\/+/, '');
-    const { data, error } = await admin.storage
-      .from(HOUSEHOLD_MEDIA_BUCKET)
-      .createSignedUrl(path, GUEST_PHOTO_TTL_SECONDS);
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl;
-  } catch {
-    return null;
-  }
-}
+// cassée à coup sûr (régression introduite par 19-09, fermée ici).
+//
+// Ce n'est plus un FORMAT copié de `recipe-invite` : le verdict et la signature
+// vivent dans le module partagé `./guest-media.ts`, seul endroit qui décide du
+// TTL et de l'échec fermé. Depuis 23-01, la couverture n'est signée que si le
+// chemin est BORNÉ au foyer de l'ardoise (R2/R3) : un chemin d'un autre foyer,
+// un segment `..` ou une forme `http(s)` héritée rendent `null` SANS appeler le
+// signeur (D-03). Le foyer est lu dans la requête existante de `buildGuestView`
+// et n'apparaît dans aucune clé de la réponse.
 
 /**
  * Vue invité partagée (`guest-view` ticket, `link-view` code vérifié) :
@@ -662,10 +632,17 @@ async function buildGuestView(
 ) {
   const { data: ardoise, error: ardoiseError } = await admin
     .from('ardoises')
-    .select('id,name,description,cover_url,is_active')
+    .select('id,name,description,cover_url,household_id,is_active')
     .eq('id', ardoiseId)
     .single();
   if (ardoiseError || !ardoise) throw new ArdoiseInviteError(404, 'Ardoise introuvable.');
+
+  // Foyer de l'ardoise, lu dans la MÊME ligne que la couverture : il sert au
+  // verdict de bornage du module `./guest-media.ts` et n'est JAMAIS rendu.
+  // `null` (colonne absente ou forme inattendue) rend la couverture `null` —
+  // échec fermé, jamais un chemin non jugé.
+  const ardoiseHousehold = (ardoise as { household_id?: unknown }).household_id;
+  const householdId = typeof ardoiseHousehold === 'string' ? ardoiseHousehold : null;
 
   const [{ data: expenses }, { data: parts }, { data: members }, { data: guests }] = await Promise.all([
     admin
@@ -734,7 +711,11 @@ async function buildGuestView(
   // Le nom dit la nature de la valeur : la colonne porte un CHEMIN de bucket
   // (`cover_url`), la charge utile porte une URL servable (`coverUrl`). Un
   // invité anonyme ne peut pas signer lui-même, c'est le serveur qui le fait.
-  const coverUrl = await resolveGuestCoverUrl(admin, (ardoise as { cover_url: string | null }).cover_url);
+  // Le verdict est prononcé dans le module `./guest-media.ts`, contre le foyer
+  // de l'ardoise : un foyer non résolu (`null`) rend la couverture `null`.
+  const coverUrl = householdId
+    ? await resolveGuestCoverUrl(admin, (ardoise as { cover_url: string | null }).cover_url, householdId)
+    : null;
 
   return json({
     ardoise: {

@@ -62,12 +62,30 @@ export interface GuestMediaSigner {
 }
 
 /**
+ * Verdict de lecture : `true` si et seulement si la valeur est un chemin du
+ * foyer `householdId` ET ne remonte pas hors de ce foyer.
+ *
+ * La BARRE FINALE est ce qui ferme le cas « foyer homonyme » : `household_ab`
+ * n'accepte pas `household_abc/…`. `startsWith`, jamais un motif `like` :
+ * `household_id` est un texte `household_<uuid>` qui contient `_`, métacaractère
+ * `like` (`0126:22-31`). Un segment `..` est refusé par `includes` : les noms
+ * déposés sont `file_<uuid>.<ext>` et ne contiennent jamais deux points
+ * consécutifs, donc le refus ne touche aucune valeur légitime (`0127:42-47`).
+ */
+export function isHouseholdBoundedPath(value: string, householdId: string): boolean {
+  return value.startsWith(`${householdId}/`) && !value.includes('..');
+}
+
+/**
  * Résout la valeur brute `cover_url` de la colonne en URL servable.
  *
- * État d'avant 23-01 (vérification à venir) : la valeur est signée telle quelle
- * sans verdict — c'est l'extraction fidèle du code en ligne de
- * `ardoise-invite/index.ts:637-651`, où un chemin d'un autre foyer, un segment
- * `..` et une forme `http(s)` héritée traversaient tous.
+ * Ordre, à ne pas inverser : la valeur est normalisée par `asTextOrNull`,
+ * jugée par `isHouseholdBoundedPath` — un refus rend `null` SANS appeler le
+ * signeur —, puis la CHAÎNE EXACTE qui a passé le verdict est signée, sans
+ * normalisation intermédiaire : un verdict prononcé sur une forme et une
+ * signature portant sur une autre forme pourraient diverger. Un `http(s)`
+ * hérité ne satisfait pas le préfixe de foyer et tombe donc dans l'échec fermé
+ * (D-03).
  */
 export async function resolveGuestCoverUrl(
   signer: GuestMediaSigner,
@@ -76,12 +94,11 @@ export async function resolveGuestCoverUrl(
 ): Promise<string | null> {
   const value = asTextOrNull(raw);
   if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
+  if (!isHouseholdBoundedPath(value, householdId)) return null;
   try {
-    const path = value.replace(/^\/+/, '');
     const { data, error } = await signer.storage
       .from(HOUSEHOLD_MEDIA_BUCKET)
-      .createSignedUrl(path, GUEST_PHOTO_TTL_SECONDS);
+      .createSignedUrl(value, GUEST_PHOTO_TTL_SECONDS);
     if (error || !data?.signedUrl) return null;
     return data.signedUrl;
   } catch {
