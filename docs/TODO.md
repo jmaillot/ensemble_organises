@@ -180,26 +180,24 @@ rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
 
 ---
 
-- [ ] **11. Les correctifs de liens invités (phases 21 à 23) ne sont pas en production**
+- [ ] **11. Les correctifs de liens invités (phases 21 à 23) sont en production — reste la preuve d'usage**
 
-**Ce qui est fait.** Les phases 21 (photos d'étapes de recette), 22 (durcissement
-des liens invités) et 23 (signature média invitée bornée au foyer) sont
-exécutées, vérifiées et **poussées sur `main`** (`d36359c`…`77f074b`). Aucune
-n'a été appliquée à la pile en service : le dépôt est prêt, l'exploitation ne
-l'est pas encore.
+**Déployé le 2026-10-17** (runbook `docs/DEPLOIEMENT-PROD.md`, clone de production à
+`b5038bf`) : `sh scripts/migrate.sh --status` nomme `0128` appliquée (lot `0123`…`0128`,
+12:42:36–12:42:39 UTC) ; les fonctions Edge métier sont chargées (copie 12:48:17Z,
+conteneur démarré 12:48:35Z, soit 18 s après) et leur identité est **prouvée par
+comportement** — `sh scripts/smoke-functions-serveur.sh` rend **6/6**, dont l'oracle
+uniforme « Ce code est invalide. » qui n'existe que dans le code de la phase 22 ; l'image
+frontend a été construite le même jour (12:49:16Z) et son conteneur démarré à 13:06:45Z.
 
-**Ce qu'il faut.** Migrations `0127` et `0128` (et toute autre non appliquée),
-puis redéploiement des Edge `gift-list-invite` et `ardoise-invite` — les deux
-signeurs changent —, puis **rebuild** de l'image frontend, les surfaces invitées
-ayant changé. La séquence ordonnée, ses points de contrôle et son retour
-arrière sont dans `docs/DEPLOIEMENT-PROD.md`.
+**Ce qui reste.** Un seul critère de #11 n'était pas un geste d'exploitation : un
+**parcours invité réel** (liste de cadeaux partagée **et** ardoise partagée) qui rend une
+image signée ou `null` — jamais un chemin brut, jamais une forme `http(s)` relayée. Le
+déploiement ne le prouve pas : il rend la preuve possible.
 
-**Qui peut le faire : l'opérateur.** C'est un geste d'exploitation, pas de code.
+**Qui peut le faire : l'utilisateur.** Appareil réel, session réelle.
 
-**Terminé quand** `sh scripts/migrate.sh --status` nomme `0128` comme appliquée,
-que `sh run.sh recreate functions` a rechargé les deux Edge, et qu'un parcours
-invité réel (liste de cadeaux partagée **et** ardoise partagée) rend une image
-signée ou `null` — jamais un chemin brut, jamais une forme `http(s)` relayée.
+**Terminé quand** ce parcours est joué et consigné ici.
 
 ---
 
@@ -223,6 +221,49 @@ mouvement ; leur checklist est dans `docs/PWA.md` §« Exploitation push ».
 
 **Terminé quand** les quatre `NN-UAT.md` sont clos et que `M-01`/`M-02` sont
 faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être cochées.
+
+---
+
+- [ ] **13. Deux scripts d'exploitation mentent sur ce qu'ils font, et l'image ne dit pas d'où elle vient**
+
+**Constats ouverts le 2026-10-17, pendant le déploiement de production** — ancrés, et
+chacun re-vérifié ouvert au moment de les écrire :
+
+- `scripts/smoke-functions-serveur.sh:6-7` et `:27` **montrent l'invocation avec le
+  secret écrit en clair**. Un secret sur la ligne de commande finit dans l'historique du
+  shell, et la documentation d'un script est faite pour être recopiée (AGENTS.md §2.7 H).
+  Pire, les noms attendus (`PUBLISHABLE_KEY`, `SECRET_KEY`) **ne sont pas** ceux du `.env`
+  de la pile (`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) : l'écart pousse à saisir
+  la valeur à la main plutôt qu'à la lire. Le bon lecteur existe déjà, deux fichiers plus
+  loin (`scripts/smoke-test.sh:49-52`). Et `API` doit être la **racine**
+  (`SUPABASE_PUBLIC_URL`, `supabase-project/.env.example:97`) : avec `API_EXTERNAL_URL`
+  (`…/auth/v1`), les cinq vérifications rendent `404 page not found`.
+  **La classe a été balayée le jour même** : `grep -rn 'smoke-functions-serveur'` sur
+  `docs/`, `README.md`, `scripts/`, `app/` et `.planning/` ne trouve que **deux** copies
+  de l'invocation — ce script et `docs/DEPLOIEMENT-PROD.md:130-131`, qui enseignait la
+  même chose. La seconde est **corrigée** (lecture des valeurs depuis
+  `supabase-project/.env`, avec la raison écrite au-dessus) ; reste la première.
+- `scripts/deploy-functions.sh` **copie sans recharger** et ne le dit pas. Le
+  rechargement vit ailleurs (`supabase-project/run.sh:149`) ; une copie sans `recreate`
+  laisse le runtime sur l'ancien code, et rien ne le signale — un succès muet.
+- **Rien n'estampille le SHA.** `VITE_APP_VERSION` est lu
+  (`app/src/modules/parametres/components/offline-panel.tsx:12`) mais jamais injecté :
+  aucun `ARG` dans `app/Dockerfile`, aucune entrée dans `.env.app.example`, aucun `LABEL`.
+  Identifier ce qui était servi a demandé une enquête manuelle (`git rev-parse HEAD` du
+  clone, `docker image inspect {{.Created}}`, comparaison par empreinte SHA-256 des
+  ressources). Aucune version n'était fausse : aucune n'était disponible.
+
+**Ce qu'il faut.** Les deux corrections de script sont de petite portée. L'estampille est
+un travail à part, **ouvert comme phase 24** (« Estampille de build et scripts
+d'exploitation véridiques », `ROADMAP.md`) et porte les trois constats : une seule liste
+de travail, pas deux.
+
+**Terminé quand** `scripts/smoke-functions-serveur.sh` ne présente plus aucun secret en
+clair, lit ses trois variables dans le `.env` de la pile et passe **6/6** sans variable
+d'environnement saisie à la main ; `scripts/deploy-functions.sh` énonce qu'il copie sans
+recharger et nomme la commande de rechargement ; et l'image frontend permet de nommer le
+SHA du dépôt construit **sans enquête manuelle** (preuve : la commande qui l'obtient,
+exécutée sur l'image servie).
 
 ---
 
