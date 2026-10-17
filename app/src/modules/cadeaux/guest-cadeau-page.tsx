@@ -197,8 +197,9 @@ export default function GuestCadeauPage() {
 
 /**
  * Garde de rendu des valeurs servies (T-06-10) : seules les URL http(s)
- * — liens organizers et photoUrl forgées par l'Edge (passage hérité ou
- * signée https) — atteignent le DOM. Toute autre forme (donnée corrompue,
+ * — liens organizers, et `photoUrl` signées par l'Edge depuis 0128 (le chemin
+ * brut n'atteint plus la charge, la forme `http(s)` héritée n'étant plus
+ * relayée, D-03) — atteignent le DOM. Toute autre forme (donnée corrompue,
  * schéma non-http) ne rend rien : échec fermé côté client aussi.
  */
 function isServableHttpUrl(value: string | null): value is string {

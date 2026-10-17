@@ -109,8 +109,9 @@
  *   guest-view -> { listId, listName, items: [{ id, name, price, comment, url, photoUrl, reserved }] }
  *     (jamais d'identifiant d'auteur — D-07 ; `reserved` seul dit l'état ;
  *     `url` est le lien organizer tel quel (chaîne ou null) ; `photoUrl` est
- *     une URL signée ÉPHÉMÈRE (une heure) forgée par requête depuis la valeur
- *     brute `photo_url`, ou l'URL http(s) héritée telle quelle — null en
+ *     une URL signée ÉPHÉMÈRE (une heure) forgée par requête depuis le chemin
+ *     `photo_url` que le RPC a DÉJÀ borné au foyer de la liste (`0128`) — la
+ *     forme `http(s)` héritée n'est plus relayée (D-03), elle rend `null` en
  *     échec fermé, jamais persistée)
  *   guest-reserve -> { itemId, alreadyReserved }
  *   member-reserve -> { itemId, alreadyReserved, released }
@@ -847,17 +848,22 @@ function asTextOrNull(value: unknown): string | null {
 }
 
 /**
- * Résout la valeur brute `photo_url` du RPC en URL servable (G-06-1a) :
- * une URL http(s) héritée passe telle quelle ; un chemin relatif au bucket
- * `household-media` (forme actuelle des dépôts) reçoit une URL signée
- * courte ; TOUT le reste (absent, forme inconnue, erreur de signature)
- * rend null — échec fermé, sans erreur, sans journaliser ni le code ni
- * l'URL (T-06-09 : rien de sensible ne fuite dans les logs).
+ * Résout la valeur `photo_url` rendue par le RPC en URL servable (G-06-1a) :
+ * un chemin relatif au bucket `household-media` reçoit une URL signée courte ;
+ * TOUT le reste (absent, forme inconnue, erreur de signature) rend null —
+ * échec fermé, sans erreur, sans journaliser ni le code ni l'URL (T-06-09 :
+ * rien de sensible ne fuite dans les logs).
+ *
+ * Depuis 0128 (R3 de `21-SECURITY.md`), la valeur reçue est DÉJÀ bornée au
+ * foyer de la LISTE par `guest_view_gift_list` — c'est le SEUL chemin par
+ * lequel l'Edge obtient une valeur à signer. La forme `http(s)` héritée n'est
+ * donc plus relayée (D-03) : elle ne satisfait pas le préfixe de foyer, le RPC
+ * la rend `null`, et ici elle tombe dans l'échec fermé comme n'importe quelle
+ * forme inconnue. Le relais qui l'acceptait verbatim est retiré.
  */
 async function resolveGuestPhotoUrl(admin: AdminClient, raw: unknown): Promise<string | null> {
   const value = asTextOrNull(raw);
   if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
   try {
     const path = value.replace(/^\/+/, '');
     const { data, error } = await admin.storage

@@ -158,7 +158,15 @@ describe('couverture d’ardoise — résolution (D-01)', () => {
     expect(storageMocks.createSignedUrl).toHaveBeenCalledTimes(1);
   });
 
-  it('coverUrlOf : URL résolue pour un chemin, brute pour une forme non-chemin, null si blanc ou non signé', () => {
+  it('coverUrlOf (vue PROPRIÉTAIRE) : URL résolue pour un chemin, brute pour une forme non-chemin, null si blanc ou non signé', () => {
+    // Surface PROPRIÉTAIRE, pas invitée : `displayableCoverUrl` sert la liste
+    // de l'ardoise à un membre connecté, dont le chemin est extrait par
+    // `householdMediaPathOf` (`app/src/lib/storage.ts:194`). La forme `http(s)`
+    // BRUTE y est donc légitime — c'est `resolveArdoiseCoverUrl`
+    // (`app/src/modules/ardoise/api.ts:193`) qui rend `null` sur `http(s)`, et
+    // cette ligne affirme le PASSTHROUGH du displayable, pas un verdict média.
+    // Le bornage INVITÉ vit dans l'Edge (`supabase/functions/ardoise-invite/guest-media.ts`)
+    // et n'a rien à voir avec ce comportement-ci.
     const row = (cover_url: string | null): ArdoiseRow => ({ id: 'ardoise-1', cover_url }) as ArdoiseRow;
     const resolved = { 'ardoise-1': 'https://signe.example/foyer-1/ardoises/plage.webp' };
 
@@ -168,6 +176,8 @@ describe('couverture d’ardoise — résolution (D-01)', () => {
     // Signature échouée (ou pas encore arrivée) : rien dans le DOM plutôt qu'un lien mort.
     expect(displayableCoverUrl(row('foyer-1/ardoises/plage.webp'), {})).toBeNull();
     expect(displayableCoverUrl(row('https://externe.example/photo.jpg'), {})).toBe('https://externe.example/photo.jpg');
+    // `data:` est une forme non-chemin légitime pour la vue PROPRIÉTAIRE : le
+    // displayable la laisse passer. Le bornage invité (D-03) est ailleurs.
     expect(displayableCoverUrl(row('data:image/png;base64,eG1s'), {})).toBe('data:image/png;base64,eG1s');
     expect(displayableCoverUrl(row(null), resolved)).toBeNull();
     expect(displayableCoverUrl(row('   '), resolved)).toBeNull();

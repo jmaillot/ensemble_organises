@@ -338,6 +338,13 @@ describe('GuestCadeauPage', () => {
 
       // La couche données laisse passer la chaîne, le rendu refuse le schéma —
       // jusque dans le détail déplié (même garde que la vignette).
+      //
+      // Portée BORNÉE : depuis 0128/D-03, l'Edge ne sert plus de forme
+      // `http(s)` héritée ni de `data:` — cette assertion n'exerce donc PAS le
+      // verdict serveur (qui vit dans `guest_view_gift_list` et dans
+      // `guest-media.ts`), mais la garde de rendu CLIENTE `isServableHttpUrl`
+      // (`guest-cadeau-page.tsx`), défense en profondeur qu'un contenu corrompu
+      // reste seul à pouvoir produire. Elle tombe si cette garde est retirée.
       await user.click(screen.getByRole('button', { name: /Piège/ }));
       expect(container.querySelector('#guest-item-detail-gift-item-1')).not.toBeNull();
       expect(container.querySelector('li img')).toBeNull();

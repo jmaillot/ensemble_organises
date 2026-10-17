@@ -144,6 +144,14 @@ describe('deleteGiftList (WR-03)', () => {
 
 const GUEST_CODE = 'JU6QUzDkv3pLmdGgVYUCqadLLKdsqfCj';
 
+/**
+ * La vue invitée telle que l'Edge la sert depuis 0128 : `photoUrl` est une URL
+ * SIGNÉE éphémère (ou `null`), jamais le chemin brut — le RPC `guest_view_gift_list`
+ * borne `photo_url` au foyer de la liste et la forme `http(s)` héritée ne
+ * traverse plus (D-03). Une doublure qui servirait une forme `http(s)` non
+ * signée modéliserait donc une charge que l'Edge ne produit plus.
+ */
+
 function stubGuestFetch(handler: (body: Record<string, unknown>) => unknown) {
   const seen: Array<{ url: string; init: RequestInit }> = [];
   vi.stubGlobal(
@@ -175,7 +183,7 @@ describe('guest helpers (D-05/D-06/D-07)', () => {
           comment: null,
           reserved: true,
           url: 'https://boutique.example.fr/foulard-32',
-          photoUrl: 'https://cdn.example.fr/foulard-32.jpg',
+          photoUrl: 'https://signe.example/household_f1/cadeaux/foulard-32.jpg',
           // Charge indésirable : un serveur futur qui en rendrait trop.
           reserved_by: 'member-thomas',
           reserved_by_name: 'Thomas',
@@ -195,7 +203,7 @@ describe('guest helpers (D-05/D-06/D-07)', () => {
     }
     // Le contenu servi atteint l'article mappé, intact.
     expect(view.items[0]?.url).toBe('https://boutique.example.fr/foulard-32');
-    expect(view.items[0]?.photoUrl).toBe('https://cdn.example.fr/foulard-32.jpg');
+    expect(view.items[0]?.photoUrl).toBe('https://signe.example/household_f1/cadeaux/foulard-32.jpg');
   });
 
   it('url/photoUrl non-chaînes ou vides : null défensif (miroir Edge)', async () => {
