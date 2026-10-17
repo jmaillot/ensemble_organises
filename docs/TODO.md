@@ -35,8 +35,6 @@ l'abonnement existe, l'empreinte de l'endpoint correspond à celle de la base
 
 **Ce qui ne l'est pas.** Qu'un `push` atteigne réellement le service worker.
 `delivered: 1` signifie que Mozilla a *accepté* l'envoi en file, pas qu'il a
-**Ce qui ne l'est pas.** Qu'un `push` atteigne réellement le service worker.
-`delivered: 1` signifie que Mozilla a *accepté* l'envoi en file, pas qu'il a
 été distribué. La nuance est écrite dans `docs/BACKEND.md` §6.6, et j'en ai
 fait une étape d'une chaîne « validée de bout en bout » alors que seule la
 remise l'était.
