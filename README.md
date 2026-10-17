@@ -15,6 +15,7 @@ Security) — jamais seulement dans l'interface.
 - Contrat visuel (tokens, composants, viewports) : [`DESIGN-HANDOFF.md`](DESIGN-HANDOFF.md) + [`design-export/`](design-export/)
 - Contrat de développement frontend : [`app/docs/frontend-contract.md`](app/docs/frontend-contract.md)
 - Backend, exploitation, runbook : [`docs/BACKEND.md`](docs/BACKEND.md)
+- Publier une nouvelle `main` en production (marche à suivre) : [`docs/DEPLOIEMENT-PROD.md`](docs/DEPLOIEMENT-PROD.md)
 - Bilan de la première exécution réelle du schéma : [`docs/RETROSPECTIVE.md`](docs/RETROSPECTIVE.md)
 - Travaux en cours, avec l'état réel de chaque point : [`docs/TODO.md`](docs/TODO.md)
 
@@ -154,6 +155,7 @@ Toutes les versions sont **épinglées** (pas de plages) dans `app/package.json`
 ├── scripts/                   # migrate, deploy-functions, test-db, backup, restore
 ├── compose.app.yaml           # Compose du frontend (application séparée)
 ├── docs/BACKEND.md            # runbook backend
+├── docs/DEPLOIEMENT-PROD.md   # publier une nouvelle `main` en production
 ├── docs/TODO.md               # travaux en cours, avec leur état
 ├── docs/RETROSPECTIVE.md      # ce que la première exécution a révélé
 └── .env.app.example           # exemple des variables de build du frontend
