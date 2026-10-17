@@ -113,9 +113,12 @@ export function useSyncedReads(scope: NotificationReadScope, localKey: string): 
     return unsubscribe;
   }, [refresh, userId]);
 
-  // `resource.rows` vaut un nouveau `[]` à chaque rendu tant que la requête
-  // n'a rien ramené (`query.data ?? []`) : le lire via une ref garde
-  // `markRead` stable, sinon l'effet qui marque à l'ouverture reboucle.
+  // `resource.rows` change d'identité quand la requête rend de nouvelles
+  // données : le lire via une ref garde `markRead` stable, sinon l'effet qui
+  // marque à l'ouverture reboucle. Quand la requête est désactivée, `rows` est
+  // `NO_ROWS` (constante de module, `lib/data/useResource.ts:72`) — ce n'est
+  // donc plus un `[]` frais à chaque rendu, comme on l'a écrit ici jusqu'au
+  // 2026-10-17.
   const rowsRef = useRef(resource.rows);
   rowsRef.current = resource.rows;
 
