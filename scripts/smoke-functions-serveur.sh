@@ -3,11 +3,30 @@
 # Smoke-test ciblé post-redéploiement : off-search (moteur search-a-licious)
 # + gift-list-invite (oracle uniforme), contre une stack déployée.
 #
-#   API=https://api.mondomaine.fr PUBLISHABLE_KEY=sb_publishable_... \
-#     SECRET_KEY=sb_secret_... sh scripts/smoke-functions-serveur.sh
+#   sh scripts/smoke-functions-serveur.sh
 #
-# SECRET_KEY ne sert qu'au nettoyage (suppression du compte jetable via
-# l'endpoint admin). Sans lui, le compte est signalé pour purge manuelle.
+# Depuis la racine du dépôt ou depuis supabase-project/ (le script s'ancre sur
+# son propre emplacement) :
+#   sh scripts/smoke-functions-serveur.sh
+#   sh ../scripts/smoke-functions-serveur.sh
+#
+# Les trois valeurs — SUPABASE_PUBLIC_URL, SUPABASE_PUBLISHABLE_KEY,
+# SUPABASE_SECRET_KEY — sont LUES dans le `.env` de la pile
+# (`supabase-project/.env`), ligne à ligne, sans être affichées ni exécutées :
+# aucun secret sur la ligne de commande, où il finirait dans l'historique du
+# shell (AGENTS.md §2.7 H). L'URL est la RACINE (`SUPABASE_PUBLIC_URL`) et non
+# `API_EXTERNAL_URL` : celle-ci porte le suffixe `…/auth/v1`, qui rendrait
+# « 404 page not found » sur chacune des six vérifications.
+#
+# Surchargeurs reconnus (par nom seulement ; aucun exemple ne porte une valeur) :
+#   STACK_ENV         fichier .env de la pile (défaut : supabase-project/.env)
+#   API               URL d'une autre pile que celle du .env
+#   PUBLISHABLE_KEY   clé publiable déjà fournie par l'appelant
+#   SECRET_KEY        clé secrète déjà fournie par l'appelant
+#
+# SECRET_KEY ne sert qu'au nettoyage : suppression du compte jetable via
+# l'endpoint admin. Sa présence est EXIGÉE — un nettoyage impossible n'est pas
+# un succès (cf. la validation plus bas, qui sort en 2 avant tout appel réseau).
 # Aucune clé n'est affichée. Compte jetable : smoke-fn-<epoch>@example.com.
 #
 # Ce que ça prouve :
@@ -19,12 +38,48 @@
 
 set -eu
 
-API="${API:-}"
-PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-}"
-SECRET_KEY="${SECRET_KEY:-}"
+# Les chemins sont ancrés sur l'emplacement du script, pas sur le répertoire
+# courant : la documentation fait lancer ce script depuis `supabase-project/`
+# comme depuis la racine, et un chemin relatif au répertoire courant donnerait
+# `supabase-project/supabase-project/.env` dans le premier cas.
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+REPO_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 
-if [ -z "$API" ] || [ -z "$PUBLISHABLE_KEY" ]; then
-  echo "Usage: API=https://api.mondomaine.fr PUBLISHABLE_KEY=sb_publishable_... sh scripts/smoke-functions-serveur.sh" >&2
+STACK_ENV="${STACK_ENV:-$REPO_DIR/supabase-project/.env}"
+
+# Première porte de refus : le fichier est ABSENT, il n'y a rien à lire.
+# (`/dev/null` n'est pas un fichier régulier : `[ -f /dev/null ]` est faux, il
+# tomberait ici — exit 1 — alors qu'un fichier vide doit tomber en exit 2.)
+if [ ! -f "$STACK_ENV" ]; then
+  echo "smoke-functions-serveur.sh: $STACK_ENV introuvable." >&2
+  echo "  Depuis la racine du dépôt, ou depuis supabase-project/ :" >&2
+  echo "    sh scripts/smoke-functions-serveur.sh" >&2
+  echo "    sh ../scripts/smoke-functions-serveur.sh" >&2
+  echo "  Autre emplacement : STACK_ENV=/chemin/vers/.env" >&2
+  exit 1
+fi
+
+# --- Lecture du .env sans le sourcer ----------------------------------------
+# Le fichier contient des secrets et des commandes potentielles : on l'extrait
+# ligne à ligne, on ne l'exécute pas, et rien n'est affiché.
+stack_value() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$STACK_ENV" \
+    | head -n 1 | sed 's/[[:space:]]*$//; s/^"\(.*\)"$/\1/'
+}
+
+API="${API:-$(stack_value SUPABASE_PUBLIC_URL)}"
+PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$(stack_value SUPABASE_PUBLISHABLE_KEY)}"
+SECRET_KEY="${SECRET_KEY:-$(stack_value SUPABASE_SECRET_KEY)}"
+
+# Seconde porte de refus : le fichier est PRÉSENT mais incomplet — dont un
+# `.env` vidé, dont le lecteur ressort les trois valeurs vides. Les trois sont
+# exigées et cette validation précède tout appel réseau : sans SECRET_KEY, le
+# compte jetable créé plus bas ne pourrait pas être purgé, et un nettoyage
+# impossible n'est pas un succès.
+if [ -z "$API" ] || [ -z "$PUBLISHABLE_KEY" ] || [ -z "$SECRET_KEY" ]; then
+  echo "smoke-functions-serveur.sh: variables absentes de $STACK_ENV." >&2
+  echo "  SUPABASE_PUBLIC_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY sont exigées :" >&2
+  echo "  un nettoyage impossible n'est pas un succès (cf. en-tête)." >&2
   exit 2
 fi
 
