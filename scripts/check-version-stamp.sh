@@ -107,9 +107,24 @@ demarrer_cas() {
   # requête qui échoue signale une config nginx invalide ; un placeholder
   # non substitué, lui, est un en-tête HTTP parfaitement valide — le
   # conteneur démarre et se voit sur `canal_egal` (divergence), pas ici.
+  # Le démarrage de nginx n'est pas instantané : sur une machine chargée ou
+  # un premier `docker run` lent (réseau, DNS), le conteneur peut ne pas
+  # encore servir après 3 s — conclure aussitôt nommerait une cause que ce
+  # délai n'a pas permis de constater. Reprise BORNÉE : 3 tentatives espacées
+  # de 2 s, échec bruyant seulement en fin de séquence, jamais de boucle
+  # infinie ; le message d'échec est inchangé.
   cas_port="$(docker port "eo-stamp-$cas_tag" 8080/tcp | sed 's/.*://')"
-  curl -sSf "http://127.0.0.1:$cas_port/" >/dev/null \
-    || echec "cas $cas_tag: le conteneur ne répond pas sur / — config nginx invalide ou placeholder non substitué."
+  tentatives=3
+  while :; do
+    if curl -sSf "http://127.0.0.1:$cas_port/" >/dev/null; then
+      break
+    fi
+    tentatives=$((tentatives - 1))
+    if [ "$tentatives" -eq 0 ]; then
+      echec "cas $cas_tag: le conteneur ne répond pas sur / — config nginx invalide ou placeholder non substitué."
+    fi
+    sleep 2
+  done
 }
 
 # --- Relevage des quatre canaux d'un cas -----------------------------------
