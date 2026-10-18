@@ -2,7 +2,7 @@
 # scripts/check-version-stamp.sh
 # Contrôle de l'estampille de build (phase 24) : LE preuve de R1/R2.
 #
-# Ce qu'il PRUVE, sur deux images éphémères construites puis détruites :
+# Ce qu'il PRUVE, sur trois images éphémères construites puis détruites :
 #   - les quatre canaux (en-tête HTTP `X-App-Version`, `/version.json`,
 #     label OCI `org.opencontainers.image.revision`, bundle Vite) portent la
 #     MÊME valeur, non vide, égale au SHA construit (cas A) ;
