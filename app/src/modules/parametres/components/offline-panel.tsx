@@ -9,7 +9,19 @@ import { isLocalMode } from '@/lib/data';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { dataModeLabel } from '../types';
 
-const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '0.1.0';
+// `unknown` signale « construit hors pipeline estampillé » (D-02) : sans
+// injection de SHA, afficher `0.1.0` — le semver du `package.json` — serait
+// une version fausse avec assurance, car un build local diffère déjà de
+// l'image servie (`.dockerignore` exclut les tests et `docs`, Tailwind émet
+// moins de classes). `||` et non `??` : un `--build-arg GIT_SHA=` transmet
+// une chaîne VIDE, qu'il faut replacer par `unknown` au même titre qu'une
+// variable absente.
+const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || 'unknown';
+// SHA complet (40) pour la comparaison exacte avec `git rev-parse HEAD` sur
+// le clone de production, forme courte (8) pour l'œil à l'écran (D-03).
+// `unknown` ne fait que 7 caractères : `slice(0, 8)` le laisse intact, aucun
+// cas spécial à gérer.
+const appVersionShort = appVersion.slice(0, 8);
 
 export function OfflinePanel() {
   const toast = useToast();
@@ -28,7 +40,7 @@ export function OfflinePanel() {
           </div>
           <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
             <span className="text-muted">Version</span>
-            <strong>{appVersion}</strong>
+            <strong title={appVersion}>{appVersionShort}</strong>
           </div>
         </div>
         {isLocalMode ? (
@@ -65,7 +77,8 @@ export function OfflinePanel() {
           <li>Les rappels arrivent en notification push, réglables dans le panneau notifications.</li>
         </ul>
         <p className="mt-4 mb-0 text-[11px] text-muted">
-          Version {appVersion} · service worker mis à jour automatiquement à chaque déploiement.
+          Version <span title={appVersion}>{appVersionShort}</span> · service worker mis à jour automatiquement à chaque
+          déploiement.
         </p>
       </Panel>
 
