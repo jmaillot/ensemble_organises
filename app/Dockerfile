@@ -15,10 +15,33 @@ ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
 COPY . .
-RUN npm run build
+# Estampille de build : UN SEUL `ARG GIT_SHA` alimente les quatre canaux —
+# bundle Vite, `/version.json`, en-tête nginx, label OCI (D-01). Les quatre
+# lectures sont faites dans la même exécution de build : diverger exigerait de
+# casser ce Dockerfile. `${GIT_SHA:-unknown}` à CHAQUE expansion n'est pas
+# décoratif : Compose transmet TOUJOURS l'argument, VIDE quand la variable est
+# absente, donc le défaut d'`ARG` ne s'applique jamais par la voie Compose.
+ARG GIT_SHA
+ENV VITE_APP_VERSION=${GIT_SHA:-unknown}
+# Un seul RUN = une seule couche : `/version.json` a exactement le même âge que
+# le reste de `dist`, que le `COPY --from=build` final dépose tel quel. L'ordre
+# n'est pas décoratif non plus : Vite vide `dist/` au build (`emptyOutDir`) —
+# un `printf` écrit AVANT le build disparaîtrait en silence, avec un âge
+# différent de celui du bundle.
+RUN npm run build && printf '{"version":"%s"}\n' "${GIT_SHA:-unknown}" > dist/version.json
 
 # Nginx non privilégié : écoute sur 8080, aucun privilège requis.
 FROM nginxinc/nginx-unprivileged:1.30.5-alpine3.24@sha256:4714e0b1b2577eaa1a6131d07c958b67f0eb68e6d0521e90c6e5287db8cf0bc5
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Re-déclaration obligatoire : un `ARG` d'un stage ne traverse pas `FROM`.
+# Le `sed` va APRÈS le `COPY` du nginx.conf (substituer un fichier non encore
+# copié n'aurait aucun effet) et AVANT le `COPY` de `dist` (sans effet sur lui).
+# Un SHA aberrant contenant un guillemet produirait une config nginx invalide :
+# le conteneur REFUSE de démarrer — échec bruyant voulu, jamais un en-tête faux.
+ARG GIT_SHA
+RUN sed -i "s/__APP_GIT_SHA__/${GIT_SHA:-unknown}/g" /etc/nginx/conf.d/default.conf
+# Nom défini par la spécification OCI : « Source control revision identifier
+# for the packaged software ».
+LABEL org.opencontainers.image.revision="${GIT_SHA:-unknown}"
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080

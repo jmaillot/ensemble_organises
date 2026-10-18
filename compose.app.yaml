@@ -3,8 +3,14 @@
 # sont jamais démarrés par le même fichier.
 #
 #   cp .env.app.example .env.app    # puis renseigner URL et clé publiable
-#   docker compose --env-file .env.app -f compose.app.yaml config
-#   docker compose --env-file .env.app -f compose.app.yaml up -d --wait
+#   GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml config
+#   GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml up -d --build --wait
+#
+# Le SHA se calcule par le shell à CHAQUE build : Compose n'exécute PAS les
+# substitutions shell (un `$(git …)` écrit ici passerait littéralement), et le
+# `--build` est obligatoire — `up -d` ne reconstruit rien, ni à un changement
+# d'argument ni à un changement de contexte (mesuré sur Compose v5.6.0) :
+# sans lui, l'estampille ne se republierait jamais.
 #
 # TLS est terminé par Traefik sur le réseau externe `frontend` : ce service
 # n'ouvre aucun port sur l'hôte.
@@ -16,6 +22,11 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        # Compose transmet TOUJOURS cet argument, VIDE quand `GIT_SHA` est
+        # absente de l'environnement : le `${…:-}` évite l'avertissement
+        # d'interpolation et laisse une chaîne vide, que chaque expansion
+        # `${GIT_SHA:-unknown}` du Dockerfile convertit en `unknown`.
+        GIT_SHA: ${GIT_SHA:-}
     container_name: ensemble-organises-app
     security_opt:
       - no-new-privileges:true
