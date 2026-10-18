@@ -165,12 +165,18 @@ canal_egal() {
 
 # --- Auto-exercice du contrôle ---------------------------------------------
 # Un contrôle se prouve sur un cas qui DOIT échouer (AGENTS.md §2.7 B) :
-# `canal_egal` doit REFUSER une valeur fausse. Si la comparaison l'acceptait,
-# le contrôle lui-même échouerait.
+# `canal_egal` doit REFUSER une valeur fausse ET un relevé vide — ses deux
+# portes de refus. Si la comparaison acceptait l'une ou l'autre, le contrôle
+# lui-même échouerait. La branche « relevé VIDE » n'est éprouvée nulle part
+# ailleurs : aucun cas réel du contrôle ne produit un canal vide, c'est ici
+# qu'elle est jouée.
 if ( canal_egal "auto-exercice" "$SHA" "0000000000000000000000000000000000000000" ) >/dev/null 2>&1; then
   echec "l'auto-exercice de canal_egal a ACCEPTÉ une valeur fausse — le contrôle lui-même est cassé."
 fi
-echo "auto-exercice de canal_egal: refus d'une valeur fausse, OK"
+if ( canal_egal "auto-exercice-vide" "$SHA" "" ) >/dev/null 2>&1; then
+  echec "l'auto-exercice a ACCEPTÉ une valeur vide — le contrôle lui-même est cassé."
+fi
+echo "auto-exercice de canal_egal: refus d'une valeur fausse et d'un relevé vide, OK"
 
 # --- Cas A : avec SHA -------------------------------------------------------
 echo "cas A — avec SHA ($SHA)"
