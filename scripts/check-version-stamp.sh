@@ -51,16 +51,26 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 # Nettoyage garanti par trap sur EXIT/INT/TERM : aucun conteneur ni image
-# éphémère ne survit, quel que soit le point de sortie. L'image ni le
-# conteneur `ensemble-organises-app` ne sont JAMAIS touchés : ce contrôle ne
-# déploie rien (la phase rend la preuve possible, elle ne la consomme pas).
+# éphémère ne survit, quel que soit le point de sortie. Un handler piégé sur
+# INT/TERM ne TERMINE PAS le script en sh POSIX — l'exécution reprend après
+# lui — donc le nettoyage seul y laisserait le contrôle poursuivre sur ses
+# conteneurs détruits jusqu'à imprimer « OK » en 0 : une interruption qui se
+# termine en succès est un succès inexpliqué (AGENTS.md §2.7 F). D'où
+# `exit 130`/`exit 143` après nettoyage (codes conventionnels de SIGINT et
+# SIGTERM). L'image ni le conteneur `ensemble-organises-app` ne sont JAMAIS
+# touchés : ce contrôle ne déploie rien (la phase rend la preuve possible,
+# elle ne la consomme pas).
 NETTOYER() {
   # Les noms reprennent les tags de cas (casa, casb1, casb2) : ce sont ceux
   # utilisés au `docker run --name` de chaque cas, pas des noms abrégés.
+  # Idempotent : sur INT/TERM il s'exécute deux fois (le handler, puis le
+  # trap EXIT déclenché par l'`exit`), sans effet pour autant.
   docker rm -f eo-stamp-casa eo-stamp-casb1 eo-stamp-casb2 >/dev/null 2>&1 || true
   docker rmi -f eo-stamp-check:casa eo-stamp-check:casb1 eo-stamp-check:casb2 >/dev/null 2>&1 || true
 }
-trap NETTOYER EXIT INT TERM
+trap NETTOYER EXIT
+trap 'NETTOYER; exit 130' INT
+trap 'NETTOYER; exit 143' TERM
 
 # --- Étape 0 : plumbing Compose --------------------------------------------
 # Le SHA ne peut venir que du shell opérateur : Compose n'exécute PAS les
