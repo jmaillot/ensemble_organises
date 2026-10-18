@@ -11,8 +11,10 @@
 #   * le script est idempotent : le résultat ne dépend pas du nombre
 #     d'exécutions.
 #   * ce script COPIE, il ne RECHARGE PAS : le service `functions` continue de
-#     servir l'ancien code jusqu'à sa recréation — `cd supabase-project &&
-#     sh run.sh recreate functions`. Le rechargement n'est pas intégré ici parce
+#     servir l'ancien code jusqu'à sa recréation — `sh run.sh recreate
+#     functions`, exécuté depuis `supabase-project/` (la séquence
+#     `cd supabase-project && …` suppose la racine du dépôt : elle n'est pas
+#     universelle). Le rechargement n'est pas intégré ici parce
 #     qu'il appartient à l'orchestration de la pile : le `recreate` lit les
 #     secrets d'environnement à la création du service, l'intégrer transformerait
 #     une copie de fichiers en redémarrage d'infrastructure.
@@ -193,7 +195,13 @@ done
 
 # Le succès ci-dessus est une copie, pas un déploiement actif : sans cette
 # phrase, l'opérateur conclut à un service déjà rechargé et le runtime sert
-# l'ancien code en silence (AGENTS.md §2.7 F).
+# l'ancien code en silence (AGENTS.md §2.7 F). La commande est imprimée avec
+# le chemin ABSOLU de `run.sh` : l'opérateur arrive du runbook, qui invoque
+# ce script DEPUIS `supabase-project/`, et une forme `cd supabase-project &&
+# …` recopiée telle quelle y chercherait `supabase-project/supabase-project`
+# — l'échec exact que cette phrase veut prévenir. `run.sh` s'ancre lui-même
+# sur son propre emplacement (`cd "$(dirname "$0")"`), le chemin absolu est
+# donc correct quel que soit le répertoire courant de l'appelant.
 echo
 echo "Copie terminée : $copied fonction(s) recopiée(s), mais le runtime ne recharge pas de lui-même, il sert encore l'ancien code."
-echo "Pour que le runtime serve ce code : cd supabase-project && sh run.sh recreate functions"
+echo "Pour que le runtime serve ce code : sh \"$PROJECT_DIR/run.sh\" recreate functions"
