@@ -10,6 +10,12 @@
 #     renommage ne laisse pas de code mort déployé ;
 #   * le script est idempotent : le résultat ne dépend pas du nombre
 #     d'exécutions.
+#   * ce script COPIE, il ne RECHARGE PAS : le service `functions` continue de
+#     servir l'ancien code jusqu'à sa recréation — `cd supabase-project &&
+#     sh run.sh recreate functions`. Le rechargement n'est pas intégré ici parce
+#     qu'il appartient à l'orchestration de la pile : le `recreate` lit les
+#     secrets d'environnement à la création du service, l'intégrer transformerait
+#     une copie de fichiers en redémarrage d'infrastructure.
 #
 # Fonctions métier attendues à ce jour :
 #   household-invite, expense-settlement, generate-routine-occurrences,
@@ -184,3 +190,10 @@ for dir in "$FUNCTIONS_DIR"/*; do
   [ -d "$dir" ] || continue
   echo "  - $(basename "$dir")"
 done
+
+# Le succès ci-dessus est une copie, pas un déploiement actif : sans cette
+# phrase, l'opérateur conclut à un service déjà rechargé et le runtime sert
+# l'ancien code en silence (AGENTS.md §2.7 F).
+echo
+echo "Copie terminée : $copied fonction(s) recopiée(s), mais le runtime ne recharge pas de lui-même, il sert encore l'ancien code."
+echo "Pour que le runtime serve ce code : cd supabase-project && sh run.sh recreate functions"
