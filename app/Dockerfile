@@ -36,10 +36,19 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Re-déclaration obligatoire : un `ARG` d'un stage ne traverse pas `FROM`.
 # Le `sed` va APRÈS le `COPY` du nginx.conf (substituer un fichier non encore
 # copié n'aurait aucun effet) et AVANT le `COPY` de `dist` (sans effet sur lui).
-# Un SHA aberrant contenant un guillemet produirait une config nginx invalide :
-# le conteneur REFUSE de démarrer — échec bruyant voulu, jamais un en-tête faux.
+# La valeur est VALIDÉE avant substitution : dans un remplacement `sed`, `&`
+# insère le texte apparié et `\` échappe — `GIT_SHA=dead&beef` produirait
+# l'en-tête `dead__APP_GIT_SHA__beef` alors que `/version.json` et le label
+# OCI porteraient `dead&beef` : divergence inter-canaux silencieuse (D-01),
+# conteneur démarrant quand même. Une valeur invalide échoue donc bruyamment
+# au build, avant tout `sed` — cette validation remplace l'acceptation du
+# risque T-24-02. `unknown` est accepté explicitement : c'est le repli voulu
+# quand l'argument est vide, le rejeter interdirait le build Compose avec la
+# variable absente.
 ARG GIT_SHA
-RUN sed -i "s/__APP_GIT_SHA__/${GIT_SHA:-unknown}/g" /etc/nginx/conf.d/default.conf
+RUN sha="${GIT_SHA:-unknown}"; \
+    printf '%s' "$sha" | grep -qxE '[0-9a-f]{7,40}|unknown' || { echo "GIT_SHA invalide: $sha" >&2; exit 1; }; \
+    sed -i "s/__APP_GIT_SHA__/$sha/g" /etc/nginx/conf.d/default.conf
 # Nom défini par la spécification OCI : « Source control revision identifier
 # for the packaged software ».
 LABEL org.opencontainers.image.revision="${GIT_SHA:-unknown}"
