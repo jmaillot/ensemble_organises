@@ -251,16 +251,25 @@ chacun re-vérifié ouvert au moment de les écrire :
   `docs/`, `README.md`, `scripts/`, `app/` et `.planning/` ne trouve que **deux** copies
   de l'invocation — ce script et `docs/DEPLOIEMENT-PROD.md:130-131`, qui enseignait la
   même chose. La seconde est **corrigée** (lecture des valeurs depuis
-  `supabase-project/.env`, avec la raison écrite au-dessus) ; reste la première.
+  `supabase-project/.env`, avec la raison écrite au-dessus) ; la première l'a été par la
+  phase 24 (plan 02) : le script lit lui-même les trois valeurs dans le `.env` de la
+  pile, refuse tout fichier absent (exit 1) ou présent mais incomplet dont vide
+  (exit 2) avant tout appel réseau, et ne présente plus aucune invocation porteuse de clé.
 - `scripts/deploy-functions.sh` **copie sans recharger** et ne le dit pas. Le
   rechargement vit ailleurs (`supabase-project/run.sh:149`) ; une copie sans `recreate`
   laisse le runtime sur l'ancien code, et rien ne le signale — un succès muet.
+  **Corrigé par la phase 24 (plan 02)** : l'en-tête énonce la limite, et la fin de la
+  sortie nomme `sh run.sh recreate functions` — la commande réelle, pas une reformulation.
 - **Rien n'estampille le SHA.** `VITE_APP_VERSION` est lu
   (`app/src/modules/parametres/components/offline-panel.tsx:12`) mais jamais injecté :
   aucun `ARG` dans `app/Dockerfile`, aucune entrée dans `.env.app.example`, aucun `LABEL`.
   Identifier ce qui était servi a demandé une enquête manuelle (`git rev-parse HEAD` du
   clone, `docker image inspect {{.Created}}`, comparaison par empreinte SHA-256 des
   ressources). Aucune version n'était fausse : aucune n'était disponible.
+  **Corrigé par la phase 24 (plan 01)** : un unique `ARG GIT_SHA` de build alimente le
+  bundle (`VITE_APP_VERSION`), le `LABEL org.opencontainers.image.revision`,
+  `/version.json` sans cache et l'en-tête `X-App-Version` ; sans SHA la valeur est
+  `unknown`, jamais `0.1.0`. La preuve est `scripts/check-version-stamp.sh`.
 
 **Ce qu'il faut.** Les deux corrections de script sont de petite portée. L'estampille est
 un travail à part, **ouvert comme phase 24** (« Estampille de build et scripts

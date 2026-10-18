@@ -107,46 +107,47 @@ Point de contrôle : sh ../scripts/check-hosts.sh   (les hôtes publiés par
 
 ## 4. Frontend
 
-Le build Vite **incorpore** l'URL et la clé publiable : elles sont passées comme
-`ARG` à l'image, pas comme variables de conteneur. Un déploiement frontend
-signifie donc **reconstruire**, pas redémarrer.
+Le build Vite **incorpore** l'URL, la clé publiable et l'estampille : elles sont
+passées comme `ARG` à l'image, pas comme variables de conteneur. Un déploiement
+frontend signifie donc **reconstruire**, pas redémarrer.
 
 ```sh
 cd ..
-docker compose --env-file .env.app -f compose.app.yaml config      # vérifier l'interpolation
-docker compose --env-file .env.app -f compose.app.yaml up -d --wait
+# Deux moitiés, chacune indispensable :
+#  * GIT_SHA vient du SHELL — Compose n'exécute pas les substitutions shell
+#    (un `$(git …)` dans compose.app.yaml passerait littéralement), et la
+#    variable du shell l'emporte sur le --env-file ;
+#  * --build — sans lui, `up -d` ne reconstruit rien, ni à un changement
+#    d'argument de build ni à un changement du contexte (mesuré sur Compose
+#    v5.6.0) : l'estampille ne se republierait jamais.
+GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml config    # vérifier l'interpolation (GIT_SHA visible dans args)
+GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml up -d --build --wait
 ```
 
 ```
 Point de contrôle : la page d'accueil se charge en HTTPS, le manifeste et le
                     service worker sont servis avec `Cache-Control: no-cache`
                     (l'app installée doit voir la nouvelle version).
+  curl -sSI https://<hôte-app>/ | grep -i x-app-version   # nomme le SHA servi
+  curl -sS https://<hôte-app>/version.json                # le SHA complet, sans cache
 ```
 
 ## 5. Contrôles finaux (si le lot les touche)
 
+Le script se lit lui-même : ses trois valeurs (`SUPABASE_PUBLIC_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) sont lues dans le `.env` de
+la pile, sans être affichées ni saisies à la main — un secret écrit sur la
+ligne de commande finit dans l'historique du shell (§2.7 H). L'URL doit être
+la **RACINE** (`SUPABASE_PUBLIC_URL`) et non `API_EXTERNAL_URL` (`…/auth/v1`),
+qui rendrait « 404 page not found ». L'ancrage du script le rend invoquable
+depuis la racine comme depuis `supabase-project/`.
+
 ```sh
-# Edge serveur, session réelle — inclut gift-list-invite (oracle uniforme).
-# Les valeurs se LISENT dans le .env de la pile : jamais écrites sur la ligne de
-# commande, où elles finiraient dans l'historique du shell (§2.7 H). L'URL est la
-# RACINE (`SUPABASE_PUBLIC_URL`), pas `API_EXTERNAL_URL` (`…/auth/v1`), qui rendrait
-# `404 page not found` sur les cinq vérifications.
-sv() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" supabase-project/.env \
-        | head -n1 | sed 's/[[:space:]]*$//; s/^"\(.*\)"$/\1/'; }
-API="$(sv SUPABASE_PUBLIC_URL)" \
-PUBLISHABLE_KEY="$(sv SUPABASE_PUBLISHABLE_KEY)" \
-SECRET_KEY="$(sv SUPABASE_SECRET_KEY)" \
-  sh scripts/smoke-functions-serveur.sh
+sh scripts/smoke-functions-serveur.sh
 
 # Secrets push dans Vault (les jobs pg_cron les lisent) :
 sh scripts/set-push-secrets.sh --check
 ```
-
-Les noms attendus par le script (`API`, `PUBLISHABLE_KEY`, `SECRET_KEY`) sont **son**
-interface, pas ceux du `.env` de la pile (`SUPABASE_PUBLIC_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) : c'est le lecteur ci-dessus qui fait
-la correspondance, et c'est ce décalage qui pousse à saisir la valeur à la main. La
-correction du script lui-même est suivie en `docs/TODO.md` #13.
 
 - `FUNCTIONS_VERIFY_JWT=false` reste en place : l'autorisation repose sur la clé
   publiable, le JWT et les RLS, chaque fonction déclarant son mode
