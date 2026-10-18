@@ -201,19 +201,26 @@ déploiement ne le prouve pas : il rend la preuve possible.
 
 ---
 
-- [ ] **12. Quatre UAT de phase ne sont pas tenues (05, 09, 16, 17)**
+- [ ] **12. Quatre UAT de phase ne sont pas tenues (05, 09, 16, 24)**
 
-**Ce qui est fait.** Le code de ces quatre phases est livré et vérifié, mais
+**Ce qui est fait.** Le code de ces phases est livré et vérifié, mais
 leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
 
-- **17 Mode cuisine** — ✅ **clos le 2026-10-18** (4/4, `status: complete`,
-  les trois gaps G-17-1/2/3 résolus) ;
+- **24 Estampille de build** — 4 items ouverts le 2026-10-18 : le transit de
+  `X-App-Version` derrière **Traefik** et le premier run du runbook sur la
+  production (les deux seuls qui closent la phase — la phase 24 ne déploie rien
+  par conception), la décision sur le flaky préexistant (voir #14), et
+  `test-dispatch-push.sh` sur appareil abonné ;
 - **16 Recettes du foyer** — 2 testés et validés le 2026-10-18 (coeur favori,
   aperçu print), **3 restants à rejouer** : partage QR mémorisé (b867382),
   fusion Courses (8269d72) et réglages en engrenage (0d77842) sont corrigés
   et couverts par les tests automatisés, **jamais rejoués en usage** ;
 - **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6) ;
-- **09 PWA offline** — 5 tests en attente (1 passé, 1 sauté, sur 7).
+- **09 PWA offline** — **4** tests en attente (sur 7 : 1 passé, 1 sauté, 1 en
+  `issue`, 4 en attente).
+
+**Clos depuis** : **17 Mode cuisine** — clos le 2026-10-18 (4/4, `status: complete`,
+les trois gaps G-17-1/2/3 résolus).
 
 **Corrections consécutives** (le 2026-10-18) : le résumé de `09-UAT.md`
 déclarait `issues: 0` alors que son T3 porte `result: issue` — arithmétique
@@ -233,7 +240,20 @@ faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être coché
 
 ---
 
-- [ ] **13. Deux scripts d'exploitation mentent sur ce qu'ils font, et l'image ne dit pas d'où elle vient**
+- [x] **13. Deux scripts d'exploitation mentent sur ce qu'ils font, et l'image ne dit pas d'où elle vient**
+
+**Clos le 2026-10-18 par la phase 24** (« Estampille de build et scripts
+d'exploitation véridiques », commits `6bf4e21`…`b95ef91`) : les trois constats
+sont corrigés et **vérifiés** — le smoke lit ses trois variables dans le `.env`
+de la pile (exit 1 si le fichier est absent, exit 2 s'il est présent mais
+incomplet, **y compris vide**) et ne présente plus aucune invocation porteuse
+de clé ; `deploy-functions.sh` énonce sa limite et nomme `sh run.sh recreate
+functions` ; un unique `ARG GIT_SHA` alimente les quatre canaux d'estampille,
+et sans SHA la valeur est `unknown`. Preuve : `sh scripts/check-version-stamp.sh`
+→ `ESTAMPILLE DE BUILD: OK` (quatre canaux au SHA avec estampille, quatre à
+`unknown` sans, les deux familles différentes). Vérification de phase : 10/10
+must-haves. Résidu **assumé et non refermé** : le transit de `X-App-Version`
+derrière Traefik ne se prouve pas depuis cet hôte — voir `24-UAT.md` items 1 et 2.
 
 **Constats ouverts le 2026-10-17, pendant le déploiement de production** — ancrés, et
 chacun re-vérifié ouvert au moment de les écrire :
@@ -275,17 +295,57 @@ chacun re-vérifié ouvert au moment de les écrire :
   `/version.json` sans cache et l'en-tête `X-App-Version` ; sans SHA la valeur est
   `unknown`, jamais `0.1.0`. La preuve est `scripts/check-version-stamp.sh`.
 
-**Ce qu'il faut.** Les deux corrections de script sont de petite portée. L'estampille est
-un travail à part, **ouvert comme phase 24** (« Estampille de build et scripts
-d'exploitation véridiques », `ROADMAP.md`) et porte les trois constats : une seule liste
-de travail, pas deux.
+**Ce qu'il fallait.** Les deux corrections de script étaient de petite portée.
+L'estampille était un travail à part, **mené par la phase 24** (« Estampille de
+build et scripts d'exploitation véridiques », `ROADMAP.md`), qui a porté les trois
+constats : une seule liste de travail, pas deux.
 
-**Terminé quand** `scripts/smoke-functions-serveur.sh` ne présente plus aucun secret en
-clair, lit ses trois variables dans le `.env` de la pile et passe **6/6** sans variable
-d'environnement saisie à la main ; `scripts/deploy-functions.sh` énonce qu'il copie sans
-recharger et nomme la commande de rechargement ; et l'image frontend permet de nommer le
-SHA du dépôt construit **sans enquête manuelle** (preuve : la commande qui l'obtient,
-exécutée sur l'image servie).
+**Terminé le 2026-10-18** : `scripts/smoke-functions-serveur.sh` ne présente plus
+aucun secret en clair, lit ses trois variables dans le `.env` de la pile et rend
+**6/6** sans variable saisie à la main ; `scripts/deploy-functions.sh` énonce qu'il
+copie sans recharger et nomme la commande de rechargement ; et « quelle version
+tourne ? » se répond désormais par une commande sur l'image servie
+(`sh scripts/check-version-stamp.sh`), sans enquête manuelle.
+
+---
+
+- [ ] **14. Le compteur « À faire » peut compter les tâches des autres — course sur les assignations**
+
+**Constats ouverts le 2026-10-18**, découverts pendant la porte de régression de la
+phase 24, sur deux tests qui échouent **par intermittence** :
+
+- `src/app/app-shell.test.tsx` › « ne compte que mes tâches ouvertes et celles sans
+  assigné » ;
+- `src/hooks/use-notifications.test.tsx` › « ne rappelle que les tâches sans assigné
+  ou assignées à moi ».
+
+**Mesuré** : 4 passages de la suite complète → **2 verts, 2 avec ces deux-là en
+échec** ; 5 passages isolés des deux fichiers → **34/34 verts**. Ce n'est donc pas
+du bruit : c'est une course.
+
+**Cause identifiée.** `openTaskCount` (`app/src/app/app-shell.tsx:80-92`) lit
+`taskAssigneesQuery.data ?? []` : tant que la requête d'assignation n'a pas rendu,
+**toute** tâche compte comme sans assigné. Une lecture qui devance l'écriture de la
+graine met en cache un tableau vide, et `use-notifications.ts:140` fait la même
+lecture pour la même abstraction (même clé de requête, même `queryFn`). En test, la
+graine est écrite par une autre
+requête ; en production, le risque est un badge faux au premier rendu, corrigé
+seulement à la revalidation suivante.
+
+**Attribution — ce n'est pas une régression de la phase 24.** `git diff
+42b76a1..HEAD -- app/src` ne touche que `offline-panel.{tsx,test.tsx}` ;
+`app-shell.tsx`, `use-notifications.ts` et leurs tests sont **identiques octet pour
+octet** à l'état d'avant la phase.
+
+**Ce qu'il faut.** Trancher le fond, pas seulement le test : soit `taskAssigneesQuery`
+expose son état de chargement et le compteur attend la donnée avant de rendre, soit
+la requête est préremplie par ce que la graine écrit. La correction doit rendre les
+deux tests **incapables d'échouer** pour cette raison, sans les rendre insensibles au
+défaut qu'ils visent (`AGENTS.md` §2.7 B).
+
+**Terminé quand** les deux tests passent 10 fois de suite en suite complète, et
+qu'une preuve montre que le badge ne peut plus compter la tâche d'un autre membre —
+même quand la lecture d'assignations arrive en retard.
 
 ---
 
