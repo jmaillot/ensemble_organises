@@ -238,8 +238,11 @@ faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être coché
 **Constats ouverts le 2026-10-17, pendant le déploiement de production** — ancrés, et
 chacun re-vérifié ouvert au moment de les écrire :
 
-- `scripts/smoke-functions-serveur.sh:6-7` et `:27` **montrent l'invocation avec le
-  secret écrit en clair**. Un secret sur la ligne de commande finit dans l'historique du
+- `scripts/smoke-functions-serveur.sh` **montrait, en tête de fichier, l'invocation
+  avec le secret écrit en clair** (constat du 2026-10-17) : l'en-tête actuel
+  enseigne l'invocation sans clé (`scripts/smoke-functions-serveur.sh:6-11`) et nomme
+  le rôle de `SECRET_KEY` (`:27-29`). Un secret sur la ligne de commande finit dans
+  l'historique du
   shell, et la documentation d'un script est faite pour être recopiée (AGENTS.md §2.7 H).
   Pire, les noms attendus (`PUBLISHABLE_KEY`, `SECRET_KEY`) **ne sont pas** ceux du `.env`
   de la pile (`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) : l'écart pousse à saisir
@@ -249,9 +252,10 @@ chacun re-vérifié ouvert au moment de les écrire :
   (`…/auth/v1`), les cinq vérifications rendent `404 page not found`.
   **La classe a été balayée le jour même** : `grep -rn 'smoke-functions-serveur'` sur
   `docs/`, `README.md`, `scripts/`, `app/` et `.planning/` ne trouve que **deux** copies
-  de l'invocation — ce script et `docs/DEPLOIEMENT-PROD.md:130-131`, qui enseignait la
+  de l'invocation — ce script et `docs/DEPLOIEMENT-PROD.md:146`, qui enseignait la
   même chose. La seconde est **corrigée** (lecture des valeurs depuis
-  `supabase-project/.env`, avec la raison écrite au-dessus) ; la première l'a été par la
+  `supabase-project/.env`, `docs/DEPLOIEMENT-PROD.md:138`, avec la raison écrite
+  au-dessus) ; la première l'a été par la
   phase 24 (plan 02) : le script lit lui-même les trois valeurs dans le `.env` de la
   pile, refuse tout fichier absent (exit 1) ou présent mais incomplet dont vide
   (exit 2) avant tout appel réseau, et ne présente plus aucune invocation porteuse de clé.
@@ -261,7 +265,7 @@ chacun re-vérifié ouvert au moment de les écrire :
   **Corrigé par la phase 24 (plan 02)** : l'en-tête énonce la limite, et la fin de la
   sortie nomme `sh run.sh recreate functions` — la commande réelle, pas une reformulation.
 - **Rien n'estampille le SHA.** `VITE_APP_VERSION` est lu
-  (`app/src/modules/parametres/components/offline-panel.tsx:12`) mais jamais injecté :
+  (`app/src/modules/parametres/components/offline-panel.tsx:19`) mais jamais injecté :
   aucun `ARG` dans `app/Dockerfile`, aucune entrée dans `.env.app.example`, aucun `LABEL`.
   Identifier ce qui était servi a demandé une enquête manuelle (`git rev-parse HEAD` du
   clone, `docker image inspect {{.Created}}`, comparaison par empreinte SHA-256 des
