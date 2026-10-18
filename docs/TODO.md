@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 17 octobre 2026.
+Dernière mise à jour : 18 octobre 2026.
 
 ---
 
