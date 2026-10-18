@@ -206,11 +206,20 @@ déploiement ne le prouve pas : il rend la preuve possible.
 **Ce qui est fait.** Le code de ces quatre phases est livré et vérifié, mais
 leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
 
+- **17 Mode cuisine** — ✅ **clos le 2026-10-18** (4/4, `status: complete`,
+  les trois gaps G-17-1/2/3 résolus) ;
+- **16 Recettes du foyer** — 2 testés et validés le 2026-10-18 (coeur favori,
+  aperçu print), **3 restants à rejouer** : partage QR mémorisé (b867382),
+  fusion Courses (8269d72) et réglages en engrenage (0d77842) sont corrigés
+  et couverts par les tests automatisés, **jamais rejoués en usage** ;
 - **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6) ;
-- **09 PWA offline** — 5 tests en attente (1 passé, 1 sauté, sur 7) ;
-- **16 Recettes du foyer** — 2 tests en attente (0 passé sur 5 ; 4 constats
-  consignés dans `## Gaps`) ;
-- **17 Mode cuisine** — 1 test en attente (3 passés sur 4).
+- **09 PWA offline** — 5 tests en attente (1 passé, 1 sauté, sur 7).
+
+**Corrections consécutives** (le 2026-10-18) : le résumé de `09-UAT.md`
+déclarait `issues: 0` alors que son T3 porte `result: issue` — arithmétique
+fausse à corriger à la clôture ; celui de `16-UAT.md` déclarait `total: 5`
+pour trois tests, dont deux absents du fichier et deux `## Gaps` placés
+**avant** leurs propres tests — reconstruit (5 sections réelles).
 
 **Ce qu'il faut.** Jouer les scénarios restants sur un vrai appareil, puis
 passer chaque fichier en `complete`. Les deux étapes opérateur **M-01** (preuve
