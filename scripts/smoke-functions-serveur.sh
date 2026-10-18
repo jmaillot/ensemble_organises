@@ -164,12 +164,16 @@ else
 fi
 
 echo "== 6. nettoyage compte jetable"
-if [ -n "${UID:-}" ] && [ -n "$SECRET_KEY" ]; then
+# Une seule condition à distinguer : un compte a été créé (UID posé) ou non.
+# SECRET_KEY n'est pas testée ici parce qu'elle est garantie non vide par la
+# porte de refus de la ligne 79, qui sort en 2 avant tout appel réseau —
+# l'ancienne branche « sans SECRET_KEY, purger manuellement » ne pouvait donc
+# jamais être jouée. L'intention de purge manuelle survit dans le ko ci-dessous,
+# qui dit explicitement de purger $EMAIL à la main.
+if [ -n "${UID:-}" ]; then
   DEL=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "$API/auth/v1/admin/users/$UID" \
     -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SECRET_KEY")
   [ "$DEL" = "200" ] || [ "$DEL" = "204" ] && ok "compte $EMAIL supprimé" || ko "purge admin: HTTP $DEL (purger $EMAIL à la main)"
-elif [ -n "${UID:-}" ]; then
-  echo "info - sans SECRET_KEY : purger manuellement $EMAIL (uid $UID)"
 else
   echo "info - aucun compte créé, rien à purger"
 fi
