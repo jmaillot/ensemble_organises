@@ -123,12 +123,25 @@ relever_canaux() {
   CANAL_JSON="$(curl -sS "http://127.0.0.1:$cas_port/version.json" \
     | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
   CANAL_LABEL="$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "eo-stamp-$cas_tag")"
+  # Le SHA doit s'y trouver en cas A et en être ABSENT en cas B — c'est
+  # l'assertion qui peut échouer : le SHA apparaîtrait ici si la valeur
+  # était injectée à tort. Le `grep -q "unknown"` qu'elle remplace matchait
+  # TOUJOURS (le littéral `unknown` du repli `|| 'unknown'` est déjà dans la
+  # source, que le bundle soit buildé avec ou sans injection), donc il ne
+  # prouvait rien : un contrôle incapable d'échouer ne regarde rien
+  # (AGENTS.md §2.7 B). grep en code 1 = le SHA
+  # est absent, le relevé attendu d'un cas B ; tout autre code (2+ : assets
+  # illisibles, docker en erreur) tombe en relevé VIDE, que `canal_egal`
+  # refuse aussi.
   if docker run --rm "eo-stamp-check:$cas_tag" sh -c 'grep -q "$1" /usr/share/nginx/html/assets/*.js' _ "$SHA"; then
     CANAL_BUNDLE="$SHA"
-  elif docker run --rm "eo-stamp-check:$cas_tag" sh -c 'grep -q "unknown" /usr/share/nginx/html/assets/*.js'; then
-    CANAL_BUNDLE="unknown"
   else
-    CANAL_BUNDLE=""
+    bundle_rc=$?
+    if [ "$bundle_rc" -eq 1 ]; then
+      CANAL_BUNDLE="unknown"
+    else
+      CANAL_BUNDLE=""
+    fi
   fi
 }
 
