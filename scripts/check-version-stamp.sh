@@ -103,9 +103,10 @@ demarrer_cas() {
     -t "eo-stamp-check:$cas_tag" app/ >/dev/null
   docker run -d --rm --name "eo-stamp-$cas_tag" -p 127.0.0.1::8080 "eo-stamp-check:$cas_tag" >/dev/null
   sleep 3
-  # Le conteneur doit DÉMARRER et servir : une requête `/` répond. Un
-  # conteneur mort après un build réussi signale presque toujours une config
-  # nginx invalide, c'est-à-dire un placeholder non substitué.
+  # Le conteneur doit DÉMARRER et servir : une requête `/` répond. Une
+  # requête qui échoue signale une config nginx invalide ; un placeholder
+  # non substitué, lui, est un en-tête HTTP parfaitement valide — le
+  # conteneur démarre et se voit sur `canal_egal` (divergence), pas ici.
   cas_port="$(docker port "eo-stamp-$cas_tag" 8080/tcp | sed 's/.*://')"
   curl -sSf "http://127.0.0.1:$cas_port/" >/dev/null \
     || echec "cas $cas_tag: le conteneur ne répond pas sur / — config nginx invalide ou placeholder non substitué."
