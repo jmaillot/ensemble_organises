@@ -201,20 +201,22 @@ déploiement ne le prouve pas : il rend la preuve possible.
 
 ---
 
-- [ ] **12. Trois UAT de phase ne sont pas tenues (05, 09, 16)**
+- [ ] **12. Deux UAT de phase ne sont pas tenues (05, 09)**
 
 **Ce qui est fait.** Le code de ces phases est livré et vérifié, mais
 leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
 
-- **16 Recettes du foyer** — 2 testés et validés le 2026-10-18 (coeur favori,
-  aperçu print), **3 restants à rejouer** : partage QR mémorisé (b867382),
-  fusion Courses (8269d72) et réglages en engrenage (0d77842) sont corrigés
-  et couverts par les tests automatisés, **jamais rejoués en usage** ;
 - **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6) ;
 - **09 PWA offline** — **4** tests en attente (sur 7 : 1 passé, 1 sauté, 1 en
   `issue`, 4 en attente).
 
 **Clos depuis** :
+- **16 Recettes du foyer** — close le 2026-10-19 (**5/5** en usage réel). Les trois
+  correctifs jusque-là seulement couverts par les tests automatisés sont confirmés
+  en usage : partage qui réaffiche QR + lien sans régénérer et purge à l'arrêt
+  (`b867382`), envoi depuis une recette qui **incrémente** la ligne existante au
+  lieu de la dupliquer et sélecteur limité aux listes du foyer (`8269d72`),
+  réglages ouverts en dialogue sans panneau en bas de page (`0d77842`).
 - **24 Estampille de build** — close le 2026-10-19. Les trois items qui relèvent
   de la phase sont mesurés **en production** : `X-App-Version` rend exactement
   `git rev-parse 4e48b3c` à travers Traefik **puis** Cloudflare, `/version.json`
