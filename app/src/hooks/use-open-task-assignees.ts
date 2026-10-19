@@ -63,10 +63,14 @@ export function useOpenTaskAssignees(openTaskIds: readonly string[]): OpenTaskAs
 /**
  * Règle « quelles tâches ouvertes me concernent » : une tâche sans assigné
  * compte pour le foyer, une tâche assignée compte pour ses assignés, et jamais
- * pour les autres. C'est exactement ce que `isOpenForMe`
- * (`@/modules/taches/types`) encode pour la page Tâches — la règle métier
- * n'est pas recopiée ici, c'est la DISTINCTION entre « personne » et « on ne
- * sait pas encore » que cette couture apporte.
+ * pour les autres.
+ *
+ * C'est la même règle que `isOpenForMe` (`@/modules/taches/types`), sous une
+ * autre forme : `isOpenForMe` la lit sur des `Task` déjà construits, cette
+ * fonction sur des lignes et une lecture d'assignations. Deux formes, une
+ * règle — et ce que cette couture ajoute, c'est la DISTINCTION entre
+ * « personne » et « on ne sait pas encore », que `isOpenForMe` ne connaît pas
+ * (il reçoit ses assignations déjà résolues).
  *
  * `null` dit « on ne sait pas », et l'appelant décide de n'afficher rien :
  * rendre les tâches du foyer dans ce cas les afficherait comme « à moi ».
