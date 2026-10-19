@@ -65,6 +65,20 @@ select testkit.eq(
     where n.value ->> 'user_id' = (select user_id::text from testkit.fx where key = 'alice')),
   0::bigint, 'la préférence coupe la distribution');
 
+-- Le dispatch EXÉCUTÉ. La forme fautive de `0042` — une liste de colonnes sur
+-- `jsonb_array_elements`, interdite puisque `due_push_notifications` rend du
+-- jsonb et non un record — ne se révélait qu'à l'appel, et aucun test ne
+-- l'appelait : le job `eo-push-messages` échouait à chaque passage (prod,
+-- 2026-10-19). Sans abonnement inscrit, `due` vaut 0 : la fonction rend son
+-- objet sans toucher à pg_net, absent de la base de recette, et la ligne
+-- fautive s'exécute pour de bon.
+select testkit.eq(
+  private.dispatch_message_notifications() ->> 'due', '0',
+  'le dispatch de messages s''exécute et ne trouve rien à envoyer sans abonnement');
+select testkit.eq(
+  private.dispatch_message_notifications() ->> 'dispatched', 'false',
+  'sans destinataire abonné, aucun envoi n''est tenté');
+
 -- Consommation par genre `message` : la file se vide (l'identifiant distribué
 -- est celui de la file, pas celui du message).
 select testkit.eq(

@@ -52,6 +52,13 @@ Les vérifications
    PostgreSQL répond « cannot ALTER TABLE … because it has pending trigger
    events » dès que le DML touche au moins une ligne — et passe sur table
    vide, ce qui est exactement pourquoi la recette locale ne le voit jamais.
+9. LISTE DE COLONNES SUR `jsonb_array_elements` — `… as n(notification jsonb)`
+   est TOUJOURS refusé : la fonction rend un jsonb, pas un `record`, et
+   PostgreSQL répond « a column definition list is only allowed for functions
+   returning "record" », à l'exécution seulement. Corrigé en `0020` pour les
+   rappels et les anniversaires, recopié tel quel en `0042` pour les messages :
+   le job `eo-push-messages` échouait à chaque passage, et rien ne l'appelait —
+   ni la suite, ni la recette.
 
     python3 scripts/check-sql-statique.py            # tout le dépôt
     python3 scripts/check-sql-statique.py 0006        # un seul fichier
@@ -961,6 +968,52 @@ def _dml_puis_alter(texte: str, nom_fichier: str, differees: set[str]) -> list[s
     return trouvailles
 
 
+# ---------------------------------------------------------------------------
+# Contrôle 9 : liste de colonnes sur `jsonb_array_elements`
+# ---------------------------------------------------------------------------
+
+RE_SRF_ARRAY = re.compile(r"\bjsonb_array_elements\s*\(", re.I)
+RE_ALIAS_COLONNES = re.compile(r"\s+as\s+([\w]+)\s*\(", re.I)
+
+
+def _listes_de_colonnes_sur_srf(corps: str) -> list[str]:
+    """`jsonb_array_elements(…) as n(notification jsonb)` : refusé à l'appel.
+
+    `jsonb_array_elements` a un type de retour CONNU (`setof jsonb`) : une liste
+    de colonnes ne s'applique qu'aux fonctions qui rendent `record`. PostgreSQL
+    l'accepte à la création — `create function` n'exécute pas le corps — et le
+    refuse au premier appel. Constaté le 2026-10-19 en production : le job
+    `eo-push-messages` échouait à chaque passage, et aucun push de message n'est
+    jamais parti.
+
+    La parenthèse fermante est cherchée par comptage sur le masque des
+    littéraux : un argument en contient parfois, sans qu'elles s'apparient.
+
+    CE QUE CE CONTRÔLE NE COUVRE PAS : la même faute sans `as` d'alias —
+    `from jsonb_array_elements(x) n(a jsonb)` — parce qu'après la parenthèse
+    fermante `where (` et `order by (` sont des formes légitimes, et un motif
+    qui les autorise signalerait du code qui fonctionne. Le dépôt n'en contient
+    aucune ; le jour où il en contiendra une, `0020` et `0130` disent la forme
+    à écrire.
+    """
+    masque = _masque_litteraux(_sans_commentes(corps))
+    trouvailles: list[str] = []
+    for appel in RE_SRF_ARRAY.finditer(masque):
+        profondeur, i = 1, appel.end()
+        while i < len(masque) and profondeur:
+            if masque[i] == "(":
+                profondeur += 1
+            elif masque[i] == ")":
+                profondeur -= 1
+            i += 1
+        suite = RE_ALIAS_COLONNES.match(masque, i)
+        if not suite:
+            continue
+        ligne = masque[: appel.start()].count("\n") + 1
+        trouvailles.append(f"as {suite.group(1)}(…) ligne {ligne}")
+    return trouvailles
+
+
 def _definitions(fichiers: list[pathlib.Path]) -> list[tuple[pathlib.Path, str, str, str, bool]]:
     """(fichier, signature, corps, langage, est_effective) pour chaque fonction.
 
@@ -1062,6 +1115,17 @@ def main() -> int:
                 f"        l'ambiguïté si deux tables les fournissent, et SUBSTITUE la\n"
                 f"        variable — donc NULL — si une seule le fait, sans erreur.\n"
                 f"        Qualifiez par l'alias du CTE ou de la table."
+            )
+
+        listes = _listes_de_colonnes_sur_srf(corps)
+        if listes:
+            defauts.append(
+                f"{f.name}  {signature}\n"
+                f"      liste de colonnes sur `jsonb_array_elements` : {', '.join(listes)}\n"
+                f"      → la fonction rend un jsonb, pas un `record` : PostgreSQL\n"
+                f"        refuse « a column definition list is only allowed for\n"
+                f"        functions returning 'record' », et seulement à l'appel.\n"
+                f"        Écrivez `as n` et lisez `n.value`."
             )
 
     # Le troisième contrôle ne porte pas sur les fonctions mais sur les
