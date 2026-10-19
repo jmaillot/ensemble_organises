@@ -5,6 +5,7 @@ import { buildQueryClient } from '@/lib/query-policy';
 import { ToastProvider, useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/empty-state';
 import { LazyRoute, RouteFallback } from '@/components/ui/route-error';
+import { OfflineBanner } from '@/components/shared/offline-banner';
 import { routeChunkLoaders } from './route-preload';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -448,6 +449,10 @@ export function AppRouter() {
         */}
         <BrowserRouter useTransitions={false}>
           <ScrollToTop />
+          {/* Bandeau hors ligne global (constat #15) : hors de `Routes`, donc
+              il couvre le shell ET les pages hors shell (l'accueil compris,
+              qui n'a, par arbitrage, aucun état d'erreur propre). */}
+          <OfflineBanner />
           <AppRoutes />
         </BrowserRouter>
       </ToastProvider>

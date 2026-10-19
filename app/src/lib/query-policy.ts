@@ -31,8 +31,22 @@ export const QUERY_POLICY: DefaultOptions = {
     gcTime: 5 * 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
+    // `networkMode: 'always'` : TanStack ne met plus AUCUNE requête en pause.
+    // Hors ligne, une lecture PART et échoue, donc `isError` devient vrai et
+    // l'`ErrorState` que chaque page prévoit déjà s'affiche — au lieu de
+    // `fetchStatus: 'paused'`, où `isLoading` et `isError` valent tous deux
+    // `false` et où la garde d'état vide rend un mensonge (« aucune donnée »).
+    networkMode: 'always',
+    // À poser EXPLICITEMENT : dans le mode `'always'`, TanStack bascule
+    // `refetchOnReconnect` à `false` par défaut (voir `defaultQueryOptions`
+    // dans `queryClient.ts`). L'omettre ferait donc perdre le rechargement
+    // automatique au retour du réseau — le remède créerait un autre mal.
+    refetchOnReconnect: true,
   },
-  mutations: { retry: 0 },
+  // Le mode s'applique aussi aux ÉCRITURES : elles partagent `defaultOptions`.
+  // Une écriture hors ligne échoue et affiche le message d'origine (D-10),
+  // jamais une mise en file silencieuse.
+  mutations: { retry: 0, networkMode: 'always' },
 };
 
 /**
