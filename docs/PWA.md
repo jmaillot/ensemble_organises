@@ -70,9 +70,21 @@ opérateur, pas du code).
    `delivered`, et ne prouve rien. Le script note le dernier
    `net._http_response` avant l’appel : le rapport lu est celui de son
    appel, même si un job `pg_cron` s’intercale.
-3. **Diagnostic** : si le reçu du panneau avance sans notification, c’est
-   la phase d’affichage (OS, permission révoquée) ; s’il ne bouge pas,
-   c’est le transport (service Push → navigateur).
+3. **Diagnostic** : trois étages, et le reçu du panneau n'en distingue que
+   deux.
+   - le reçu **avance sans notification** : l'affichage (OS, permission
+     révoquée) ;
+   - le reçu **ne bouge pas** et le journal du navigateur montre
+     `receivedPushMessage` suivi de `Bad encryption` ou d'un accusé
+     `code: 101` : le message est arrivé, mais le navigateur l'a rejeté au
+     **déchiffrement** — c'est la trame envoyée (RFC 8188/8291), pas le
+     transport ni l'appareil ;
+   - le reçu **ne bouge pas** et aucun message n'arrive : le transport
+     (service Push → navigateur).
+
+   Un `201` du service, et même un compteur `delivered`, ne disent que
+   « accepté » — jamais « lisible ». Seul le reçu écrit par le worker
+   (`shown: true`) en témoigne.
 4. **Rotation `INVITE_TOKEN_HMAC_SECRET`** : invalide tous les tokens
    d’invitation actifs (régénération requise) ; sans rapport avec VAPID,
    ne pas confondre les deux secrets.
