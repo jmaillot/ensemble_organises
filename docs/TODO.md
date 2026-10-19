@@ -355,6 +355,17 @@ défaut qu'ils visent (`AGENTS.md` §2.7 B).
 qu'une preuve montre que le badge ne peut plus compter la tâche d'un autre membre —
 même quand la lecture d'assignations arrive en retard.
 
+**Observation du 2026-10-19, non identifiée.** Un passage complet de `npm test`
+(tâche `261019-dw6`) a rapporté **1 échec**, dont le nom a été perdu : la sortie
+avait été filtrée par un `tail` de l'appelant. C'est une **faute de mesure**, pas
+une preuve de bruit — et elle est notée ici plutôt que passée sous silence, parce
+qu'un échec inexpliqué n'est pas un succès. Trois passages complets ultérieurs
+sont verts (1288/1288, 153 fichiers), et les deux fichiers ci-dessus passent
+**5/5 en isolé**. L'échec est donc réel, non attribuable aux deux courses
+documentées, et non reproduit. À reprendre si un passage le retrouve : la
+première chose à faire alors est de **capturer la sortie entière**, jamais un
+`tail`.
+
 ---
 
 - [ ] **15. Hors ligne, l'application affiche « rien » au lieu de dire qu'elle n'a pas pu lire**
@@ -413,6 +424,32 @@ ligne chacun, même famille de résidus.
 qu'elle n'a pas pu lire au lieu d'afficher un état vide — et qu'un test rend une
 page avec `navigator.onLine = false` en exigeant une **erreur**, pas un état vide
 (le test doit échouer sur le code d'aujourd'hui, sans quoi il ne prouve rien).
+
+**Corrigé le 2026-10-19** (tâche `261019-dw6`, commits `f3ee6fc`, `e07c6fd`,
+`f1d5191`, `690ae9a`). La politique réseau est désormais unique et partagée —
+`app/src/lib/query-policy.ts`, dont dérivent **et** `router.tsx` (le client que
+l'application monte) **et** le harnais de test, ce qui rend la non-régression
+honnête : elle exerce la politique réelle, pas une politique recopiée.
+`networkMode: 'always'` vaut pour les requêtes **et** les mutations, et
+`refetchOnReconnect` est remis explicitement à `true` (dans ce mode TanStack le
+passe à `false` par défaut). Un bandeau global annonce la coupure, et il porte
+seul l'explication puisque l'accueil n'a pas d'état d'erreur propre — arbitrage
+explicite, pas un oubli. Les deux commentaires de la file de rejeu sont
+corrigés ; le vérificateur en a trouvé un troisième de la même famille
+(`use-online-status.ts`), corrigé aussi.
+
+Les gardes sont prouvées **rouge avant vert**, et le vérificateur ne s'est pas
+contenté du rapport : il a retiré `networkMode` lui-même pour voir tomber quatre
+tests, puis écrit un `new QueryClient` hors politique pour voir tomber le
+garde-fou textuel.
+
+**Ce qui reste, et qu'aucun test ne peut faire : le rejeu humain.** Le test de
+non-régression déclare l'état hors ligne via `onlineManager` et simule la lecture
+en échec — il ne conduit jamais le vrai `navigator.onLine`. Le geste attendu est
+celui du constat d'origine, cette fois dans le bon sens : Firefox, `F12` →
+« Hors ligne », ouvrir Courses **à froid** → l'erreur et « Réessayer »,
+jamais « Aucune liste pour ce foyer ». Cela demande un déploiement (aucune CI
+dans ce dépôt).
 
 ---
 
