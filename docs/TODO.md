@@ -201,15 +201,11 @@ déploiement ne le prouve pas : il rend la preuve possible.
 
 ---
 
-- [ ] **12. Quatre UAT de phase ne sont pas tenues (05, 09, 16, 24)**
+- [ ] **12. Trois UAT de phase ne sont pas tenues (05, 09, 16)**
 
 **Ce qui est fait.** Le code de ces phases est livré et vérifié, mais
 leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
 
-- **24 Estampille de build** — **3 items sur 4 faits le 2026-10-19 en production** :
-  `X-App-Version` rend le SHA poussé à travers Traefik et Cloudflare, `/version.json`
-  le nomme sans cache, manifeste et `sw.js` sont en `no-cache`, smoke **6/6** contre
-  la pile de prod. Reste `test-dispatch-push.sh`, qui exige un appareil abonné ;
 - **16 Recettes du foyer** — 2 testés et validés le 2026-10-18 (coeur favori,
   aperçu print), **3 restants à rejouer** : partage QR mémorisé (b867382),
   fusion Courses (8269d72) et réglages en engrenage (0d77842) sont corrigés
@@ -218,8 +214,17 @@ leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer 
 - **09 PWA offline** — **4** tests en attente (sur 7 : 1 passé, 1 sauté, 1 en
   `issue`, 4 en attente).
 
-**Clos depuis** : **17 Mode cuisine** — clos le 2026-10-18 (4/4, `status: complete`,
-les trois gaps G-17-1/2/3 résolus).
+**Clos depuis** :
+- **24 Estampille de build** — close le 2026-10-19. Les trois items qui relèvent
+  de la phase sont mesurés **en production** : `X-App-Version` rend exactement
+  `git rev-parse 4e48b3c` à travers Traefik **puis** Cloudflare, `/version.json`
+  le nomme sans cache, manifeste et `sw.js` sont en `no-cache`, smoke **6/6**
+  contre la pile de prod. Le quatrième (`test-dispatch-push.sh`) ne couvre aucune
+  exigence de la phase : il reste en **#1** et dans l'UAT 05, même appareil.
+  Le risque `T-24-03` (transit de l'en-tête), classé `accept` au plan, est refermé
+  **par la mesure**.
+- **17 Mode cuisine** — close le 2026-10-18 (4/4, `status: complete`, les trois
+  gaps G-17-1/2/3 résolus).
 
 **Corrections consécutives** (le 2026-10-18) : le résumé de `09-UAT.md`
 déclarait `issues: 0` alors que son T3 porte `result: issue` — arithmétique
@@ -234,7 +239,7 @@ mouvement ; leur checklist est dans `docs/PWA.md` §« Exploitation push ».
 
 **Qui peut le faire : l'utilisateur.** C'est le seul point bloquant, avec #11.
 
-**Terminé quand** les quatre `NN-UAT.md` sont clos et que `M-01`/`M-02` sont
+**Terminé quand** les trois `NN-UAT.md` sont clos et que `M-01`/`M-02` sont
 faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être cochées.
 
 ---
