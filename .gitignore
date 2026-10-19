@@ -46,6 +46,12 @@ blob-report/
 playwright/.cache/
 shots/
 
+# Sortie du serveur Playwright piloté par l'agent (instantanés de page,
+# journaux de console) : un artefact de session, jamais du produit. Les
+# familles ci-dessus sont les sorties du lanceur de tests ; celle-ci vient
+# d'un autre outil, d'où sa ligne propre.
+.playwright-mcp/
+
 # ── Système et éditeurs ──────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
