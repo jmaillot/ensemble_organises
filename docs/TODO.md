@@ -184,13 +184,19 @@ déploiement ne le prouve pas : il rend la preuve possible.
 
 ---
 
-- [ ] **12. Une UAT de phase n'est pas tenue (05)**
+- [x] **12. Une UAT de phase n'est pas tenue (05)**
 
-**Ce qui est fait.** Le code de la phase 05 est livré et vérifié, mais le
-fichier `05-UAT.md` est resté en `status: testing`. Il reste à jouer :
+**Clos le 2026-10-19** : `05-UAT.md` passe à `status: complete` — **6/6, 0
+bloqué**. Le dernier item (`test-dispatch-push.sh`) a été joué sur la
+production : `{"due": 1, "dispatched": true}`, puis `200 {"delivered": 3,
+"failed": 0, "dropped": 0, "consumed": 1}`, `Rappel restant : 0`, nettoyage
+effectué — et la **notification est arrivée**.
 
-- **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6), le même appareil
-  et le même sujet que le push.
+Le `blocked` d'origine accusait Firefox 156 (« ne déclenche jamais l'événement
+push ») : c'était faux. Le navigateur recevait le message et le rejetait au
+déchiffrement (`Bad encryption`, accusé `101`), parce que
+`push-notify/web-push.ts` insérait un octet `0x51` absent de la RFC 8188 §2.1.
+Corrigé par `d348309`.
 
 **Clos depuis** :
 - **09 PWA offline** — close le 2026-10-19 : **4 passés, 3 sautés, 0 bloqué**.
@@ -221,16 +227,12 @@ alors que son T3 portait `result: issue`, et son total ignorait l'item bloqué ;
 `16-UAT.md` déclarait `total: 5` pour trois tests, dont deux absents du fichier,
 et deux `## Gaps` placés **avant** leurs propres tests.
 
-**Ce qu'il faut.** Jouer le dernier scénario de la phase 05 sur un vrai
-appareil, puis passer son fichier en `complete`. Les deux étapes opérateur
-**M-01** (preuve push prod) et **M-02** (clés VAPID en production) sont faites
-le 2026-10-19 ; leur checklist reste dans `docs/PWA.md` §« Exploitation push »,
-avec le diagnostic corrigé (déchiffrement ≠ transport).
-
-**Qui peut le faire : l'utilisateur.** C'est le seul point bloquant, avec #11.
-
-**Terminé quand** `05-UAT.md` est clos — alors les cases des phases 8 et 9 de
-`ROADMAP.md` peuvent être cochées.
+**Ce qu'il faut / Terminé quand** — sans objet : les deux UAT sont closes et les
+deux étapes opérateur **M-01** (preuve push prod) et **M-02** (clés VAPID en
+production) sont faites le 2026-10-19. Les cases des phases 8 et 9 de
+`ROADMAP.md` peuvent être cochées : la phase 9 (10-notifications) n'a jamais eu
+de fichier `10-UAT.md`, donc son verdict repose sur ses plans exécutés et sur la
+preuve push de ce jour.
 
 ---
 
