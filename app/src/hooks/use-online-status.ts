@@ -4,9 +4,9 @@ import { onlineManager } from '@tanstack/react-query';
 /**
  * État réseau de l'application, lu depuis `onlineManager` de TanStack Query.
  *
- * POURQUOI CETTE SOURCE, ET PAS LES ÉVÉNEMENTS DU NAVIGATEUR. C'est
- * `onlineManager` qui décide si une requête part ou reste en pause — la même
- * source que la politique réseau (`networkMode: 'always'`). Un bandeau abonné
+ * POURQUOI CETTE SOURCE, ET PAS LES ÉVÉNEMENTS DU NAVIGATEUR. `onlineManager`
+ * est l'état réseau unique de l'application : c'est lui que TanStack interroge
+ * (`networkMode`, et le rechargement à la reconnexion). Un bandeau abonné
  * à `window.ononline`/`onoffline` serait une SECONDE vérité : au mieux elle
  * suivrait la première avec un décalage, au pire elle afficherait « hors
  * ligne » sur une lecture qui aboutit, ou l'inverse. Un seul état, une seule
