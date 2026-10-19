@@ -53,10 +53,10 @@ nouveau au renvoi avec le même tag.
 
 **Clos le 2026-10-19** : les deux critères sont atteints sur mobile — bannière
 système au premier envoi, **et seconde bannière au renvoi avec le même tag**,
-donc `renotify` compris. Le poste n'est pas nommé dans cette trace : le système
-et le navigateur n'ont pas été relevés pendant le test. Le chemin complet est
-donc prouvé sur deux postes au total (Firefox/Linux le 2026-10-19, et ce
-téléphone), et le défaut de trame `d348309` est soldé des deux côtés.
+donc `renotify` compris. Poste : **Android, Chrome, l'application installée**
+(PWA). Le chemin complet est donc prouvé sur deux postes au total
+(Firefox/Linux le 2026-10-19, et ce téléphone), et le défaut de trame
+`d348309` est soldé des deux côtés.
 
 ---
 
