@@ -357,6 +357,65 @@ même quand la lecture d'assignations arrive en retard.
 
 ---
 
+- [ ] **15. Hors ligne, l'application affiche « rien » au lieu de dire qu'elle n'a pas pu lire**
+
+**Constat ouvert le 2026-10-19**, en rejouant l'UAT 09 (item 3, réécrit — voir
+`09-UAT.md`, constat `G-09-etat-vide-mensonger`). Observation en usage réel,
+Firefox, app déployée, `F12` → Réseau → « Hors ligne », navigation par clic :
+
+> « quand je vais dans courses, il me dit aucune liste pour ce foyer »
+
+Ce n'est pas une liste vide : c'est une lecture qui **n'a jamais été tentée**.
+Courses avait pourtant l'erreur explicitement prévue (`ErrorState` +
+« Réessayer », `courses-page.tsx:247`).
+
+**Cause racine, prouvée.** TanStack Query 5.103.2, `networkMode` **défaut** =
+`'online'` : il n'est configuré nulle part dans le dépôt. Quand `navigator.onLine`
+est faux, la requête ne part pas — elle reste dans son état courant et passe en
+`fetchStatus: 'paused'`. Or `isLoading = isPending && isFetching`, donc
+**`isLoading` vaut `false` en pause**, et `isError` aussi. La garde
+`!isLoading && !isError && rows.length === 0` s'ouvre, et la page rend son état
+vide ordinaire. La documentation TanStack l'écrit noir sur blanc : « Queries can
+be in `state: 'pending'`, but `fetchStatus: 'paused'` if they are mounting for the
+first time, and you have no network connection. » Le dépôt ne lit **jamais**
+`fetchStatus` ni `isPaused` — aucune occurrence hors tests — donc rien ne
+distingue « vide » de « en pause ».
+
+**Ce n'est pas un reste d'un ancien mode.** D-10 (2026-10-12) a retiré l'offline
+volontairement, et a promis en échange que « les listes vides authentiques et les
+**erreurs réseau d'origine** reviennent » (`09-CONTEXT.md:72-79`). Avec le défaut
+`'online'`, ces erreurs ne reviennent pas : elles sont retenues, et remplacées par
+un état vide qui a l'air normal. Le code ne tient donc pas la décision qu'il
+enregistre.
+
+**Étendue mesurée** : 10 gardes `!isLoading && !isError` dans 5 modules (Courses,
+Recettes, Prestataires, Animaux, Voyages). S'y ajoute l'accueil
+(`dashboard/hooks/use-dashboard.ts`), qui n'expose **aucun** état d'erreur : ses
+widgets retombent sur `[]` et affichent « rien » sans le dire.
+
+**Ce qu'il faut.** Trancher la politique, puis l'appliquer partout — les deux
+voies sont défendables, et le choix est le fond du sujet :
+
+- `networkMode: 'always'` : la requête part malgré l'absence de réseau et échoue
+  comme une autre, donc l'erreur d'origine s'affiche partout sans toucher aux 10
+  gardes. C'est la lecture littérale de D-10. À vérifier : le comportement du
+  rejeu à la reconnexion (`refetchOnReconnect`) et le bruit visuel sur une simple
+  coupure passagère ;
+- distinguer « en pause » de « vide » dans l'interface (`isPaused` /`fetchStatus`) :
+  plus juste pour l'utilisateur, mais chaque site doit être revu.
+
+Au passage, deux commentaires parlent encore de la file de rejeu supprimée par
+D-10 — `app/src/modules/dashboard/hooks/use-dashboard.ts:229` (« la file
+rejouera ») et `app/src/app/route-preload.ts:71` (« la file de synchro »). Une
+ligne chacun, même famille de résidus.
+
+**Terminé quand** une preuve montre que, hors ligne, chaque zone concernée dit
+qu'elle n'a pas pu lire au lieu d'afficher un état vide — et qu'un test rend une
+page avec `navigator.onLine = false` en exigeant une **erreur**, pas un état vide
+(le test doit échouer sur le code d'aujourd'hui, sans quoi il ne prouve rien).
+
+---
+
 ## Plus tard
 
 - **4. Le parcours humain (rappels de tâche) n'a jamais été fait.** Parké le
