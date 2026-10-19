@@ -21,9 +21,8 @@ import { useInstallPrompt } from '@/hooks/use-pwa';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
-import { queryKeys, useResource } from '@/lib/data/useResource';
-import { useQuery } from '@tanstack/react-query';
-import { listTaskAssignees } from '@/modules/taches/api';
+import { useResource } from '@/lib/data/useResource';
+import { useOpenTaskAssignees, selectTasksForMember } from '@/hooks/use-open-task-assignees';
 import { syncRotatedPushSubscription } from '@/modules/parametres/lib/push';
 import type { TaskRow } from '@/types';
 
@@ -63,33 +62,18 @@ export function AppShell() {
     selectKey: 'tasks-open',
   });
   // Compteur personnel (comme la page Tâches) : ouvertes sans assigné (foyer)
-  // ou assignées à moi — jamais celles des autres membres.
+  // ou assignées à moi — jamais celles des autres membres. La règle et sa
+  // lecture vivent dans une seule couture (`use-open-task-assignees`), la même
+  // que la cloche : un préfixe de clé maison (`['app-shell', …]`) n'était atteint
+  // par aucune invalidation, et le badge restait faux après une réassignation
+  // (D-08). La clé de la couture vit sous `['all', 'task_assignees', …]`.
   const currentMember = useCurrentMember();
   const openTaskIds = useMemo(() => openTasks.map((row) => row.id), [openTasks]);
-  const taskAssigneesQuery = useQuery({
-    // La clé vit sous `['all', 'task_assignees', …]` — le préfixe que les
-    // invalidations d'assignation touchent réellement (`use-notifications.ts`
-    // construit la même clé pour la même table et le même `queryFn` : la
-    // requête est partagée, c'est voulu). Un préfixe maison (`['app-shell', …]`)
-    // n'était atteint par aucune d'elles, et le badge restait faux après une
-    // réassignation (D-08).
-    queryKey: [...queryKeys.tableAll('task_assignees'), openTaskIds],
-    enabled: openTaskIds.length > 0,
-    queryFn: () => listTaskAssignees(openTaskIds),
-  });
-  const openTaskCount = useMemo(() => {
-    const assigneeByTask = new Map<string, string[]>();
-    for (const entry of taskAssigneesQuery.data ?? []) {
-      const list = assigneeByTask.get(entry.task_id) ?? [];
-      list.push(entry.member_id);
-      assigneeByTask.set(entry.task_id, list);
-    }
-    return openTasks.filter((row) => {
-      const assignees = assigneeByTask.get(row.id) ?? [];
-      if (assignees.length === 0) return true;
-      return currentMember !== null && assignees.includes(currentMember.id);
-    }).length;
-  }, [openTasks, taskAssigneesQuery.data, currentMember]);
+  const openTaskAssignees = useOpenTaskAssignees(openTaskIds);
+  // `null` = « on ne sait pas » : lecture jamais aboutie, ou membre courant
+  // inconnu. Un chiffre inconnu ne s'affiche pas — il ne s'affiche pas faux.
+  const openTaskCount =
+    selectTasksForMember(openTasks, openTaskAssignees, currentMember?.id ?? null)?.length ?? null;
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -186,7 +170,7 @@ export function AppShell() {
                     <NavLink to={modulePath(key)} className={navItemClass}>
                       <Icon name={entry.icon} />
                       <span className="max-[920px]:sr-only">{navLabelOf(entry)}</span>
-                      {key === 'taches' && openTaskCount > 0 ? (
+                      {key === 'taches' && openTaskCount !== null && openTaskCount > 0 ? (
                         <span className="ml-auto text-xs text-muted max-[920px]:hidden" aria-label={`${openTaskCount} tâches ouvertes`}>
                           {openTaskCount}
                         </span>

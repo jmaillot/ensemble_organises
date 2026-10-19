@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { queryKeys, useResource } from '@/lib/data/useResource';
+import { useResource } from '@/lib/data/useResource';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { fromProfileColumns } from '@/modules/parametres/lib/push';
 import { useMessagesFeed, useMessagesRealtime } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
-import { listTaskAssignees } from '@/modules/taches/api';
+import { useOpenTaskAssignees, selectTasksForMember } from '@/hooks/use-open-task-assignees';
 import { toTask } from '@/modules/taches/types';
 import type { EventRow, ProfileRow, TaskRow } from '@/types';
 import type { IconName } from '@/components/shared/icon';
@@ -130,20 +129,9 @@ export function useNotifications(): NotificationsSummary {
     () => tasksResource.rows.filter((row) => row.trip_id == null && row.status !== 'fait').map((row) => row.id),
     [tasksResource.rows],
   );
-  const taskAssigneesQuery = useQuery({
-    queryKey: [...queryKeys.tableAll('task_assignees'), openTaskIds],
-    enabled: openTaskIds.length > 0,
-    queryFn: () => listTaskAssignees(openTaskIds),
-  });
-  const assigneesByTask = useMemo(() => {
-    const grouped = new Map<string, string[]>();
-    for (const entry of taskAssigneesQuery.data ?? []) {
-      const list = grouped.get(entry.task_id) ?? [];
-      list.push(entry.member_id);
-      grouped.set(entry.task_id, list);
-    }
-    return grouped;
-  }, [taskAssigneesQuery.data]);
+  // Même couture que le compteur du shell (261019-n14) : une seule lecture, et
+  // un état qui distingue « personne n'est assigné » de « on ne sait pas ».
+  const openTaskAssignees = useOpenTaskAssignees(openTaskIds);
 
   const profilesResource = useResource<ProfileRow>('profiles', {
     scoped: false,
@@ -276,14 +264,17 @@ export function useNotifications(): NotificationsSummary {
     if (showTasks) {
       // Régime 15-01 (comme le module Tâches et le tableau de bord) : les
       // tâches propres à un voyage vivent dans sa fiche, pas dans les restes.
-      // Personnel (comme À faire) : sans assigné, ou assignées à moi.
-      const open = tasksResource.rows
-        .filter((row) => row.trip_id == null)
-        .filter((row) => {
-          const assignees = assigneesByTask.get(row.id) ?? [];
-          if (assignees.length === 0) return true;
-          return currentMember !== null && assignees.includes(currentMember.id);
-        })
+      // Personnel (comme À faire) : sans assigné, ou assignées à moi. La règle
+      // vit dans la couture, avec sa distinction « personne » / « on ne sait
+      // pas » : sur un état inconnu (`null`), la cloche n'annonce AUCUNE tâche.
+      // Les annoncer toutes reviendrait à affirmer qu'elles sont les miennes.
+      const open = (
+        selectTasksForMember(
+          tasksResource.rows.filter((row) => row.trip_id == null),
+          openTaskAssignees,
+          currentMember?.id ?? null,
+        ) ?? []
+      )
         .map((row) => toTask(row))
         .filter((task) => task.status !== 'fait' && task.dueDate !== null)
         .sort((a, b) => Number(b.isLate) - Number(a.isLate) || (a.dueDate as string).localeCompare(b.dueDate as string));
@@ -348,11 +339,11 @@ export function useNotifications(): NotificationsSummary {
     return list;
   }, [
     // WR-19 : toutes les valeurs que le corps lit. `task_assignees` change sans
-    // que `tasks.rows` bouge — sans `assigneesByTask`, la cloche gardait la
-    // tâche réassignée alors que le compteur du module Tâches suivait déjà.
-    // `currentMember` décide du même filtre (« sans assigné, ou assignées à
-    // moi ») : une bascule de membre change aussi la liste.
-    assigneesByTask,
+    // que `tasks.rows` bouge — sans la couture (`openTaskAssignees`), la cloche
+    // gardait la tâche réassignée alors que le compteur du module Tâches suivait
+    // déjà. `currentMember` décide du même filtre (« sans assigné, ou assignées
+    // à moi ») : une bascule de membre change aussi la liste.
+    openTaskAssignees,
     cercle.feed,
     currentMember,
     eventsResource.rows,
@@ -449,7 +440,6 @@ export function useNotifications(): NotificationsSummary {
       cercle.isLoading ||
       routinesFeed.isLoading ||
       tasksResource.isLoading ||
-      taskAssigneesQuery.isLoading ||
       eventsResource.isLoading,
     markAllRead,
     markItem,

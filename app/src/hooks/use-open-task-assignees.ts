@@ -22,16 +22,13 @@ export type OpenTaskAssignees =
  * Assignations des tâches ouvertes demandées.
  *
  * La clé vit sous `['all', 'task_assignees', …]` : c'est le préfixe que les
- * invalidations d'assignation visent réellement (`queryKeys.tableAll(
- * TASK_ASSIGNEES_TABLE)`, dans `use-taches.ts` `refreshChildren`, et le
- * `refetchQueries` de la garde D-08). Le shell et la cloche construisent donc
- * la même clé pour la même table et le même `queryFn` — la requête est
- * partagée quand leurs ensembles d'identifiants coïncident, c'est voulu.
- *
- * CORPS D'AUJOURD'HUI, ET VOLONTAIREMENT : ce corps reproduit la règle actuelle
- * (`query.data ?? []`, jamais `'unknown'`) pour que les gardes de
- * `use-open-task-assignees.test.tsx` rougissent sur l'ASSERTION et non sur un
- * import manquant. Le corps juste est le geste de la tâche 261019-n14.
+ * invalidations d'assignation visent réellement — `queryKeys.tableAll(
+ * TASK_ASSIGNEES_TABLE)` dans `use-taches.ts` `refreshChildren`, et le
+ * `refetchQueries` de la garde D-08. Jamais `invalidateQueries({ queryKey:
+ * [table] })` : ce préfixe-là ne descend pas jusqu'ici. Le shell et la cloche
+ * construisent donc la même clé pour la même table et le même `queryFn` — la
+ * requête est partagée quand leurs ensembles d'identifiants coïncident, c'est
+ * voulu.
  */
 export function useOpenTaskAssignees(openTaskIds: readonly string[]): OpenTaskAssignees {
   const query = useQuery({
@@ -44,8 +41,17 @@ export function useOpenTaskAssignees(openTaskIds: readonly string[]): OpenTaskAs
   // à chaque fois pour rien (constat (d) de la phase 19).
   const idsKey = openTaskIds.join('\u0000');
   return useMemo<OpenTaskAssignees>(() => {
+    // « On ne sait pas » se dit : une lecture qui n'a JAMAIS rien rendu n'est pas
+    // une lecture qui a rendu « personne ». C'est tout le défaut que cette
+    // couture corrige, et la raison pour laquelle l'état est dans le TYPE.
+    //
+    // Le repère est `data === undefined`, et NON `status !== 'success'` : le
+    // cache garde `data` quand un rafraîchissement ultérieur échoue (réseau qui
+    // tombe, relecture après invalidation), et effacer un chiffre réellement lu
+    // parce qu'une relecture a raté serait remplacer un mensonge par un autre.
+    if (query.data === undefined) return { state: 'unknown' };
     const byTask = new Map<string, string[]>();
-    for (const entry of query.data ?? []) {
+    for (const entry of query.data) {
       const list = byTask.get(entry.task_id) ?? [];
       list.push(entry.member_id);
       byTask.set(entry.task_id, list);
@@ -62,19 +68,18 @@ export function useOpenTaskAssignees(openTaskIds: readonly string[]): OpenTaskAs
  * n'est pas recopiée ici, c'est la DISTINCTION entre « personne » et « on ne
  * sait pas encore » que cette couture apporte.
  *
- * CORPS D'AUJOURD'HUI, ET VOLONTAIREMENT : il lit un état inconnu comme un
- * foyer sans assignation (donc « toutes les tâches sont à moi ») et `null`
- * comme « ni moi ni personne ». Le corps juste rend `null` dans les deux cas.
+ * `null` dit « on ne sait pas », et l'appelant décide de n'afficher rien :
+ * rendre les tâches du foyer dans ce cas les afficherait comme « à moi ».
  */
 export function selectTasksForMember<T extends { id: string }>(
   tasks: readonly T[],
   assignees: OpenTaskAssignees,
   memberId: string | null,
 ): T[] | null {
-  const byTask = assignees.state === 'known' ? assignees.byTask : new Map<string, readonly string[]>();
+  if (assignees.state !== 'known' || memberId === null) return null;
   return tasks.filter((task) => {
-    const list = byTask.get(task.id) ?? [];
+    const list = assignees.byTask.get(task.id) ?? [];
     if (list.length === 0) return true;
-    return memberId !== null && list.includes(memberId);
+    return list.includes(memberId);
   });
 }
