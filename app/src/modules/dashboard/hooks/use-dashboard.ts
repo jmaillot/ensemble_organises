@@ -226,7 +226,9 @@ export function useDashboard(): DashboardData {
       try {
         await data.update('profiles', sessionUser.id, { city: next } as never);
       } catch {
-        // Hors ligne ou refus : le store garde la valeur, la file rejouera.
+        // Hors ligne ou refus : l'écriture échoue et RIEN ne la rejoue (D-10 a
+        // retiré la file de rejeu). Le store garde la valeur jusqu'au
+        // rechargement, et c'est tout : elle n'est pas enregistrée côté serveur.
       }
     },
     [sessionUser?.id, setCityInStore],

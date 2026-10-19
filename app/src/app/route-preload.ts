@@ -67,8 +67,9 @@ let preloadStarted = false;
  * - À l'idle (`requestIdleCallback`, repli `setTimeout` différé) : la première
  *   peinture n'est jamais ralentie — rien ne part avant que le navigateur
  *   soit inactif.
- * - En ligne seulement : hors ligne, télécharger est voué à l'échec et
- *   disputerait la bande passante à la file de synchro.
+ * - En ligne seulement : hors ligne, télécharger est voué à l'échec — les
+ *   requêtes n'ont de toute façon aucun réseau à emprunter, et attendre l'idle
+ *   ne change rien à l'issue.
  * - Séquentiel, chaque échec avalé : un morceau indisponible n'interrompt pas
  *   les suivants, et la garde par route (`LazyRoute`) gère l'UX dans tous les
  *   cas (T-09-07 : pas de rafale, pas de minuteur qui martèle).
