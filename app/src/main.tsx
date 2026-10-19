@@ -4,9 +4,18 @@ import { registerSW } from 'virtual:pwa-register';
 import { AppRouter } from '@/app/router';
 import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
+import { seedOnlineStatus } from '@/lib/online-status';
 import '@/styles/app.css';
 
 registerSW({ immediate: true });
+
+// L'état réseau est amorcé ICI, au niveau module, avant le premier rendu : le
+// bandeau hors ligne doit dire la vérité dès la première peinture, et l'état
+// doit être juste avant que `QueryClientProvider` ne monte le client — c'est
+// `mount()` qui pose `onlineManager.subscribe`, donc seulement au rendu, après
+// ce point. C'est ce qui rend le retour du réseau notifiable (une seule fois,
+// au démarrage : ensuite, les événements `online`/`offline` prennent le relais).
+seedOnlineStatus();
 
 /**
  * Attend la restauration de session avant d'afficher l'application, afin de
