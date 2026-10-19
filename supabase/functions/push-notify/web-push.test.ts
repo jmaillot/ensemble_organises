@@ -6,7 +6,7 @@
  * l'auto-cohérence d'un générateur, c'est-à-dire rien. Un message Push
  * qu'aucun service n'a jamais reçu ne peut pas être « tested » autrement.
  *
- * La RFC donne le message complet (145 octets), son en-tête (86 octets), le
+ * La RFC donne le message complet (144 octets), son en-tête (86 octets), le
  * texte clair, le sel, le secret d'authentification, les deux clés et chaque
  * valeur intermédiaire. Tout y est vérifié ici, de l'ECDH au tag AEAD.
  */
@@ -49,8 +49,9 @@ const receiverPair = keyPairFrom(base64UrlToBytes(UA_PUBLIC), base64UrlToBytes(U
 
 /** Le message publié en section 5, en-tête et contenu chiffré compris. */
 const EXPECTED_BODY =
-  'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A9R' +
-  '8pfeW0KbunFT06SuDKoJH9Ql87S1QUrdirN6GcG7sFz1y1sqLgVi1VhjVkHsUoEsbI_0LpXMuGvnzQ';
+  'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27ml' +
+  'mlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPT' +
+  'pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN';
 
 describe('clés P-256', () => {
   it('retrouve la clé publique publiée à partir du scalaire privé', () => {
@@ -148,12 +149,12 @@ describe('en-tête et corps chiffré', () => {
     expect(readRecordSize(header)).toBe(4096);
   });
 
-  it('produit le message complet de 145 octets, octet pour octet', async () => {
+  it('produit le message complet de 144 octets, octet pour octet', async () => {
     const { body } = await encryptPayload(PLAINTEXT, UA_PUBLIC, AUTH_SECRET, {
       salt: base64UrlToBytes(SALT),
       keyPair: serverPair,
     });
-    expect(body).toHaveLength(145);
+    expect(body).toHaveLength(144);
     expect(bytesToBase64Url(body)).toBe(EXPECTED_BODY);
   });
 
@@ -262,7 +263,7 @@ describe('budget de taille', () => {
   });
 
   it('compte des octets, pas des caractères : un accent pèse trois octets', () => {
-    expect(MAX_PLAINTEXT_BYTES).toBe(3992);
+    expect(MAX_PLAINTEXT_BYTES).toBe(3993);
     expect(() => assertPayloadWithinLimit('é'.repeat(MAX_PLAINTEXT_BYTES))).toThrow(/maximum/);
   });
 });

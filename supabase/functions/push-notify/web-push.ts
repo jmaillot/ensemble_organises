@@ -24,13 +24,23 @@
  *   importable telle quelle. Le calcul de courbe n'a donc aucune raison
  *   d'exister ici — et le vecteur de la RFC 8291 le prouve.
  *
- * SOIXANTE SEIZE OCTETS DE TAILLE
+ * QUATRE MILLE QUATRE-VINGT-SEIZE OCTETS DE TAILLE
  *   Un service Push peut refuser un message dont le corps dépasse 4096 octets
- *   (RFC 8030 §7.2). Le budget se déduit à l'envers : 4096 − 86 (en-tête) − 1
- *   (indicateur d'enregistrement) − 16 (tag AEAD) − 1 (délimiteur de bourrage)
- *   − la taille du JSON. `assertPayloadWithinLimit` refuse tout message trop
- *   long AVANT l'envoi : un corps rejeté silencieusement par le service est
- *   indiscernable d'un rappel oublié.
+ *   (RFC 8030 §7.2). Le budget se déduit à l'envers : 4096 − 86 (en-tête) − 16
+ *   (tag AEAD) − 1 (délimiteur de bourrage) − la taille du JSON.
+ *   `assertPayloadWithinLimit` refuse tout message trop long AVANT l'envoi :
+ *   un corps rejeté silencieusement par le service est indiscernable d'un
+ *   rappel oublié.
+ *
+ * LE CORPS, C'EST L'EN-TÊTE PUIS LE CHIFFRÉ — RIEN ENTRE LES DEUX
+ *   La RFC 8188 §2.1 définit l'en-tête (`sel || rs || longueur || clé`) et
+ *   enchaîne immédiatement les enregistrements chiffrés. Aucun octet
+ *   « d'indicateur d'enregistrement » ne s'intercale : le délimiteur de fin
+ *   (0x02) est DANS le texte clair, donc à l'intérieur du chiffré. Insérer un
+ *   octet entre l'en-tête et le chiffré décale la lecture du récepteur d'un
+ *   cran ; l'authentification AEAD échoue alors, et le navigateur jette le
+ *   message en accusant réception d'une erreur de chiffrement (code 101) —
+ *   sans que rien, côté serveur, ne signale autre chose qu'un `201`.
  */
 
 // ---------------------------------------------------------------------------
@@ -287,7 +297,7 @@ export function buildHeader(salt: Uint8Array, recordSize: number, serverPublicKe
 }
 
 export interface EncryptedPayload {
-  /** Corps complet : en-tête, indicateur d'enregistrement, puis contenu chiffré. */
+  /** Corps complet : en-tête, puis contenu chiffré (RFC 8188 §2). */
   body: Uint8Array;
   salt: Uint8Array;
   serverPublicKey: Uint8Array;
@@ -336,18 +346,19 @@ export async function encryptPayload(
   });
   const header = buildHeader(salt, recordSize, keyPair.publicKey);
 
-  // Dernier enregistrement (1), type 0101 = aes128gcm (RFC 8188 §2.1).
+  // Délimiteur de fin du dernier enregistrement (RFC 8188 §2) : il appartient
+  // au texte clair, donc il est chiffré avec lui.
   const padded = concatBytes(utf8(plaintext), new Uint8Array([0x02]));
   // AUCUNE donnée associée, et c'est délibéré : pour `aes128gcm`, le tag AEAD
   // ne couvre pas l'en-tête. Il ne faut pas en conclure que l'en-tête est
   // manipulable — le sel et les deux clés publiques entrent dans la dérivation
   // de la CEK, donc un en-tête modifié donne une autre clé et le déchiffrement
-  // échoue. Le vecteur de la RFC 8291 tranche : les 145 octets publiés ne
+  // échoue. Le vecteur de la RFC 8291 tranche : ses 144 octets publiés ne
   // sortent qu'avec un AAD vide.
   const ciphertext = await encryptAesGcm(keys.cek, keys.nonce, padded);
 
   return {
-    body: concatBytes(header, new Uint8Array([0x51]), ciphertext),
+    body: concatBytes(header, ciphertext),
     salt,
     serverPublicKey: keyPair.publicKey,
     recordSize,
@@ -403,15 +414,10 @@ export async function decryptPayload(
     peerPublicKey: serverPublicKey,
   });
 
-  // L'octet qui suit l'en-tête décrit l'enregistrement : dernier (1) et type
-  // 0101 = aes128gcm. Le contenu chiffré commence APRÈS lui — l'inclure dans
-  // le texte chiffré décalerait tout d'un octet, et l'échec se manifesterait
-  // comme un tag invalide, sans rapport avec la cause.
-  const recordFlag = body[HEADER_FIXED_LENGTH + idLength];
-  if (recordFlag !== 0x51) {
-    throw new Error(`Web Push : enregistrement inattendu (0x${recordFlag.toString(16)}).`);
-  }
-  const ciphertext = body.subarray(HEADER_FIXED_LENGTH + idLength + 1);
+  // Le contenu chiffré commence immédiatement après l'en-tête (RFC 8188 §2.1) :
+  // il n'y a aucun octet d'enregistrement à sauter. Le délimiteur de fin est
+  // dans le texte clair, donc déjà couvert par le chiffré.
+  const ciphertext = body.subarray(HEADER_FIXED_LENGTH + idLength);
   // Le dernier octet du texte clair est le délimiteur de bourrage ; sa valeur
   // doit être 0x02, faute de quoi le message est rejeté (RFC 8291 §4).
   const plaintext = await decryptAesGcm(keys.cek, keys.nonce, ciphertext);
@@ -517,12 +523,11 @@ export async function buildVapidAuthorization(
 
 const MAX_BODY_BYTES = 4096;
 const HEADER_BYTES = 86;
-const RECORD_FLAG_BYTES = 1;
 const AEAD_TAG_BYTES = 16;
 const PADDING_DELIMITER_BYTES = 1;
 
 /** Taille maximale du texte clair encryptable pour un service Push. */
-export const MAX_PLAINTEXT_BYTES = MAX_BODY_BYTES - HEADER_BYTES - RECORD_FLAG_BYTES - AEAD_TAG_BYTES - PADDING_DELIMITER_BYTES;
+export const MAX_PLAINTEXT_BYTES = MAX_BODY_BYTES - HEADER_BYTES - AEAD_TAG_BYTES - PADDING_DELIMITER_BYTES;
 
 export function assertPayloadWithinLimit(plaintext: string): void {
   const size = utf8(plaintext).length;

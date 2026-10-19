@@ -808,7 +808,7 @@ sur tous les appareils ayant déjà activé les notifications.
 HKDF, AES-128-GCM) et la RFC 8292 (jeton VAPID ES256). Ce fichier n'utilise que
 `globalThis.crypto` : il est donc vérifié par la suite Vitest du frontend
 (`npm test`) contre les **vecteurs publiés** de la RFC 8291 — le message
-complet de 145 octets, octet pour octet, plus chaque valeur intermédiaire de
+complet de 144 octets, octet pour octet, plus chaque valeur intermédiaire de
 l'annexe A. Sans ces vecteurs, la suite ne prouverait que l'auto-cohérence
 d'un générateur.
 

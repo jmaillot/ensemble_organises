@@ -510,7 +510,7 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 | Data layer | inclus | adaptateur local, file hors ligne, génération de token, formatage |
 | End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement, largeur réelle des tuiles, cibles tactiles de 44 px |
 | SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires, notifications push |
-| Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 145 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
+| Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 144 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
 
 L'end-to-end se lance sur un build de production (`vite preview`) et joue les
 parcours en français (`fr-FR`, `Europe/Paris`).
