@@ -317,7 +317,7 @@ tourne ? » se répond désormais par une commande sur l'image servie
 
 ---
 
-- [ ] **14. Le compteur « À faire » peut compter les tâches des autres — course sur les assignations**
+- [x] **14. Le compteur « À faire » peut compter les tâches des autres — course sur les assignations**
 
 **Constats ouverts le 2026-10-18**, découverts pendant la porte de régression de la
 phase 24, sur deux tests qui échouent **par intermittence** :
@@ -355,16 +355,88 @@ défaut qu'ils visent (`AGENTS.md` §2.7 B).
 qu'une preuve montre que le badge ne peut plus compter la tâche d'un autre membre —
 même quand la lecture d'assignations arrive en retard.
 
-**Observation du 2026-10-19, non identifiée.** Un passage complet de `npm test`
-(tâche `261019-dw6`) a rapporté **1 échec**, dont le nom a été perdu : la sortie
-avait été filtrée par un `tail` de l'appelant. C'est une **faute de mesure**, pas
-une preuve de bruit — et elle est notée ici plutôt que passée sous silence, parce
-qu'un échec inexpliqué n'est pas un succès. Trois passages complets ultérieurs
-sont verts (1288/1288, 153 fichiers), et les deux fichiers ci-dessus passent
-**5/5 en isolé**. L'échec est donc réel, non attribuable aux deux courses
-documentées, et non reproduit. À reprendre si un passage le retrouve : la
-première chose à faire alors est de **capturer la sortie entière**, jamais un
-`tail`.
+**Cause du flake établie le 2026-10-19 : c'est le défaut lui-même.** Les deux gardes
+ne mesurent pas une horloge, elles lisent une valeur **dérivée d'une lecture en vol**.
+`app-shell.test.tsx` attendait un `findByLabelText` (budget par défaut : 1 s) et
+`use-notifications.test.tsx` avait déjà dû relever le sien à 8 s
+(`configure({ asyncUtilTimeout: 8000 })`) — deux fichiers, deux budgets, une seule
+cause. Tant que la lecture n'a pas rendu, le compteur vaut « toutes les tâches sont
+à moi » : le badge portait **3** (les trois tâches ouvertes hors voyage), là où une
+seule lui appartient. Ce n'était donc pas une lenteur qui faisait tomber le test,
+mais une valeur **fausse et parfaitement stable**.
+
+**L'attribution de la « Cause identifiée » ci-dessus est corrigée ici.** Une lecture
+qui devance l'écriture de la graine n'est **pas** le mécanisme : le flake ne dépend
+d'aucune course avec l'amorçage, et il se reproduit sans elle. Ce qui reste vrai de
+ce paragraphe, c'est que la même abstraction (`data ?? []`) est lue par le shell et
+par la cloche.
+
+**La politique réseau n'y est pour rien.** `onlineManager` (source installée,
+`query-core`) démarre à `#online = true` **codé en dur** et ne lit **jamais**
+`navigator`. `dw6` ne peut donc pas expliquer la disparition du flake, et cette
+disparition ne lui est pas attribuée.
+
+**Mesure du 2026-10-19, avant correction** : 16 tentatives sans échec (4 suites
+complètes + 12 passages ciblés sous 4 brûleurs CPU) contre 2 échecs sur 4 la veille.
+Le flake est rare — ce qui le rendait dangereux : il ne se signalait presque jamais.
+
+**Second défaut, trouvé par cette investigation.** Dans
+`app/src/lib/data/local-adapter.ts`, `seedNow()` marquait une table comme amorcée
+**avant** son `bulkPut`. Une passe qui échouait laissait donc toutes les tables
+marquées : la lecture suivante les sautait, la graine était perdue **sans un mot**,
+et l'écran vide se lisait « il n'y a rien » au lieu de « l'amorçage a échoué ».
+Mesuré avant correction, après une écriture refusée puis une reprise : `tasks=0`,
+`task_assignees=0`, base entière à `rows=0`.
+
+**Corrigé le 2026-10-19** (tâche `261019-n14`, commits `2a74f8b` → `0fcd2b1` pour le
+compteur, `9cd3353` → `1a180a3` pour l'amorçage).
+
+1. **Une seule couture** — `app/src/hooks/use-open-task-assignees.ts` — lue par le
+   shell ET par la cloche : une requête, une clé (`['all', 'task_assignees', …]`,
+   celle que les invalidations d'assignation touchent réellement), une règle.
+   L'ambiguïté est portée par le **type** (union discriminée `unknown` / `known`) :
+   une lecture qui n'a rien rendu ne peut plus se déguiser en tableau vide.
+   `selectTasksForMember` rend `null`, le badge n'affiche rien et la cloche
+   n'annonce aucune tâche ; la portée de chaque compteur est inchangée (shell :
+   `a_faire` hors voyage ; cloche : non `fait` hors voyage), et la règle « sans
+   assigné, ou à moi » est **la même** que celle d'`isOpenForMe` — sous une autre
+   forme (des `Task` déjà construits là-bas, des lignes et une lecture
+   d'assignations ici), donc deux formes pour une règle, ce qui est écrit dans le
+   fichier plutôt que sous-entendu.
+2. **L'amorçage marque après avoir écrit** : la marque dit « écrite », donc une passe
+   qui échoue ne laisse aucune trace et la lecture suivante reprend tout. L'écriture
+   reste unique (une seule `bulkPut`) et le court-circuit `already > 0` est intact.
+
+**Preuve, rouge avant vert.** Neuf gardes rouges écrites d'abord, en deux temps :
+G1-G4 (la couture et sa règle) et G6-G9 (le compteur du shell, puis la cloche, en vol
+puis en erreur) avec le compteur, G11 (l'amorçage) ensuite. Le rouge porte sur la
+**valeur affichée** par le code d'alors — le badge portait `3` sous préconditions
+établies (tâches lues, lecture des assignations en vol ou en erreur) — jamais sur un
+import manquant. Deux gardes sont vertes dès le départ, et c'est dit : G5 (la règle
+sur des assignations connues, inchangée) et G12 (le court-circuit `already > 0`, que
+le correctif ne devait pas emporter). Aucune assertion n'a bougé entre le rouge et le
+vert ; les deux gardes existantes ont seulement changé de **mode d'attente** — elles
+attendent un état du cache, plus un budget d'apparition — et leurs assertions sont
+intactes.
+
+**Ce qui remplace le critère « 10 passages complets de suite », et ce qui n'est pas
+la même chose.** Sa seconde moitié est remplie : une garde montre désormais que le
+badge ne peut plus compter la tâche d'un autre membre, puisqu'il n'affiche rien tant
+que la lecture n'a pas abouti, et la valeur connue reste vérifiée par la garde
+existante. Sa première moitié — dix suites complètes consécutives — **n'est pas
+faite** : la preuve de correction n'est plus statistique mais structurelle (les
+gardes échouent de façon **déterministe** sur le code d'alors, ce qui a été vu), et
+l'observation sur dix suites, elle, n'a pas été menée. Elle n'est donc pas affirmée.
+
+**Observation du 2026-10-19, non identifiée, et toujours ouverte.** Un passage complet
+de `npm test` (tâche `261019-dw6`) a rapporté **1 échec**, dont le nom a été perdu :
+la sortie avait été filtrée par un `tail` de l'appelant. C'est une **faute de mesure**,
+pas une preuve de bruit — et elle est notée ici plutôt que passée sous silence, parce
+qu'un échec inexpliqué n'est pas un succès. Trois passages complets ultérieurs sont
+verts (1288/1288, 153 fichiers), et les deux fichiers ci-dessus passent **5/5 en
+isolé**. L'échec est donc réel, non attribuable aux deux courses documentées, et non
+reproduit. À reprendre si un passage le retrouve : la première chose à faire alors est
+de **capturer la sortie entière**, jamais un `tail`.
 
 ---
 
@@ -494,6 +566,39 @@ précis, et non à un « quelque chose de plus récent ». Les deux correctifs o
 donc été livrés ensemble : la lecture dit qu'elle a échoué, le bandeau dit
 pourquoi dès le premier rendu, et le retour du réseau recharge sans
 rechargement de page.
+
+---
+
+- [ ] **16. Trois écrans affichent « sans assigné » tant que la lecture des assignations n'a pas rendu**
+
+**Suite de #14**, trouvée en corrigeant la couture, et **volontairement non
+traitée** : trois autres sites lisent les assignations avec `?? []`. Aucun n'est un
+compteur d'appartenance, mais tous affirment la même chose fausse pendant la
+lecture.
+
+- `app/src/modules/taches/hooks/use-taches.ts:150` —
+  `buildTasks(rows, assigneesQuery.data ?? [], remindersQuery.data ?? [], members)` :
+  les lignes de la page Tâches, et `taskMetrics.assigneeCount` ;
+- `app/src/modules/calendrier/hooks/use-calendrier.ts:138` —
+  `const assignees = (assigneesQuery.data ?? [])…` dans le memo `tasks` : les tâches
+  affichées au calendrier (pas les événements) ;
+- `app/src/modules/voyages/components/trip-tasks-tab.tsx:76` — le regroupement
+  d'assignés de l'onglet Tâches d'un voyage, exactement la même forme que
+  `use-notifications.ts:138-146` avant #14.
+
+**Conséquence commune** : « sans assigné » est affiché pour des tâches qui en ont,
+tant que la lecture est en vol (et, en erreur, définitivement).
+
+**Ce qui reste à décider — c'est la raison pour laquelle ce n'est pas fait** : ce
+qu'affiche une **ligne** de tâche quand les assignés sont inconnus. La couture de
+#14 répond « rien », et c'est lisible pour un compteur et pour une alerte ; pour une
+ligne, l'absence d'avatar est indiscernable d'un « personne n'est assigné ». La
+réponse demande un état de ligne explicite (placeholders, « … », ou attente du
+rendu), donc un arbitrage d'interface, pas un correctif mécanique.
+
+**Terminé quand** les trois sites distinguent « personne » de « on ne sait pas »,
+chaque garde échouant sur le code d'aujourd'hui — la forme de l'attente étant
+`waitForQueryStatus` (`app/src/test/render.tsx`), pas un délai.
 
 ---
 
