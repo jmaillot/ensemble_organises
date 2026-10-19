@@ -48,15 +48,30 @@ export class LocalAdapter implements DataAdapter {
    * Amorce le jeu de démonstration table par table. Le contrôle est global
    * pour chaque table et non sur le total : une écriture tardive (ou un cache
    * partiellement vidé) ne peut pas empêcher le ré-amorçage des autres tables.
+   *
+   * L'invariant tient en une phrase : la marque dit « écrite », donc elle se
+   * pose APRÈS l'écriture. Les tables retenues par la passe ci-dessous sont
+   * donc collectées, écrites, puis marquées — une passe qui échoue ne laisse
+   * aucune marque, et `ensureSeeded` (qui remet `seedPromise` à `null` sur
+   * échec) refait le travail entier à la lecture suivante. Marquer avant
+   * rendrait l'échec INVISIBLE : la graine serait perdue, sans erreur et sans
+   * trace, et l'écran vide se lirait « il n'y a rien » au lieu de « l'amorçage
+   * a échoué » (§2.7 F).
    */
   private async seedNow() {
     const db = getDatabase();
     const entries: StoredRow[] = [];
+    const written: string[] = [];
     for (const [table, rows] of Object.entries(seedRows())) {
       if (this.seededTables.has(table)) continue;
       const already = await db.rows.where('table').equals(table).count();
-      this.seededTables.add(table);
-      if (already > 0) continue;
+      // Une table déjà peuplée se marque ici, et ce n'est pas une entorse à
+      // l'invariant : il n'y a rien à écrire pour elle, donc rien à attendre.
+      if (already > 0) {
+        this.seededTables.add(table);
+        continue;
+      }
+      written.push(table);
       for (const data of rows) {
         entries.push({
           key: rowKey(table, data),
@@ -68,6 +83,7 @@ export class LocalAdapter implements DataAdapter {
       }
     }
     if (entries.length > 0) await db.rows.bulkPut(entries);
+    for (const table of written) this.seededTables.add(table);
   }
 
   async list<T = Row>(table: string, filter: RowFilter = {}): Promise<T[]> {
