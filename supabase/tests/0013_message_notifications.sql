@@ -65,6 +65,41 @@ select testkit.eq(
     where n.value ->> 'user_id' = (select user_id::text from testkit.fx where key = 'alice')),
   0::bigint, 'la préférence coupe la distribution');
 
+-- Fenêtre de 24 h (`0100:233`) : au-delà, l'annonce s'éteint sans supprimer la
+-- file. Le contrôle porte sur `private.push_message_notifications`, où vit la
+-- fenêtre ; la préférence, elle, est filtrée plus loin dans
+-- `due_push_notifications`, et reste coupée pour Alice à cet endroit du test.
+-- Le contrôle positif vient d'abord : sans lui, l'assertion suivante serait
+-- vraie pour n'importe quelle raison.
+select testkit.eq(
+  (select count(*) from private.push_message_notifications(now()) n
+    where n.reminder_id = (select id from public.message_notifications
+                            where message_id = (select row_id from testkit.fx where key = 'msg'))
+      and n.user_id = (select user_id from testkit.fx where key = 'alice')),
+  1::bigint, 'un message récent est annoncé');
+
+-- 25 h plus tard : l'annonce s'éteint…
+update public.message_notifications
+   set created_at = now() - interval '25 hours'
+ where message_id = (select row_id from testkit.fx where key = 'msg');
+select testkit.eq(
+  (select count(*) from private.push_message_notifications(now()) n
+    where n.reminder_id = (select id from public.message_notifications
+                            where message_id = (select row_id from testkit.fx where key = 'msg'))
+      and n.user_id = (select user_id from testkit.fx where key = 'alice')),
+  0::bigint, 'un message de plus de 24 h n''est plus annoncé');
+
+-- …et rien n'est supprimé : c'est l'âge qui décide, pas la file.
+select testkit.ok(
+  exists (select 1 from public.message_notifications
+           where message_id = (select row_id from testkit.fx where key = 'msg')),
+  'la file garde la ligne : la fenêtre éteint l''annonce, elle ne supprime rien');
+
+-- Remise à l'heure : la consommation qui suit vise l'identifiant de la file.
+update public.message_notifications
+   set created_at = now()
+ where message_id = (select row_id from testkit.fx where key = 'msg');
+
 -- Le dispatch EXÉCUTÉ. La forme fautive de `0042` — une liste de colonnes sur
 -- `jsonb_array_elements`, interdite puisque `due_push_notifications` rend du
 -- jsonb et non un record — ne se révélait qu'à l'appel, et aucun test ne
