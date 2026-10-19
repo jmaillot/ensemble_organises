@@ -14,59 +14,42 @@ Dernière mise à jour : 19 octobre 2026.
 
 - [ ] **1. L'affichage des notifications, à revalider sur mobile**
 
-**Établi le 28/09 : la remise fonctionne** (snippet 40 s → `NOTIFICATION
-REÇUE`). Le silence venait de deux couches : abonnement navigateur disparu
-(`getSubscription() → null`, `granted` pourtant) pendant que le serveur
-gardait l'orphelin — *`delivered` signifie « accepté par le service »,
-jamais « reçu »* — puis remplacement silencieux même tag (pas de `renotify`
-dans `sw.ts`, corrigé + typé, en attente de rebuild).
-**Mis de côté à la demande : retest sur mobile au moment opportun**
-(bannière au 1er envoi, puis seconde bannière au renvoi même tag).
+**Le 2026-10-19, une notification a été reçue et affichée** dans Firefox
+(Linux), après déploiement du correctif `d348309`. Le chemin complet — base,
+Edge Function, service Push, déchiffrement, service worker, affichage — est
+donc prouvé, mais **sur ce poste seulement**.
 
-**Qui peut le faire : l'utilisateur.** C'est le seul point bloquant.
+**Ce qui bloquait réellement était dans le dépôt.** `push-notify/web-push.ts`
+insérait un octet `0x51` entre l'en-tête et le chiffré, que la RFC 8188 §2.1 ne
+prévoit pas. Le navigateur lisait le chiffré un cran trop tôt, rejetait le
+message au déchiffrement (`Bad encryption`, accusé `101`) et ne réveillait
+jamais le worker : ni bannière, ni reçu. Le défaut datait de la création du
+fichier (`6bbfbbf`, 26/09) — aucun push émis par l'application n'était
+déchiffrable depuis cette date, ce qui explique aussi pourquoi
+`delivered: 1` avait pu être pris pour une réception. Elle explique de même
+l'observation du 28/09 (« snippet 40 s → `NOTIFICATION REÇUE` ») : une
+notification affichée alors ne pouvait pas venir de l'expéditeur de
+l'application.
 
-**Ce qui est établi.** Le chemin « base → Edge Function → service Push » est
-validé et reproductible par `sh scripts/test-dispatch-push.sh` : rapport
-`{ notifications: 1, delivered: 1, failed: 0, dropped: 0, consumed: 1 }`, et la
-ligne de rappel supprimée de `public.task_reminders`. Côté navigateur,
-l'abonnement existe, l'empreinte de l'endpoint correspond à celle de la base
-(`dfd1d16ba4985a4d`), le bundle déployé contient l'écouteur `push`, et
-`showNotification` appelé depuis la console affiche bien une bannière.
+**Pourquoi le test ne l'avait pas vu.** Il attendait un corps de 145 octets au
+lieu des **144** publiés par la RFC 8291 : le vecteur avait été ajusté sur
+l'implémentation, pas pris dans la RFC. Il porte désormais les octets publiés,
+et a été vu **rouge** sur l'ancien code (`expected 144 but got 145`).
 
-**Ce qui ne l'est pas.** Qu'un `push` atteigne réellement le service worker.
-`delivered: 1` signifie que Mozilla a *accepté* l'envoi en file, pas qu'il a
-été distribué. La nuance est écrite dans `docs/BACKEND.md` §6.6, et j'en ai
-fait une étape d'une chaîne « validée de bout en bout » alors que seule la
-remise l'était.
+**Ce qui reste à jouer : le même parcours sur mobile** — bannière au premier
+envoi, puis seconde bannière au renvoi avec le même tag (`renotify`). Rien ne
+l'a encore fait.
 
-**Comment trancher.** Dans la console Firefox, sur la page de l'application,
-puis cliquer « Envoyer un test » dans les 40 secondes :
+**Comment trancher.** Sur la page de l'application, lancer le bouton
+« Envoyer un test », puis lire `Paramètres → Notifications → Dernier push
+reçu` : `shown: true` vaut réception et affichage par le worker. Si la ligne ne
+bouge pas, le journal du navigateur (`dom.push.loglevel = Debug`) sépare les
+deux étages restants : `Bad encryption` / accusé `101` désigne la trame
+envoyée, l'absence de tout message désigne le transport — voir `docs/PWA.md`
+§« Exploitation push ».
 
-```js
-(async () => {
-  const r = await navigator.serviceWorker.ready;
-  let vus = 0;
-  const t = setInterval(async () => {
-    const ns = await r.getNotifications({ includeInvisible: true });
-    if (ns.length > vus) {
-      vus = ns.length;
-      console.log('NOTIFICATION REÇUE ->', ns.map(n => n.title));
-    }
-  }, 500);
-  setTimeout(() => {
-    clearInterval(t);
-    console.log('fin. notifications aperçues :', vus);
-  }, 40000);
-})()
-```
-
-- `NOTIFICATION REÇUE` → la remise fonctionne, et le problème est
-  l'affichage par GNOME. Aucun correctif côté dépôt.
-- `0` → le `push` n'arrive pas. `about:debugging` → Service Workers →
-  Inspecter → Console : un `push` reçu y apparaîtrait, et son absence est la
-  preuve.
-
-**Terminé quand** le point 4 a été fait, ou que la remise est prouvée.
+**Terminé quand** la bannière apparaît sur mobile au premier envoi, et de
+nouveau au renvoi avec le même tag.
 
 ---
 
@@ -201,16 +184,20 @@ déploiement ne le prouve pas : il rend la preuve possible.
 
 ---
 
-- [ ] **12. Deux UAT de phase ne sont pas tenues (05, 09)**
+- [ ] **12. Une UAT de phase n'est pas tenue (05)**
 
-**Ce qui est fait.** Le code de ces phases est livré et vérifié, mais
-leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
+**Ce qui est fait.** Le code de la phase 05 est livré et vérifié, mais le
+fichier `05-UAT.md` est resté en `status: testing`. Il reste à jouer :
 
-- **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6) ;
-- **09 PWA offline** — **4** tests en attente (sur 7 : 1 passé, 1 sauté, 1 en
-  `issue`, 4 en attente).
+- **05 Cadeaux & contacts** — 1 test bloqué (5 passés sur 6), le même appareil
+  et le même sujet que le push.
 
 **Clos depuis** :
+- **09 PWA offline** — close le 2026-10-19 : **4 passés, 3 sautés, 0 bloqué**.
+  L'item 6 (push + VAPID) a demandé de corriger la trame envoyée (`d348309`) :
+  le navigateur rejetait chaque message au déchiffrement, et l'appareil n'y
+  était pour rien. L'item 7 garde son critère (`delivered`, jamais `dropped`),
+  avec la réserve écrite que cela ne prouve pas une réception lisible.
 - **16 Recettes du foyer** — close le 2026-10-19 (**5/5** en usage réel). Les trois
   correctifs jusque-là seulement couverts par les tests automatisés sont confirmés
   en usage : partage qui réaffiche QR + lien sans régénérer et purge à l'arrêt
@@ -228,21 +215,22 @@ leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer 
 - **17 Mode cuisine** — close le 2026-10-18 (4/4, `status: complete`, les trois
   gaps G-17-1/2/3 résolus).
 
-**Corrections consécutives** (le 2026-10-18) : le résumé de `09-UAT.md`
-déclarait `issues: 0` alors que son T3 porte `result: issue` — arithmétique
-fausse à corriger à la clôture ; celui de `16-UAT.md` déclarait `total: 5`
-pour trois tests, dont deux absents du fichier et deux `## Gaps` placés
-**avant** leurs propres tests — reconstruit (5 sections réelles).
+**Corrections consécutives** : les deux résumés dont l'arithmétique était
+fausse ont été corrigés à leur clôture — `09-UAT.md` déclarait `issues: 0`
+alors que son T3 portait `result: issue`, et son total ignorait l'item bloqué ;
+`16-UAT.md` déclarait `total: 5` pour trois tests, dont deux absents du fichier,
+et deux `## Gaps` placés **avant** leurs propres tests.
 
-**Ce qu'il faut.** Jouer les scénarios restants sur un vrai appareil, puis
-passer chaque fichier en `complete`. Les deux étapes opérateur **M-01** (preuve
-push prod) et **M-02** (clés VAPID en production) se jouent dans le même
-mouvement ; leur checklist est dans `docs/PWA.md` §« Exploitation push ».
+**Ce qu'il faut.** Jouer le dernier scénario de la phase 05 sur un vrai
+appareil, puis passer son fichier en `complete`. Les deux étapes opérateur
+**M-01** (preuve push prod) et **M-02** (clés VAPID en production) sont faites
+le 2026-10-19 ; leur checklist reste dans `docs/PWA.md` §« Exploitation push »,
+avec le diagnostic corrigé (déchiffrement ≠ transport).
 
 **Qui peut le faire : l'utilisateur.** C'est le seul point bloquant, avec #11.
 
-**Terminé quand** les trois `NN-UAT.md` sont clos et que `M-01`/`M-02` sont
-faits — alors les cases des phases 8 et 9 de `ROADMAP.md` peuvent être cochées.
+**Terminé quand** `05-UAT.md` est clos — alors les cases des phases 8 et 9 de
+`ROADMAP.md` peuvent être cochées.
 
 ---
 
