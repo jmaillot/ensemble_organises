@@ -451,6 +451,40 @@ celui du constat d'origine, cette fois dans le bon sens : Firefox, `F12` →
 jamais « Aucune liste pour ce foyer ». Cela demande un déploiement (aucune CI
 dans ce dépôt).
 
+**Second défaut, trouvé par ce rejeu** (tâche `261019-gwh`, commits `7fa4293`,
+`c069437`). La politique ci-dessus corrigeait la lecture, mais le bandeau qui
+devait l'expliquer était **muet sur le scénario même de ce constat** : un
+démarrage à froid hors ligne. Cause, prouvée deux fois (source installée, puis
+reproduction en vrai navigateur) : l'`onlineManager` de TanStack démarre à
+`#online = true` **codé en dur** et ne lit **jamais** `navigator.onLine` — son
+propre commentaire dit « assumes an active network connection » — il ne change
+que sur un événement `online`/`offline` du document courant. Sur un chargement à
+froid hors ligne, aucun événement n'arrive : l'application se croit en ligne, le
+bandeau ne se rend pas, et le retour réel du réseau n'est pas un changement
+d'état, donc **aucune notification** — le `refetchOnReconnect` ajouté ci-dessus
+restait mort sur le chemin qu'il visait.
+
+Corrigé par `app/src/lib/online-status.ts` : une fonction `seedOnlineStatus()`
+pose l'état initial depuis `navigator.onLine`, appelée **une fois** au bootstrap
+(`app/src/main.tsx`) avant le rendu. Un module dédié, et non un effet de
+composant, parce que l'état doit être juste avant que `QueryClientProvider`
+n'appelle `queryClient.mount()` — c'est cet abonnement qui rend le retour du
+réseau notifiable. Quatre gardes, rouges avant vert ; le vérificateur a
+**reproduit les quatre rouges lui-même** et confirmé que le fichier de test est
+**identique** entre le commit rouge et le commit vert. Sa limite est dite : la
+garde de l'appel au bootstrap est **textuelle**, elle attrape le retrait de
+l'appel, pas une ligne commentée ni un déplacement. Vérifié hors ligne dans un
+vrai navigateur : bandeau **absent** au rechargement avant le correctif, présent
+après.
+
+**Observation non élucidée, à ne pas confondre avec un cache applicatif.**
+Pendant ce même rejeu, avec le cache du navigateur laissé actif, la liste
+**réelle** est apparue hors ligne. Courses ne lit que le backend — le code a été
+vérifié, il n'existe aucun repli local — donc une donnée réelle hors ligne ne
+peut venir que du cache du navigateur. C'est une **piste, pas une conclusion** :
+elle n'a pas été mesurée. Le rejeu doit garder « Désactiver le cache » **coché**,
+comme le constat d'origine.
+
 ---
 
 ## Plus tard
