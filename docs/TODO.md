@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 18 octobre 2026.
+Dernière mise à jour : 19 octobre 2026.
 
 ---
 
@@ -206,11 +206,10 @@ déploiement ne le prouve pas : il rend la preuve possible.
 **Ce qui est fait.** Le code de ces phases est livré et vérifié, mais
 leurs fichiers `NN-UAT.md` sont restés en `status: testing`. Il reste à jouer :
 
-- **24 Estampille de build** — 4 items ouverts le 2026-10-18 : le transit de
-  `X-App-Version` derrière **Traefik** et le premier run du runbook sur la
-  production (les deux seuls qui closent la phase — la phase 24 ne déploie rien
-  par conception), la décision sur le flaky préexistant (voir #14), et
-  `test-dispatch-push.sh` sur appareil abonné ;
+- **24 Estampille de build** — **3 items sur 4 faits le 2026-10-19 en production** :
+  `X-App-Version` rend le SHA poussé à travers Traefik et Cloudflare, `/version.json`
+  le nomme sans cache, manifeste et `sw.js` sont en `no-cache`, smoke **6/6** contre
+  la pile de prod. Reste `test-dispatch-push.sh`, qui exige un appareil abonné ;
 - **16 Recettes du foyer** — 2 testés et validés le 2026-10-18 (coeur favori,
   aperçu print), **3 restants à rejouer** : partage QR mémorisé (b867382),
   fusion Courses (8269d72) et réglages en engrenage (0d77842) sont corrigés
@@ -252,8 +251,10 @@ functions` ; un unique `ARG GIT_SHA` alimente les quatre canaux d'estampille,
 et sans SHA la valeur est `unknown`. Preuve : `sh scripts/check-version-stamp.sh`
 → `ESTAMPILLE DE BUILD: OK` (quatre canaux au SHA avec estampille, quatre à
 `unknown` sans, les deux familles différentes). Vérification de phase : 10/10
-must-haves. Résidu **assumé et non refermé** : le transit de `X-App-Version`
-derrière Traefik ne se prouve pas depuis cet hôte — voir `24-UAT.md` items 1 et 2.
+must-haves. Le résidu qui restait ouvert — le transit de `X-App-Version` derrière
+le proxy — a été **mesuré le 2026-10-19 en production** : `x-app-version` y rend
+`4e48b3cdec…`, soit exactement le commit poussé, à travers Traefik **puis**
+Cloudflare, et `/version.json` rend le même SHA avec `Cache-Control: no-cache`.
 
 **Constats ouverts le 2026-10-17, pendant le déploiement de production** — ancrés, et
 chacun re-vérifié ouvert au moment de les écrire :
