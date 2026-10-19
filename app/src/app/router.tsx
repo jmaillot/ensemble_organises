@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
-import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { buildQueryClient } from '@/lib/query-policy';
 import { ToastProvider, useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/empty-state';
 import { LazyRoute, RouteFallback } from '@/components/ui/route-error';
@@ -15,17 +16,10 @@ import { data } from '@/lib/data';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import type { ProfileRow } from '@/types';
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-    mutations: { retry: 0 },
-  },
-});
+// Le client de l'application DÉRIVE de la politique partagée
+// (`@/lib/query-policy`) : il n'a plus de politique à lui. Une valeur ajoutée
+// à la politique vaut donc pour l'application ET pour le harnais de test.
+export const queryClient = buildQueryClient();
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated();

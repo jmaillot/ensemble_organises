@@ -1,15 +1,17 @@
 import type { ReactElement } from 'react';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/toast';
 import { useHouseholdStore } from '@/stores/household-store';
+import { buildQueryClient } from '@/lib/query-policy';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoHousehold, demoMembers } from '@/lib/data/seed';
 
 export function createTestQueryClient() {
-  return new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 }, mutations: { retry: false } },
-  });
+  // Le client de test DÉRIVE de la politique de l'application : les tests
+  // exercent donc la politique réelle, jamais une politique recopiée ici.
+  return buildQueryClient({ queries: { retry: false, gcTime: 0, staleTime: 0 } });
 }
 
 /** Place le foyer de démonstration dans le store avant rendu. */
