@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, configure, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/components/ui/toast';
-import { createTestQueryClient, seedHouseholdStore } from '@/test/render';
+import { createTestQueryClient, seedHouseholdStore, waitForQueryStatus } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, DEMO_USER_ID } from '@/lib/data/seed';
 import { useSessionStore } from '@/stores/session-store';
@@ -11,6 +11,7 @@ import { demoUser } from '@/hooks/use-auth';
 import { useMessagesFeed } from '@/modules/messages/hooks/use-messages';
 import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { setTaskAssignees } from '@/modules/taches/api';
+import type { TaskAssigneeRecord } from '@/modules/taches/types';
 import { queryKeys } from '@/lib/data/useResource';
 import { useNotifications } from './use-notifications';
 
@@ -19,13 +20,48 @@ import { useNotifications } from './use-notifications';
 // court et fait flaker. 8s absorbe les pics sans masquer un vrai blocage.
 configure({ asyncUtilTimeout: 8000 });
 
+/**
+ * Le client de requête vit au niveau du FICHIER, rafraîchi par un `beforeEach`
+ * lui aussi au niveau du fichier : les gardes de « on ne sait pas » doivent
+ * pouvoir observer l'ÉTAT du cache, et un client créé dans `wrapper` à chaque
+ * rendu serait hors d'atteinte. Le placer dans le `beforeEach` d'un `describe`
+ * serait une faute : les quatre autres `describe` du fichier partagent ce
+ * `wrapper` et recevraient `client={undefined}`.
+ */
+let queryClient = createTestQueryClient();
+
 function wrapper({ children }: { children: ReactNode }) {
   return (
-    <QueryClientProvider client={createTestQueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <ToastProvider>{children}</ToastProvider>
     </QueryClientProvider>
   );
 }
+
+/**
+ * La lecture des assignations est mise sous contrôle pour les seules gardes de
+ * « on ne sait pas » (en vol, en erreur). Le mock est partiel — `setTaskAssignees`
+ * et le reste de `taches/api` restent réels — et le `beforeEach` REMET la vraie
+ * implémentation, sans quoi tous les autres cas du fichier liraient `undefined`.
+ */
+const { listTaskAssigneesMock, realListTaskAssignees } = vi.hoisted(() => ({
+  listTaskAssigneesMock: vi.fn(),
+  realListTaskAssignees: {
+    fn: null as null | ((taskIds: string[]) => Promise<TaskAssigneeRecord[]>),
+  },
+}));
+
+vi.mock('@/modules/taches/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/taches/api')>();
+  realListTaskAssignees.fn = actual.listTaskAssignees;
+  return { ...actual, listTaskAssignees: listTaskAssigneesMock };
+});
+
+beforeEach(() => {
+  queryClient = createTestQueryClient();
+  listTaskAssigneesMock.mockReset();
+  listTaskAssigneesMock.mockImplementation((taskIds: string[]) => realListTaskAssignees.fn!(taskIds));
+});
 
 describe('centre de notifications', () => {
   // Horloge relative : la graine est déjà datée en instants relatifs, mais ce
@@ -512,6 +548,9 @@ describe('centre de notifications — restes personnels', () => {
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
+    // La règle ne se juge que sur des assignations CONNUES : on attend cet état,
+    // et non un budget sur l'apparition des restes.
+    await waitForQueryStatus(queryClient, queryKeys.tableAll('task_assignees'));
     await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
     const taches = result.current.items.filter((item) => item.kind === 'tache').map((item) => item.title);
     // Camille connectée : task-1 à elle ; task-2/task-4 à Thomas (exclues).
@@ -519,4 +558,40 @@ describe('centre de notifications — restes personnels', () => {
     expect(taches).not.toContain('Ajouter le lait d’agne');
     expect(taches).not.toContain('Choisir le menu du week-end');
   });
+});
+
+describe('centre de notifications — restes dont les assignations sont inconnues', () => {
+  /**
+   * « On ne sait pas » n'est pas « personne n'est assigné ». Quand la lecture
+   * des assignations n'a rien rendu, la cloche ne peut pas dire quelles tâches
+   * sont les miennes : elle n'en annonce donc AUCUNE, au lieu de les annoncer
+   * toutes. C'est la même règle que le compteur du shell, et la même couture.
+   */
+  it("n'annonce aucune tâche tant que les assignations ne sont pas lues", async () => {
+    // Lecture EN VOL : elle ne rendra jamais.
+    listTaskAssigneesMock.mockImplementation(() => new Promise<TaskAssigneeRecord[]>(() => {}));
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    // Préconditions : la liste des tâches a abouti, le flux a rendu des restes,
+    // et la lecture des assignations est bien DÉMARRÉE. Sans elles, l'absence de
+    // tâche serait vraie pour une autre raison et la garde ne prouverait rien.
+    await waitForQueryStatus(queryClient, ['tasks'], 'success');
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    await waitFor(() => expect(listTaskAssigneesMock).toHaveBeenCalled());
+
+    expect(result.current.items.filter((item) => item.kind === 'tache')).toHaveLength(0);
+  }, 12_000);
+
+  it("n'annonce aucune tâche quand la lecture des assignations échoue", async () => {
+    listTaskAssigneesMock.mockRejectedValue(new Error('réseau indisponible'));
+    seedHouseholdStore();
+    const { result } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitForQueryStatus(queryClient, ['tasks'], 'success');
+    await waitForQueryStatus(queryClient, queryKeys.tableAll('task_assignees'), 'error');
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+
+    expect(result.current.items.filter((item) => item.kind === 'tache')).toHaveLength(0);
+  }, 12_000);
 });

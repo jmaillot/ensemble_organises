@@ -1,12 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
-import { renderWithProviders } from '@/test/render';
+import { renderWithProviders, waitForQueryStatus } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { queryKeys } from '@/lib/data/useResource';
 import { setTaskAssignees } from '@/modules/taches/api';
+import type { TaskAssigneeRecord } from '@/modules/taches/types';
 import { catalogueModules, isChildHiddenModule } from '@/lib/modules';
 import { MOBILE_DRAWER_GROUPS } from '@/components/shared/mobile-drawer';
 import { AppShell } from './app-shell';
@@ -21,6 +22,30 @@ const { syncRotatedPushSubscriptionMock } = vi.hoisted(() => ({ syncRotatedPushS
 vi.mock('@/modules/parametres/lib/push', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/parametres/lib/push')>();
   return { ...actual, syncRotatedPushSubscription: syncRotatedPushSubscriptionMock };
+});
+
+/**
+ * La lecture des assignations est mise sous contrôle pour les seules gardes de
+ * « on ne sait pas » (en vol, en erreur). Le mock est partiel : `setTaskAssignees`
+ * et le reste de `taches/api` restent réels, et le `beforeEach` REMET la vraie
+ * implémentation — sans quoi tous les autres cas du fichier liraient `undefined`.
+ */
+const { listTaskAssigneesMock, realListTaskAssignees } = vi.hoisted(() => ({
+  listTaskAssigneesMock: vi.fn(),
+  realListTaskAssignees: {
+    fn: null as null | ((taskIds: string[]) => Promise<TaskAssigneeRecord[]>),
+  },
+}));
+
+vi.mock('@/modules/taches/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/taches/api')>();
+  realListTaskAssignees.fn = actual.listTaskAssignees;
+  return { ...actual, listTaskAssignees: listTaskAssigneesMock };
+});
+
+beforeEach(() => {
+  listTaskAssigneesMock.mockReset();
+  listTaskAssigneesMock.mockImplementation((taskIds: string[]) => realListTaskAssignees.fn!(taskIds));
 });
 
 function renderShell(route: string) {
@@ -258,9 +283,15 @@ describe('AppShell — périmètre enfant', () => {
 });
 
 describe('AppShell — badge À faire (15-01, personnel)', () => {
+  /** Le badge n'existe que si la lecture des assignations a abouti : on attend
+   * cet ÉTAT, et non un budget sur l'apparition du libellé. */
+  const waitForAssignees = (queryClient: Parameters<typeof waitForQueryStatus>[0]) =>
+    waitForQueryStatus(queryClient, queryKeys.tableAll('task_assignees'));
+
   it('ne compte que mes tâches ouvertes et celles sans assigné', async () => {
-    renderShell('/accueil');
+    const { queryClient } = renderShell('/accueil');
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    await waitForAssignees(queryClient);
     // Graines (Camille connectée) : task-1 à moi, task-2/task-4 à Thomas, 1 faite, 2 de voyage.
     const badge = await within(nav).findByLabelText('1 tâches ouvertes');
     expect(badge).toHaveTextContent('1');
@@ -269,6 +300,7 @@ describe('AppShell — badge À faire (15-01, personnel)', () => {
   it('retire le badge quand la tâche est réassignée (D-08)', async () => {
     const { queryClient } = renderShell('/accueil');
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    await waitForAssignees(queryClient);
     await within(nav).findByLabelText('1 tâches ouvertes');
     try {
       // Réassignation réelle (même chemin que le module Tâches) : la table
@@ -289,6 +321,34 @@ describe('AppShell — badge À faire (15-01, personnel)', () => {
       // laisser task-1 chez Thomas ferait dépendre le test des graines.
       await setTaskAssignees('task-1', [DEMO_MEMBERS.camille]);
     }
+  });
+
+  it("n'affiche aucun compteur tant que les assignations ne sont pas lues", async () => {
+    // Lecture EN VOL : elle ne rendra jamais. Le compteur ne peut donc pas être
+    // connu de tout le cas — et « on ne sait pas » ne s'affiche pas comme
+    // « tout le foyer ». Avant correction, le badge portait 3 et restait stable.
+    listTaskAssigneesMock.mockImplementation(() => new Promise<TaskAssigneeRecord[]>(() => {}));
+    const { queryClient } = renderShell('/accueil');
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+
+    // Préconditions : les tâches du shell ont abouti, ET la lecture des
+    // assignations a bien démarré. Sans elles, l'absence de badge serait vraie
+    // pour une autre raison et la garde ne prouverait rien.
+    await waitForQueryStatus(queryClient, ['tasks'], 'success');
+    await waitFor(() => expect(listTaskAssigneesMock).toHaveBeenCalled());
+
+    expect(within(nav).queryByLabelText(/tâches ouvertes/)).not.toBeInTheDocument();
+  });
+
+  it("n'affiche aucun compteur quand la lecture des assignations échoue", async () => {
+    listTaskAssigneesMock.mockRejectedValue(new Error('réseau indisponible'));
+    const { queryClient } = renderShell('/accueil');
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+
+    await waitForQueryStatus(queryClient, ['tasks'], 'success');
+    await waitForQueryStatus(queryClient, queryKeys.tableAll('task_assignees'), 'error');
+
+    expect(within(nav).queryByLabelText(/tâches ouvertes/)).not.toBeInTheDocument();
   });
 });
 
