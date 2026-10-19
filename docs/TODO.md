@@ -12,7 +12,7 @@ Dernière mise à jour : 19 octobre 2026.
 
 ---
 
-- [ ] **1. L'affichage des notifications, à revalider sur mobile**
+- [x] **1. L'affichage des notifications, à revalider sur mobile**
 
 **Le 2026-10-19, une notification a été reçue et affichée** dans Firefox
 (Linux), après déploiement du correctif `d348309`. Le chemin complet — base,
@@ -50,6 +50,13 @@ envoyée, l'absence de tout message désigne le transport — voir `docs/PWA.md`
 
 **Terminé quand** la bannière apparaît sur mobile au premier envoi, et de
 nouveau au renvoi avec le même tag.
+
+**Clos le 2026-10-19** : les deux critères sont atteints sur mobile — bannière
+système au premier envoi, **et seconde bannière au renvoi avec le même tag**,
+donc `renotify` compris. Le poste n'est pas nommé dans cette trace : le système
+et le navigateur n'ont pas été relevés pendant le test. Le chemin complet est
+donc prouvé sur deux postes au total (Firefox/Linux le 2026-10-19, et ce
+téléphone), et le défaut de trame `d348309` est soldé des deux côtés.
 
 ---
 
