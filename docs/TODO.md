@@ -603,6 +603,27 @@ dans git (`TODO.md`).
 
 ---
 
+## Ouvert, consigné pendant l'UAT des notifications
+
+- [ ] **17. Ouvrir Messages solde un fil qu'on n'a pas ouvert**
+
+`app/src/modules/messages/messages-page.tsx:32-38` choisit d'office
+`conversations[0]` quand rien n'est sélectionné, et `:42-44` marque lu tout
+`activeId` — y compris celui-là, dès le montage de la page. Le fil le plus
+récent perd donc son badge et sa ligne de cloche au simple fait d'ouvrir
+Messages, sans avoir été lu. Sous 650 px, `listVisible` démarre à `true` : la
+liste est affichée et le fil pourtant déjà soldé — le geste est invisible.
+
+Le fautif n'est pas le marquage à l'ouverture, qui est voulu (D-02), mais la
+**sélection implicite** qui le déclenche. Vu en usage réel le 2026-10-19
+pendant l'UAT des notifications, et non consigné à ce moment-là.
+
+**Terminé quand** ouvrir Messages ne solde plus rien tant qu'aucune
+conversation n'a été choisie, et que la ligne de cloche d'un fil subsiste tant
+qu'il n'a pas été ouvert.
+
+---
+
 ## Décidé, sans action
 
 **Les listes de privilèges en dur restent.** Elles ne sont pas redondantes avec
