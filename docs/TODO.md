@@ -368,7 +368,7 @@ première chose à faire alors est de **capturer la sortie entière**, jamais un
 
 ---
 
-- [ ] **15. Hors ligne, l'application affiche « rien » au lieu de dire qu'elle n'a pas pu lire**
+- [x] **15. Hors ligne, l'application affiche « rien » au lieu de dire qu'elle n'a pas pu lire**
 
 **Constat ouvert le 2026-10-19**, en rejouant l'UAT 09 (item 3, réécrit — voir
 `09-UAT.md`, constat `G-09-etat-vide-mensonger`). Observation en usage réel,
@@ -484,6 +484,16 @@ vérifié, il n'existe aucun repli local — donc une donnée réelle hors ligne
 peut venir que du cache du navigateur. C'est une **piste, pas une conclusion** :
 elle n'a pas été mesurée. Le rejeu doit garder « Désactiver le cache » **coché**,
 comme le constat d'origine.
+
+**Clos le 2026-10-19 par le rejeu humain.** Le rejeu a été fait sur
+l'application déployée, et le build déployé a été **vérifié avant de conclure** :
+`x-app-version` rend `022fca62daf98e9e3d41f589baa5b813f78a38b1`, soit exactement
+le commit poussé, et le bundle servi porte l'amorçage (`navigator.onLine`) comme
+la politique (`networkMode: 'always'`). Le rejeu est donc attribuable à un build
+précis, et non à un « quelque chose de plus récent ». Les deux correctifs ont
+donc été livrés ensemble : la lecture dit qu'elle a échoué, le bandeau dit
+pourquoi dès le premier rendu, et le retour du réseau recharge sans
+rechargement de page.
 
 ---
 
