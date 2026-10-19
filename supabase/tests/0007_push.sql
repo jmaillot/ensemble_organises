@@ -656,7 +656,7 @@ begin
   v_result := private.dispatch_push_notifications();
   perform testkit.eq(v_result ->> 'due', '0', 'le job des rappels ne compte plus rien');
   perform testkit.eq(v_result ->> 'dispatched', 'false',
-    'sans rien à envoyer, le job n''appelle pas la fonction d''envoi : la stack ne se réveille pas quatre fois par heure');
+    'sans rien à envoyer, le job n''appelle pas la fonction d''envoi : la stack n''est pas réveillée chaque minute');
 
   v_result := private.dispatch_birthday_alerts();
   perform testkit.eq(v_result ->> 'due', '0', 'le job anniversaires ne compte que les anniversaires du jour');

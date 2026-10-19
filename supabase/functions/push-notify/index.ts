@@ -37,8 +37,8 @@
  *   Les résultats sont consignés en un seul appel à
  *   `public.record_push_deliveries`, et les rappels distribués retirés en un seul
  *   appel à `public.consume_push_reminders`. Deux allers-retours par exécution,
- *   quel que soit le nombre d'appareils : c'est ce qui rend le job de quinze
- *   minutes tenable.
+ *   quel que soit le nombre d'appareils : c'est ce qui rend un passage par
+ *   minute tenable.
  *
  * Note d'exécution : `withSupabase` renvoie un gestionnaire `fetch` ; on le
  * passe à `Deno.serve`.
@@ -297,7 +297,7 @@ async function send(
   }
 
   // Deux appels, quel que soit le volume : c'est la condition pour que le job
-  // de quinze minutes reste tenable.
+  // d'une minute reste tenable.
   if (results.length > 0) {
     const { data: report, error } = await admin.rpc('record_push_deliveries', {
       p_results: results,

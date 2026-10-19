@@ -900,7 +900,7 @@ depuis l'interface d'abord.
 
 #### L'envoi, sans attendre le job
 
-Le job `eo-push-dispatch` passe toutes les quinze minutes. La même fonction
+Le job `eo-push-dispatch` passe chaque minute. La même fonction
 s'appelle directement, ce qui évite l'attente et rend le test déterministe :
 
 ```sh
@@ -988,7 +988,7 @@ docker compose exec db psql -U postgres -c "select jobid, run_time, status, retu
 | `eo-routine-maintenance` | `5 6 * * *` | génère les occurrences dues (14 derniers jours → aujourd'hui) et escalade en `manque` celles de plus de 7 jours |
 | `eo-invite-token-prune` | `20 6 * * *` | désactive les tokens expirés ou épuisés |
 | `eo-birthday-alerts` | `40 6 * * *` | annonce les anniversaires **du jour** de chaque foyer |
-| `eo-push-dispatch` | `*/15 * * * *` | distribue les rappels de tâche, d'événement et de routine dus |
+| `eo-push-dispatch` | `* * * * *` | distribue les rappels de tâche, d'événement et de routine dus |
 | `eo-push-prune` | `30 6 * * *` | supprime les abonnements push sans envoi réussi depuis six mois |
 
 Points de conception :
@@ -1006,8 +1006,8 @@ Points de conception :
 * **Aucun secret en clair** dans `cron.job.command`. Les deux dispatches Web
   Push lisent `project_url` et `service_role_key` dans Vault **au moment de
   l'exécution**, via `private.post_push_dispatch()`. Ils n'appellent la fonction
-  d'envoi que s'il y a des destinataires : sans cela, la stack se réveillerait
-  quatre fois par heure pour rien.
+  d'envoi que s'il y a des destinataires : sans cela, la stack serait réveillée
+  chaque minute pour rien.
 * **Un seul point d'entrée d'envoi** : `functions/v1/push-notify`, avec un
   `scope` (`rappels` ou `anniversaires`). Deux fonctions d'envoi, ce serait deux
   déploiements à tenir alignés et deux jeux de secrets.
@@ -1034,8 +1034,10 @@ Un rappel est une ligne de `task_reminders`, `event_reminders` ou
   (`public.consume_push_reminders`). Un rappel dont aucun appareil n'a pu le
   recevoir reste en place, et sera tenté au passage suivant.
 
-La fréquence du job (quinze minutes) et la granularité d'un rappel (de l'ordre
-de la minute) sont les deux seules constantes du dimensionnement.
+La fréquence du job (une minute) et la granularité d'un rappel (de l'ordre de
+la minute) coïncident : le pire délai entre l'heure d'un rappel et son départ
+est d'environ une minute. Ce sont les deux seules constantes du
+dimensionnement.
 
 ### Sous-ensemble RRULE supporté
 
@@ -1332,7 +1334,7 @@ Functions, espace disque, expiration des certificats, résultat de
   `{ notifications: 1, delivered: 1, failed: 0, dropped: 0, consumed: 1 }`, et la
   ligne de rappel a disparu de `public.task_reminders`. C'est ce second fait qui établit que
   `consume_push_reminders` supprime bien, donc qu'un rappel ne reviendra pas
-  quatre fois par heure. La validation est reproductible par
+  au passage suivant. La validation est reproductible par
   `sh scripts/test-dispatch-push.sh`, qui sème son propre rappel et attribue le
   rapport à son appel (§6.6).
 

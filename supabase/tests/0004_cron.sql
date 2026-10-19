@@ -193,8 +193,8 @@ begin
     'la maintenance quotidienne est planifiée à 06 h 05'
   );
   perform testkit.ok(
-    exists (select 1 from cron.job where jobname = 'eo-push-dispatch' and schedule = '*/15 * * * *'),
-    'les rappels push sont tentés toutes les quinze minutes'
+    exists (select 1 from cron.job where jobname = 'eo-push-dispatch' and schedule = '* * * * *'),
+    'les rappels push sont tentés chaque minute'
   );
   perform testkit.ok(
     exists (select 1 from cron.job where jobname = 'eo-birthday-alerts' and schedule = '40 6 * * *'),

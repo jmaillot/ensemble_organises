@@ -507,7 +507,7 @@ export function NotificationsPanel() {
       <Panel title="Comment ça arrive" description="Le parcours d’un rappel, du foyer à l’écran.">
         <ol className="m-0 grid list-none gap-2.5 p-0 text-[11px] text-muted">
           <li>1. Une tâche, un événement ou une routine porte une heure de rappel.</li>
-          <li>2. Toutes les quinze minutes, la base rassemble les rappels dus et les membres concernés.</li>
+          <li>2. Chaque minute, la base rassemble les rappels dus et les membres concernés.</li>
           <li>3. Chaque membre reçoit sur ses appareils enregistrés, sauf ceux qui ont coupé ce type de rappel.</li>
           <li>4. Le rappel est retiré une fois reçu : il ne se répète pas.</li>
         </ol>
