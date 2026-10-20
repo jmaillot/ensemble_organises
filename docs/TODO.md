@@ -170,7 +170,7 @@ rattrapage sans écraser) ; couvert par `0008_household_defaults.sql`.
 
 ---
 
-- [ ] **11. Les correctifs de liens invités (phases 21 à 23) sont en production — reste la preuve d'usage**
+- [x] **11. Les correctifs de liens invités (phases 21 à 23) sont en production — reste la preuve d'usage**
 
 **Déployé le 2026-10-17** (runbook `docs/DEPLOIEMENT-PROD.md`, clone de production à
 `b5038bf`) : `sh scripts/migrate.sh --status` nomme `0128` appliquée (lot `0123`…`0128`,
@@ -188,6 +188,12 @@ déploiement ne le prouve pas : il rend la preuve possible.
 **Qui peut le faire : l'utilisateur.** Appareil réel, session réelle.
 
 **Terminé quand** ce parcours est joué et consigné ici.
+
+**Clos le 2026-10-19** : parcours réel joué en production, sans session
+authentifiée, sur les **deux** surfaces — liste de cadeaux partagée et ardoise
+partagée. Les photos s'affichent côté invité ; comme la page invitée n'accepte
+que des formes `http(s)` (`isServableHttpUrl`), un chemin brut n'aurait rien
+rendu : l'image visible est la preuve que l'URL signée a bien été servie.
 
 ---
 
@@ -612,7 +618,7 @@ dans git (`TODO.md`).
 
 ## Ouvert, consigné pendant l'UAT des notifications
 
-- [ ] **17. Ouvrir Messages solde un fil qu'on n'a pas ouvert**
+- [x] **17. Ouvrir Messages solde un fil qu'on n'a pas ouvert**
 
 `app/src/modules/messages/messages-page.tsx:32-38` choisit d'office
 `conversations[0]` quand rien n'est sélectionné, et `:42-44` marque lu tout
@@ -628,6 +634,13 @@ pendant l'UAT des notifications, et non consigné à ce moment-là.
 **Terminé quand** ouvrir Messages ne solde plus rien tant qu'aucune
 conversation n'a été choisie, et que la ligne de cloche d'un fil subsiste tant
 qu'il n'a pas été ouvert.
+
+**Clos le 2026-10-19** : `messages-page.tsx` ne retombe plus sur
+`conversations[0]`, donc `markRead` ne s'exécute qu'après un choix explicite ;
+le panneau vide dit « Choisissez une conversation » au lieu d'« Aucune
+conversation », qui décrivait un foyer sans fil. Test : « ouvrir Messages ne
+solde aucun fil tant qu'aucune conversation n'est choisie (TODO #17) », vu
+rouge sur l'ancien code (le fil s'ouvrait et se soldait sans clic).
 
 ---
 
