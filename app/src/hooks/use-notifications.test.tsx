@@ -13,7 +13,34 @@ import { useCercleFeed } from '@/modules/cercle/hooks/use-cercle';
 import { setTaskAssignees } from '@/modules/taches/api';
 import type { TaskAssigneeRecord } from '@/modules/taches/types';
 import { queryKeys } from '@/lib/data/useResource';
-import { useNotifications } from './use-notifications';
+import { localReadKey } from '@/lib/notification-reads';
+import { maskedStorageKey, useNotifications } from './use-notifications';
+
+/**
+ * Les marques locales portent désormais le compte (`localReadKey`) : un
+ * `removeItem` de la clé nue ne les atteint plus, et les relire demande le
+ * compte courant. Ces deux aides évitent de recopier la forme des clés.
+ */
+const currentUserId = () => useSessionStore.getState().user?.id ?? null;
+
+function clearLocalReads(): void {
+  const prefixes = [
+    'ensemble-organises-messages-read',
+    'ensemble-organises-cercle-read',
+    'eo-notifications-masquees-v1',
+  ];
+  for (const key of Object.keys(localStorage)) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+  }
+}
+
+function storedReads(base: string): Record<string, string> {
+  return JSON.parse(localStorage.getItem(localReadKey(base, currentUserId())) ?? '{}') as Record<string, string>;
+}
+
+function storedMasks(): Record<string, string> {
+  return JSON.parse(localStorage.getItem(maskedStorageKey(currentUserId())) ?? '{}') as Record<string, string>;
+}
 
 // Fichier temps réel (émission → invalidation → relecture Dexie) : sur
 // machine chargée (suite complète), le délai d'1s des `waitFor` est trop
@@ -108,7 +135,7 @@ describe('centre de notifications', () => {
     await act(async () => {
       result.current.markAllRead();
     });
-    const marks = JSON.parse(localStorage.getItem('ensemble-organises-messages-read') ?? '{}') as Record<string, string>;
+    const marks = storedReads('ensemble-organises-messages-read');
     expect(Object.keys(marks).sort()).toEqual(['conversation-1', 'conversation-2', 'conversation-3']);
     // Seule la conversation-3 peut rester marquable : le `beforeEach` recale
     // son dernier message dans le futur, donc « tout marquer » ne le solde pas.
@@ -121,9 +148,7 @@ describe('centre de notifications', () => {
   });
 
   it('expose lus récents, masquage et effacement sans suppression', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
@@ -142,9 +167,9 @@ describe('centre de notifications', () => {
     });
     await waitFor(() => expect(result.current.items.some((item) => item.id === unreadMessage!.id)).toBe(false));
     expect(result.current.recentRead.some((item) => item.id === unreadMessage!.id)).toBe(false);
-    const messageMarks = JSON.parse(localStorage.getItem('ensemble-organises-messages-read') ?? '{}');
+    const messageMarks = storedReads('ensemble-organises-messages-read');
     expect(messageMarks[unreadMessage!.ref]).toBeDefined();
-    expect(Object.keys(JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}'))).toContain(
+    expect(Object.keys(storedMasks())).toContain(
       unreadMessage!.id,
     );
 
@@ -179,7 +204,7 @@ describe('centre de notifications', () => {
     await act(async () => {
       result.current.dismissItem(computed!);
     });
-    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    const masked = storedMasks();
     expect(Object.keys(masked)).toContain(computed!.id);
     await waitFor(() => expect(result.current.items.some((item) => item.id === computed!.id)).toBe(false));
 
@@ -192,7 +217,7 @@ describe('centre de notifications', () => {
   });
 
   it('isole le feed messages : marquage direct de conversation-1', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
+    clearLocalReads();
     seedHouseholdStore();
     const { result } = renderHook(() => useMessagesFeed(), { wrapper });
 
@@ -208,9 +233,7 @@ describe('centre de notifications', () => {
   });
 
   it('fait surface un message posté dans un fil non ouvert (cloche affamée)', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
@@ -246,9 +269,7 @@ describe('centre de notifications', () => {
   });
 
   it('ouvrir le fil cache sa ligne partout (auto-masquage à la lecture)', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
@@ -265,14 +286,12 @@ describe('centre de notifications', () => {
     await waitFor(() =>
       expect(result.current.recentRead.some((item) => item.id === 'message:conversation-1')).toBe(false),
     );
-    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    const masked = storedMasks();
     expect(Object.keys(masked)).toContain('message:conversation-1');
   });
 
   it('masque les lignes messages quand la préférence est coupée', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     // Sans utilisateur de session, la requête profils est désactivée et les
     // défauts (tout affiché) s'appliquent : on connecte le démo-utilisateur
@@ -293,9 +312,7 @@ describe('centre de notifications', () => {
   });
 
   it('le marquage au niveau du fil ouvert cache aussi la ligne (sans markItem)', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     // Deux crochets sur le même client : la page Messages marque au niveau du
     // feed (messages-page.tsx), sans passer par markItem — la cloche suit par
@@ -317,7 +334,7 @@ describe('centre de notifications', () => {
       await waitFor(() =>
         expect(result.current.notifs.recentRead.some((item) => item.id === 'message:conversation-2')).toBe(false),
       );
-      const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+      const masked = storedMasks();
       expect(Object.keys(masked)).toContain('message:conversation-2');
     } finally {
       useSessionStore.setState({ user: null, status: 'guest' });
@@ -325,9 +342,7 @@ describe('centre de notifications', () => {
   });
 
   it('le marquage d’un post au niveau du Cercle cache aussi sa ligne', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     // Session connectée : comme cercle-page.tsx, marquage direct au feed via
     // le même chemin serveur que en production, sans markItem.
@@ -356,7 +371,7 @@ describe('centre de notifications', () => {
       await waitFor(() =>
         expect(result.current.notifs.recentRead.some((item) => item.id === 'cercle:post-1')).toBe(false),
       );
-      const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+      const masked = storedMasks();
       expect(Object.keys(masked)).toContain('cercle:post-1');
     } finally {
       useSessionStore.setState({ user: null, status: 'guest' });
@@ -364,9 +379,7 @@ describe('centre de notifications', () => {
   });
 
   it('une activité fraîche sur un fil masqué le réaffiche avec pastille', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     const { result } = renderHook(() => useNotifications(), { wrapper });
 
@@ -399,14 +412,12 @@ describe('centre de notifications', () => {
       expect(raised?.detail).toBe(body);
     });
     expect(result.current.messagesUnread).toBeGreaterThan(0);
-    const masked = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    const masked = storedMasks();
     expect(Object.keys(masked)).not.toContain('message:conversation-2');
   });
 
   it('un masque expiré réaffiche le rappel (horizon jusqu’à demain)', async () => {
-    localStorage.removeItem('ensemble-organises-messages-read');
-    localStorage.removeItem('ensemble-organises-cercle-read');
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     const first = renderHook(() => useNotifications(), { wrapper });
 
@@ -420,11 +431,38 @@ describe('centre de notifications', () => {
     first.unmount();
 
     // Le sursis expire : échéance antidatée, le prochain chargement nettoie.
-    const stored = JSON.parse(localStorage.getItem('eo-notifications-masquees-v1') ?? '{}');
+    const stored = storedMasks();
     stored[computed!.id] = new Date(Date.now() - 1000).toISOString();
-    localStorage.setItem('eo-notifications-masquees-v1', JSON.stringify(stored));
+    localStorage.setItem(maskedStorageKey(currentUserId()), JSON.stringify(stored));
     const second = renderHook(() => useNotifications(), { wrapper });
     await waitFor(() => expect(second.result.current.items.some((item) => item.id === computed!.id)).toBe(true));
+  });
+});
+
+describe('centre de notifications — comptes partagés', () => {
+  it('ne lègue pas au compte suivant les rappels masqués par le précédent', async () => {
+    clearLocalReads();
+    seedHouseholdStore();
+    useSessionStore.setState({ user: demoUser, status: 'authenticated' });
+    const { result, rerender } = renderHook(() => useNotifications(), { wrapper });
+
+    await waitFor(() => expect(result.current.total).toBeGreaterThan(0));
+    const computed = result.current.items.find((item) => !item.markable);
+    expect(computed).toBeDefined();
+    await act(async () => {
+      result.current.dismissItem(computed!);
+    });
+    await waitFor(() =>
+      expect(result.current.items.some((item) => item.id === computed!.id)).toBe(false),
+    );
+
+    act(() => useSessionStore.setState({ user: { ...demoUser, id: 'profile-voisin' } }));
+    rerender();
+
+    // Le masque appartenait au premier compte : le second doit voir le rappel.
+    await waitFor(() =>
+      expect(result.current.items.some((item) => item.id === computed!.id)).toBe(true),
+    );
   });
 });
 
@@ -503,7 +541,7 @@ describe('centre de notifications — fils inédits (UAT phase 9)', () => {
  */
 describe('centre de notifications — réassignation (WR-19)', () => {
   it('retire de la cloche une tâche réassignée, et le compteur décroît d’autant', async () => {
-    localStorage.removeItem('eo-notifications-masquees-v1');
+    clearLocalReads();
     seedHouseholdStore();
     useSessionStore.setState({ user: demoUser, status: 'authenticated' });
     try {

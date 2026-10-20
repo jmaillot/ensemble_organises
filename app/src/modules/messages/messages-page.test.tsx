@@ -6,8 +6,15 @@ import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { ConversationMemberRow, MessageRow, RowFilter } from '@/types';
 import { useHouseholdStore } from '@/stores/household-store';
+import { useSessionStore } from '@/stores/session-store';
+import { localReadKey } from '@/lib/notification-reads';
 import { addConversationMembers } from './api';
 import MessagesPage from './messages-page';
+
+/** La marque locale porte le compte depuis le 2026-10-19 (`localReadKey`) :
+ * la relire demande le compte courant, la clé nue n'est plus écrite. */
+const readMarksKey = () =>
+  localReadKey('ensemble-organises-messages-read', useSessionStore.getState().user?.id ?? null);
 
 describe('Messages', () => {
   it('ouvre la conversation de Lina et y ajoute un message', async () => {
@@ -967,7 +974,7 @@ describe('Messages', () => {
 
   it('ouvrir Messages ne solde aucun fil tant qu’aucune conversation n’est choisie (TODO #17)', async () => {
     const user = userEvent.setup();
-    localStorage.removeItem('ensemble-organises-messages-read');
+    localStorage.removeItem(readMarksKey());
     renderWithProviders(<MessagesPage />);
 
     // La liste est là, mais aucun fil n'est ouvert d'office : la bulle de
@@ -975,14 +982,14 @@ describe('Messages', () => {
     await screen.findByRole('button', { name: /^Lina/ });
     expect(screen.queryByRole('log')).not.toBeInTheDocument();
     expect(screen.getByText('Choisissez une conversation')).toBeInTheDocument();
-    expect(localStorage.getItem('ensemble-organises-messages-read') ?? '{}').toBe('{}');
+    expect(localStorage.getItem(readMarksKey()) ?? '{}').toBe('{}');
 
     // Le choix explicite, lui, solde bien le fil ouvert.
     await user.click(screen.getByRole('button', { name: /^Lina/ }));
     expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
     await waitFor(() => {
       const map = JSON.parse(
-        localStorage.getItem('ensemble-organises-messages-read') ?? '{}',
+        localStorage.getItem(readMarksKey()) ?? '{}',
       ) as Record<string, string>;
       expect(Object.keys(map)).toHaveLength(1);
     });

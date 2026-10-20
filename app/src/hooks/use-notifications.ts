@@ -63,10 +63,22 @@ const KIND_META: Record<NotificationKind, { label: string; icon: IconName; href:
 export { KIND_META };
 
 /** Masquage des rappels calculés (« effacer ») : ni table, ni serveur, un
- * simple sursis local `{ id: échéance ISO }`. Expiré = réaffiché. */
+ * simple sursis local `{ id: échéance ISO }`. Expiré = réaffiché. La clé porte
+ * le compte : deux personnes d'un même navigateur ne masquent pas les rappels
+ * l'une de l'autre. */
 const MASKED_STORAGE_KEY = 'eo-notifications-masquees-v1';
 /** Lus récents affichés dans l'onglet « Toutes » (au-delà, c'est l'historique des modules). */
 export const RECENT_READ_LIMIT = 5;
+
+function maskedKey(userId: string | null): string {
+  return `${MASKED_STORAGE_KEY}:${userId ?? 'anonyme'}`;
+}
+
+/** Clé des masques pour un compte — exportée pour que les tests la relisent
+ * comme le hook l'écrit, plutôt qu'en recopiant sa forme. */
+export function maskedStorageKey(userId: string | null): string {
+  return maskedKey(userId);
+}
 
 function cleanMasked(entries: Record<string, string>, now = new Date().toISOString()): Record<string, string> {
   return Object.fromEntries(
@@ -74,9 +86,9 @@ function cleanMasked(entries: Record<string, string>, now = new Date().toISOStri
   );
 }
 
-function loadMasked(): Record<string, string> {
+function loadMasked(userId: string | null): Record<string, string> {
   try {
-    const raw = localStorage.getItem(MASKED_STORAGE_KEY);
+    const raw = localStorage.getItem(maskedKey(userId));
     if (!raw) return {};
     return cleanMasked(JSON.parse(raw) as Record<string, string>);
   } catch {
@@ -84,9 +96,9 @@ function loadMasked(): Record<string, string> {
   }
 }
 
-function saveMasked(entries: Record<string, string>) {
+function saveMasked(userId: string | null, entries: Record<string, string>) {
   try {
-    localStorage.setItem(MASKED_STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(maskedKey(userId), JSON.stringify(entries));
   } catch {
     // Stockage indisponible : le masquage ne survit pas au rechargement.
   }
@@ -150,7 +162,16 @@ export function useNotifications(): NotificationsSummary {
   const showEvents = preferences?.eventReminders ?? true;
   const showRoutines = preferences?.routineReminders ?? true;
 
-  const [masked, setMasked] = useState<Record<string, string>>(loadMasked);
+  const [masked, setMasked] = useState<Record<string, string>>(() => loadMasked(user?.id ?? null));
+  // Changement de compte dans le même onglet : reprendre SES masques, pas ceux
+  // du précédent.
+  const maskedUserIdRef = useRef(user?.id ?? null);
+  const currentUserId = user?.id ?? null;
+  useEffect(() => {
+    if (maskedUserIdRef.current === currentUserId) return;
+    maskedUserIdRef.current = currentUserId;
+    setMasked(loadMasked(currentUserId));
+  }, [currentUserId]);
   const nowIso = new Date().toISOString();
   const maskIds = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
@@ -158,10 +179,10 @@ export function useNotifications(): NotificationsSummary {
     setMasked((previous) => {
       const next = cleanMasked(previous);
       for (const id of ids) next[id] = expiry;
-      saveMasked(next);
+      saveMasked(currentUserId, next);
       return next;
     });
-  }, []);
+  }, [currentUserId]);
   const unmaskIds = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
     setMasked((previous) => {
@@ -175,10 +196,10 @@ export function useNotifications(): NotificationsSummary {
         }
       }
       if (!changed) return previous;
-      saveMasked(next);
+      saveMasked(currentUserId, next);
       return next;
     });
-  }, []);
+  }, [currentUserId]);
   const isMasked = (id: string) => masked[id] !== undefined && masked[id] > nowIso;
 
   /** Identifiants marquables non lus (`message:<conv>`, `cercle:<post>`) :

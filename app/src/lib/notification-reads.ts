@@ -21,6 +21,16 @@ function readLocal(key: string): ReadMap {
   }
 }
 
+/**
+ * Clé de la marque locale, propre au **compte** : deux personnes qui se
+ * partagent un navigateur ne se soldent plus mutuellement leurs lignes.
+ * La clé antérieure (sans suffixe) n'est pas reprise : elle mélangeait les
+ * comptes, ce qui en faisait précisément une source d'erreur.
+ */
+export function localReadKey(baseKey: string, userId: string | null): string {
+  return `${baseKey}:${userId ?? 'anonyme'}`;
+}
+
 function writeLocal(key: string, map: ReadMap): void {
   if (typeof localStorage === 'undefined') return;
   try {
@@ -69,16 +79,28 @@ export interface SyncedReads {
  * (`conversation`, `post`).
  *
  * Le serveur est la source de vérité partagée ; le `localStorage` (clé
- * dédiée par portée) sert d'écriture optimiste et de repli hors ligne :
- * l'interface réagit aussitôt, même sans réseau, et le maximum des deux
- * gagne à la lecture. Un échec réseau n'est jamais remonté à l'utilisateur :
- * la marque sera reprise au prochain marquage.
+ * dédiée par portée **et par compte**, voir `localReadKey`) sert d'écriture
+ * optimiste et de repli hors ligne : l'interface réagit aussitôt, même sans
+ * réseau, et le maximum des deux gagne à la lecture. Un échec réseau n'est
+ * jamais remonté à l'utilisateur : la marque sera reprise au prochain
+ * marquage.
  */
 export function useSyncedReads(scope: NotificationReadScope, localKey: string): SyncedReads {
   const queryClient = useQueryClient();
   const user = useSessionUser();
   const userId = user?.id ?? null;
-  const [localMap, setLocalMap] = useState<ReadMap>(() => readLocal(localKey));
+  const storageKey = useMemo(() => localReadKey(localKey, userId), [localKey, userId]);
+  const [localMap, setLocalMap] = useState<ReadMap>(() => readLocal(storageKey));
+
+  // Changement de compte dans le même navigateur : on relit la marque du
+  // nouveau compte. Sans cela, les lignes soldées par le précédent le
+  // resteraient pour lui, et le nouveau ne verrait jamais les siennes.
+  const storageKeyRef = useRef(storageKey);
+  useEffect(() => {
+    if (storageKeyRef.current === storageKey) return;
+    storageKeyRef.current = storageKey;
+    setLocalMap(readLocal(storageKey));
+  }, [storageKey]);
   const resource = useResource<NotificationReadRow>(NOTIFICATION_READS_TABLE, {
     scoped: false,
     enabled: Boolean(userId),
@@ -128,7 +150,7 @@ export function useSyncedReads(scope: NotificationReadScope, localKey: string): 
       setLocalMap((current) => {
         if (current[id] !== undefined && current[id] >= at) return current;
         const next = { ...current, [id]: at };
-        writeLocal(localKey, next);
+        writeLocal(storageKey, next);
         return next;
       });
       if (!userId) {
@@ -158,7 +180,7 @@ export function useSyncedReads(scope: NotificationReadScope, localKey: string): 
         }
       })();
     },
-    [localKey, refresh, scope, userId],
+    [refresh, scope, storageKey, userId],
   );
 
   return { readMap, markRead, isLoading: resource.isLoading };
