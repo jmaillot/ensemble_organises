@@ -572,7 +572,7 @@ rechargement de page.
 
 ---
 
-- [ ] **16. Trois écrans affichent « sans assigné » tant que la lecture des assignations n'a pas rendu**
+- [x] **16. Trois écrans affichent « sans assigné » tant que la lecture des assignations n'a pas rendu**
 
 **Suite de #14**, trouvée en corrigeant la couture, et **volontairement non
 traitée** : trois autres sites lisent les assignations avec `?? []`. Aucun n'est un
@@ -602,6 +602,21 @@ rendu), donc un arbitrage d'interface, pas un correctif mécanique.
 **Terminé quand** les trois sites distinguent « personne » de « on ne sait pas »,
 chaque garde échouant sur le code d'aujourd'hui — la forme de l'attente étant
 `waitForQueryStatus` (`app/src/test/render.tsx`), pas un délai.
+
+**Clos le 2026-10-19**, sur la forme choisie en usage réel : **des pastilles
+d'attente**. `PendingAssignee` (`app/src/components/shared/pending-assignee.tsx`)
+reprend le gabarit de `MemberAvatar` — rond en pointillés, `role="img"`, libellé
+« Assignation en cours de chargement » — et ne paraît que tant que la lecture
+n'a pas rendu (`isSuccess` faux, **erreur comprise** : l'ignorance ne se dégrade
+pas en « personne »). Sur la page Tâches, le compteur « Membres » affiche « … »
+au lieu de 0.
+
+Quatre tests, tous vus **rouges** sur le code d'avant : `task-row.test.tsx`,
+`agenda-list.test.tsx`, `trip-tasks-tab-pending.test.tsx` (la lecture est
+retenue par une promesse qui ne se résout jamais, seule façon d'observer l'état
+sans course — `waitForQueryStatus` attend un état **établi** et ne peut donc pas
+décrire l'intervalle qui nous intéresse) et `types.test.ts` (le drapeau traverse
+bien `buildTasks`).
 
 ---
 
