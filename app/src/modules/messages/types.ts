@@ -21,8 +21,10 @@ export interface ConversationSummary {
   lastMessageAt: string | null;
   lastMessageMine: boolean;
   unread: number;
-  /** Fil quitté (pierre tombale) : section archives, lecture seule. */
+  /** Fil sorti de MA liste active — quitté ou archivé pour moi (0131). */
   isArchived: boolean;
+  /** Fil quitté (pierre tombale) : lecture seule, quoi qu'il arrive. */
+  isLeft: boolean;
 }
 
 /** Message affiché dans la zone de discussion. */

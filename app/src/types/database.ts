@@ -770,6 +770,8 @@ export interface ConversationMemberRow {
   member_id: Uuid;
   /** Pierre tombale (D-08) : renseigné, le membre a quitté (lecture seule). */
   left_at: IsoDateTime | null;
+  /** Archive personnelle (0131) : renseigné, le fil sort de la liste active du membre ; écrire le désarchive. */
+  archived_at: IsoDateTime | null;
 }
 
 export interface MessageRow {

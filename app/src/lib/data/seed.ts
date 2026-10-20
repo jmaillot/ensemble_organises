@@ -1263,11 +1263,11 @@ export const demoConversations: ConversationRow[] = [
 ];
 
 export const demoConversationMembers: ConversationMemberRow[] = [
-  { conversation_id: 'conversation-1', member_id: DEMO_MEMBERS.camille, left_at: null },
-  { conversation_id: 'conversation-1', member_id: DEMO_MEMBERS.lina, left_at: null },
-  { conversation_id: 'conversation-2', member_id: DEMO_MEMBERS.camille, left_at: null },
-  { conversation_id: 'conversation-2', member_id: DEMO_MEMBERS.thomas, left_at: null },
-  { conversation_id: 'conversation-3', member_id: DEMO_MEMBERS.camille, left_at: null },
+  { conversation_id: 'conversation-1', member_id: DEMO_MEMBERS.camille, left_at: null, archived_at: null },
+  { conversation_id: 'conversation-1', member_id: DEMO_MEMBERS.lina, left_at: null, archived_at: null },
+  { conversation_id: 'conversation-2', member_id: DEMO_MEMBERS.camille, left_at: null, archived_at: null },
+  { conversation_id: 'conversation-2', member_id: DEMO_MEMBERS.thomas, left_at: null, archived_at: null },
+  { conversation_id: 'conversation-3', member_id: DEMO_MEMBERS.camille, left_at: null, archived_at: null },
 ];
 
 export const demoMessages: MessageRow[] = [

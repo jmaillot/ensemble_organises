@@ -142,11 +142,61 @@ export async function leaveConversation(conversationId: string, memberId: string
 }
 
 /**
- * Retrait d'un fil quitté de ses archives (D-08) : seule sa propre pierre
- * est supprimée — nettoyage personnel, jamais suppression du fil. La RLS
- * réserve l'opération au partant sur sa tombe (prouvée en 0039).
+ * Archivage personnel (0131) : le fil sort de MA liste active, les autres ne
+ * voient rien changer, il reste lisible et écrivable — écrire le désarchive.
+ * En ligne le RPC `archive_conversation_for_me` ; en local la même marque,
+ * posée sur ma seule ligne.
  */
-export async function removeArchivedConversation(conversationId: string, memberId: string): Promise<void> {
+export async function archiveConversationForMe(conversationId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('archive_conversation_for_me', { p_conversation_id: conversationId });
+    if (error) throw new DataError(error.message || 'L’archivage n’a pas pu être enregistré.', error);
+    return;
+  }
+  const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
+  const mine = rows.find((row) => row.member_id === memberId && !row.left_at);
+  if (!mine || mine.archived_at) return;
+  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
+  await data.create<ConversationMemberRow>('conversation_members', {
+    conversation_id: conversationId,
+    member_id: memberId,
+    left_at: null,
+    archived_at: new Date().toISOString(),
+  });
+}
+
+/** Retire l'archive personnelle (0131) : le fil revient dans ma liste active. */
+export async function unarchiveConversationForMe(conversationId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('unarchive_conversation_for_me', { p_conversation_id: conversationId });
+    if (error) throw new DataError(error.message || 'Le désarchivage n’a pas pu être enregistré.', error);
+    return;
+  }
+  const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
+  const mine = rows.find((row) => row.member_id === memberId && !row.left_at && row.archived_at);
+  if (!mine) return;
+  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
+  await data.create<ConversationMemberRow>('conversation_members', {
+    conversation_id: conversationId,
+    member_id: memberId,
+    left_at: null,
+    archived_at: null,
+  });
+}
+
+/**
+ * Suppression pour soi (0131) : seule ma ligne d'appartenance est effacée —
+ * nettoyage personnel, jamais suppression du fil. Le fil me devient
+ * invisible ; les autres le gardent, et un fil dont j'étais le dernier membre
+ * disparaît faute de membres. En ligne le RPC `delete_conversation_for_me`
+ * (actif, archivé ou tombé) ; en local la même suppression de ligne.
+ */
+export async function deleteConversationForMe(conversationId: string, memberId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('delete_conversation_for_me', { p_conversation_id: conversationId });
+    if (error) throw new DataError(error.message || 'La suppression n’a pas pu être enregistrée.', error);
+    return;
+  }
   await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
 }
 

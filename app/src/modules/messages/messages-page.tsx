@@ -38,6 +38,8 @@ export default function MessagesPage() {
     null;
   const activeId = active?.id ?? null;
   const isArchived = active?.isArchived ?? false;
+  // Quitté (pierre tombale) : lecture seule. Archivé pour moi : écrivable.
+  const isLeft = active?.isLeft ?? false;
 
   // Seul un choix explicite marque lu (mise à jour optimiste) : `activeId` est
   // nul tant que la liste n'a pas été touchée.
@@ -55,16 +57,13 @@ export default function MessagesPage() {
   // désactivé avec copie explicative plutôt qu'un refus serveur.
   const declaredIds = activeId ? (feed.memberIdsByConversation.get(activeId) ?? []) : [];
   const iAmDeclaredMember = declaredIds.includes(feed.currentMemberId);
-  const leaveDisabledReason = !iAmDeclaredMember
-    ? null
-    : declaredIds.length > 1
-      ? null
-      : 'Vous êtes le dernier membre de cette conversation : archivez-la (admin) pour la figer.';
   // Fil solo (D-11) : un seul membre actif dans le registre déclaré — signalé
   // au compositeur comme indication, jamais comme blocage d'envoi. Même
   // source que le bouton Quitter (pierres exclues), aucune requête ajoutée ;
-  // les archives n'ont pas de compositeur, donc pas d'avis.
-  const isSolo = !isArchived && activeId !== null && declaredIds.length === 1;
+  // les archives n'ont pas de compositeur, donc pas d'avis. Le dernier membre
+  // peut partir (0131) : l'admin est le seul à pouvoir figer le fil pour tous,
+  // et un membre ne doit pas rester prisonnier d'un fil qu'il est seul à voir.
+  const isSolo = !isLeft && activeId !== null && declaredIds.length === 1;
   const leavingTitle = active?.title ?? 'cette conversation';
 
   if (feed.isError) {
@@ -112,7 +111,7 @@ export default function MessagesPage() {
   }
 
   const eligible = members.filter(
-    (member) => active && !isArchived && !active.participants.some((participant) => participant.id === member.id),
+    (member) => active && !isLeft && !active.participants.some((participant) => participant.id === member.id),
   );
 
   return (
@@ -152,9 +151,34 @@ export default function MessagesPage() {
           conversation={active}
           messages={thread.messages}
           isSending={feed.isSending}
-          readOnly={isArchived}
+          readOnly={isLeft}
+          archivedForMe={isArchived && !isLeft}
           showSoloNotice={isSolo}
-          onRemoveArchived={isArchived && active ? () => setPendingArchiveRemoval(active.id) : undefined}
+          onDeleteForMe={isArchived && active ? () => setPendingArchiveRemoval(active.id) : undefined}
+          onArchiveForMe={
+            active && !isArchived && iAmDeclaredMember
+              ? () => {
+                  void feed
+                    .archiveForMe(active.id)
+                    .then(() => toast('Conversation archivée pour vous. Écrire la ramènera dans votre liste.'))
+                    .catch((error: unknown) => {
+                      toast(error instanceof Error ? error.message : 'L’archivage a échoué.', 'error');
+                    });
+                }
+              : undefined
+          }
+          onUnarchiveForMe={
+            active && isArchived && !isLeft
+              ? () => {
+                  void feed
+                    .unarchiveForMe(active.id)
+                    .then(() => toast('Conversation de retour dans vos conversations.'))
+                    .catch((error: unknown) => {
+                      toast(error instanceof Error ? error.message : 'Le désarchivage a échoué.', 'error');
+                    });
+                }
+              : undefined
+          }
           pageInfo={
             active
               ? {
@@ -168,13 +192,13 @@ export default function MessagesPage() {
           isLoadingMore={thread.isLoadingMore}
           onLoadMore={thread.loadMore}
           onSend={(content) => {
-            if (!active || isArchived) return;
+            if (!active || isLeft) return;
             void feed.send(active.id, content).catch((error: unknown) => {
               toast(error instanceof Error ? error.message : 'Message non envoyé.', 'error');
             });
           }}
           onSendMedia={
-            active && !isArchived
+            active && !isLeft
               ? (content, image) => {
                   void feed.sendMedia(active.id, content, image).catch((error: unknown) => {
                     toast(error instanceof Error ? error.message : 'Image non envoyée.', 'error');
@@ -182,10 +206,10 @@ export default function MessagesPage() {
                 }
               : undefined
           }
-          onAddMember={active && !isArchived ? () => setAddOpen(true) : undefined}
+          onAddMember={active && !isLeft ? () => setAddOpen(true) : undefined}
           onArchiveConversation={active && isAdmin ? () => setPendingArchive(active.id) : undefined}
           onEditMessage={
-            active && !isArchived
+            active && !isLeft
               ? (messageId, content) => {
                   void feed
                     .editMessage(active.id, messageId, content)
@@ -197,7 +221,7 @@ export default function MessagesPage() {
               : undefined
           }
           onDeleteMessage={
-            active && !isArchived
+            active && !isLeft
               ? (messageId) => {
                   void feed
                     .deleteMessage(active.id, messageId)
@@ -208,8 +232,7 @@ export default function MessagesPage() {
                 }
               : undefined
           }
-          onLeaveConversation={active && !isArchived && iAmDeclaredMember ? () => setPendingLeave(active.id) : undefined}
-          leaveDisabledReason={leaveDisabledReason}
+          onLeaveConversation={active && !isLeft && iAmDeclaredMember ? () => setPendingLeave(active.id) : undefined}
           onBackToList={() => setListVisible(true)}
           className={cn(
             'flex min-h-[460px] flex-col overflow-hidden rounded-[16px] border border-border bg-surface',
@@ -305,9 +328,13 @@ export default function MessagesPage() {
         onOpenChange={(open) => {
           if (!open) setPendingArchiveRemoval(null);
         }}
-        title="Retirer de vos archives ?"
-        description="Ce fil disparaîtra de vos anciennes conversations. Les autres membres le conservent ; cette action ne supprime la conversation pour personne d’autre."
-        confirmLabel="Retirer de mes archives"
+        title="Supprimer pour vous ?"
+        description={
+          isSolo
+            ? 'Vous êtes le dernier membre : ce fil disparaîtra pour tout le monde, personne ne le verra plus. Cette action ne supprime pas les messages de la base.'
+            : 'Ce fil disparaîtra de votre vue. Les autres membres le conservent, avec ses messages ; cette action ne supprime la conversation pour personne d’autre.'
+        }
+        confirmLabel="Supprimer pour moi"
         onConfirm={() => {
           const target = pendingArchiveRemoval;
           setPendingArchiveRemoval(null);
@@ -321,9 +348,9 @@ export default function MessagesPage() {
           }
           void feed
             .removeArchivedConversation(target)
-            .then(() => toast('Fil retiré de vos archives.'))
+            .then(() => toast('Fil supprimé de votre vue.'))
             .catch((error: unknown) =>
-              toast(error instanceof Error ? error.message : 'Le retrait n’a pas pu être enregistré.', 'error'),
+              toast(error instanceof Error ? error.message : 'La suppression n’a pas pu être enregistrée.', 'error'),
             );
         }}
       />

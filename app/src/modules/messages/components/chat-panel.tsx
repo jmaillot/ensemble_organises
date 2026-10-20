@@ -24,17 +24,21 @@ export interface ChatPanelProps {
   onDeleteMessage?: (messageId: string) => void;
   /** Demande le départ volontaire du fil ; absent, le bouton est masqué. */
   onLeaveConversation?: () => void;
-  /** Quand renseigné, « Quitter » est désactivé et la raison est expliquée. */
-  leaveDisabledReason?: string | null;
   /** Fil quitté (D-08) : historique en lecture seule, sans compositeur ni actions d'écriture. */
   readOnly?: boolean;
+  /** Fil archivé pour moi (0131) : hors de ma liste, mais écrivable — écrire la ramène. */
+  archivedForMe?: boolean;
   /**
    * Fil solo (D-11) : un seul membre actif — indication sobre au compositeur,
    * jamais un blocage d'envoi. Dérivé du registre actif déjà chargé.
    */
   showSoloNotice?: boolean;
-  /** Retire ce fil quitté de ses archives (sa propre pierre, D-08) ; absent, le bouton est masqué. */
-  onRemoveArchived?: () => void;
+  /** Archive ce fil pour moi seul (0131) ; absent, le bouton est masqué. */
+  onArchiveForMe?: () => void;
+  /** Retire l'archive personnelle (0131) ; absent, le bouton est masqué. */
+  onUnarchiveForMe?: () => void;
+  /** Supprime ce fil pour moi seul (0131) ; absent, le bouton est masqué. */
+  onDeleteForMe?: () => void;
   /** Fenêtre chargée du fil : affiche « Charger plus » quand des anciens restent déchargés. */
   pageInfo?: { hasMoreBefore: boolean; remainingBefore: number; loaded: number; total: number };
   /** Élargit la fenêtre vers les messages plus anciens. */
@@ -148,7 +152,7 @@ function MessageBubble({
 }
 
 /** Zone de discussion : journal accessible, bulles, pièces jointes et saisie. */
-export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onArchiveConversation, onEditMessage, onDeleteMessage, onLeaveConversation, leaveDisabledReason = null, readOnly = false, showSoloNotice = false, onRemoveArchived, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
+export function ChatPanel({ conversation, messages, isSending = false, onSend, onSendMedia, onAddMember, onArchiveConversation, onEditMessage, onDeleteMessage, onLeaveConversation, readOnly = false, archivedForMe = false, showSoloNotice = false, onArchiveForMe, onUnarchiveForMe, onDeleteForMe, pageInfo, onLoadMore, isLoadingMore = false, onBackToList, composerRef, className }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<CompressedImage | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -247,6 +251,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
           <small className="block truncate text-[10px] text-muted">
             {readOnly ? (
               'Conversation quittée · lecture seule'
+            ) : archivedForMe ? (
+              'Archivée pour vous · écrivez pour la ramener'
             ) : conversation.type === 'direct' ? (
               'Échange privé'
             ) : (
@@ -273,21 +279,45 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             size="icon"
             icon="archive"
             onClick={onArchiveConversation}
-            aria-label={`Archiver la conversation ${conversation.title}`}
+            aria-label={`Archiver la conversation ${conversation.title} pour tout le foyer`}
+            title="Archiver pour tout le foyer (admin)"
             className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
           />
         ) : null}
-        {readOnly && onRemoveArchived ? (
+        {onArchiveForMe ? (
           <Button
             variant="quiet"
             size="sm"
-            icon="trash"
-            onClick={onRemoveArchived}
-            aria-label={`Retirer ${conversation.title} de mes archives`}
+            icon="archive"
+            onClick={onArchiveForMe}
+            aria-label={`Archiver la conversation ${conversation.title} pour moi`}
+            title="Archiver pour moi : elle quitte ma liste, les autres la gardent"
             className="shrink-0"
           >
-            Retirer de mes archives
+            Archiver
           </Button>
+        ) : null}
+        {onUnarchiveForMe ? (
+          <Button
+            variant="quiet"
+            size="sm"
+            onClick={onUnarchiveForMe}
+            aria-label={`Désarchiver la conversation ${conversation.title}`}
+            className="shrink-0"
+          >
+            Désarchiver
+          </Button>
+        ) : null}
+        {onDeleteForMe ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            icon="trash"
+            onClick={onDeleteForMe}
+            aria-label={`Supprimer la conversation ${conversation.title} pour moi`}
+            title="Supprimer pour moi : elle disparaît de ma vue, les autres la gardent"
+            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+          />
         ) : null}
         {!readOnly && onLeaveConversation ? (
           <Button
@@ -295,8 +325,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             size="sm"
             icon="logout"
             onClick={onLeaveConversation}
-            disabled={leaveDisabledReason !== null}
-            title={leaveDisabledReason ?? 'Quitter cette conversation'}
+            title="Quitter cette conversation"
             aria-label={`Quitter la conversation ${conversation.title}`}
             className="shrink-0"
           >

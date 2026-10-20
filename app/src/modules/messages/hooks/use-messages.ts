@@ -5,7 +5,7 @@ import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, removeArchivedConversation as removeArchivedConversationRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
+import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, deleteConversationForMe as deleteConversationForMeRow, archiveConversationForMe as archiveConversationForMeRow, unarchiveConversationForMe as unarchiveConversationForMeRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { ConversationMemberRow, MessageRow } from '@/types';
@@ -39,7 +39,7 @@ export function useReadConversations() {
 export interface MessagesFeed {
   /** Fils actifs (le membre courant y est actif) : triés par activité. */
   conversations: ConversationSummary[];
-  /** Fils quittés (pierre tombale) : archives en lecture seule. */
+  /** Fils quittés (pierre tombale) et archivés pour moi (0131) : hors liste active. */
   archivedConversations: ConversationSummary[];
   /** Appartenances ACTIVES déclarées par fil (pierres exclues). */
   memberIdsByConversation: Map<string, string[]>;
@@ -68,11 +68,16 @@ export interface MessagesFeed {
   editMessage: (conversationId: string, messageId: string, content: string) => Promise<void>;
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   leaveConversation: (conversationId: string) => Promise<void>;
-  /** Retire un fil quitté de ses archives (sa propre pierre, D-08). */
+  /** Retire un fil de ma vue : ma ligne d'appartenance (0131, D-08). */
   removeArchivedConversation: (conversationId: string) => Promise<void>;
+  /** Archive le fil pour moi seul (0131) : hors liste, écrivable. */
+  archiveForMe: (conversationId: string) => Promise<void>;
+  /** Retire l'archive personnelle (0131). */
+  unarchiveForMe: (conversationId: string) => Promise<void>;
   isCreating: boolean;
   isArchiving: boolean;
   isLeaving: boolean;
+  isArchivingForMe: boolean;
   isRemovingArchived: boolean;
 }
 
@@ -140,8 +145,20 @@ export function useMessagesFeed(): MessagesFeed {
     return grouped;
   }, [participantRows]);
 
-  // Fils quittés par le membre courant : leurs lignes portent sa pierre.
+  // Fils sortis de MA liste active : les miens quittés (pierre tombale) et
+  // ceux que j'ai archivés pour moi (0131) — les autres ne voient rien.
   const archivedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of participantRows) {
+      if (row.member_id !== currentMemberId) continue;
+      if (row.left_at || row.archived_at) ids.add(row.conversation_id);
+    }
+    return ids;
+  }, [currentMemberId, participantRows]);
+
+  // Fils que j'ai quittés : lecture seule. L'archive personnelle, elle, reste
+  // écrivable — écrire la lève (déclencheur `unarchive_on_send`, 0131).
+  const leftIds = useMemo(() => {
     const ids = new Set<string>();
     for (const row of participantRows) {
       if (row.member_id === currentMemberId && row.left_at) ids.add(row.conversation_id);
@@ -188,6 +205,7 @@ export function useMessagesFeed(): MessagesFeed {
         lastMessageMine: last?.isMine ?? false,
         unread: unseenLatest ? 1 : 0,
         isArchived: archivedIds.has(row.id),
+        isLeft: leftIds.has(row.id),
       } satisfies ConversationSummary;
     });
     // Les conversations les plus récentes d'abord ; celles sans message restent en fin de liste.
@@ -197,7 +215,7 @@ export function useMessagesFeed(): MessagesFeed {
       return activity(right).localeCompare(activity(left));
     });
     },
-    [archivedIds, currentMemberId, memberIdsByConversation, members, previewByConversation, readMap],
+    [archivedIds, currentMemberId, leftIds, memberIdsByConversation, members, previewByConversation, readMap],
   );
 
   const conversations = useMemo(
@@ -261,15 +279,21 @@ export function useMessagesFeed(): MessagesFeed {
   );
 
   const sendMutation = useMutation({
-    mutationFn: (input: { conversationId: string; content: string; mediaUrl?: string | null }) => {
+    mutationFn: async (input: { conversationId: string; content: string; mediaUrl?: string | null }) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
-      return createMessage({
+      const row = await createMessage({
         conversationId: input.conversationId,
         householdId,
         senderId: currentMemberId,
         content: input.content,
         mediaUrl: input.mediaUrl ?? null,
       });
+      // Démo locale : la règle « écrire désarchive » (0131) vit dans un
+      // déclencheur serveur ; ici elle est rejouée, une fois le message écrit.
+      if (data.kind === 'local') {
+        await unarchiveConversationForMeRow(input.conversationId, currentMemberId);
+      }
+      return row;
     },
     onMutate: async (input) => {
       if (!householdId) return { previous: undefined };
@@ -454,10 +478,74 @@ export function useMessagesFeed(): MessagesFeed {
    * Retrait d'un fil quitté de ses archives (D-08) : seule sa propre pierre
    * est retirée, le fil disparaît des archives. Restauré en cas de refus.
    */
-  const removeArchivedMutation = useMutation({
+  /**
+   * Archive personnelle (0131) : ma ligne porte `archived_at`, le fil quitte
+   * ma liste active sans que les autres voient rien. Optimiste, restaurée en
+   * cas de refus.
+   */
+  const archiveForMeMutation = useMutation({
     mutationFn: (conversationId: string) => {
-      if (!currentMemberId) throw new Error('Aucun membre courant pour retirer ce fil des archives.');
-      return removeArchivedConversationRow(conversationId, currentMemberId);
+      if (!currentMemberId) throw new Error('Aucun membre courant pour archiver ce fil.');
+      return archiveConversationForMeRow(conversationId, currentMemberId);
+    },
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: messageKeys.participants });
+      const previous = queryClient.getQueryData<ConversationMemberRow[]>(messageKeys.participants);
+      const stampedAt = new Date().toISOString();
+      queryClient.setQueryData<ConversationMemberRow[]>(messageKeys.participants, (current = []) =>
+        current.map((row) =>
+          row.conversation_id === conversationId && row.member_id === currentMemberId && !row.left_at
+            ? { ...row, archived_at: row.archived_at ?? stampedAt }
+            : row,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!context?.previous) return;
+      queryClient.setQueryData(messageKeys.participants, context.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  /** Désarchivage personnel (0131) : la marque tombe, le fil revient dans ma liste. */
+  const unarchiveForMeMutation = useMutation({
+    mutationFn: (conversationId: string) => {
+      if (!currentMemberId) throw new Error('Aucun membre courant pour désarchiver ce fil.');
+      return unarchiveConversationForMeRow(conversationId, currentMemberId);
+    },
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: messageKeys.participants });
+      const previous = queryClient.getQueryData<ConversationMemberRow[]>(messageKeys.participants);
+      queryClient.setQueryData<ConversationMemberRow[]>(messageKeys.participants, (current = []) =>
+        current.map((row) =>
+          row.conversation_id === conversationId && row.member_id === currentMemberId
+            ? { ...row, archived_at: null }
+            : row,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (!context?.previous) return;
+      queryClient.setQueryData(messageKeys.participants, context.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+  /**
+   * Suppression pour soi (0131) : ma ligne d'appartenance est effacée, le fil
+   * disparaît de ma vue. Il reste aux autres ; si j'étais le dernier membre,
+   * il n'appartient plus à personne. Restaurée en cas de refus.
+   */
+  const deleteForMeMutation = useMutation({
+    mutationFn: (conversationId: string) => {
+      if (!currentMemberId) throw new Error('Aucun membre courant pour supprimer ce fil.');
+      return deleteConversationForMeRow(conversationId, currentMemberId);
     },
     onMutate: async (conversationId) => {
       await queryClient.cancelQueries({ queryKey: messageKeys.participants });
@@ -505,8 +593,16 @@ export function useMessagesFeed(): MessagesFeed {
     [leaveMutation],
   );
   const removeArchivedConversation = useCallback(
-    async (conversationId: string) => removeArchivedMutation.mutateAsync(conversationId),
-    [removeArchivedMutation],
+    async (conversationId: string) => deleteForMeMutation.mutateAsync(conversationId),
+    [deleteForMeMutation],
+  );
+  const archiveForMe = useCallback(
+    async (conversationId: string) => archiveForMeMutation.mutateAsync(conversationId),
+    [archiveForMeMutation],
+  );
+  const unarchiveForMe = useCallback(
+    async (conversationId: string) => unarchiveForMeMutation.mutateAsync(conversationId),
+    [unarchiveForMeMutation],
   );
 
   const refetch = useCallback(() => {
@@ -538,10 +634,13 @@ export function useMessagesFeed(): MessagesFeed {
     deleteMessage,
     leaveConversation,
     removeArchivedConversation,
+    archiveForMe,
+    unarchiveForMe,
     isCreating: createMutation.isPending || addMembersMutation.isPending,
     isArchiving: archiveMutation.isPending,
     isLeaving: leaveMutation.isPending,
-    isRemovingArchived: removeArchivedMutation.isPending,
+    isRemovingArchived: deleteForMeMutation.isPending,
+    isArchivingForMe: archiveForMeMutation.isPending || unarchiveForMeMutation.isPending,
   };
 }
 
