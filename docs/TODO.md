@@ -631,6 +631,59 @@ qu'il n'a pas été ouvert.
 
 ---
 
+## Ouvert, consigné pendant la preuve d'usage des liens invités
+
+- [ ] **18. Le code de partage d'une liste de cadeaux disparaît à la fermeture — et le message accuse le mauvais appareil**
+
+`app/src/modules/cadeaux/components/gift-share-dialog.tsx:82` garde le code brut
+dans un `useState`. Fermer la boîte le perd définitivement : la base ne garde
+que `gift_list_invites.token_hash` (`gift-list-invite/index.ts:598`), donc rien
+ne peut le réafficher. La boîte dit alors « Code actif créé ailleurs :
+régénérez pour l'afficher sur cet appareil » (`:224-232`) — **créé ailleurs**
+alors qu'il vient d'être créé ici même. Régénérer invalide le lien déjà
+transmis, pour une raison qui n'a rien à voir avec la sécurité.
+
+L'Ardoise a déjà tranché ce point : `ardoise-detail-page.tsx:481-493` mémorise
+le code brut dans `localStorage` (`eo:ardoise-code:<id>`), et le commentaire
+`:478-480` dit pourquoi (le serveur ne conserve que l'empreinte). Le formulaire
+cadeau n'a pas suivi ; c'est la même situation, pas une décision différente.
+
+**Terminé quand** créer un code, fermer la boîte et la rouvrir sur le même
+appareil réaffiche le code et son lien, tandis qu'un code créé sur un autre
+appareil demande toujours une régénération — et que le libellé ne dit « créé
+ailleurs » que dans ce second cas.
+
+---
+
+- [ ] **19. Une photo ajoutée à un article cadeau est stockée en `data:` — l'invité ne la verra jamais**
+
+`app/src/modules/cadeaux/components/gift-form-dialog.tsx:36-55` (`readPhoto`)
+encode la photo choisie en `data:` URL, et `submit` la transmet telle quelle :
+`cadeaux-page.tsx:172` l'écrit dans `gift_items.photo_url`. Or la surface
+invitée ne sert que des chemins bornés au foyer — `0128` rend `null` pour toute
+autre forme, et `gift-list-invite/index.ts:865` ne signe qu'un chemin. Un
+article dont la photo vient du formulaire n'a donc **jamais** d'image chez
+l'invité, quel que soit le soin visible côté membre.
+
+Le seul chemin qui produit un chemin de bucket est la promotion d'une idée
+(`cadeaux-page.tsx:199` dépose, `:283-285` recopie `photoStored`) : c'est le
+seul cas où `guest-cadeau-page.tsx:371` sert quelque chose. Deux surfaces se
+contredisent donc sur ce que signifie `photo_url` pour un article.
+
+**Ce qu'il faut trancher** : déposer les photos d'articles comme celles des
+idées (`depositHouseholdFile`, dossier `cadeaux`, `storedValueOf` à l'écriture,
+`replacedMediaPath` au remplacement) — c'est ce que la surface invitée
+suppose ; ou assumer qu'un article ne porte pas de photo servie et retirer la
+branche `<img>` de la page invitée, avec la raison écrite. Le `data:` en
+colonne texte a un second coût, indépendant de la question : ni déduplication
+ni nettoyage.
+
+**Terminé quand** les deux surfaces disent la même chose et qu'un test le
+tient : soit une photo ajoutée par le formulaire d'article sort signée chez
+l'invité, soit la page invitée ne prétend plus en afficher une.
+
+---
+
 ## Décidé, sans action
 
 **Les listes de privilèges en dur restent.** Elles ne sont pas redondantes avec
