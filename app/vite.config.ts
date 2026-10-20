@@ -71,10 +71,14 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}', '../supabase/functions/**/*.test.ts'],
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
-    // Les fichiers de test partagent le moteur IndexedDB simulé : on les
-    // exécute séquentiellement pour éviter les courses entre suites.
+    // Les fichiers tournent en parallèle. La sérialisation reposait sur « les
+    // suites partagent le moteur IndexedDB simulé », ce qui n'est plus vrai :
+    // `isolate` (défaut) donne à chaque fichier son propre environnement, donc
+    // son propre `fake-indexeddb`, et `src/test/setup.ts` nomme en plus la base
+    // d'après le chemin du fichier. En séquentiel, 162 fichiers payaient 162
+    // démarrages : 8 minutes contre 2 minutes 20.
     pool: 'forks',
-    fileParallelism: false,
+    fileParallelism: true,
     coverage: { reporter: ['text', 'html'], include: ['src/**/*.{ts,tsx}'], exclude: ['src/**/*.test.*', 'src/test/**'] },
   },
 });
