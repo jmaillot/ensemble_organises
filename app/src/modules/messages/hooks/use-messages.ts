@@ -145,6 +145,25 @@ export function useMessagesFeed(): MessagesFeed {
     return grouped;
   }, [participantRows]);
 
+  // Registre des PARTIS, du départ le plus récent au plus ancien : il ne sert
+  // qu'au nom d'un direct dont l'interlocuteur a quitté le fil (le titre
+  // tombait sinon sur « Foyer »). Le plus récent d'abord, parce que c'est le
+  // dernier nom connu de l'échange.
+  const formerIdsByConversation = useMemo(() => {
+    const grouped = new Map<string, { memberId: string; leftAt: string }[]>();
+    for (const row of participantRows) {
+      if (!row.left_at) continue;
+      const entry = { memberId: row.member_id, leftAt: row.left_at };
+      const existing = grouped.get(row.conversation_id);
+      if (existing) existing.push(entry);
+      else grouped.set(row.conversation_id, [entry]);
+    }
+    for (const entries of grouped.values()) {
+      entries.sort((left, right) => right.leftAt.localeCompare(left.leftAt));
+    }
+    return grouped;
+  }, [participantRows]);
+
   // Fils sortis de MA liste active : les miens quittés (pierre tombale) et
   // ceux que j'ai archivés pour moi (0131) — les autres ne voient rien.
   const archivedIds = useMemo(() => {
@@ -189,6 +208,10 @@ export function useMessagesFeed(): MessagesFeed {
         .filter((member): member is NonNullable<typeof member> => Boolean(member))
         .map(toParticipant);
       const last = preview ? toMessage(preview, { currentMemberId, members }) : null;
+      const formerParticipants = (formerIdsByConversation.get(row.id) ?? [])
+        .map((entry) => memberById.get(entry.memberId))
+        .filter((member): member is NonNullable<typeof member> => Boolean(member))
+        .map(toParticipant);
       const readAt = readMap[row.id] ?? '';
       // Une ligne système (départ D-09, arrivée D-11) n'est jamais un non-lu : le fil
       // lui-même est le signal, sans pastille (prouvé côté SQL par 0040/0042,
@@ -197,9 +220,11 @@ export function useMessagesFeed(): MessagesFeed {
       return {
         id: row.id,
         type: row.type,
-        title: resolveConversationTitle(row, participants, currentMemberId),
+        title: resolveConversationTitle(row, participants, currentMemberId, formerParticipants),
         participants,
-        colorTag: participants.find((participant) => participant.id !== currentMemberId)?.colorTag ?? 'accent',
+        colorTag:
+          (participants.find((participant) => participant.id !== currentMemberId) ?? formerParticipants[0])
+            ?.colorTag ?? 'accent',
         lastMessage: last?.content ?? null,
         lastMessageAt: last?.createdAt ?? null,
         lastMessageMine: last?.isMine ?? false,
@@ -215,7 +240,7 @@ export function useMessagesFeed(): MessagesFeed {
       return activity(right).localeCompare(activity(left));
     });
     },
-    [archivedIds, currentMemberId, leftIds, memberIdsByConversation, members, previewByConversation, readMap],
+    [archivedIds, currentMemberId, formerIdsByConversation, leftIds, memberIdsByConversation, members, previewByConversation, readMap],
   );
 
   const conversations = useMemo(

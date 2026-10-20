@@ -73,17 +73,25 @@ export function formatListTime(iso: string | null) {
 /**
  * Titre d'une conversation : les prénoms des autres participants pour un
  * échange direct, le `title` du groupe sinon (jamais l'identifiant SQL).
+ *
+ * `formerParticipants` porte les membres partis (pierre tombale). Un direct
+ * dont l'interlocuteur est parti garde son prénom : sans lui, le titre
+ * retomberait sur « Foyer », et l'échange privé deviendrait anonyme alors que
+ * c'est précisément le nom qu'on cherche dans sa liste.
  */
 export function resolveConversationTitle(
   row: ConversationRow,
   participants: ConversationParticipant[],
   currentMemberId: string | null,
+  formerParticipants: ConversationParticipant[] = [],
 ): string {
   if (row.type === 'groupe') return row.title?.trim() || 'Groupe du foyer';
   const others = participants.filter((participant) => participant.id !== currentMemberId);
-  if (others.length === 0) return firstNameOf(row.title?.trim() || 'Foyer');
   if (others.length === 1) return firstNameOf(others[0].name);
-  return others.map((participant) => firstNameOf(participant.name)).join(', ');
+  if (others.length > 1) return others.map((participant) => firstNameOf(participant.name)).join(', ');
+  const former = formerParticipants.filter((participant) => participant.id !== currentMemberId);
+  if (former.length > 0) return firstNameOf(former[0].name);
+  return firstNameOf(row.title?.trim() || 'Foyer');
 }
 
 export function toParticipant(member: HouseholdMemberRow): ConversationParticipant {
