@@ -282,4 +282,13 @@ select testkit.eq(
     where conversation_id = (select row_id from testkit.fx where key = 'conv2')),
   0::bigint, 'et il ne reste aucune appartenance');
 
+-- Le fil, lui, n'est pas effacé : personne ne peut plus le lire (la visibilité
+-- dérive de l'appartenance), mais la ligne demeure. Assertion volontairement
+-- conservée : elle fixe l'état que TODO #21 doit trancher, et la purge, si elle
+-- est décidée, fera rougir cette ligne avant d'être écrite.
+select testkit.eq(
+  (select count(*) from public.conversations
+    where id = (select row_id from testkit.fx where key = 'conv2')),
+  1::bigint, 'la ligne de conversation subsiste sans aucun membre');
+
 rollback;

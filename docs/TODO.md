@@ -756,6 +756,29 @@ formulaire qui ne le lui donnait pas.
 
 ---
 
+## Ouvert, consigné pendant la livraison de 0131
+
+- [ ] **21. Un fil dont le dernier membre a supprimé sa ligne reste en base**
+
+`delete_conversation_for_me` (0131) efface **une** ligne d'appartenance. Quand
+c'est celle du dernier membre, la conversation disparaît de toutes les listes —
+la visibilité dérive de l'appartenance — mais la ligne `conversations` et ses
+`messages` subsistent : personne ne peut plus les atteindre, ni les relire, ni
+les purger depuis l'application.
+
+Ce n'est pas une fuite : la RLS les rend invisibles. C'est une ligne morte, et
+un écart entre ce que le geste annonce (« supprimer pour vous ») et ce qu'il
+laisse quand on est seul — le fil était alors l'échange privé de deux
+personnes, et il reste en base.
+
+**Terminé quand** la décision est prise et appliquée : soit la suppression de
+la dernière appartenance emporte le fil et ses messages, soit la conservation
+est assumée et écrite (durée, purge, base légale). Le test `0131` §9 prouve
+aujourd'hui l'état actuel — zéro appartenance, ligne conservée — pour que le
+changement se voie dans la suite SQL.
+
+---
+
 ## Décidé, sans action
 
 **Les listes de privilèges en dur restent.** Elles ne sont pas redondantes avec
