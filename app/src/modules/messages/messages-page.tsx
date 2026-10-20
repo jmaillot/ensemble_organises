@@ -331,7 +331,7 @@ export default function MessagesPage() {
         title="Supprimer pour vous ?"
         description={
           isSolo
-            ? 'Vous êtes le dernier membre : ce fil disparaîtra pour tout le monde, personne ne le verra plus. Cette action ne supprime pas les messages de la base.'
+            ? 'Vous êtes le dernier membre : ce fil et ses messages seront définitivement supprimés.'
             : 'Ce fil disparaîtra de votre vue. Les autres membres le conservent, avec ses messages ; cette action ne supprime la conversation pour personne d’autre.'
         }
         confirmLabel="Supprimer pour moi"

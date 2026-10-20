@@ -758,7 +758,7 @@ formulaire qui ne le lui donnait pas.
 
 ## Ouvert, consigné pendant la livraison de 0131
 
-- [ ] **21. Un fil dont le dernier membre a supprimé sa ligne reste en base**
+- [x] **21. Un fil dont le dernier membre a supprimé sa ligne reste en base**
 
 `delete_conversation_for_me` (0131) efface **une** ligne d'appartenance. Quand
 c'est celle du dernier membre, la conversation disparaît de toutes les listes —
@@ -773,9 +773,27 @@ personnes, et il reste en base.
 
 **Terminé quand** la décision est prise et appliquée : soit la suppression de
 la dernière appartenance emporte le fil et ses messages, soit la conservation
-est assumée et écrite (durée, purge, base légale). Le test `0131` §9 prouve
-aujourd'hui l'état actuel — zéro appartenance, ligne conservée — pour que le
-changement se voie dans la suite SQL.
+est assumée et écrite (durée, purge, base légale).
+
+**Clos le 2026-10-20** — décision de l'exploitant : purger. `0132` supprime la
+conversation quand la dernière appartenance part ; la cascade de `0004` emporte
+messages, appartenances et périodes. Un verrou `for update` sur la
+conversation sérialise deux suppressions simultanées, sinon deux membres
+pourraient chacun constater une ligne restante et laisser le fil mort.
+
+Ce qui n'est **pas** purgé, et c'est voulu : le fil où subsiste une **pierre
+tombale**. Le membre parti lit encore l'historique en lecture seule ; effacer
+la conversation lui retirerait cet accès. Le test `0132` le prouve dans les
+deux sens, et il a été vu **rouge** sur la fonction de `0131` (`purged` attendu
+`true`, obtenu `false`).
+
+Les fichiers Storage restent, comme pour tout message supprimé aujourd'hui —
+`deleteMessage` ne retire déjà que la ligne en base. Ce n'est donc pas une
+régression de cette purge, mais la règle existante ; si l'on veut un jour
+nettoyer les objets, cela vaut pour les messages comme pour les fils.
+
+La copie de la modale ne prétend plus le contraire : elle annonçait « cette
+action ne supprime pas les messages de la base », ce qui devenait faux.
 
 ---
 
