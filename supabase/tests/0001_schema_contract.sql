@@ -82,7 +82,7 @@ begin
           ('trip_guests', ARRAY['id', 'trip_id', 'display_name', 'ticket_hash', 'created_at']::text[]),
           ('trip_invites', ARRAY['id', 'trip_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('conversations', ARRAY['id', 'household_id', 'type', 'title', 'created_at']::text[]),
-          ('conversation_members', ARRAY['conversation_id', 'member_id', 'left_at']::text[]),
+          ('conversation_members', ARRAY['conversation_id', 'member_id', 'left_at', 'archived_at']::text[]),
           ('conversation_membership_periods', ARRAY['id', 'conversation_id', 'member_id', 'joined_at', 'left_at']::text[]),
           ('messages', ARRAY['id', 'conversation_id', 'household_id', 'sender_id', 'content', 'media_url', 'created_at']::text[]),
           ('dashboard_widgets', ARRAY['id', 'member_id', 'household_id', 'widget_type', 'position_x', 'position_y', 'width', 'height', 'settings']::text[]),

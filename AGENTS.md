@@ -494,7 +494,7 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 
 ### Messages
 - `conversations` (id, household_id, type [direct/groupe])
-- `conversation_members` (conversation_id, member_id)
+- `conversation_members` (conversation_id, member_id, left_at, archived_at) — `left_at` est la pierre tombale (départ), `archived_at` l'archive **personnelle** : le fil sort de la liste du membre sans qu'il le quitte, reste lisible, et le premier message le ramène (0131)
 - `messages` (id, conversation_id, sender_id, content, media_url, created_at)
 - ⚠️ Point d'attention : une vraie messagerie temps réel est un gros morceau (accusés de lecture, notifications, pièces jointes). envisager un scope réduit (fil de discussion simple par foyer, sans conversations privées)
 
