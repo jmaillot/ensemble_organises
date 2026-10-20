@@ -53,15 +53,29 @@ export interface GiftShareDialogProps {
  * affiché une fois en mono + QR, mention code-actif-créé-ailleurs,
  * « Arrêter le partage » avec revoke.
  *
- * Le code brut vit dans l'état du dialogue : fermer (naviguer) le masque.
+ * Le code brut n'est rendu qu'à sa création (la base ne garde que
+ * `gift_list_invites.token_hash`) ; il est mémorisé par liste dans
+ * `localStorage`, comme le panneau ardoise, donc fermer la boîte ne le perd
+ * plus sur l'appareil qui l'a créé. La mention « créé ailleurs » ne couvre
+ * plus que le cas qu'elle décrit : un code généré sur un autre appareil.
  * Le rachat externe (D-16/D-17) passe par le lien : inscription avec l'e-mail
  * invité puis activation via la branche e-mail de `redeem_gift_list_invite`
  * (OQ-1 OPTION A, Edge user-only, plan 05-03).
  */
+function readStoredCode(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    // Stockage indisponible (navigation privée) : l'affichage en mémoire suffit.
+    return null;
+  }
+}
+
 function GiftCodePanel({
   list,
   open,
   summary,
+  summaryBusy,
   codeError,
   onRefresh,
   onEnsureLectureShare,
@@ -74,12 +88,15 @@ function GiftCodePanel({
    * formulaire et ce panneau disent toujours la même chose.
    */
   summary: GiftListInviteSummary | null;
+  /** Un chargement de résumé est en vol : son contenu n'est pas encore l'état vrai. */
+  summaryBusy: boolean;
   codeError: boolean;
   onRefresh: () => Promise<void>;
   onEnsureLectureShare: (listId: string, email: string) => Promise<void>;
 }) {
   const toast = useToast();
-  const [lastCode, setLastCode] = useState<string | null>(null);
+  const codeKey = `eo:cadeaux-code:${list.id}`;
+  const [lastCode, setLastCode] = useState<string | null>(() => readStoredCode(codeKey));
   const [busy, setBusy] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [hostMessage, setHostMessage] = useState('');
@@ -87,19 +104,43 @@ function GiftCodePanel({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendOk, setSendOk] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
-      // Navigation / fermeture : le code brut ne survit pas au dialogue.
-      setLastCode(null);
-      return;
+  const rememberCode = (code: string | null) => {
+    setLastCode(code);
+    try {
+      if (code === null) localStorage.removeItem(codeKey);
+      else localStorage.setItem(codeKey, code);
+    } catch {
+      // Stockage indisponible : l'affichage en mémoire suffit.
     }
-    // Réouverture : le formulaire d'envoi repart vierge (le code, lui, se
-    // régénère via le bouton — jamais réaffiché depuis le serveur).
+  };
+
+  // La boîte peut changer de liste sans être démontée : on relit la mémoire de
+  // la liste affichée, sinon on montrerait le code de la précédente.
+  useEffect(() => {
+    setLastCode(readStoredCode(codeKey));
+  }, [codeKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    // Réouverture : le formulaire d'envoi repart vierge ; le code, lui, est
+    // relu dans la mémoire locale (il ne dépend que de cet appareil).
     setRecipient('');
     setHostMessage('');
     setSendError(null);
     setSendOk(null);
   }, [open]);
+
+  // Code arrêté (ou régénéré depuis un autre appareil) : le code mémorisé est
+  // périmé, on le purge. Deux gardes — le résumé doit exister et ne pas être
+  // en vol : pendant le rechargement qui suit une génération, il porte encore
+  // l'état d'avant (`hasCode: false`) et purgerait le code tout juste créé.
+  // `rememberCode` n'est pas en dépendance : recréée à chaque rendu, elle
+  // relancerait l'effet sans que rien n'ait changé ; elle ne lit que `codeKey`,
+  // que le parent invalide avec le résumé quand la liste change.
+  useEffect(() => {
+    if (!open || summaryBusy || summary === null) return;
+    if (!summary.hasCode && lastCode !== null) rememberCode(null);
+  }, [open, summaryBusy, summary, lastCode]);
 
   const refresh = () => onRefresh();
 
@@ -136,7 +177,7 @@ function GiftCodePanel({
     setBusy(true);
     createGiftListInviteCode(list.id)
       .then((created) => {
-        setLastCode(created.code);
+        rememberCode(created.code);
         return refresh();
       })
       .then(() => toast('Nouveau code généré : l’ancien est invalidé.'))
@@ -150,7 +191,7 @@ function GiftCodePanel({
     setBusy(true);
     revokeGiftListInviteCode(list.id)
       .then(() => {
-        setLastCode(null);
+        rememberCode(null);
         return refresh();
       })
       .then(() => toast('Partage arrêté : le code ne passe plus.'))
@@ -341,6 +382,7 @@ export function GiftShareDialog({
    * `revokeGiftListInviteCode` est réutilisé tel quel.
    */
   const [summary, setSummary] = useState<GiftListInviteSummary | null>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
   const [codeError, setCodeError] = useState(false);
   const [linkReminder, setLinkReminder] = useState(false);
   const [revokeBusy, setRevokeBusy] = useState(false);
@@ -360,6 +402,10 @@ export function GiftShareDialog({
   useEffect(() => {
     if (!open || !listId) return;
     let active = true;
+    // Le résumé appartient à une liste : changer de liste repart de zéro, sinon
+    // le panneau lirait l'état de la précédente.
+    setSummary(null);
+    setSummaryBusy(true);
     fetchGiftListInviteSummary(listId)
       .then((result) => {
         if (active) {
@@ -369,6 +415,9 @@ export function GiftShareDialog({
       })
       .catch(() => {
         if (active) setCodeError(true);
+      })
+      .finally(() => {
+        if (active) setSummaryBusy(false);
       });
     return () => {
       active = false;
@@ -377,12 +426,14 @@ export function GiftShareDialog({
 
   const refreshSummary = () => {
     if (!listId) return Promise.resolve();
+    setSummaryBusy(true);
     return fetchGiftListInviteSummary(listId)
       .then((result) => {
         setSummary(result);
         setCodeError(false);
       })
-      .catch(() => setCodeError(true));
+      .catch(() => setCodeError(true))
+      .finally(() => setSummaryBusy(false));
   };
 
   const linkLive = summary?.hasCode === true && summary?.isActive === true;
@@ -503,6 +554,7 @@ export function GiftShareDialog({
             list={list}
             open={open}
             summary={summary}
+            summaryBusy={summaryBusy}
             codeError={codeError}
             onRefresh={refreshSummary}
             onEnsureLectureShare={onEnsureLectureShare}

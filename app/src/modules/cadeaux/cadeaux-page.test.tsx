@@ -275,7 +275,9 @@ describe('CadeauxPage', () => {
     expect(nextIdeaOccasion({ gifteeContactId: null }, [], '2023-06-01')).toBeNull();
   });
 
-  it('panneau partage : Générer puis Régénérer, code brut masqué après navigation', async () => {
+  it('panneau partage : Générer, puis code brut réaffiché après fermeture sur le même appareil (#18)', async () => {
+    // La mémoire du code est locale : un test précédent ne doit pas la fournir.
+    localStorage.clear();
     const user = userEvent.setup();
     renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
 
@@ -289,16 +291,17 @@ describe('CadeauxPage', () => {
     expect(within(dialog).getByText(/\/invitation\/cadeau\?code=/)).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Régénérer' })).toBeInTheDocument());
 
-    // Fermer = naviguer : le code brut ne survit pas au dialogue.
+    // Fermer puis rouvrir sur le même appareil : le code est relu dans la
+    // mémoire locale — le serveur n'en garde que l'empreinte (#18). Il n'est
+    // donc plus annoncé comme « créé ailleurs », contrairement à un code
+    // généré depuis un autre appareil.
     await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /Partager/ }));
     const reopened = await screen.findByRole('dialog');
-    expect(within(reopened).queryByText(TEST_CODE)).not.toBeInTheDocument();
-    expect(
-      within(reopened).getByText('Code actif créé ailleurs : régénérez pour l’afficher sur cet appareil.'),
-    ).toBeInTheDocument();
+    expect(await within(reopened).findByText(TEST_CODE)).toBeInTheDocument();
+    expect(within(reopened).queryByText(/créé ailleurs/)).not.toBeInTheDocument();
   });
 });
 

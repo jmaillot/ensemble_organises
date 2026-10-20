@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -218,5 +219,65 @@ describe('GiftShareDialog — indépendance partages / lien (G-06-1d)', () => {
       expect(share.email).toBeNull();
     }
     expect(within(dialog).queryByText(/existe encore/)).not.toBeInTheDocument();
+  });
+});
+
+describe('GiftShareDialog — code de partage mémorisé (#18)', () => {
+  beforeEach(() => {
+    inviteState = { hasCode: false, isActive: false };
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('rouvrir la boîte sur le même appareil réaffiche le code créé', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(listId: string, shares: GiftShareInput[]) => void>();
+    const onEnsureLectureShare = vi.fn(async (_listId: string, _email: string) => {});
+
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen((value) => !value)}>
+            basculer
+          </button>
+          <GiftShareDialog
+            open={open}
+            onOpenChange={setOpen}
+            list={LIST}
+            members={MEMBERS}
+            existingShares={[]}
+            onSubmit={onSubmit}
+            onEnsureLectureShare={onEnsureLectureShare}
+          />
+        </>
+      );
+    }
+
+    renderWithProviders(<Harness />);
+    const dialog = await openDialog();
+    await user.click(within(dialog).getByRole('button', { name: 'Générer un code' }));
+    expect(await within(dialog).findByText('CODECADEAU22CHARS012345')).toBeInTheDocument();
+
+    // Fermer par le bouton du dialogue : Radix démonte le contenu, donc l'état
+    // du panneau disparaît. (Cliquer hors du dialogue est impossible tant
+    // qu'il est modal : c'est `pointer-events` qui protège l'arrière-plan.)
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Rouvrir : le code est relu dans la mémoire locale, pas redemandé au
+    // serveur (qui n'en garde que l'empreinte) ni régénéré.
+    await user.click(screen.getByText('basculer'));
+    const reopened = await openDialog();
+    expect(await within(reopened).findByText('CODECADEAU22CHARS012345')).toBeInTheDocument();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(within(reopened).queryByText(/créé ailleurs/)).not.toBeInTheDocument();
+  });
+
+  it('un code créé sur un autre appareil reste annoncé comme tel', async () => {
+    inviteState = { hasCode: true, isActive: true };
+    renderDialog();
+    const dialog = await openDialog();
+    expect(await within(dialog).findByText(/créé ailleurs/)).toBeInTheDocument();
   });
 });
