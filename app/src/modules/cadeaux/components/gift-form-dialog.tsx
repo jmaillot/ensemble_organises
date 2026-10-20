@@ -26,30 +26,11 @@ const parsePrice = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const MAX_EDGE = 1200;
-
-/**
- * Compression native avant enregistrement : `createImageBitmap` + `<canvas>`,
- * WebP lorsque le navigateur l'encode, JPEG sinon. Sans ces API, l'aperçu
- * objet est conservé tel quel.
- */
-async function readPhoto(file: File): Promise<string> {
-  if (typeof createImageBitmap !== 'function') return URL.createObjectURL(file);
-  const bitmap = await createImageBitmap(file);
-  try {
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) return URL.createObjectURL(file);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const webp = canvas.toDataURL('image/webp', 0.82);
-    if (webp.startsWith('data:image/webp')) return webp;
-    return canvas.toDataURL('image/jpeg', 0.82);
-  } finally {
-    bitmap.close();
-  }
+export interface GiftFormResult {
+  values: NewGiftItemInput;
+  /** Fichier déposé par la page à l'enregistrement (`depositHouseholdFile`, dossier `cadeaux`). */
+  photoFile: File | null;
+  photoRemoved: boolean;
 }
 
 export interface GiftFormDialogProps {
@@ -59,7 +40,7 @@ export interface GiftFormDialogProps {
   defaultListId: string | null;
   /** Idée en cours d'édition, `null` pour une création. */
   item?: GiftItem | null;
-  onSubmit: (values: NewGiftItemInput) => void;
+  onSubmit: (result: GiftFormResult) => void;
   isPending?: boolean;
 }
 
@@ -72,13 +53,13 @@ export function GiftFormDialog({
   onSubmit,
   isPending = false,
 }: GiftFormDialogProps) {
-  // `photoUrl` porte la valeur de COLONNE soumise (chemin de bucket pour un
-  // dépôt promu, `data:`/`blob:` sinon) ; `photoPreview` n'est que l'aperçu
-  // affichable (URL signée forgée à la lecture pour un chemin, D-01).
-  const [photoUrl, setPhotoUrl] = useState<string | null>(item?.photoStored ?? null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(item?.photoUrl ?? null);
+  // Valeur de COLONNE soumise : chemin de bucket pour un dépôt, `data:`/`blob:`
+  // hérité pour un article ancien. La page la remplace par le chemin du dépôt
+  // quand `photoFile` est fourni (même partage des rôles que la boîte « idée »).
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const {
     register,
@@ -99,36 +80,45 @@ export function GiftFormDialog({
       url: item?.url ?? '',
       comment: item?.comment ?? '',
     });
-    setPhotoUrl(item?.photoStored ?? null);
-    setPhotoPreview(item?.photoUrl ?? null);
+    setPhotoFile(null);
+    setPhotoRemoved(false);
+    setPreviewUrl(null);
     setFileName(null);
-    setPhotoError(null);
   }, [defaultListId, item, lists, open, reset]);
 
-  const pickPhoto = async (file: File | undefined) => {
+  useEffect(() => {
+    if (!photoFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
+  const displayedPhoto = previewUrl ?? (photoRemoved ? null : (item?.photoUrl ?? null));
+
+  const pickPhoto = (file: File | undefined) => {
     if (!file) return;
     setFileName(file.name);
-    try {
-      const encoded = await readPhoto(file);
-      setPhotoUrl(encoded);
-      setPhotoPreview(encoded);
-      setPhotoError(null);
-    } catch {
-      const objectUrl = URL.createObjectURL(file);
-      setPhotoUrl(objectUrl);
-      setPhotoPreview(objectUrl);
-      setPhotoError('Photo conservée sans compression sur ce navigateur.');
-    }
+    setPhotoFile(file);
+    setPhotoRemoved(false);
   };
 
   const submit = (values: FormValues) => {
     onSubmit({
-      listId: values.listId,
-      name: values.name,
-      price: values.price === '' ? null : roundPrice(parsePrice(values.price)),
-      url: values.url === '' ? null : values.url,
-      comment: values.comment === '' ? null : values.comment,
-      photoUrl,
+      values: {
+        listId: values.listId,
+        name: values.name,
+        price: values.price === '' ? null : roundPrice(parsePrice(values.price)),
+        url: values.url === '' ? null : values.url,
+        comment: values.comment === '' ? null : values.comment,
+        // Valeur de COLONNE si la photo n'est pas touchée (chemin du bucket,
+        // D-01) : re-soumettre `photoUrl` persisterait l'URL signée affichée.
+        photoUrl: photoRemoved ? null : (item?.photoStored ?? null),
+      },
+      photoFile,
+      photoRemoved,
     });
   };
 
@@ -168,11 +158,11 @@ export function GiftFormDialog({
           <Field label="Commentaire" error={errors.comment?.message} optional>
             {(props) => <Textarea {...props} rows={2} placeholder="Ex. offrir avec un petit voucher" {...register('comment')} />}
           </Field>
-          <Field label="Photo" optional hint="Compression automatique en WebP">
+          <Field label="Photo" optional hint="Bucket privé, compression WebP au dépôt">
             {(props) => (
               <div className="flex flex-wrap items-center gap-3">
-                {photoPreview ? (
-                  <img src={photoPreview} alt="" className="h-14 w-14 rounded-[11px] object-cover" />
+                {displayedPhoto ? (
+                  <img src={displayedPhoto} alt="" className="h-14 w-14 rounded-[11px] object-cover" />
                 ) : (
                   <span className="grid h-14 w-14 place-items-center rounded-[11px] bg-bg text-muted">
                     <Icon name="image" />
@@ -183,17 +173,26 @@ export function GiftFormDialog({
                   type="file"
                   accept="image/*"
                   className="text-[11px] text-muted file:mr-3 file:min-h-9 file:rounded-[10px] file:border-0 file:bg-accent-soft file:px-3 file:text-[12px] file:font-bold file:text-accent-strong"
-                  onChange={(event) => void pickPhoto(event.target.files?.[0])}
+                  onChange={(event) => pickPhoto(event.target.files?.[0])}
                 />
+                {displayedPhoto ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setPhotoFile(null);
+                      setPhotoRemoved(true);
+                      setFileName(null);
+                    }}
+                  >
+                    Retirer
+                  </Button>
+                ) : null}
                 {fileName ? <span className="text-[11px] text-muted">{fileName}</span> : null}
               </div>
             )}
           </Field>
-          {photoError ? (
-            <p role="status" className="m-0 text-[11px] text-muted">
-              {photoError}
-            </p>
-          ) : null}
           {lists.some((list) => list.isPrivate && list.id === (item?.listId ?? defaultListId)) ? (
             <p className="m-0 text-[11px] text-muted">
               {`Cette liste est ${visibilityLabel.privee.toLowerCase()} : personne ne la verra tant que vous ne l’aurez pas partagée.`}

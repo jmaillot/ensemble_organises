@@ -806,6 +806,69 @@ describe('CadeauxPage — photos en colonne (D-01, D-03, WR-10)', () => {
     expect(removeMock).not.toHaveBeenCalledWith('household-martin/cadeaux/nouvelle.webp');
   });
 
+  it('ajouter un article avec photo : gift_items.photo_url porte le CHEMIN du bucket (#19)', async () => {
+    const user = userEvent.setup();
+    depositMock.mockResolvedValue({
+      url: 'https://signed.example/household-martin/cadeaux/fichier.webp',
+      path: 'household-martin/cadeaux/fichier.webp',
+      name: 'photo.jpg',
+      mime: 'image/webp',
+      size: 18,
+    });
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    // Les données de démo arrivent : sans elles, « Ajouter une idée » reste
+    // désactivé (aucune liste active) et le clic n'ouvrirait rien.
+    expect(await screen.findByText('Atelier céramique')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ajouter une idée' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Nom du cadeau/), 'Vase');
+    await user.upload(
+      within(dialog).getByLabelText(/^Photo/),
+      new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Ajouter l’idée' }));
+
+    await waitFor(async () => {
+      const items = await data.list<GiftItemRow>('gift_items', { household_id: DEMO_HOUSEHOLD_ID });
+      const created = items.find((item) => item.name === 'Vase');
+      expect(created).toBeDefined();
+      // Un chemin que la surface invitée sait signer (0128), jamais une URL
+      // signée éphémère ni un `data:` que l'invité refuserait.
+      expect(created?.photo_url).toBe('household-martin/cadeaux/fichier.webp');
+      expect(created?.photo_url).not.toMatch(/^https?:|^data:/);
+    });
+    expect(depositMock).toHaveBeenCalledWith(expect.objectContaining({ folder: 'cadeaux' }));
+  });
+
+  it('changer la photo d’un article pose le nouveau chemin et retire l’objet précédent (#19)', async () => {
+    const user = userEvent.setup();
+    await data.update<GiftItemRow>('gift_items', 'gift-1', {
+      photo_url: 'household-martin/cadeaux/ancienne.webp',
+    });
+    depositMock.mockResolvedValue({
+      url: 'https://signed.example/household-martin/cadeaux/nouvelle.webp',
+      path: 'household-martin/cadeaux/nouvelle.webp',
+      name: 'photo.jpg',
+      mime: 'image/webp',
+      size: 18,
+    });
+    renderWithProviders(<CadeauxPage />, { route: '/cadeaux' });
+
+    await user.click(await screen.findByRole('button', { name: 'Modifier Atelier céramique' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.upload(
+      within(dialog).getByLabelText(/^Photo/),
+      new File(['pixels'], 'photo.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => expect(removeMock).toHaveBeenCalledWith('household-martin/cadeaux/ancienne.webp'));
+    const rows = (await data.list<GiftItemRow>('gift_items', { id: 'gift-1' })) as GiftItemRow[];
+    expect(rows[0].photo_url).toBe('household-martin/cadeaux/nouvelle.webp');
+    expect(removeMock).not.toHaveBeenCalledWith('household-martin/cadeaux/nouvelle.webp');
+  });
+
   it('promouvoir une idée à photo copie le CHEMIN en article, pas l’URL affichée (D-01, D-05)', async () => {
     const user = userEvent.setup();
     await data.update<GiftIdeaRow>('gift_ideas', 'idea-2', { photo_url: 'household-martin/cadeaux/idee.webp' });

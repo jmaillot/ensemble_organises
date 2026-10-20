@@ -35,9 +35,8 @@ import {
   type GiftList,
   type GiftShareInput,
   type GiftVisibility,
-  type NewGiftItemInput,
 } from './types';
-import { GiftFormDialog } from './components/gift-form-dialog';
+import { GiftFormDialog, type GiftFormResult } from './components/gift-form-dialog';
 import { GiftIdeaFormDialog, type GiftIdeaFormResult } from './components/gift-idea-form-dialog';
 import { GiftShareDialog } from './components/gift-share-dialog';
 
@@ -159,9 +158,22 @@ export default function CadeauxPage() {
     setIdeaFormOpen(true);
   };
 
-  const handleSubmitItem = async (values: NewGiftItemInput) => {
+  const handleSubmitItem = async ({ values, photoFile }: GiftFormResult) => {
+    let photoUrl = values.photoUrl;
+    let depositedPath: string | null = null;
+    let previousPath: string | null = null;
     try {
+      if (photoFile) {
+        if (!householdId) throw new Error('Aucun foyer sélectionné.');
+        const deposited = await depositHouseholdFile({ householdId, folder: 'cadeaux', file: photoFile });
+        // Valeur de COLONNE (chemin du bucket) : c'est elle que la surface
+        // invitée sait signer (`0128` borne au foyer, l'Edge ne signe qu'un
+        // chemin). Une `data:` URL y était refusée, donc invisible.
+        photoUrl = storedValueOf(deposited);
+        depositedPath = deposited.path;
+      }
       if (editedItem) {
+        previousPath = replacedMediaPath(editedItem.photoStored, photoUrl);
         await updateItem.mutateAsync({
           id: editedItem.id,
           values: {
@@ -169,18 +181,22 @@ export default function CadeauxPage() {
             name: values.name,
             price: values.price,
             comment: values.comment,
-            photo_url: values.photoUrl,
+            photo_url: photoUrl,
             url: values.url,
           },
         });
         toast('Idée mise à jour.');
       } else {
-        await addItem.mutateAsync(values);
+        await addItem.mutateAsync({ ...values, photoUrl });
         toast('Idée ajoutée à la liste.');
       }
+      // Objet remplacé : best-effort, jamais un succès d'écriture transformé en échec.
+      if (previousPath) await removeHouseholdFile(previousPath).catch(() => {});
       setFormOpen(false);
       setEditedItem(null);
     } catch (creationError) {
+      // Compensation : aucun dépôt orphelin en bucket privé.
+      if (depositedPath) await removeHouseholdFile(depositedPath).catch(() => {});
       toast(creationError instanceof Error ? creationError.message : 'Enregistrement impossible.', 'error');
     }
   };
