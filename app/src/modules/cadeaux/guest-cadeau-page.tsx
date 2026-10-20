@@ -341,6 +341,14 @@ function GuestAnonymousView({
                   onClick={() => toggleExpanded(item.id)}
                   className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] text-left focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
+                  {isServableHttpUrl(item.photoUrl) ? (
+                    <img
+                      src={item.photoUrl}
+                      alt=""
+                      loading="lazy"
+                      className="h-12 w-12 shrink-0 rounded-[9px] object-cover"
+                    />
+                  ) : null}
                   <span className="grid min-w-0 flex-1 gap-0.5">
                     <strong className="text-[14px]">{item.name}</strong>
                     <span className="text-[12px] font-semibold">

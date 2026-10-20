@@ -136,16 +136,22 @@ describe('GuestCadeauPage', () => {
       const { container } = renderGuest(CODE);
       expect(await screen.findByText('Foulard')).toBeInTheDocument();
 
-      // Replié : résumé seul, aucun contenu servi (G-06-1a-bis).
-      expect(container.querySelector('li img')).toBeNull();
+      // Replié : la vignette est déjà là (demande d'usage réel), le lien et le
+      // commentaire restent au détail (G-06-1a-bis).
+      const collapsedPhotos = container.querySelectorAll('li img');
+      expect(collapsedPhotos).toHaveLength(1);
+      expect(collapsedPhotos[0]?.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
       expect(container.querySelector('li a')).toBeNull();
 
       // Tap : le détail déplié porte la photo et le lien.
+      // Tap : le détail déplié ajoute la photo pleine largeur, la vignette reste.
       await user.click(screen.getByRole('button', { name: /Foulard/ }));
       const photos = container.querySelectorAll('li img');
-      expect(photos).toHaveLength(1);
-      expect(photos[0]?.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
-      expect(photos[0]?.getAttribute('loading')).toBe('lazy');
+      expect(photos).toHaveLength(2);
+      Array.from(photos).forEach((photo) => {
+        expect(photo.getAttribute('src')).toBe('https://cdn.example.fr/foulard-32.jpg');
+        expect(photo.getAttribute('loading')).toBe('lazy');
+      });
       const link = screen.getByRole('link', { name: /Voir : Foulard/ });
       expect(link).toHaveAttribute('href', 'https://boutique.example.fr/foulard-32');
       expect(link).toHaveAttribute('target', '_blank');
@@ -192,7 +198,8 @@ describe('GuestCadeauPage', () => {
       expect(toggle.getAttribute('aria-controls')).toBe('guest-item-detail-gift-item-1');
       expect(container.querySelector('#guest-item-detail-gift-item-1')).toBeNull();
       expect(screen.queryByText('Laine mérinos')).not.toBeInTheDocument();
-      expect(container.querySelector('li img')).toBeNull();
+      // Seule la vignette reste : le détail (photo pleine, lien) est démonté.
+      expect(container.querySelectorAll('li img')).toHaveLength(1);
       expect(container.querySelector('li a')).toBeNull();
       // La réserve reste joignable même repliée.
       expect(screen.getByRole('button', { name: 'Réserver' })).toBeInTheDocument();
