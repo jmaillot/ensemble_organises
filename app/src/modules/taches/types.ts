@@ -44,6 +44,9 @@ export interface Task {
   /** Priorité déduite du rang manuel : plus la tâche est haute, plus elle est urgente. */
   priority: TaskPriority;
   assignees: TaskAssignee[];
+  /** Vrai tant que la lecture de `task_assignees` n'a pas rendu : « on ne sait
+   * pas encore » ne se dit pas comme « personne » (TODO #16). */
+  assigneesUnknown?: boolean;
   reminderAt: string | null;
   /** Dossier (`task_lists.id`), `null` = Général. */
   folderId: string | null;
@@ -148,6 +151,8 @@ export function buildTasks(
   assigneeRows: TaskAssigneeRecord[],
   reminderRows: TaskReminderRecord[],
   members: HouseholdMemberRow[],
+  /** La lecture des assignations n'a pas encore rendu (ou a échoué). */
+  assigneesUnknown = false,
 ): Task[] {
   const membersById = new Map(members.map((member) => [member.id, member]));
   const assigneesByTask = new Map<string, TaskAssigneeRow[]>();
@@ -173,7 +178,10 @@ export function buildTasks(
     });
   });
 
-  return rows.map((row) => toTask(row, contexts.get(row.id) ?? emptyContext));
+  return rows.map((row) => {
+    const task = toTask(row, contexts.get(row.id) ?? emptyContext);
+    return assigneesUnknown ? { ...task, assigneesUnknown: true } : task;
+  });
 }
 
 export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {

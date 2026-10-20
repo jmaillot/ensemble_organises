@@ -18,6 +18,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { PendingAssignee } from '@/components/shared/pending-assignee';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { data } from '@/lib/data';
@@ -71,6 +72,9 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
     enabled: taskIds.length > 0,
     queryFn: () => listTripTaskAssignees(taskIds),
   });
+  // La lecture des assignations n'a pas encore rendu : l'onglet le dit au lieu
+  // d'affirmer « Personne assigné » (TODO #16).
+  const assigneesUnknown = !assigneesQuery.isSuccess;
   const assigneesByTask = useMemo(() => {
     const grouped = new Map<string, HouseholdMemberRow[]>();
     for (const entry of assigneesQuery.data ?? []) {
@@ -287,13 +291,20 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
                   <p className="m-0 text-[13px] font-[760]">{task.name}</p>
                   <small className="text-[11px] text-muted">
                     {task.due_date ? `Échéance ${task.due_date} · ` : ''}
-                    {(assigneesByTask.get(task.id) ?? []).map((member) => member.display_name).join(', ') || 'Personne assigné'}
+                    {assigneesUnknown
+                      ? '…'
+                      : (assigneesByTask.get(task.id) ?? []).map((member) => member.display_name).join(', ') ||
+                        'Personne assigné'}
                   </small>
                 </div>
                 <div className="flex items-center gap-1">
-                  {(assigneesByTask.get(task.id) ?? []).map((member) => (
-                    <MemberAvatar key={member.id} member={member} size="sm" />
-                  ))}
+                  {assigneesUnknown ? (
+                    <PendingAssignee size="sm" />
+                  ) : (
+                    (assigneesByTask.get(task.id) ?? []).map((member) => (
+                      <MemberAvatar key={member.id} member={member} size="sm" />
+                    ))
+                  )}
                   {!readOnly ? (
                     <>
                       <button

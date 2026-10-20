@@ -43,6 +43,8 @@ export interface UseTachesResult extends TaskMetrics {
   visibleTasks: Task[];
   /** Tâches portant un rappel, pour le panneau « Rappels du jour ». */
   reminders: Task[];
+  /** La lecture des assignations n'a pas encore rendu (ou a échoué). */
+  assigneesUnknown: boolean;
   members: HouseholdMemberRow[];
   currentMemberId: string;
   folders: TaskListRow[];
@@ -146,9 +148,14 @@ export function useTaches(): UseTachesResult {
     queryFn: () => listTaskReminders(taskIds),
   });
 
+  // « On ne sait pas » tant que la lecture des assignations n'a pas rendu : la
+  // liste montre alors un rond d'attente au lieu de laisser croire que personne
+  // n'est assigné (TODO #16).
+  const assigneesUnknown = !assigneesQuery.isSuccess;
+
   const tasks = useMemo(
-    () => buildTasks(rows, assigneesQuery.data ?? [], remindersQuery.data ?? [], members),
-    [assigneesQuery.data, members, remindersQuery.data, rows],
+    () => buildTasks(rows, assigneesQuery.data ?? [], remindersQuery.data ?? [], members, assigneesUnknown),
+    [assigneesQuery.data, assigneesUnknown, members, remindersQuery.data, rows],
   );
   const visibleTasks = useMemo(
     () => sortTasks(filterByAssignee(filterByFolder(filterTasks(tasks, filter), activeFolderId), assigneeFilter)),
@@ -248,6 +255,7 @@ export function useTaches(): UseTachesResult {
     tasks,
     visibleTasks,
     reminders,
+    assigneesUnknown,
     members,
     currentMemberId: currentMember?.id ?? '',
     folders,

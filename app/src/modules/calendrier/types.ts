@@ -145,6 +145,8 @@ export type AgendaItem =
       colorTag: MemberColorTag;
       chipLabel: string;
       assignees: TaskAssignee[];
+      /** Lecture des assignations en vol : « on ne sait pas » (TODO #16). */
+      assigneesUnknown?: boolean;
     }
   | {
       kind: 'anniversaire';
@@ -181,6 +183,8 @@ export interface CalendarTask {
   isLate: boolean;
   lateDays: number;
   assignees: TaskAssignee[];
+  /** Lecture des assignations en vol : « on ne sait pas » (TODO #16). */
+  assigneesUnknown?: boolean;
 }
 
 /** Tâches visibles un jour donné : dues ce jour-là, plus les en retard
@@ -240,6 +244,7 @@ export function buildAgenda(
     colorTag: 'violet',
     chipLabel: task.isLate ? 'En retard' : 'Tâche',
     assignees: task.assignees,
+    assigneesUnknown: task.assigneesUnknown,
   }));
 
   const birthdaysOfDay = birthdays

@@ -134,6 +134,9 @@ export function useCalendrier(): CalendrierResource {
 
   const tasks = useMemo<CalendarTask[]>(() => {
     const membersById = new Map(members.map((member) => [member.id, member]));
+    // La lecture des assignations n'a pas encore rendu : la ligne le dit au
+    // lieu d'affirmer « sans assigné » (TODO #16).
+    const assigneesUnknown = !assigneesQuery.isSuccess;
     return tasksResource.rows.map((row) => {
       const assignees = (assigneesQuery.data ?? [])
         .filter((assignee) => assignee.task_id === row.id)
@@ -150,9 +153,10 @@ export function useCalendrier(): CalendrierResource {
         isLate: task.isLate,
         lateDays: task.lateDays,
         assignees: task.assignees,
+        assigneesUnknown,
       };
     });
-  }, [tasksResource.rows, assigneesQuery.data, members]);
+  }, [tasksResource.rows, assigneesQuery.data, assigneesQuery.isSuccess, members]);
 
   const reminders = useMemo(() => {
     const map: Record<string, EventReminder> = {};

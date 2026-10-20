@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Icon } from '@/components/shared/icon';
 import { Checkbox } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { PendingAssignee } from '@/components/shared/pending-assignee';
 import { PriorityTag } from '@/components/shared/module-shell';
 import { memberFirstName, type Task } from '../types';
 
@@ -78,13 +79,20 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
             <Icon name="clock" size="sm" />
             <span className={cn(task.isLate && 'font-semibold text-coral')}>{task.dueLabel}</span>
           </span>
-          {task.assignees.map((assignee) => (
-            <span key={assignee.memberId} className="inline-flex items-center gap-1.5">
+          {task.assigneesUnknown ? (
+            <span className="inline-flex items-center gap-1.5">
               <span aria-hidden="true">·</span>
-              <MemberAvatar member={assignee.member} size="sm" />
-              {memberFirstName(assignee.member.display_name)}
+              <PendingAssignee size="sm" />
             </span>
-          ))}
+          ) : (
+            task.assignees.map((assignee) => (
+              <span key={assignee.memberId} className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true">·</span>
+                <MemberAvatar member={assignee.member} size="sm" />
+                {memberFirstName(assignee.member.display_name)}
+              </span>
+            ))
+          )}
           {task.reminderLabel ? (
             <span className="inline-flex items-center gap-1.5">
               <span aria-hidden="true">·</span>

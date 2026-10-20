@@ -68,6 +68,7 @@ export default function TachesPage() {
     total,
     highPriority,
     assigneeCount,
+    assigneesUnknown,
     currentMemberId,
     isLoading,
     isError,
@@ -200,7 +201,7 @@ export default function TachesPage() {
           { label: 'À faire', value: openMine, caption: 'pour moi ou sans assigné' },
           { label: 'Total', value: total, caption: 'dans la liste' },
           { label: 'Priorité haute', value: highPriority, caption: 'à regarder aujourd’hui' },
-          { label: 'Membres', value: assigneeCount, caption: 'participants actifs' },
+          { label: 'Membres', value: assigneesUnknown ? '…' : assigneeCount, caption: 'participants actifs' },
         ]}
       />
 

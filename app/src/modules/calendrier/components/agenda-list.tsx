@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar';
+import { PendingAssignee } from '@/components/shared/pending-assignee';
 import { Icon } from '@/components/shared/icon';
 import { LoadingRows } from '@/components/ui/empty-state';
 import type { AgendaItem, CalendarEvent } from '../types';
@@ -66,7 +67,12 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
                   {item.author.display_name}
                 </span>
               ) : null}
-              {item.kind === 'tache' && item.assignees.length > 0 ? (
+              {item.kind === 'tache' && item.assigneesUnknown ? (
+                <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                  <PendingAssignee size="sm" />
+                </span>
+              ) : null}
+              {item.kind === 'tache' && item.assignees.length > 0 && !item.assigneesUnknown ? (
                 <span className="flex items-center gap-1.5 text-[11px] text-muted">
                   {item.assignees.slice(0, 2).map((assignee) => (
                     <MemberAvatar key={assignee.memberId} member={assignee.member} size="sm" />
