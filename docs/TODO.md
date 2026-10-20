@@ -633,7 +633,7 @@ qu'il n'a pas été ouvert.
 
 ## Ouvert, consigné pendant la preuve d'usage des liens invités
 
-- [ ] **18. Le code de partage d'une liste de cadeaux disparaît à la fermeture — et le message accuse le mauvais appareil**
+- [x] **18. Le code de partage d'une liste de cadeaux disparaît à la fermeture — et le message accuse le mauvais appareil**
 
 `app/src/modules/cadeaux/components/gift-share-dialog.tsx:82` garde le code brut
 dans un `useState`. Fermer la boîte le perd définitivement : la base ne garde
@@ -653,9 +653,17 @@ appareil réaffiche le code et son lien, tandis qu'un code créé sur un autre
 appareil demande toujours une régénération — et que le libellé ne dit « créé
 ailleurs » que dans ce second cas.
 
+**Clos le 2026-10-20** : mémorisé par liste dans `localStorage`
+(`eo:cadeaux-code:<id>`) et purgé quand le résumé serveur dit qu'il n'y a plus
+de code. Le panneau distingue un chargement de résumé en vol (`summaryBusy`) :
+sans cette garde, le résumé d'avant la génération — `hasCode: false` — aurait
+purgé le code tout juste créé. Deux tests le tiennent : fermeture puis
+réouverture dans la boîte, et le parcours de la page (`cadeaux-page.test.tsx`)
+réécrit, qui affirmait l'ancien contrat.
+
 ---
 
-- [ ] **19. Une photo ajoutée à un article cadeau est stockée en `data:` — l'invité ne la verra jamais**
+- [x] **19. Une photo ajoutée à un article cadeau est stockée en `data:` — l'invité ne la verra jamais**
 
 `app/src/modules/cadeaux/components/gift-form-dialog.tsx:36-55` (`readPhoto`)
 encode la photo choisie en `data:` URL, et `submit` la transmet telle quelle :
@@ -681,6 +689,14 @@ ni nettoyage.
 **Terminé quand** les deux surfaces disent la même chose et qu'un test le
 tient : soit une photo ajoutée par le formulaire d'article sort signée chez
 l'invité, soit la page invitée ne prétend plus en afficher une.
+
+**Clos le 2026-10-20**, en faveur du dépôt : le formulaire remet un `File`, la
+page le dépose (`depositHouseholdFile`, dossier `cadeaux`) et enregistre le
+chemin de colonne, comme pour les idées ; « Retirer » efface la photo. Deux
+tests : création (le chemin part en colonne, jamais une URL signée ni un
+`data:`) et remplacement (l'ancien objet est retiré, jamais le nouveau). La
+page invitée n'a pas eu à changer — elle attendait déjà un chemin, c'est le
+formulaire qui ne le lui donnait pas.
 
 ---
 
