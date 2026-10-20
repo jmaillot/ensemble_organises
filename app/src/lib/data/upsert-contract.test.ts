@@ -153,4 +153,29 @@ describe('Contrat d’écriture — LocalAdapter (symétrie du mode démo)', () 
     expect(rows).toHaveLength(1);
     expect(rows[0].width).toBe(2);
   });
+
+  it('fusionne une table de jointure, qui ne porte pas d’id', async () => {
+    // `conversation_members` a pour clé le couple (conversation, membre) et
+    // aucune colonne `id`. Exiger un `id` renvoyait vers `create` : la ligne
+    // semée restait en place et une seconde appartenance apparaissait à côté,
+    // l'une à jour, l'autre périmée — deux vérités pour le même membre.
+    await adapter.upsert<Row>(
+      'conversation_members',
+      {
+        conversation_id: 'conversation-1',
+        member_id: DEMO_MEMBERS.camille,
+        left_at: null,
+        archived_at: '2026-10-19T00:00:00.000Z',
+      },
+      { onConflict: 'conversation_id,member_id' },
+    );
+
+    const rows = await adapter.list<Row>('conversation_members', {
+      conversation_id: 'conversation-1',
+      member_id: DEMO_MEMBERS.camille,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].archived_at).toBe('2026-10-19T00:00:00.000Z');
+    expect(rows[0].id).toBeUndefined();
+  });
 });

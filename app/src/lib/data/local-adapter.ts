@@ -148,13 +148,18 @@ export class LocalAdapter implements DataAdapter {
     const entries = await collection.toArray();
     const existing = entries.find((entry) => columns.every((column) => entry.data[column] === record[column]));
     const id = existing?.data.id;
-    // Aucune ligne ne porte la cible : c'est une création, avec sa clé et ses
-    // horodatages, exactement comme `create`.
-    if (!existing || typeof id !== 'string') return this.create<T>(table, values);
+    // Table de jointure : sa clé est composite et elle ne porte pas d'`id`
+    // — `create` n'en injecte pas non plus. Exiger un `id` ici renvoyait donc
+    // vers `create` au lieu de fusionner : la ligne était recréée à côté de
+    // l'ancienne, et le foyer de démonstration finissait avec deux
+    // appartenances pour un même couple, l'une à jour, l'autre périmée.
+    if (!existing || (typeof id !== "string" && !isKeylessTable(table))) {
+      return this.create<T>(table, values);
+    }
     const row = {
       ...existing.data,
       ...values,
-      id,
+      ...(typeof id === 'string' ? { id } : {}),
       created_at: (existing.data.created_at as string | undefined) ?? new Date().toISOString(),
       updated_at: record.updated_at ?? new Date().toISOString(),
     } as unknown as T;

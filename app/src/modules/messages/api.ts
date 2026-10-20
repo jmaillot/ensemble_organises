@@ -119,10 +119,32 @@ export async function deleteMessage(messageId: string): Promise<void> {
 }
 
 /**
+ * Écrit ma ligne d'appartenance en une seule opération.
+ *
+ * `removeWhere` puis `create` laissait un instant pendant lequel ma ligne
+ * n'existait plus : un lecteur concurrent — l'interface, ou un test qui relit
+ * juste après le clic — y voyait un membre absent. `upsert` sur la clé
+ * composite (conversation, membre) écrit une fois et conserve ce que la mise à
+ * jour ne touche pas, comme le fait le serveur : le départ pose `left_at` sans
+ * effacer `archived_at`, et le miroir local doit dire la même chose.
+ */
+async function writeMyMembership(
+  conversationId: string,
+  memberId: string,
+  values: Pick<ConversationMemberRow, 'left_at' | 'archived_at'>,
+): Promise<void> {
+  await data.upsert<ConversationMemberRow>(
+    'conversation_members',
+    { conversation_id: conversationId, member_id: memberId, ...values },
+    { onConflict: 'conversation_id,member_id' },
+  );
+}
+
+/**
  * Départ volontaire en pierre tombale (D-08) : la ligne d'appartenance porte
  * `left_at`, les messages restent lisibles en lecture seule. En ligne le RPC
- * `leave_conversation` (0100, idempotent) ; en local la même tombe écrite en
- * IndexedDB, atomique sur deux écritures (aucune RLS à traverser).
+ * `leave_conversation` (0100, idempotent) ; en local la même tombe, posée en
+ * une écriture (aucune RLS à traverser).
  */
 export async function leaveConversation(conversationId: string, memberId: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
@@ -133,11 +155,9 @@ export async function leaveConversation(conversationId: string, memberId: string
   const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
   const mine = rows.find((row) => row.member_id === memberId && !row.left_at);
   if (!mine) return;
-  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
-  await data.create<ConversationMemberRow>('conversation_members', {
-    conversation_id: conversationId,
-    member_id: memberId,
+  await writeMyMembership(conversationId, memberId, {
     left_at: new Date().toISOString(),
+    archived_at: mine.archived_at,
   });
 }
 
@@ -156,10 +176,7 @@ export async function archiveConversationForMe(conversationId: string, memberId:
   const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
   const mine = rows.find((row) => row.member_id === memberId && !row.left_at);
   if (!mine || mine.archived_at) return;
-  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
-  await data.create<ConversationMemberRow>('conversation_members', {
-    conversation_id: conversationId,
-    member_id: memberId,
+  await writeMyMembership(conversationId, memberId, {
     left_at: null,
     archived_at: new Date().toISOString(),
   });
@@ -175,13 +192,7 @@ export async function unarchiveConversationForMe(conversationId: string, memberI
   const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: conversationId });
   const mine = rows.find((row) => row.member_id === memberId && !row.left_at && row.archived_at);
   if (!mine) return;
-  await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
-  await data.create<ConversationMemberRow>('conversation_members', {
-    conversation_id: conversationId,
-    member_id: memberId,
-    left_at: null,
-    archived_at: null,
-  });
+  await writeMyMembership(conversationId, memberId, { left_at: null, archived_at: null });
 }
 
 /**

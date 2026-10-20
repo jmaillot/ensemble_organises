@@ -483,11 +483,17 @@ describe('Messages', () => {
     expect(screen.getByText(/Archivée pour vous/)).toBeInTheDocument();
     expect(screen.getByLabelText('Écrire un message')).toBeInTheDocument();
 
-    // Et il revient à la demande.
+    // Et il revient à la demande. La relecture attend l'écriture : le clic ne
+    // l'attend pas, l'interface bascule sur son miroir optimiste avant que la
+    // ligne ne soit écrite.
     await user.click(screen.getByRole('button', { name: 'Désarchiver la conversation Lina' }));
     await waitFor(() => expect(screen.queryByText('Anciennes conversations')).not.toBeInTheDocument());
-    const rows = await data.list<ConversationMemberRow>('conversation_members', { conversation_id: 'conversation-1' });
-    expect(rows.find((row) => row.member_id === DEMO_MEMBERS.camille)?.archived_at).toBeNull();
+    await waitFor(async () => {
+      const rows = await data.list<ConversationMemberRow>('conversation_members', {
+        conversation_id: 'conversation-1',
+      });
+      expect(rows.find((row) => row.member_id === DEMO_MEMBERS.camille)?.archived_at).toBeNull();
+    });
   });
 
   it('écrire dans un fil archivé le ramène dans ma liste (0131)', async () => {
