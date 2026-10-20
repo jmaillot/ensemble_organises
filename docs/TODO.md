@@ -820,4 +820,7 @@ encore :
 - le nettoyage du script de dispatch est vérifié par comptage, plus muet ;
 - l'empreinte de l'abonnement en base correspond à celle du navigateur ;
 - le bundle déployé contient l'écouteur `push` ;
-- `showNotification` fonctionne depuis la console.
+- `showNotification` fonctionne depuis la console ;
+- le parcours « archiver pour vous / quitter / supprimer pour vous » a été
+  validé en production le 2026-10-19 sur le protocole en trois gestes (retour
+  utilisateur), après `0131` et `0132`.
