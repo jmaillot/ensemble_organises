@@ -184,7 +184,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
       <section aria-label="Discussion" className={className}>
         <EmptyState
           icon="message"
-          title="Aucune conversation"
+          title="Choisissez une conversation"
           description="Les échanges de votre foyer apparaîtront ici. Choisissez une conversation dans la liste pour la rejoindre."
         />
       </section>

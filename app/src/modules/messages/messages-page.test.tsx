@@ -964,4 +964,27 @@ describe('Messages', () => {
     expect(within(archived).getByRole('button', { name: /^Lina/ })).toBeInTheDocument();
     expect(screen.queryByLabelText('Écrire un message')).not.toBeInTheDocument();
   });
+
+  it('ouvrir Messages ne solde aucun fil tant qu’aucune conversation n’est choisie (TODO #17)', async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem('ensemble-organises-messages-read');
+    renderWithProviders(<MessagesPage />);
+
+    // La liste est là, mais aucun fil n'est ouvert d'office : la bulle de
+    // notification garde donc ses lignes tant qu'on n'a rien choisi.
+    await screen.findByRole('button', { name: /^Lina/ });
+    expect(screen.queryByRole('log')).not.toBeInTheDocument();
+    expect(screen.getByText('Choisissez une conversation')).toBeInTheDocument();
+    expect(localStorage.getItem('ensemble-organises-messages-read') ?? '{}').toBe('{}');
+
+    // Le choix explicite, lui, solde bien le fil ouvert.
+    await user.click(screen.getByRole('button', { name: /^Lina/ }));
+    expect(await screen.findByRole('log', { name: /Messages de Lina/ })).toBeInTheDocument();
+    await waitFor(() => {
+      const map = JSON.parse(
+        localStorage.getItem('ensemble-organises-messages-read') ?? '{}',
+      ) as Record<string, string>;
+      expect(Object.keys(map)).toHaveLength(1);
+    });
+  });
 });

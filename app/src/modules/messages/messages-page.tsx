@@ -29,15 +29,18 @@ export default function MessagesPage() {
 
   const conversations = feed.conversations;
   const archivedConversations = feed.archivedConversations;
+  // Aucune sélection implicite : ouvrir Messages ne solde aucun fil. Le
+  // premier de la liste n'est pas choisi d'office, sans quoi l'effet suivant
+  // le marquerait lu alors que personne ne l'a ouvert (TODO #17).
   const active =
     conversations.find((conversation) => conversation.id === selectedId) ??
     archivedConversations.find((conversation) => conversation.id === selectedId) ??
-    conversations[0] ??
     null;
   const activeId = active?.id ?? null;
   const isArchived = active?.isArchived ?? false;
 
-  // Ouvrir une conversation la marque comme lue (mise à jour optimiste).
+  // Seul un choix explicite marque lu (mise à jour optimiste) : `activeId` est
+  // nul tant que la liste n'a pas été touchée.
   useEffect(() => {
     if (activeId) markRead(activeId);
   }, [activeId, markRead]);
