@@ -659,6 +659,34 @@ rouge sur l'ancien code (le fil s'ouvrait et se soldait sans clic).
 
 ---
 
+- [x] **20. Deux personnes d'un même navigateur se partagent leurs marques de lecture**
+
+`app/src/lib/notification-reads.ts` rangeait la marque locale sous une clé
+unique (`ensemble-organises-messages-read`, `…-cercle-read`), sans le compte :
+le second utilisateur d'un navigateur partagé héritait des lignes soldées par
+le premier, et la cloche lui masquait ce qu'il n'avait jamais lu. Le masquage
+des rappels (`use-notifications.ts`, `eo-notifications-masquees-v1`) avait
+exactement le même défaut. C'est la classe que l'enquête de G-10-7 avait
+frôlée : une marque locale qui ne dit pas à qui elle appartient.
+
+**Clos le 2026-10-19** : la clé porte le compte (`localReadKey(base, userId)`,
+`:anonyme` sans session) et le masquage suit la même règle
+(`maskedStorageKey`). Les deux relisent leur carte au changement de compte dans
+le même onglet ; sans cela, l'état du précédent restait en mémoire. Les clés
+nues antérieures ne sont pas reprises, et c'est voulu : elles mélangeaient les
+comptes. Conséquence assumée pour l'existant — une marque locale perdue est
+recalculée depuis le serveur (`notification_reads`), et les rappels masqués
+avant la mise à jour réapparaissent une fois, puisque le masquage est local.
+
+Quatre gardes, toutes vues rouges sur le code d'avant : trois dans
+`notification-reads.accounts.test.tsx` (clé du compte, non-héritage au
+changement, relecture de la marque du compte qui prend la session) et une pour
+les masques dans `use-notifications.test.tsx`. Les tests qui lisaient la clé
+nue lisent désormais les clés exportées par le code, plutôt que d'en recopier
+la forme.
+
+---
+
 ## Ouvert, consigné pendant la preuve d'usage des liens invités
 
 - [x] **18. Le code de partage d'une liste de cadeaux disparaît à la fermeture — et le message accuse le mauvais appareil**
