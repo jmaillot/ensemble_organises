@@ -622,31 +622,8 @@ bien `buildTasks`).
 
 ## Plus tard
 
-- **4. Rappels de tâche : reste la livraison sur un appareil.** Parké le 28/09
-  sur « les rappels ne se déclenchent pas du tout en usage ». Depuis, les
-  maillons client et serveur sont prouvés : le formulaire écrit
-  `task_reminders` par `replace_task_reminders` (0133, une transaction), et
-  vider le champ retire la ligne — `taches-page.test.tsx` le tient, vu rouge
-  sur les deux mutations (écriture forcée à `null`, puis écriture omise quand
-  le champ est vide) ; `0007_push.sql` couvre la sélection (fenêtre de 24 h,
-  préférence du profil, consommation uniquement si `delivered`) ; la
-  notification de test est arrivée en production le 2026-10-19
-  (`delivered: 3`).
-
-  Non prouvé : **un rappel de tâche reçu puis cliqué sur un appareil abonné**.
-  C'est le seul segment qui exige un vrai navigateur, et la preuve de
-  production ne l'exerce pas : elle passe par la branche `scope: 'test'`, qui
-  construit sa notification sans lire `task_reminders`.
-
-  **Comment faire.** Sur un navigateur déjà abonné (Paramètres, notifications
-  activées), créer une tâche avec un rappel à deux minutes, vérifier que la
-  notification arrive, puis que le clic ouvre `/taches`. En local, il faut
-  d'abord un abonnement réel : la pile de développement n'en a aucun
-  (`push_subscriptions` vide), et aucun test n'en fabrique.
-
-  **Terminé quand** la notification est reçue, le clic mène à `/taches`, et la
-  ligne `task_reminders` a disparu — `consume_push_reminders` ne supprime que
-  ce qu'un appareil a réellement reçu.
+(Rien pour le moment — le #4 est soldé en production le 2026-10-21, voir
+« Validé, pour mémoire ».)
 
 ---
 
@@ -881,6 +858,13 @@ encore :
 - l'empreinte de l'abonnement en base correspond à celle du navigateur ;
 - le bundle déployé contient l'écouteur `push` ;
 - `showNotification` fonctionne depuis la console ;
+- **les rappels de tâche fonctionnent en production**, validé en usage le
+  2026-10-21 (retour utilisateur) : c'était le dernier segment que
+  `scope: 'test'` ne pouvait pas prouver, puisque cette branche construit sa
+  notification sans lire `task_reminders`. Le segment client est tenu par deux
+  tests de page (écriture du rappel saisi, retrait quand le champ est vidé,
+  chacun vu rouge sur sa propre mutation) et la sélection par
+  `supabase/tests/0007_push.sql` ;
 - le parcours « archiver pour vous / quitter / supprimer pour vous » a été
   validé en production le 2026-10-19 sur le protocole en trois gestes (retour
   utilisateur), après `0131` et `0132`.
