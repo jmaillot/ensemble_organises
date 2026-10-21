@@ -171,13 +171,13 @@ export default function TripDetailPage() {
 
 function CountCard({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-[17px]">
-      <strong className="block font-display text-[25px] tracking-[-0.05em]">
+    <div className="rounded-[22px] border border-border bg-surface p-4 min-[651px]:p-[22px]">
+      <strong className="block font-display text-[26px] tracking-[-0.05em]">
         {value === null ? '—' : value}
       </strong>
-      <span className="text-[11px] text-muted">{label}</span>
+      <span className="eyebrow mt-1 block">{label}</span>
       {value === null ? (
-        <p className="mt-1 mb-0 text-[11px] text-muted">Illisible pour le moment.</p>
+        <p className="mt-1.5 mb-0 text-[11.5px] text-muted">Illisible pour le moment.</p>
       ) : null}
     </div>
   );

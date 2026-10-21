@@ -134,15 +134,15 @@ function PostCardComponent({
         onClick={onSelect}
         onFocusCapture={onSelect}
         className={cn(
-          'panel-surface mb-3.5 rounded-[16px] p-[18px] transition-[border-color,background] duration-[var(--duration-quick)]',
+          'panel-surface mb-3.5 rounded-[22px] p-[18px] transition-[border-color,box-shadow] duration-[var(--duration-quick)] hover:shadow-md min-[651px]:p-[22px]',
           active && 'border-accent shadow-[inset_0_0_0_1px_var(--color-accent)]',
         )}
       >
         <div className="mb-3.5 flex items-center gap-2.5">
           <MemberAvatar member={post.author} name={authorName} size="md" />
           <div className="min-w-0 flex-1">
-            <strong className="block text-[13px] font-bold">{authorName}</strong>
-            <small className="block text-[10px] text-muted">{post.createdLabel}</small>
+            <strong className="block text-[14px] font-bold">{authorName}</strong>
+            <small className="block text-[11px] text-muted">{post.createdLabel}</small>
           </div>
           {post.unreadComments > 0 ? (
             <Badge tone="coral">
@@ -212,7 +212,7 @@ function PostCardComponent({
             </div>
           </form>
         ) : post.text ? (
-          <p className="mb-[13px] text-[13px] leading-[1.6]">{post.text}</p>
+          <p className="mb-[13px] text-[13.5px] leading-[1.6]">{post.text}</p>
         ) : null}
 
         {post.media.map((media) =>
@@ -222,7 +222,7 @@ function PostCardComponent({
           media.url === null ? null : media.kind === 'video' ? (
             <video
               key={media.id}
-              className="mb-[13px] max-h-[420px] w-full rounded-[13px] bg-bg object-contain"
+              className="mb-[13px] max-h-[420px] w-full rounded-[18px] bg-bg object-contain"
               src={media.url}
               controls
               preload="metadata"
@@ -231,7 +231,7 @@ function PostCardComponent({
           ) : (
             <img
               key={media.id}
-              className="mb-[13px] max-h-[420px] w-full rounded-[13px] bg-bg object-contain"
+              className="mb-[13px] max-h-[420px] w-full rounded-[18px] bg-bg object-contain"
               src={media.url}
               alt={`Publication de ${authorName}`}
               loading="lazy"
@@ -242,7 +242,7 @@ function PostCardComponent({
         {visibleComments.length > 0 ? (
           <ul
             aria-label={`Derniers commentaires sur la publication de ${authorName}`}
-            className="my-[13px] grid gap-2 rounded-[11px] bg-bg py-2.5 px-3"
+            className="my-[13px] grid gap-2 rounded-[16px] bg-bg py-3 px-3.5"
           >
             {visibleComments.map((comment) => {
               const commentAuthor = comment.author?.display_name ?? 'Membre';
@@ -393,7 +393,7 @@ function PostCardComponent({
           </small>
         ) : null}
 
-        <div className="flex gap-1.5">
+        <div className="mt-1 flex gap-2 border-t border-border/70 pt-3">
           <button
             type="button"
             onClick={(event) => {
@@ -403,8 +403,8 @@ function PostCardComponent({
             aria-pressed={post.liked}
             aria-label={post.liked ? 'Retirer ma réaction' : 'Réagir à cette publication'}
             className={cn(
-              'inline-flex min-h-9 items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral hover:bg-coral-soft',
-              post.liked && 'bg-coral-soft text-coral',
+              'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[11.5px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:text-coral hover:bg-coral-soft',
+              post.liked && 'border-coral/40 bg-coral-soft text-coral',
             )}
           >
             <Icon name="heart" size="sm" />
@@ -417,7 +417,7 @@ function PostCardComponent({
               onOpenComments();
             }}
             aria-label="Ouvrir les commentaires"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[11.5px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
           >
             <Icon name="comment" size="sm" />
             {post.commentCount > 0 ? pluralize(post.commentCount, 'commentaire') : 'Commenter'}
