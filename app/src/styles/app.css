@@ -276,6 +276,31 @@
   }
 }
 
+/* Pluie de confettis du jour J (`BirthdayConfetti`). Déplacement à vitesse
+   constante : une particule qui tombe ne prend pas de vitesse, elle flotte.
+   Seuls `transform` et `opacity` sont animés — rien à recalculer, ni mise en
+   page ni peinture. La particule sort par le bas (`104vh`) et s'efface avant
+   d'être coupée par le bord, sinon la dernière image ferait un saut sec. */
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(var(--confetti-drift, 0px), 104vh, 0) rotate(var(--confetti-spin, 360deg));
+    opacity: 0;
+  }
+}
+
 /* Garde-fou : aucune vue ne doit scroller horizontalement sous 650px. */
 @media (max-width: 650px) {
   html,

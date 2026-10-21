@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primit
 import { useToast } from '@/components/ui/toast';
 import { useCalendarGrid } from '@/hooks/use-calendar';
 import { cn, formatMonthLabel, pad, pluralize, todayIso } from '@/lib/utils';
+import { BirthdayConfetti } from './components/birthday-confetti';
 import { BirthdayFormDialog } from './components/birthday-form-dialog';
 import { useAnniversaires } from './hooks/use-anniversaires';
 import { birthdayCountdown, formatDayMonth, isInMonth, monthDayKey } from './types';
@@ -38,6 +39,12 @@ export default function AnniversairesPage() {
   const thisMonth = useMemo(() => rows.filter((birthday) => isInMonth(birthday, todayIso())), [rows]);
   const next = rows[0] ?? null;
 
+  // Confettis du jour J : une seule fois par an et par personne, donc le
+  // budget « delight » est là. Le repère est redondant avec le libellé
+  // « C'est aujourd'hui » de la ligne — l'overlay est `aria-hidden`, il ne
+  // porte aucune information que la liste ne dise déjà.
+  const isCelebrating = useMemo(() => rows.some((birthday) => birthday.daysUntil === 0), [rows]);
+
   const openCreate = () => setDialog({ open: true, birthday: null });
   const openEdit = (birthday: Birthday) => setDialog({ open: true, birthday });
 
@@ -50,6 +57,8 @@ export default function AnniversairesPage() {
         </Button>
       }
     >
+      {isCelebrating ? <BirthdayConfetti /> : null}
+
       <MetricRow
         items={[
           { label: 'Cette année', value: rows.length, caption: 'anniversaires suivis' },
