@@ -4,8 +4,9 @@
 > **État au 21 octobre 2026 :** le lot 0 est engagé. Les polices, les jetons, les
 > boutons, l'en-tête de module, le shell desktop/mobile et l'écran pilote
 > Courses sont faits. Les primitives `Card`, `PillTabs`, `ListRow` et
-> `EmptyState` restent à extraire, et les autres écrans n'ont pas encore été
-> repris un par un — ils héritent seulement des nouveaux jetons.
+> `EmptyState` restent à extraire, et les écrans n'ont pas encore été repris un
+> par un — ils héritent seulement des nouveaux jetons. Le **Calendrier** est le
+> premier écran repris en profondeur (grille, agenda, filtres, vues).
 
 ## 0. Réponse courte
 
@@ -593,6 +594,12 @@ aucune régression sur `npm run typecheck && npm test && npm run build`.
 Ordre : Accueil, Calendrier, Tâches, Notes, Courses, Routines, Recettes,
 Ardoise, Cadeaux, Anniversaires, Contacts, Animaux, Prestataires, Fidélité,
 Adresses, Cercle, Voyages, Messages, Paramètres.
+
+**Fait le 21 octobre 2026 :** Calendrier (numéros de semaine ISO, agenda en
+lignes aérées avec pastilles typées, filtres en une rangée défilante sur
+mobile, zone scolaire rapprochée de son explication). L'accueil a reçu les
+primitives communes (états vides, tuiles, navigation basse) sans reprise
+complète.
 
 Pour chaque écran : en-tête Fraunces, pilules d'onglets, cartes 28 px, lignes
 aérées, tuiles pastel. Aucun changement de données.
