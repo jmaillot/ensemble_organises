@@ -507,6 +507,23 @@ déclenche alors pas. Une politique RLS traite NULL comme faux, un corps
 `SECURITY DEFINER` non : avant cette forme, un test a vu un membre d'un autre
 foyer remplacer l'ensemble d'autrui.
 
+### Dossiers : « perso » veut dire privé, y compris de l'administrateur
+
+Jusqu'à `0051`, `folder_visible` laissait l'administrateur lire les dossiers
+`perso` des autres membres au titre de la modération. Depuis `0134`, un dossier
+`perso` n'est visible que de son propriétaire — le dossier **et** son contenu,
+puisque les politiques des items passent toutes par cette fonction. Un dossier
+`foyer` reste visible de tous, et son écriture réservée à l'administrateur.
+
+La suppression dépend de la visibilité, et ne peut donc pas être portée par la
+clé étrangère `folder_id` (`on delete set null`) : supprimer un dossier `foyer`
+range ses items dans Général, visible de tout le foyer, alors qu'un dossier
+`perso` emporte son contenu — sans quoi supprimer « mes tâches privées » les
+publierait. `public.delete_folder(p_kind, p_folder_id)` fait les deux dans une
+transaction, vérifie la propriété (ou le rôle admin pour un dossier `foyer`) et
+refuse Général. Côté client, `DataAdapter.deleteFolder` appelle cette RPC en
+ligne et reproduit la même sémantique en transaction Dexie en mode démo.
+
 ---
 
 ## 6. Edge Functions
