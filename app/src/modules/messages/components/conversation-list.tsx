@@ -27,23 +27,35 @@ export function ConversationList({ conversations, archivedConversations = [], ac
           aria-current={isActive ? 'true' : undefined}
           aria-label={`${conversation.title}${unreadLabel}`}
           onClick={() => onSelect(conversation.id)}
-          className={`flex w-full items-center gap-2.5 rounded-[11px] px-2 py-[11px] text-left transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint ${
+          className={`flex min-h-[56px] w-full items-center gap-3 rounded-[14px] px-2.5 py-2 text-left transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint ${
             isActive ? 'bg-accent-faint' : ''
           }`}
         >
-          <MemberAvatar name={conversation.title} colorTag={conversation.colorTag} size="sm" />
+          <MemberAvatar name={conversation.title} colorTag={conversation.colorTag} size="md" />
           <span className="min-w-0 flex-1">
-            <strong className="block text-xs">{conversation.title}</strong>
-            <span className="block truncate text-[10px] text-muted">
-              {conversation.lastMessageMine ? 'Vous : ' : ''}
-              {conversation.lastMessage ?? 'Aucun message'}
+            <strong className={`block truncate text-[13.5px] ${conversation.unread > 0 ? 'font-extrabold' : 'font-semibold'}`}>
+              {conversation.title}
+            </strong>
+            <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted">
+              <span className="min-w-0 truncate">
+                {conversation.lastMessageMine ? 'Vous : ' : ''}
+                {conversation.lastMessage ?? 'Aucun message'}
+              </span>
             </span>
           </span>
-          {conversation.unread > 0 ? (
-            <span className="size-[7px] shrink-0 rounded-full bg-coral" aria-hidden="true" />
-          ) : (
-            <small className="shrink-0 text-[10px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
-          )}
+          <span className="flex w-9 shrink-0 flex-col items-end gap-1">
+            {conversation.lastMessageAt ? (
+              <small className="text-[10px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
+            ) : null}
+            {conversation.unread > 0 ? (
+              <span
+                className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral px-1 text-[10px] font-extrabold text-white"
+                aria-hidden="true"
+              >
+                {conversation.unread}
+              </span>
+            ) : null}
+          </span>
         </button>
       </li>
     );
@@ -51,7 +63,7 @@ export function ConversationList({ conversations, archivedConversations = [], ac
   return (
     <aside
       aria-label="Conversations"
-      className={className ?? 'panel-surface rounded-[16px] p-2.5 max-[920px]:max-h-[260px] max-[920px]:overflow-auto'}
+      className={className ?? 'panel-surface rounded-[22px] p-2 max-[920px]:max-h-[260px] max-[920px]:overflow-auto'}
     >
       <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-3">
         <h3 className="m-0 font-display text-base tracking-[-0.035em]">Conversations</h3>

@@ -78,8 +78,8 @@ function MessageBubble({
   const canSave = editDraft.trim() !== '';
   return (
     <div
-      className={`max-w-[72%] rounded-[14px_14px_14px_4px] border border-border bg-surface px-3 py-2.5 text-xs ${
-        message.isMine ? 'self-end rounded-[14px_14px_4px_14px]' : 'self-start'
+      className={`max-w-[76%] rounded-[18px_18px_18px_6px] border border-border bg-surface px-3.5 py-2.5 text-[12.5px] ${
+        message.isMine ? 'self-end rounded-[18px_18px_6px_18px] border-accent/25 bg-accent-soft' : 'self-start'
       }`}
     >
       <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>

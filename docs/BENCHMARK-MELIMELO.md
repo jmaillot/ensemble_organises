@@ -595,14 +595,35 @@ Ordre : Accueil, Calendrier, Tâches, Notes, Courses, Routines, Recettes,
 Ardoise, Cadeaux, Anniversaires, Contacts, Animaux, Prestataires, Fidélité,
 Adresses, Cercle, Voyages, Messages, Paramètres.
 
-**Fait le 21 octobre 2026 :** Calendrier (numéros de semaine ISO, agenda en
-lignes aérées avec pastilles typées, filtres en une rangée défilante sur
-mobile, zone scolaire rapprochée de son explication) et Tâches (lignes de
-64 px, case 22 px, priorité en pilule, actions révélées au survol et toujours
-visibles au tactile). Routines (cartes du jour en 20 px, série en pastille,
-listes à lignes survolables et historique en lignes rondes). L'accueil a reçu
-les primitives communes (états vides, tuiles, navigation basse) sans reprise
-complète.
+**Fait le 21 octobre 2026 :** quinze espaces repris, plus les deux primitives
+qui les portent (lignes de liste et onglets). Calendrier (numéros de semaine
+ISO, agenda en lignes aérées avec pastilles typées, filtres en une rangée
+défilante sur mobile, zone scolaire rapprochée de son explication), Tâches
+(lignes de 64 px, case 22 px, priorité en pilule, actions révélées au survol et
+toujours visibles au tactile), Routines (cartes du jour en 20 px, série en
+pastille, listes à lignes survolables, historique en lignes rondes), Recettes
+(voile dégradé dédié pour que le titre reste lisible sur les photos), Ardoise
+(tuile sauge et montants en Fraunces), Cadeaux, Anniversaires, Contacts,
+Animaux, Prestataires, Fidélité, Adresses, Cercle, Voyages, Messages et Notes.
+Accueil et Paramètres tiennent leur cohérence des primitives partagées : ils
+n'ont pas reçu de reprise écran par écran.
+
+Deux décisions de fond ont été prises en chemin :
+
+- **Onglets en pilules** (`TabsList`/`TabsTrigger` partagés) à la place des
+  soulignements : un seul état actif lisible, `bg-accent` sur `text-surface`,
+  et le même geste dans Animaux, Anniversaires et Paramètres.
+- **Actions de ligne au survol** : 32 px, rondes, bordées, visibles au clavier
+  (`focus-visible`) et toujours affichées sous 650 px, où le survol n'existe
+  pas. Une action destructive garde sa confirmation.
+
+Les métriques de Voyages sont alignées sur `MetricRow` (valeur Fraunces,
+libellé en sur-titre) pour que le même chiffre se lise pareil partout.
+
+**Critère de sortie.** Tous les écrans lisibles à 390 px, 768 px et 1440 px ;
+zéro débordement horizontal ; parcours clavier sur les 5 écrans principaux.
+Mesuré sur les 19 routes à 390, 768 et 1440 px : aucun `scrollWidth` supérieur
+à la fenêtre. Captures conservées à 390 et 1440 px dans `shots/` (non versionné).
 
 Pour chaque écran : en-tête Fraunces, pilules d'onglets, cartes 28 px, lignes
 aérées, tuiles pastel. Aucun changement de données.
