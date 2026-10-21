@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import { data } from '@/lib/data';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { todayIso } from '@/lib/utils';
@@ -101,6 +102,63 @@ describe('TachesPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     // Le foyer compte désormais une tâche de plus.
     expect(screen.getByText('dans la liste').previousElementSibling).toHaveTextContent('5');
+  });
+
+  /**
+   * TODO #4, segment client : le rappel d'une tâche était le seul maillon que
+   * rien ne couvrait. Le formulaire écrit `task_reminders` par
+   * `replace_task_reminders` (0133) — une seule fonction, donc une transaction
+   * — et la relecture doit rendre le même instant, pas un décalage de fuseau
+   * (WR-07). Le serveur est prouvé séparément : `test-db.sh` pour les
+   * fonctions, et la sonde du dispatch pour la sélection.
+   */
+  async function remindersOf(name: string) {
+    const task = (await data.list<{ id: string; name: string }>('tasks')).find((row) => row.name === name);
+    if (!task) throw new Error(`tâche introuvable : ${name}`);
+    return data.list<{ task_id: string; remind_at: string }>('task_reminders', { task_id: task.id });
+  }
+
+  async function createTaskWithReminder(name: string, reminder: string) {
+    supportDialogEnvironment();
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+    await findTaskList();
+    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(/Nom de la tâche/), name);
+    // `datetime-local` se remplit par un changement de valeur : `type` y écrit
+    // segment par segment et laisse le champ dans un état intermédiaire.
+    fireEvent.change(dialog.getByLabelText(/Rappel/), { target: { value: reminder } });
+    await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await (await findTaskList()).findByText(name);
+    return user;
+  }
+
+  it('écrit le rappel saisi et le relit à l’édition', async () => {
+    const name = 'Appeler le plombier';
+    const reminder = '2030-01-02T09:30';
+    const user = await createTaskWithReminder(name, reminder);
+
+    expect((await remindersOf(name)).map((row) => row.remind_at)).toEqual([instantOfDatetimeLocal(reminder)]);
+
+    await user.click(screen.getByRole('button', { name: `Modifier ${name}` }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByLabelText(/Rappel/)).toHaveValue(reminder);
+  });
+
+  it('retire le rappel quand le champ est vidé', async () => {
+    const name = 'Passer chez le dentiste';
+    const user = await createTaskWithReminder(name, '2030-01-02T09:30');
+    expect(await remindersOf(name)).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: `Modifier ${name}` }));
+    const dialog = within(await screen.findByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText(/Rappel/), { target: { value: '' } });
+    await user.click(dialog.getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(async () => expect(await remindersOf(name)).toHaveLength(0));
   });
 
   it('ouvre la création pré-remplie depuis l’état de navigation (raccourci calendrier)', async () => {

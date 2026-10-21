@@ -622,12 +622,31 @@ bien `buildTasks`).
 
 ## Plus tard
 
-- **4. Le parcours humain (rappels de tâche) n'a jamais été fait.** Parké le
-28/09 : les rappels ne se déclenchent pas du tout en usage (rien n'arrive,
-pas seulement un défaut d'affichage). À rouvrir avec, dans l'ordre : le
-rappel est-il créé en base (`task_reminders`) ? la fenêtre du dispatch le
-couvre-t-elle ? le push part-il (`delivered`, voir #1) ? Voir l'historique
-dans git (`TODO.md`).
+- **4. Rappels de tâche : reste la livraison sur un appareil.** Parké le 28/09
+  sur « les rappels ne se déclenchent pas du tout en usage ». Depuis, les
+  maillons client et serveur sont prouvés : le formulaire écrit
+  `task_reminders` par `replace_task_reminders` (0133, une transaction), et
+  vider le champ retire la ligne — `taches-page.test.tsx` le tient, vu rouge
+  sur les deux mutations (écriture forcée à `null`, puis écriture omise quand
+  le champ est vide) ; `0007_push.sql` couvre la sélection (fenêtre de 24 h,
+  préférence du profil, consommation uniquement si `delivered`) ; la
+  notification de test est arrivée en production le 2026-10-19
+  (`delivered: 3`).
+
+  Non prouvé : **un rappel de tâche reçu puis cliqué sur un appareil abonné**.
+  C'est le seul segment qui exige un vrai navigateur, et la preuve de
+  production ne l'exerce pas : elle passe par la branche `scope: 'test'`, qui
+  construit sa notification sans lire `task_reminders`.
+
+  **Comment faire.** Sur un navigateur déjà abonné (Paramètres, notifications
+  activées), créer une tâche avec un rappel à deux minutes, vérifier que la
+  notification arrive, puis que le clic ouvre `/taches`. En local, il faut
+  d'abord un abonnement réel : la pile de développement n'en a aucun
+  (`push_subscriptions` vide), et aucun test n'en fabrique.
+
+  **Terminé quand** la notification est reçue, le clic mène à `/taches`, et la
+  ligne `task_reminders` a disparu — `consume_push_reminders` ne supprime que
+  ce qu'un appareil a réellement reçu.
 
 ---
 
