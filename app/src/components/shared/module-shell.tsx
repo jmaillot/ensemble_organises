@@ -174,11 +174,11 @@ export function CountBadge({ value, label }: { value: number | string; label?: s
 export function PriorityTag({ priority }: { priority: 'haute' | 'normale' | 'basse' }) {
   const map = {
     haute: { label: 'Haute', className: 'bg-coral-soft text-coral' },
-    normale: { label: 'Normale', className: 'bg-amber-soft text-[oklch(52%_0.11_78)]' },
-    basse: { label: 'Basse', className: 'bg-bg text-muted' },
+    normale: { label: 'Normale', className: 'bg-amber-soft text-[oklch(45%_0.11_78)]' },
+    basse: { label: 'Basse', className: 'bg-sand text-muted' },
   } as const;
   const entry = map[priority];
-  return <span className={cn('inline-flex min-h-[25px] items-center rounded-full px-2 text-[10px] font-extrabold', entry.className)}>{entry.label}</span>;
+  return <span className={cn('inline-flex min-h-[24px] items-center rounded-full px-2.5 text-[10px] font-extrabold', entry.className)}>{entry.label}</span>;
 }
 
 export function MemberBadge({ name, className }: { name: string; className?: string }) {

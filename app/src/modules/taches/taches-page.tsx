@@ -301,7 +301,7 @@ export default function TachesPage() {
                 onAction={canWrite ? openCreate : undefined}
               />
             ) : !canWrite ? (
-              <div role="list" aria-label="Tâches du foyer" className="grid gap-2.5">
+              <div role="list" aria-label="Tâches du foyer" className="grid gap-1">
                 {visibleTasks.map((task) => (
                   <TaskRow
                     key={task.id}
@@ -333,7 +333,7 @@ export default function TachesPage() {
                 onDragCancel={() => setDragged(null)}
               >
                 <SortableContext items={visibleTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-                  <div role="list" aria-label="Tâches du foyer" className="grid gap-2.5">
+                  <div role="list" aria-label="Tâches du foyer" className="grid gap-1">
                     {visibleTasks.map((task) => (
                       <TaskRow
                         key={task.id}
@@ -358,7 +358,7 @@ export default function TachesPage() {
                 </SortableContext>
                 <DragOverlay>
                   {dragged ? (
-                    <p className="rounded-[10px] border border-accent bg-surface px-3 py-2 text-[13px] font-[760] shadow-[var(--shadow-md)]">
+                    <p className="rounded-[14px] border border-accent/30 bg-surface px-3 py-2 text-[13.5px] font-[700] shadow-[var(--shadow-md)]">
                       {dragged.name}
                     </p>
                   ) : null}
@@ -377,18 +377,18 @@ export default function TachesPage() {
                 Aucun rappel aujourd’hui. Ajoutez-en un depuis le formulaire d’une tâche.
               </p>
             ) : (
-              <div className="grid gap-2.5">
+              <div className="grid gap-1">
                 {reminders.slice(0, 3).map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-[9px] border-t border-border py-2.5 first:border-t-0 first:pt-0"
+                    className="flex items-center gap-2.5 rounded-[14px] px-1 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
                   >
-                    <span className="w-[43px] text-[11px] font-extrabold text-accent-strong">
+                    <span className="w-[44px] shrink-0 text-[11.5px] font-extrabold text-accent-strong tabular-nums">
                       {task.reminderTime}
                     </span>
                     <div className="min-w-0">
-                      <p className="m-0 truncate text-xs font-[760]">{task.name}</p>
-                      <small className="text-[10px] text-muted">
+                      <p className="m-0 truncate text-[13px] font-[700]">{task.name}</p>
+                      <small className="text-[11px] text-muted">
                         {task.assignees.length > 0
                           ? task.assignees.map((assignee) => memberFirstName(assignee.member.display_name)).join(', ')
                           : 'Personne assigné'}

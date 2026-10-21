@@ -41,8 +41,8 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
       role="listitem"
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'grid grid-cols-[20px_18px_minmax(0,1fr)_auto] items-center gap-[11px] border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0 max-[650px]:grid-cols-[20px_minmax(0,1fr)_auto]',
-        task.isLate && '-mx-3 rounded-[10px] border-transparent bg-coral-soft px-3',
+        'group grid grid-cols-[20px_22px_minmax(0,1fr)_auto] items-start gap-3 rounded-[16px] px-2 py-3 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70 max-[650px]:grid-cols-[22px_minmax(0,1fr)_auto] max-[650px]:gap-2.5',
+        task.isLate && 'bg-coral-soft/70 hover:bg-coral-soft',
         isDragging && 'opacity-50',
       )}
     >
@@ -53,7 +53,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
           {...attributes}
           {...listeners}
           aria-label={`Réordonner : ${task.name}`}
-          className="relative grid size-[20px] cursor-grab place-items-center text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
+          className="relative mt-[3px] grid size-5 cursor-grab place-items-center text-muted/70 transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
         >
           <Icon name="drag" size="sm" />
         </button>
@@ -66,36 +66,31 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
         onCheckedChange={() => onToggle(task)}
         disabled={readOnly}
         aria-label={`${done ? 'Rouvrir' : 'Terminer'} ${task.name}`}
-        // La case mesure 19px comme dans l'export : la zone cliquable est
-        // agrandie à 43px sans modifier la mise en page.
-        className="relative after:absolute after:-inset-3 after:content-['']"
+        // La case mesure 22px : la zone cliquable est agrandie à 42px sans
+        // modifier la mise en page.
+        className="relative mt-[3px] size-[22px] rounded-[7px] after:absolute after:-inset-2.5 after:content-['']"
       />
 
       <div className="min-w-0">
-        <p className={cn('text-[13px] font-[760]', done && 'text-muted line-through')}>{task.name}</p>
-        {task.description ? <p className="mt-[3px] text-[11px] text-muted">{task.description}</p> : null}
-        <div className="mt-[3px] flex flex-wrap items-center gap-[7px] text-[11px] text-muted">
-          <span className="inline-flex items-center gap-1.5">
+        <p className={cn('text-[14px] leading-snug font-[700]', done && 'text-muted line-through')}>{task.name}</p>
+        {task.description ? <p className="mt-0.5 text-[12px] text-muted">{task.description}</p> : null}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-muted">
+          <span className="inline-flex items-center gap-1">
             <Icon name="clock" size="sm" />
             <span className={cn(task.isLate && 'font-semibold text-coral')}>{task.dueLabel}</span>
           </span>
           {task.assigneesUnknown ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden="true">·</span>
-              <PendingAssignee size="sm" />
-            </span>
+            <PendingAssignee size="sm" />
           ) : (
             task.assignees.map((assignee) => (
-              <span key={assignee.memberId} className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true">·</span>
+              <span key={assignee.memberId} className="inline-flex items-center gap-1">
                 <MemberAvatar member={assignee.member} size="sm" />
                 {memberFirstName(assignee.member.display_name)}
               </span>
             ))
           )}
           {task.reminderLabel ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1">
               <Icon name="bell" size="sm" />
               {task.reminderLabel}
             </span>
@@ -103,14 +98,14 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
         </div>
       </div>
 
-      <div className="flex items-center gap-[5px]">
+      <div className="flex items-center gap-1">
         <PriorityTag priority={task.priority} />
         {!readOnly ? (
           <button
             type="button"
             onClick={() => onEdit(task)}
             aria-label={`Modifier ${task.name}`}
-            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg max-[650px]:hidden"
+            className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-accent hover:bg-accent-faint hover:text-fg focus-visible:opacity-100 max-[650px]:opacity-100"
           >
             <Icon name="edit" size="sm" />
           </button>
@@ -120,7 +115,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
             type="button"
             onClick={() => onDelete(task)}
             aria-label={`Supprimer ${task.name}`}
-            className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+            className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-coral hover:bg-coral-soft hover:text-coral focus-visible:opacity-100 max-[650px]:opacity-100"
           >
             <Icon name="trash" size="sm" />
           </button>
