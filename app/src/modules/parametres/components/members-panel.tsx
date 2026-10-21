@@ -114,7 +114,7 @@ export function MembersPanel() {
         })}
       </ul>
       {isAdmin ? (
-        <p id="role-change-notice" className="mt-4 mb-0 rounded-[11px] bg-bg p-3 text-[11px] text-muted">
+        <p id="role-change-notice" className="mt-4 mb-0 rounded-[14px] bg-bg p-3 text-[12px] text-muted">
           {roleChangeNotice}
         </p>
       ) : null}

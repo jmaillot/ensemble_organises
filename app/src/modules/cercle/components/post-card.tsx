@@ -253,9 +253,11 @@ function PostCardComponent({
                 commentTrimmed.length <= COMMENT_CONTENT_MAX &&
                 commentTrimmed !== comment.content;
               return (
-                <li key={comment.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 text-[11px] text-ink-soft">
-                  <strong className="text-fg">{commentAuthor}</strong>
-                  <div className="min-w-0">
+                <li
+                  key={comment.id}
+                  className="group/comment flex items-start gap-2 text-[11.5px] leading-[1.55] text-ink-soft"
+                >
+                  <div className="min-w-0 flex-1">
                     {editingComment ? (
                       <form
                         className="grid gap-1.5"
@@ -296,44 +298,47 @@ function PostCardComponent({
                         </div>
                       </form>
                     ) : (
-                      <span>{comment.content}</span>
+                      <p className="m-0">
+                        <strong className="text-fg">{commentAuthor}</strong>{' '}
+                        <span>{comment.content}</span>
+                      </p>
                     )}
-                    {!editingComment && (canEditInline(comment) || canDeleteInline(comment)) ? (
-                      <div className="mt-1 flex justify-end gap-1">
-                        {canEditInline(comment) ? (
-                          <Button
-                            type="button"
-                            variant="quiet"
-                            size="sm"
-                            icon="edit"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startCommentEdit(comment);
-                            }}
-                            aria-label="Modifier ce commentaire"
-                          >
-                            <span className="sr-only">Modifier</span>
-                          </Button>
-                        ) : null}
-                        {canDeleteInline(comment) ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            icon="trash"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setPendingDeleteComment(comment);
-                            }}
-                            aria-label="Supprimer ce commentaire"
-                            className="text-coral hover:bg-coral-soft hover:text-coral"
-                          >
-                            <span className="sr-only">Supprimer</span>
-                          </Button>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </div>
+                  {/* Les deux commandes restent sur la ligne du commentaire, à
+                      droite : posées dessous, elles coupaient la lecture du fil.
+                      Elles s'effacent tant qu'on ne survole pas (ou ne tabule
+                      pas dessus) et restent visibles au tactile, où le survol
+                      n'existe pas. */}
+                  {!editingComment && (canEditInline(comment) || canDeleteInline(comment)) ? (
+                    <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 max-[650px]:opacity-100">
+                      {canEditInline(comment) ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            startCommentEdit(comment);
+                          }}
+                          aria-label="Modifier ce commentaire"
+                          className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-surface hover:text-fg"
+                        >
+                          <Icon name="edit" size="sm" />
+                        </button>
+                      ) : null}
+                      {canDeleteInline(comment) ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPendingDeleteComment(comment);
+                          }}
+                          aria-label="Supprimer ce commentaire"
+                          className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                        >
+                          <Icon name="trash" size="sm" />
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

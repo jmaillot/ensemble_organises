@@ -595,18 +595,25 @@ Ordre : Accueil, Calendrier, Tâches, Notes, Courses, Routines, Recettes,
 Ardoise, Cadeaux, Anniversaires, Contacts, Animaux, Prestataires, Fidélité,
 Adresses, Cercle, Voyages, Messages, Paramètres.
 
-**Fait le 21 octobre 2026 :** quinze espaces repris, plus les deux primitives
-qui les portent (lignes de liste et onglets). Calendrier (numéros de semaine
-ISO, agenda en lignes aérées avec pastilles typées, filtres en une rangée
-défilante sur mobile, zone scolaire rapprochée de son explication), Tâches
+**Fait le 21 octobre 2026 :** les dix-sept espaces ont reçu la passe — quinze
+écran par écran, Accueil et Paramètres de façon ciblée — plus les deux
+primitives qui les portent (lignes de liste et onglets). Calendrier (numéros de
+semaine ISO, agenda en lignes aérées avec pastilles typées, filtres en une
+rangée défilante sur mobile, zone scolaire rapprochée de son explication), Tâches
 (lignes de 64 px, case 22 px, priorité en pilule, actions révélées au survol et
 toujours visibles au tactile), Routines (cartes du jour en 20 px, série en
 pastille, listes à lignes survolables, historique en lignes rondes), Recettes
 (voile dégradé dédié pour que le titre reste lisible sur les photos), Ardoise
 (tuile sauge et montants en Fraunces), Cadeaux, Anniversaires, Contacts,
 Animaux, Prestataires, Fidélité, Adresses, Cercle, Voyages, Messages et Notes.
-Accueil et Paramètres tiennent leur cohérence des primitives partagées : ils
-n'ont pas reçu de reprise écran par écran.
+Accueil et Paramètres ont reçu une passe ciblée : cartes de widgets à 20–22 px,
+fiches d'invitation à 20 px, métadonnées remontées de 10 à 11 px.
+
+Un détail du Cercle a été corrigé après essai : les commandes d'un commentaire
+(modifier, supprimer) étaient posées sous le texte et coupaient la lecture du
+fil. Elles tiennent maintenant la ligne du commentaire, à droite, en 28 px,
+effacées tant qu'on ne survole pas la ligne (ou ne tabule pas dedans) et
+toujours visibles au tactile.
 
 Deux décisions de fond ont été prises en chemin :
 

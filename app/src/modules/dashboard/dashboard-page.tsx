@@ -188,7 +188,7 @@ export default function DashboardPage() {
           />
 
           {dashboard.placements.length === 0 ? (
-            <p className="panel-surface mb-[34px] rounded-[16px] p-[19px] text-xs text-muted">
+            <p className="panel-surface mb-[34px] rounded-[20px] p-[19px] text-xs text-muted">
               Tous les widgets sont masqués. Utilisez « Personnaliser l’accueil » pour en réactiver.
             </p>
           ) : (
@@ -374,7 +374,7 @@ function BirthdayPreview({
   onOpen: () => void;
 }) {
   return (
-    <section className="side-card panel-surface rounded-[16px] p-[17px]">
+    <section className="side-card panel-surface rounded-[22px] p-[18px]">
       <div className="mb-3 flex items-start justify-between gap-2.5">
         <div>
           <h3 className="mb-1 font-display text-base tracking-[-0.035em]">Anniversaires</h3>
