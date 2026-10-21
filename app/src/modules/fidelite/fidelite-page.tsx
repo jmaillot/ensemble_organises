@@ -177,7 +177,7 @@ export default function FidelitePage() {
               onClick={() => setPreview(card)}
               aria-label={`Afficher le code de ${card.name} en plein écran`}
               className={cn(
-                'panel-surface w-full rounded-[16px] p-[17px] text-left transition-[transform,border-color] duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:-translate-y-0.5 hover:border-accent',
+                'panel-surface w-full rounded-[20px] p-4 text-left transition-[transform,border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:-translate-y-0.5 hover:border-accent hover:shadow-md',
                 index % 2 === 1 && 'border-accent/25 bg-accent-faint',
               )}
             >
@@ -194,19 +194,19 @@ export default function FidelitePage() {
                 </span>
               </div>
 
-              {card.codeType === 'qr' ? (
-                <span className="mt-[18px] mb-[9px] flex justify-center">
-                  <QrCode value={card.codeValue} size={116} label={`QR code de fidélité de ${card.name}`} />
-                </span>
-              ) : (
-                <BarCode
-                  value={card.codeValue}
-                  label={`Code-barres de fidélité de ${card.name}`}
-                  className="mt-[18px] mb-[9px] block overflow-hidden rounded-[7px]"
-                />
-              )}
+              <span className="mt-4 flex min-h-[132px] items-center justify-center rounded-[14px] border border-border/60 bg-surface px-3 py-4">
+                {card.codeType === 'qr' ? (
+                  <QrCode value={card.codeValue} size={104} label={`QR code de fidélité de ${card.name}`} />
+                ) : (
+                  <BarCode
+                    value={card.codeValue}
+                    label={`Code-barres de fidélité de ${card.name}`}
+                    className="block overflow-hidden rounded-[7px]"
+                  />
+                )}
+              </span>
 
-              <span className="block font-mono text-[11px] tracking-[0.1em] break-all text-muted">{card.codeValue}</span>
+              <span className="mt-2 block font-mono text-[11px] tracking-[0.1em] break-all text-muted">{card.codeValue}</span>
             </button>
           ))}
         </div>

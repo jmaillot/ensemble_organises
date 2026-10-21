@@ -149,7 +149,7 @@ export default function ContactsPage() {
                     <div
                       key={contact.id}
                       role="listitem"
-                      className="flex items-center gap-3 border-t border-border py-3.5 first:border-t-0 first:pt-0"
+                      className="group flex min-h-[68px] items-center gap-3 rounded-[16px] px-2 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
                     >
                       {contact.photoUrl ? (
                         <img
@@ -161,8 +161,8 @@ export default function ContactsPage() {
                         <MemberAvatar member={contact.linkedMember} name={contact.name} size="lg" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <strong className="block text-[13px]">{contact.name}</strong>
-                        <small className="text-[11px] text-muted">
+                        <strong className="block text-[14px] font-[700]">{contact.name}</strong>
+                        <small className="text-[11.5px] text-muted">
                           {contact.birthDate ? `Né(e) le ${formatFrDate(contact.birthDate)}` : 'Sans date de naissance'}
                           {contact.linkedMember ? ` · ${contact.linkedMember.display_name}` : ''}
                         </small>
@@ -174,7 +174,7 @@ export default function ContactsPage() {
                             onClick={() => setPendingMove(contact)}
                             aria-label={`Déplacer la fiche de ${contact.name} vers Famille`}
                             title="Déplacer vers Famille"
-                            className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                            className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-accent hover:bg-accent-faint hover:text-fg"
                           >
                             <Icon name="send" size="sm" />
                           </button>
@@ -183,7 +183,7 @@ export default function ContactsPage() {
                           type="button"
                           onClick={() => openEdit(contact)}
                           aria-label={`Modifier la fiche de ${contact.name}`}
-                          className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-accent hover:bg-accent-faint hover:text-fg"
                         >
                           <Icon name="edit" size="sm" />
                         </button>
@@ -191,7 +191,7 @@ export default function ContactsPage() {
                           type="button"
                           onClick={() => setPendingDelete(contact)}
                           aria-label={`Supprimer la fiche de ${contact.name}`}
-                          className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-coral hover:bg-coral-soft hover:text-coral"
                         >
                           <Icon name="trash" size="sm" />
                         </button>
