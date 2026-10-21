@@ -174,27 +174,30 @@ export default function PrestatairesPage() {
       {visible.length > 0 ? (
         <div className="grid grid-cols-2 gap-3.5 max-[650px]:grid-cols-1">
           {visible.map((provider) => (
-            <article key={provider.id} className="panel-surface rounded-[16px] p-[17px]">
-              <div className="flex items-start gap-[11px]">
-                <div className="grid size-[42px] place-items-center rounded-[13px] bg-accent-soft text-accent-strong">
+            <article
+              key={provider.id}
+              className="panel-surface group rounded-[22px] p-4 transition-shadow duration-[var(--duration-quick)] hover:shadow-md min-[651px]:p-[22px]"
+            >
+              <div className="flex items-start gap-3">
+                <div className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-sage text-[#2f5d50]">
                   <Icon name={provider.typeIcon} size="sm" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="mb-0.5 text-[15px]">{provider.name}</h3>
-                  <p className="m-0 text-[11px] text-muted">{provider.typeName}</p>
+                  <h3 className="mb-0.5 font-display text-[17px]">{provider.name}</h3>
+                  <p className="m-0 text-[11.5px] text-muted">{provider.typeName}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  icon="edit"
-                  className="size-[31px] text-muted hover:bg-accent-faint hover:text-fg"
+                <button
+                  type="button"
                   aria-label={`Modifier ${provider.name}`}
                   onClick={() => setForm({ open: true, provider })}
-                />
+                  className="grid size-8 shrink-0 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                >
+                  <Icon name="edit" size="sm" />
+                </button>
               </div>
-              <div className="mt-4 grid gap-2 border-t border-border pt-3 text-[11px] text-muted">
+              <div className="mt-3.5 grid gap-2 border-t border-border/70 pt-3 text-[12px] text-muted">
                 {provider.email ? (
-                  <span className="flex items-center gap-2">
+                  <span className="-mx-1.5 flex min-h-8 items-center gap-2 rounded-[10px] px-1.5 hover:bg-accent-faint/60">
                     <Icon name="message" size="sm" />
                     <a className="truncate hover:text-accent-strong" href={mailtoHref(provider.email)}>
                       {provider.email}
@@ -202,7 +205,7 @@ export default function PrestatairesPage() {
                   </span>
                 ) : null}
                 {provider.phone ? (
-                  <span className="flex items-center gap-2">
+                  <span className="-mx-1.5 flex min-h-8 items-center gap-2 rounded-[10px] px-1.5 hover:bg-accent-faint/60">
                     <Icon name="phone" size="sm" />
                     <a className="hover:text-accent-strong" href={telHref(provider.phone)}>
                       {provider.phone}
@@ -210,13 +213,13 @@ export default function PrestatairesPage() {
                   </span>
                 ) : null}
                 {hasAddress(provider) ? (
-                  <span className="flex items-start gap-2">
+                  <span className="-mx-1.5 flex min-h-8 items-start gap-2 rounded-[10px] px-1.5 py-1">
                     <Icon name="pin" size="sm" className="mt-px" />
                     <span>{provider.fullAddress}</span>
                   </span>
                 ) : null}
                 {provider.notes ? (
-                  <span className="flex items-start gap-2">
+                  <span className="-mx-1.5 flex min-h-8 items-start gap-2 rounded-[10px] px-1.5 py-1">
                     <Icon name="info" size="sm" className="mt-px" />
                     <span>{provider.notes}</span>
                   </span>

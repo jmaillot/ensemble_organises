@@ -242,12 +242,12 @@ export default function NotesPage() {
                 <article
                   key={note.id}
                   className={cn(
-                    'panel-surface flex min-h-[170px] flex-col rounded-[16px] p-[17px]',
+                    'panel-surface group flex min-h-[180px] flex-col rounded-[22px] p-[18px] transition-shadow duration-[var(--duration-quick)] hover:shadow-md',
                     featured && 'border-accent/20 bg-accent-faint',
                   )}
                 >
                   <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
-                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-bg px-2 py-[3px]">
                       <span
                         aria-hidden="true"
                         className={cn('size-2 shrink-0 rounded-full', toneDot[noteCategoryTone(note.category)])}
@@ -296,7 +296,7 @@ export default function NotesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="rounded-[9px] hover:bg-coral-soft hover:text-coral"
+                          className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral"
                           aria-label={`Supprimer ${note.title}`}
                           onClick={() => setPendingDelete(note)}
                         >
@@ -304,7 +304,7 @@ export default function NotesPage() {
                         </Button>
                         <button
                           type="button"
-                          className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[11px] font-extrabold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:text-accent-deep"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
                           onClick={() => openEdit(note)}
                         >
                           Modifier
