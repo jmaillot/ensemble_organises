@@ -41,21 +41,22 @@ Security) — jamais seulement dans l'interface.
 
 ## 1. Ce que fait l'application
 
-Dix-huit routes : seize espaces du foyer, plus l'accueil et les préférences. Un
+Dix-neuf pages : dix-sept espaces du foyer, plus l'accueil et les préférences. Un
 seul jeu de membres, de rappels, de couleurs et de permissions pour tous :
 
 | Espace | Route | Ce qu'on y fait |
 |---|---|---|
-| **Accueil** | `/accueil` | Widgets du jour réordonnables, point du jour, accès aux 16 espaces |
+| **Accueil** | `/accueil` | Widgets du jour réordonnables, point du jour, accès aux 17 espaces |
 | **À faire** | `/taches` | Tâches par échéance, priorité, assignataires, rappels, réordonnancement au glisser-déposer |
 | **Calendrier** | `/calendrier` | Vue mois, agenda du jour, jours fériés français, anniversaires, création par appui long |
 | **Notes** | `/notes` | Notes en Markdown (aperçu dans l’éditeur), catégories colorées, recherche plein texte, épinglage, visibilité privée/partagée |
 | **Courses** | `/courses` | Listes partagées, regroupement par rayon, ajout rapide au clavier, suggestions d'historique |
 | **Routines** | `/routines` | Rituel récurrent (RRULE), occurrences du jour, séries, historique et carte mensuelle |
-| **Recettes** | `/recettes` | Espace réservé (placeholder) : les recettes arrivent bientôt |
+| **Recettes** | `/recettes` | Recettes du foyer : ingrédients, étapes (photo par étape), catégories et étiquettes, favoris, recherche, mode cuisine et export imprimable |
 | **Ardoise** | `/ardoise` | Dépenses partagées, soldes par membre, compensation de dettes, invitations ciblées |
 | **Cadeaux** | `/cadeaux` | Listes privées ou partagées, idées, prix, réservation, partage à un proche |
 | **Anniversaires** | `/anniversaires` | Liste et calendrier, recherche, rappel du mois en cours |
+| **Contacts** | `/contacts` | Listes de contacts (Famille partagée et listes perso), fiches avec photo et date de naissance, rattachement à un membre du foyer |
 | **Animaux** | `/animaux` | Fiche, carnet de santé (produits, vaccins, traitements), alertes de rappel |
 | **Prestataires** | `/prestataires` | Contacts par type, appel `tel:`, itinéraire, gestion des types |
 | **Fidélité** | `/fidelite` | Cartes de fidélité, code en plein écran, scan code-barres / QR (API native + repli) |
@@ -63,10 +64,10 @@ seul jeu de membres, de rappels, de couleurs et de permissions pour tous :
 | **Cercle** | `/cercle` | Fil familial : publications, photos compressées, réactions, commentaires |
 | **Voyages** | `/voyages` | Projets, dates, avancement de préparation, membres invités |
 | **Messages** | `/messages` | Conversations privées, temps réel, accusés de lecture côté client |
-| **Paramètres** | `/parametres` | Profil, foyer, membres, tokens d'invitation, notifications, état hors ligne |
+| **Paramètres** | `/parametres` | Profil, foyer, membres, tokens d'invitation, notifications, mode de données et installation |
 
 Et le parcours d'entrée : **landing** (`/`) → **connexion** (`/connexion`,
-Google / Facebook / e-mail) → **créer ou rejoindre un foyer** (`/foyer`,
+Google / e-mail) → **créer ou rejoindre un foyer** (`/foyer`,
 token d'invitation) → tableau de bord.
 
 ---
@@ -75,9 +76,10 @@ token d'invitation) → tableau de bord.
 
 - **Le foyer d'abord.** Chaque donnée appartient à un foyer ; l'accès est vérifié
   en base, pas côté client.
-- **Hors ligne d'abord.** Les données consultées sont mises en cache (IndexedDB),
-  les saisies hors ligne sont rejouées à la reconnexion. L'application reste
-  installable et utilisable sans réseau.
+- **En ligne d'abord, démo locale.** En mode connecté, chaque lecture et chaque
+  écriture part directement au serveur du foyer : une erreur réseau s'affiche
+  telle quelle et rien n'est rejoué. Sans configuration Supabase, l'application
+  tourne en démo sur IndexedDB, avec le même code et un adaptateur local.
 - **Lisible sans effort.** Un code couleur par membre (avatar, tâche assignée,
   événement, message), des échéances exprimées en français (« Dans 12 jours »),
   des totaux lisibles avant le détail.
@@ -134,9 +136,9 @@ Toutes les versions sont **épinglées** (pas de plages) dans `app/package.json`
 │   │   ├── components/
 │   │   │   ├── ui/            #   primitives accessibles (bouton, champ, dialogue…)
 │   │   │   └── shared/        #   composants métier (en-tête de module, panneau, tuile…)
-│   │   ├── lib/               # client Supabase, data layer, hors ligne, formatage
+│   │   ├── lib/               # client Supabase, data layer (serveur ou démo), formatage
 │   │   ├── stores/            # session et foyer (Zustand)
-│   │   ├── hooks/             # hooks transverses (auth, calendrier, PWA, hors ligne)
+│   │   ├── hooks/             # hooks transverses (auth, calendrier, PWA, état réseau)
 │   │   ├── styles/app.css     # jetons de design (@theme) + utilitaires
 │   │   ├── sw.ts              # service worker (précache + handlers push)
 │   │   └── types/             # lignes SQL typées (contrat avec le backend)
@@ -522,7 +524,7 @@ rayons 10/16/22 px, ombres douces, échelle typographique fluide
 | Niveau | Commande | Couverture |
 |---|---|---|
 | Composants et hooks | `npm test` (dans `app/`) | rendu, interactions, états vides/chargement/erreur, règles métier de chaque module |
-| Data layer | inclus | adaptateur local, file hors ligne, génération de token, formatage |
+| Data layer | inclus | adaptateur local (démo), contrats de lecture et d'écriture, génération de token, formatage |
 | End-to-end | `npm run test:e2e` (dans `app/`) | connexion, création/rejoint de foyer, tâche, dépense, carte de fidélité, calendrier, absence de débordement, lien d'évitement, largeur réelle des tuiles, cibles tactiles de 44 px |
 | SQL | `sh scripts/test-db.sh` | contrat de schéma, isolation RLS, invitations, cron, compensation Ardoise, anniversaires, notifications push |
 | Chiffrement Web Push | `npm test` (dans `app/`) | vecteurs **publiés** de la RFC 8291 (message de 144 octets, valeurs intermédiaires de l'annexe A) et signature VAPID de la RFC 8292 |
@@ -538,24 +540,9 @@ L'état actionnable — qui fait quoi, et comment vérifier que c'est fini — v
 dans [`docs/TODO.md`](docs/TODO.md), seule liste qui fait foi. Ce qui suit
 n'en est qu'un résumé de contexte.
 
-- **Le schéma a été exécuté, pas le Web Push.** Les migrations 0001 à 0017 et
-  les six premières suites SQL ont tourné sur une vraie base le 25 septembre
-  2026 (244 assertions, voir [`docs/RETROSPECTIVE.md`](docs/RETROSPECTIVE.md)).
-  Les migrations **0018 et 0019** (abonnements push, dispatch) et la suite
-  `0007_push.sql` sont écrites et relues, mais **n'ont jamais été appliquées** :
-  aucune stack n'était disponible. Avant déploiement :
-  `sh scripts/migrate.sh && sh scripts/test-db.sh`.
-- **Web Push complet mais jamais exercé en conditions réelles** : table
-  d'abonnements, préférences, Edge Functions `push-subscribe` et `push-notify`,
-  chiffrement RFC 8291, signature VAPID, jobs `eo-push-dispatch` et
-  `eo-push-prune`. Le chiffrement est vérifié par 19 assertions contre les
-  vecteurs publiés de la RFC 8291 ; le reste exige une stack allumée. Voir
-  [`docs/BACKEND.md`](docs/BACKEND.md) §6.4, §6.5 et §13.
 - **`profiles.reminder_frequency` n'influence aucun envoi** : la cadence est
   enregistrée et affichée, mais les rappels étant unitaires, donc immédiats.
   L'interface le dit plutôt que de présenter un réglage sans effet.
-- **Recettes** est un placeholder (le schéma détaillé reste à définir, comme
-  prévu par le référentiel).
 - **Accusés de lecture des messages** suivis côté client : il faudrait une
   colonne `read_at` et une mise à jour serveur.
 - **Ville du profil** : `profiles.city` (migration 0034, contrainte 2–60
@@ -564,10 +551,9 @@ n'en est qu'un résumé de contexte.
   **Validé en usage le 30/09** (ville enregistrée → température réelle Open-Meteo
   affichée), `migrate.sh` + `test-db.sh` verts sur l'hôte, CSP Traefik avec
   `connect-src` Open-Meteo en place.
-- **Colonnes suggérées par les modules** : `notes.visibility`
-(remplacerait le champ `color` utilisé comme porteuse), `pets.notes`,
-`pets.next_reminder_date`, `trips.status`.
-- **Les grilles de cartes ont été balayées, pas seulement la Home.** Les dix-huit
+- **Colonne suggérée par les modules** : `notes.visibility`
+  (remplacerait le champ `color` utilisé comme porteuse).
+- **Les grilles de cartes ont été balayées, pas seulement la Home.** Les dix-neuf
   routes ont été rendues dans un vrai moteur (chromium, 1440 px, 820 px et
   Pixel 7), à la recherche d'éléments présents au DOM mais sans surface : zéro
   aujourd'hui. Le balayage a trouvé un lien de barre latérale de 15×15 px sous
@@ -575,15 +561,16 @@ n'en est qu'un résumé de contexte.
   la suite e2e, qui tient désormais la règle. Un balayage ne remplace pas une
   relecture : il ne voit ni un contraste insuffisant, ni un ordre de tabulation
   faux, ni une étiquette qui ment.
-- **Le frontend n'a toujours jamais parlé à un vrai Supabase** : tout le
-  produit tourne sur l'adaptateur IndexedDB. C'est la réserve la plus lourde de
-  la rétrospective, et elle est entière.
 - **Compensation de l'Ardoise** : l'algorithme de référence est côté serveur
   (Edge Function `expense-settlement`) et le frontend l'affiche quand il est
   connecté (`useServerSettlement`, page Ardoise + résumé de l'accueil) ; le
-  calcul local reste le repli (démo, hors ligne, erreur) et couvre les
+  calcul local reste le repli (démo, serveur injoignable, erreur) et couvre les
   participants externes, ignorés par le serveur. À valider en usage : comparer
   les soldes affichés avec un foyer comportant un externe.
+- **Le client contre une pile réelle** reste à prouver : les e2e tournent sur
+  l'adaptateur démo, et `scripts/smoke-test.sh` prouve la chaîne JWT/RLS côté
+  HTTP, pas les modules dans un navigateur. Réserve de
+  [`docs/RETROSPECTIVE.md`](docs/RETROSPECTIVE.md) §4, toujours ouverte.
 - **Messages** : accusés de lecture et pièces jointes restent hors périmètre.
 
 Voir [`docs/BACKEND.md`](docs/BACKEND.md) pour le détail opératoire et

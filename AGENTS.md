@@ -454,7 +454,11 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 - `routine_completions` (id, routine_id, occurrence_date, completed_by, completed_at, status [fait/en retard/manqué])
 
 ### Recettes
-- Placeholder : `recipes` (id, household_id, title) — schéma complet à définir plus tard (ingrédients, étapes, temps de préparation, liaison possible avec Courses)
+- `recipes` (id, household_id, title, servings, prep_minutes, cook_minutes, cover_photo [chemin du bucket `household-media`], category_id, created_by)
+- `recipe_categories` (catégories du foyer, « Recettes du foyer » par défaut), `recipe_tags` + `recipe_tag_links` (étiquettes multiples)
+- `recipe_ingredients` (quantity nullable = « au goût », unit, position), `recipe_steps` (content, position, `photo_path` nullable)
+- `recipe_favorites` (par membre), `recipe_shares` (code partagé haché, expiration, max_uses, is_active)
+- Envoi des ingrédients vers une liste de Courses du foyer, qui incrémente la ligne existante au lieu de la dupliquer
 
 ### Ardoise
 - `expenses` (id, household_id, title, amount, paid_by member_id, expense_date, split_type [égal/personnalisé])
