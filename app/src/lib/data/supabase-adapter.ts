@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable } from './keys';
+import { SET_TABLES, type SetTable } from './set-tables';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
@@ -190,6 +191,24 @@ export class SupabaseAdapter implements DataAdapter {
     if ((removed ?? []).length === 0 && options?.ifMissing !== 'ignore') {
       throw new DataError(REMOVE_WHERE_MISSING_MESSAGE, { table, filter });
     }
+  }
+
+  /**
+   * Remplacement d'ensemble : UN appel à la fonction SQL de `0133`, donc une
+   * transaction. Deux appels (`delete` puis `insert`) laisseraient l'ensemble
+   * précédent perdu si le second échoue, et un refus RLS n'annulerait rien.
+   *
+   * Le foyer n'est jamais transmis : la fonction le dérive du parent
+   * (`recipe_tag_links`), un client ne choisit pas le foyer d'une ligne.
+   */
+  async replaceSet(table: SetTable, parentId: string, values: string[]): Promise<void> {
+    const client = this.client();
+    const spec = SET_TABLES[table];
+    const { error } = await client.rpc(spec.rpc, {
+      [spec.parentParam]: parentId,
+      [spec.valuesParam]: values,
+    });
+    if (error) throw new DataError(error.message, error);
   }
 
   subscribe(table: string, onChange: () => void) {

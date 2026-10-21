@@ -1,4 +1,5 @@
 import type { Row, RowFilter } from '@/types';
+import type { SetTable } from './set-tables';
 
 /** Une entité porte un `id` texte ; les tables de jointure n'en ont pas. */
 export interface Entity {
@@ -59,6 +60,23 @@ export interface DataAdapter {
   remove(table: string, id: string, options?: RemoveOptions): Promise<void>;
   /** Suppression d'un ensemble de lignes correspondant à un filtre (jointures). */
   removeWhere(table: string, filter: RowFilter, options?: RemoveOptions): Promise<void>;
+  /**
+   * Remplace d'un seul tenant l'ensemble des lignes rattachées à un parent.
+   *
+   * Méthode à part entière, et non `removeWhere()` suivi de `create()` : deux
+   * requêtes PostgREST n'ont aucune transaction en commun. Si la seconde
+   * échoue (réseau, session expirée, refus RLS), la première a déjà supprimé
+   * l'ensemble précédent — les assignataires ou les rappels sont perdus alors
+   * que l'utilisateur n'a rien supprimé. En mode démo, la même séquence laisse
+   * un intervalle pendant lequel un lecteur voit l'ensemble vide.
+   *
+   * Côté Supabase, l'écriture est UNE fonction SQL (`0133`) : suppression et
+   * insertion dans la même transaction, et un refus RLS annule les deux. Côté
+   * démo, une transaction Dexie. `values` porte la colonne enfant de la table
+   * (membre, instant de rappel, étiquette) ; un tableau vide est un
+   * remplacement légitime par zéro ligne, jamais un no-op silencieux.
+   */
+  replaceSet(table: SetTable, parentId: string, values: string[]): Promise<void>;
   /**
    * Crée un foyer et son premier membre d'un seul tenant.
    *

@@ -2,6 +2,7 @@ import { getDatabase, type StoredRow } from './dexie';
 import { seedRows, DEMO_HOUSEHOLD_ID } from './seed';
 import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable, rowKey } from './keys';
+import { SET_TABLES, type SetTable } from './set-tables';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
@@ -108,21 +109,74 @@ export class LocalAdapter implements DataAdapter {
 
   async create<T = Row>(table: string, values: Partial<T>): Promise<T> {
     await this.ensureSeeded();
-    const db = getDatabase();
+    const entry = this.rowEntry(table, values as Partial<Row>);
+    await getDatabase().rows.put(entry);
+    this.emit(table);
+    return entry.data as T;
+  }
+
+  /**
+   * Ligne telle que `create` l'écrirait : `id` seulement pour les tables qui
+   * en ont un, `created_at`/`updated_at` comme les défauts SQL. Partagé avec
+   * `replaceSet` pour que les deux chemins produisent exactement la même
+   * forme de ligne — une divergence rendrait certaines lignes invisibles aux
+   * filtres de `list` (clé de stockage comprise).
+   */
+  private rowEntry(table: string, values: Partial<Row>): StoredRow {
     const id = isKeylessTable(table) ? undefined : ((values as { id?: string }).id ?? randomId(table));
-    // Le schéma SQL pose `created_at` par défaut : on reproduit ce comportement
-    // en mode local pour que les tris par date restent justes.
     const record = values as Record<string, unknown>;
     const row = {
       ...values,
       ...(id === undefined ? {} : { id }),
       created_at: record.created_at ?? new Date().toISOString(),
       updated_at: record.updated_at ?? record.created_at ?? new Date().toISOString(),
-    } as unknown as T;
-    const householdId = String((values as Record<string, unknown>).household_id ?? DEMO_HOUSEHOLD_ID);
-    await db.rows.put({ key: rowKey(table, row as unknown as Row), table, householdId, data: row as unknown as Row, updatedAt: Date.now() });
+    } as unknown as Row;
+    const householdId = String(record.household_id ?? DEMO_HOUSEHOLD_ID);
+    return { key: rowKey(table, row), table, householdId, data: row, updatedAt: Date.now() };
+  }
+
+  /**
+   * Remplacement d'ensemble en une transaction Dexie : le mode démo suit le
+   * serveur (0133) plutôt que de laisser un intervalle où l'ensemble est vide.
+   * Un échec (parent introuvable) annule la suppression comprise.
+   */
+  async replaceSet(table: SetTable, parentId: string, values: string[]): Promise<void> {
+    await this.ensureSeeded();
+    const db = getDatabase();
+    const spec = SET_TABLES[table];
+    // Un ensemble n'a pas de doublon : la fonction SQL le traite ainsi, le
+    // mode démo doit produire les mêmes lignes.
+    const unique = [...new Set(values)];
+
+    // Le parent est lu AVANT la transaction, donc hors d'elle : une erreur
+    // levée dans une transaction Dexie est réemballée par Dexie et l'appelant
+    // ne reçoit plus une `DataError`. La lecture ne peut pas non plus
+    // s'intercaler avec l'écriture, IndexedDB sérialisant les transactions.
+    let householdId: string | undefined;
+    if (spec.householdFrom) {
+      const parent = await db.rows.get(rowKey(spec.householdFrom, { id: parentId }));
+      if (!parent) {
+        throw new DataError(`Remplacement annulé : ${spec.householdFrom} ${parentId} est introuvable.`);
+      }
+      householdId = String(parent.data.household_id ?? DEMO_HOUSEHOLD_ID);
+    }
+
+    await db.transaction('rw', db.rows, async () => {
+      const existing = await db.rows.where('table').equals(table).toArray();
+      const stale = existing.filter((entry) => entry.data[spec.parentColumn] === parentId);
+      if (stale.length > 0) await db.rows.bulkDelete(stale.map((entry) => entry.key));
+
+      const fresh = unique.map((value) =>
+        this.rowEntry(table, {
+          [spec.parentColumn]: parentId,
+          [spec.childColumn]: value,
+          ...(householdId === undefined ? {} : { household_id: householdId }),
+        }),
+      );
+      if (fresh.length > 0) await db.rows.bulkPut(fresh);
+    });
+
     this.emit(table);
-    return row;
   }
 
   /**

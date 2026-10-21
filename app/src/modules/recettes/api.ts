@@ -76,9 +76,8 @@ export async function deleteRecipeTag(id: string): Promise<void> {
 }
 
 /**
- * Remplace les tags d'une recette. La table de liens n'a pas de colonne
- * `id` : on repart de la liste existante (motif `setTaskAssignees`).
- * La frappe libre cree le tag manquant avant le lien (D-09).
+ * Remplace les tags d'une recette. Les tags manquants sont créés avant le lien
+ * (D-09), puis l'ensemble des liens est remplacé en une transaction (0133).
  */
 export async function setRecipeTags(recipeId: string, householdId: string, tagNames: string[]): Promise<void> {
   const names = [...new Set(tagNames.map((name) => name.trim()).filter((name) => name !== ''))];
@@ -94,18 +93,11 @@ export async function setRecipeTags(recipeId: string, householdId: string, tagNa
       tags.push(created);
     }
   }
-  // Remplacement en bloc des liens : partir d'un état vide (recette sans tag)
-  // supprime légitimement zéro ligne — tolérance déclarée.
-  await data.removeWhere(RECIPE_TAG_LINKS_TABLE, { recipe_id: recipeId }, { ifMissing: 'ignore' });
-  await Promise.all(
-    tags.map((tag) =>
-      data.create<RecipeTagLinkRow>(RECIPE_TAG_LINKS_TABLE, {
-        recipe_id: recipeId,
-        household_id: householdId,
-        tag_id: tag.id,
-      }),
-    ),
-  );
+  // Remplacement en bloc des liens, en une transaction (0133) : une recette
+  // sans tag remplace légitimement l'ensemble par zéro ligne. Les tags absents
+  // ont été créés juste avant — un tag orphelin reste inoffensif, alors qu'un
+  // échec d'insertion de lien ne doit pas vider la recette de ses tags.
+  await data.replaceSet('recipe_tag_links', recipeId, tags.map((tag) => tag.id));
 }
 
 export interface RecipePayload {

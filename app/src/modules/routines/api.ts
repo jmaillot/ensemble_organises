@@ -98,16 +98,12 @@ export async function listRoutineCompletions(routineIds: string[]): Promise<Rout
 }
 
 /**
- * Remplace les assignataires d'une routine. La table n'a pas de colonne `id` :
- * on repart donc de la liste existante au lieu d'alterner ajouts et retraits.
+ * Remplace les assignataires d'une routine en une transaction (0133). Une
+ * routine vidée de ses assignataires remplace légitimement l'ensemble par zéro
+ * ligne.
  */
 export async function setRoutineAssignees(routineId: string, memberIds: string[]): Promise<void> {
-  // Remplacement en bloc : zéro ligne à supprimer (retrait du dernier
-  // assignataire) est normal — tolérance déclarée.
-  await data.removeWhere(ROUTINE_ASSIGNEES_TABLE, { routine_id: routineId }, { ifMissing: 'ignore' });
-  await Promise.all(
-    memberIds.map((memberId) => data.create<RoutineAssigneeRecord>(ROUTINE_ASSIGNEES_TABLE, { routine_id: routineId, member_id: memberId })),
-  );
+  await data.replaceSet('routine_assignees', routineId, memberIds);
 }
 
 /** Rappels d'une routine : remplacés plutôt qu'accumulés (zéro, un ou plusieurs). */
@@ -115,16 +111,9 @@ export async function setRoutineReminder(routineId: string, remindAt: string | n
   await setRoutineReminders(routineId, remindAt === null ? [] : [remindAt]);
 }
 
-/** Remplace l'ensemble des rappels d'une routine. */
+/** Remplace l'ensemble des rappels d'une routine, en une transaction (0133). */
 export async function setRoutineReminders(routineId: string, remindAts: string[]): Promise<void> {
-  // Remplacement : une routine sans rappel n'en a aucun à supprimer — tolérance
-  // déclarée.
-  await data.removeWhere(ROUTINE_REMINDERS_TABLE, { routine_id: routineId }, { ifMissing: 'ignore' });
-  await Promise.all(
-    remindAts.map((remindAt) =>
-      data.create<RoutineReminderRecord>(ROUTINE_REMINDERS_TABLE, { routine_id: routineId, remind_at: remindAt }),
-    ),
-  );
+  await data.replaceSet('routine_reminders', routineId, remindAts);
 }
 
 /** Occurrence enregistrée d'un jour donné, si elle existe. */

@@ -111,15 +111,9 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
         const trimmed = name.trim();
         if (trimmed.length === 0 || trimmed.length > 200) throw new Error('Nommez la tâche (1 à 200 caractères).');
         await data.update('tasks', editing.id, { name: trimmed, due_date: dueDate || null });
-        // Remplacement en bloc des assignataires : tolérance déclarée.
-        await data.removeWhere('task_assignees', { task_id: editing.id }, { ifMissing: 'ignore' });
-        if (assigneeIds.length > 0) {
-          await Promise.all(
-            assigneeIds.map((memberId) =>
-              data.create('task_assignees', { task_id: editing.id, member_id: memberId }),
-            ),
-          );
-        }
+        // Remplacement en bloc des assignataires, en une transaction (0133) :
+        // un échec ne doit pas laisser la tâche sans aucun assigné.
+        await data.replaceSet('task_assignees', editing.id, assigneeIds);
         setEditing(null);
         setName('');
         setDueDate('');
