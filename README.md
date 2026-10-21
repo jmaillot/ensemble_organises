@@ -49,7 +49,7 @@ seul jeu de membres, de rappels, de couleurs et de permissions pour tous :
 | **Accueil** | `/accueil` | Widgets du jour réordonnables, point du jour, accès aux 16 espaces |
 | **À faire** | `/taches` | Tâches par échéance, priorité, assignataires, rappels, réordonnancement au glisser-déposer |
 | **Calendrier** | `/calendrier` | Vue mois, agenda du jour, jours fériés français, anniversaires, création par appui long |
-| **Notes** | `/notes` | Notes avec catégories colorées, recherche plein texte, épinglage, visibilité privée/partagée |
+| **Notes** | `/notes` | Notes en Markdown (aperçu dans l’éditeur), catégories colorées, recherche plein texte, épinglage, visibilité privée/partagée |
 | **Courses** | `/courses` | Listes partagées, regroupement par rayon, ajout rapide au clavier, suggestions d'historique |
 | **Routines** | `/routines` | Rituel récurrent (RRULE), occurrences du jour, séries, historique et carte mensuelle |
 | **Recettes** | `/recettes` | Espace réservé (placeholder) : les recettes arrivent bientôt |

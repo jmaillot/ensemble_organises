@@ -229,8 +229,47 @@ export function noteMetrics(notes: Note[]): NoteMetrics {
   };
 }
 
+/**
+ * Texte nu d'un contenu Markdown.
+ *
+ * L'extrait de carte tient sur une ou deux lignes : les repères de syntaxe y
+ * seraient du bruit (« **Préparer** les cartables »). On retire donc les
+ * marques en gardant le texte qu'elles portaient — un lien perd son adresse
+ * mais pas son libellé, une image garde sa légende.
+ */
+export function notePlainText(content: string): string {
+  // Le code est mis de côté avant le nettoyage : `snake_case` dans une portée
+  // de code n'est pas de l'italique, et retirer ses soulignés changerait le
+  // texte qu'on prétend seulement débarrasser de ses repères.
+  const code: string[] = [];
+  const stash = (body: string) => `\u0000${code.push(body.trim()) - 1}\u0000`;
+
+  const withoutCode = content
+    .replace(/```[^\n]*\n?([\s\S]*?)```/g, (_match, body: string) => stash(body))
+    .replace(/`([^`\n]+)`/g, (_match, body: string) => stash(body));
+
+  return withoutCode
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s{0,3}(?:[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, ' ')
+    .replace(/^\s*```[^\n]*$/gm, ' ')
+    // Les bornes évitent de prendre `snake_case` ou `2 * 3` pour de l'italique :
+    // un marqueur n'ouvre pas sur une espace et ne ferme pas après elle.
+    .replace(/\b__(?!\s)(.+?)(?<!\s)__\b/g, '$1')
+    .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*/g, '$1')
+    .replace(/(?<!\*)\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)/g, '$1')
+    .replace(/\b_(?![\s_])(.+?)(?<![\s_])_\b/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/\u0000(\d+)\u0000/g, (_match, index: string) => code[Number(index)] ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Contenu de carte, raccourci pour garder des cartes homogènes. */
 export function noteExcerpt(content: string, maxLength = 140): string {
-  const clean = content.trim();
+  const clean = notePlainText(content);
   return clean.length <= maxLength ? clean : `${clean.slice(0, maxLength - 1).trimEnd()}…`;
 }

@@ -65,6 +65,28 @@ describe('NotesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('prévisualise le Markdown sans perdre la saisie', async () => {
+    supportScrollIntoView();
+    const user = userEvent.setup();
+    renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Créer une note' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const textarea = within(dialog).getByLabelText(/Contenu/);
+    await user.type(textarea, '**Préparer** les cartables');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Aperçu' }));
+    expect(await within(dialog).findByText('Préparer', { selector: 'strong' })).toBeInTheDocument();
+    // Le champ reste monté mais masqué : c'est lui qui porte la valeur envoyée.
+    expect(textarea).not.toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Écrire' }));
+    expect(textarea).toBeVisible();
+    expect(textarea).toHaveValue('**Préparer** les cartables');
+  });
+
   it('joint un PDF à la création et l’affiche sur la carte', async () => {
     supportScrollIntoView();
     // Mode démo : le dépôt renvoie un aperçu local.

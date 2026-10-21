@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
+import { cn } from '@/lib/utils';
 import { formatBytes, isImageMime } from '@/lib/storage';
+import { NoteMarkdown } from './note-markdown';
 import {
   NOTE_CATEGORIES,
   OTHER_CATEGORY,
@@ -70,6 +72,8 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
   });
   const errors = formState.errors;
   const category = watch('category');
+  const contentValue = watch('content') ?? '';
+  const [isPreview, setIsPreview] = useState(false);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
 
@@ -78,6 +82,7 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
     reset(defaultValues(note, initialFolderId));
     setNewFiles([]);
     setRemovedIds([]);
+    setIsPreview(false);
     // `note` — objet recréé par la page à chaque rendu — identifie une ouverture
     // par son `note?.id` stable : le formulaire n'est pas réinitialisé à chaque
     // frappe, et `reset` (react-hook-form) est stable.
@@ -177,14 +182,68 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
             </Field>
           ) : null}
 
-          <Field label="Contenu" error={errors.content?.message}>
+          <Field
+            label="Contenu"
+            hint="Markdown accepté : **gras**, *italique*, - liste, [lien](https://exemple.fr)"
+            error={errors.content?.message}
+          >
             {(props) => (
-              <Textarea
-                {...props}
-                {...register('content')}
-                rows={6}
-                placeholder="Cartables, crayons, gourdes et un goûter pour le premier jour."
-              />
+              <div className="grid gap-2">
+                <div className="flex justify-end">
+                  <div
+                    role="group"
+                    aria-label="Affichage du contenu"
+                    className="flex gap-0.5 rounded-full border border-border/70 bg-bg p-0.5"
+                  >
+                    {(
+                      [
+                        { preview: false, label: 'Écrire' },
+                        { preview: true, label: 'Aperçu' },
+                      ] as const
+                    ).map((mode) => (
+                      <button
+                        key={mode.label}
+                        type="button"
+                        aria-pressed={isPreview === mode.preview}
+                        onClick={() => setIsPreview(mode.preview)}
+                        className={cn(
+                          'min-h-9 rounded-full px-3 text-[11.5px] font-bold transition-colors duration-[var(--duration-quick)]',
+                          isPreview === mode.preview
+                            ? 'bg-surface text-fg shadow-sm'
+                            : 'text-muted hover:text-fg',
+                        )}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/*
+                  Le champ reste monté en aperçu, masqué : c'est lui qui porte la
+                  valeur enregistrée, et le démonter la perdrait à l'envoi. Il
+                  porte les attributs d'accessibilité du libellé, d'où le
+                  `aria-label` de la zone d'aperçu qui reprend le rôle.
+                */}
+                <Textarea
+                  {...props}
+                  {...register('content')}
+                  rows={6}
+                  placeholder="Cartables, crayons, gourdes et un goûter pour le premier jour."
+                  hidden={isPreview}
+                />
+                {isPreview ? (
+                  <div
+                    aria-label="Aperçu du contenu"
+                    className="min-h-[132px] rounded-[14px] border border-border bg-surface px-3.5 py-3"
+                  >
+                    {contentValue.trim() === '' ? (
+                      <p className="m-0 text-xs text-muted">Rien à prévisualiser pour l’instant.</p>
+                    ) : (
+                      <NoteMarkdown content={contentValue} />
+                    )}
+                  </div>
+                ) : null}
+              </div>
             )}
           </Field>
 
