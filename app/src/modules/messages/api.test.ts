@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { addConversationMembers, archiveConversation } from './api';
 
-const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, mockUpdate, mockRemove } =
+const { supabaseState, supabaseMocks, mockList, mockCreate, mockUpsert, mockRemoveWhere, mockUpdate, mockRemove } =
   vi.hoisted(() => {
     const supabaseState = {
       configured: false,
@@ -30,9 +30,15 @@ const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, moc
     const supabaseMocks = { from, update, eqOuter, eqInner, rpc };
     // Registre du fil `conv-1` : deux actifs, un tombé, le reste absent.
     const memberRows: Array<Record<string, unknown>> = [
-      { conversation_id: 'conv-1', member_id: 'member-actif', left_at: null },
-      { conversation_id: 'conv-1', member_id: 'member-actif-2', left_at: null },
-      { conversation_id: 'conv-1', member_id: 'member-parti', left_at: '2026-01-01T00:00:00Z' },
+      { conversation_id: 'conv-1', member_id: 'member-actif', left_at: null, archived_at: null },
+      // Archivé pour lui : le départ conserve l'archive, comme le serveur.
+      {
+        conversation_id: 'conv-1',
+        member_id: 'member-actif-2',
+        left_at: null,
+        archived_at: '2026-02-01T00:00:00.000Z',
+      },
+      { conversation_id: 'conv-1', member_id: 'member-parti', left_at: '2026-01-01T00:00:00Z', archived_at: null },
     ];
     const matches = (row: Record<string, unknown>, filter: Record<string, unknown>) =>
       Object.entries(filter).every(([key, value]) => {
@@ -45,17 +51,27 @@ const { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, moc
       return memberRows.filter((row) => matches(row, filter));
     });
     const mockCreate = vi.fn(async (_table: string, values: Record<string, unknown>) => values);
+    const mockUpsert = vi.fn(
+      async (_table: string, values: Record<string, unknown>, _options: { onConflict: string }) => values,
+    );
     const mockRemoveWhere = vi.fn(async () => {});
     const mockUpdate = vi.fn(async () => ({}));
     const mockRemove = vi.fn(async () => {});
-    return { supabaseState, supabaseMocks, mockList, mockCreate, mockRemoveWhere, mockUpdate, mockRemove, memberRows };
+    return { supabaseState, supabaseMocks, mockList, mockCreate, mockUpsert, mockRemoveWhere, mockUpdate, mockRemove, memberRows };
   });
 
 vi.mock('@/lib/data', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/data')>();
   return {
     ...actual,
-    data: { list: mockList, create: mockCreate, removeWhere: mockRemoveWhere, update: mockUpdate, remove: mockRemove },
+    data: {
+      list: mockList,
+      create: mockCreate,
+      upsert: mockUpsert,
+      removeWhere: mockRemoveWhere,
+      update: mockUpdate,
+      remove: mockRemove,
+    },
   };
 });
 
@@ -118,23 +134,22 @@ describe('addConversationMembers — réadhésion (D-12)', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('en local : même transition sans RLS à traverser (retrait + création, démo)', async () => {
-    // En démo il n’y a ni politique ni déclencheur : l’adaptateur local n’a
-    // pas de `updateWhere`, on garde le deux-temps local — aucun appel réseau.
+  it('en local : même transition sans RLS à traverser, en une écriture', async () => {
+    // En démo il n'y a ni politique ni déclencheur : la réadhésion efface la
+    // tombe et l'archive (`clear_archive_on_rejoin`, 0131) d'une seule écriture,
+    // pour que la ligne ne disparaisse à aucun moment.
     supabaseState.configured = false;
 
     await addConversationMembers('conv-1', ['member-parti']);
 
     expect(supabaseMocks.from).not.toHaveBeenCalled();
-    expect(mockRemoveWhere).toHaveBeenCalledWith('conversation_members', {
-      conversation_id: 'conv-1',
-      member_id: 'member-parti',
-    });
-    expect(mockCreate).toHaveBeenCalledWith('conversation_members', {
-      conversation_id: 'conv-1',
-      member_id: 'member-parti',
-      left_at: null,
-    });
+    expect(mockUpsert).toHaveBeenCalledWith(
+      'conversation_members',
+      { conversation_id: 'conv-1', member_id: 'member-parti', left_at: null, archived_at: null },
+      { onConflict: 'conversation_id,member_id' },
+    );
+    expect(mockRemoveWhere).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('garde vide : aucun appel, ni réseau ni registre', async () => {
@@ -182,26 +197,27 @@ describe('archiveConversation — archivage-pour-tous (D-14)', () => {
     await archiveConversation('conv-1');
 
     expect(supabaseMocks.rpc).not.toHaveBeenCalled();
-    expect(mockRemoveWhere).toHaveBeenCalledTimes(2);
-    expect(mockRemoveWhere).toHaveBeenCalledWith('conversation_members', {
-      conversation_id: 'conv-1',
-      member_id: 'member-actif',
-    });
-    expect(mockRemoveWhere).toHaveBeenCalledWith('conversation_members', {
-      conversation_id: 'conv-1',
-      member_id: 'member-actif-2',
-    });
-    expect(mockCreate).toHaveBeenCalledTimes(2);
-    const stamps = mockCreate.mock.calls.map(
-      (call) => (call[1] as Record<string, unknown>).left_at as string,
-    );
+    expect(mockUpsert).toHaveBeenCalledTimes(2);
+    const upserts = mockUpsert.mock.calls.map((call) => ({
+      values: call[1] as Record<string, unknown>,
+      options: call[2] as { onConflict: string },
+    }));
+    expect(upserts.map((call) => call.values.member_id)).toEqual(['member-actif', 'member-actif-2']);
+    expect(upserts.map((call) => call.options.onConflict)).toEqual([
+      'conversation_id,member_id',
+      'conversation_id,member_id',
+    ]);
+    const stamps = upserts.map((call) => call.values.left_at as string);
     expect(stamps[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // Un seul instant commun, comme le RPC (0106).
     expect(stamps[1]).toBe(stamps[0]);
-    // Le déjà-parti n'est jamais réécrit.
-    expect(mockCreate.mock.calls.some((call) =>
-      ((call[1] as Record<string, unknown>).member_id as string).includes('parti'),
-    )).toBe(false);
+    // L'archive personnelle survit au départ : le serveur ne l'efface qu'à la
+    // réadhésion (`clear_archive_on_rejoin`, 0131).
+    expect(upserts[1].values.archived_at).toBe('2026-02-01T00:00:00.000Z');
+    // Le déjà-parti n'est jamais réécrit, et rien ne disparaît au passage.
+    expect(upserts.some((call) => String(call.values.member_id).includes('parti'))).toBe(false);
+    expect(mockRemoveWhere).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('en local : fil sans actif, aucun appel au registre', async () => {

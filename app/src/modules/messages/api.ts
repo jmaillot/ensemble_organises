@@ -346,12 +346,10 @@ export async function addConversationMembers(conversationId: string, memberIds: 
     return;
   }
   for (const memberId of left) {
-    await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: memberId });
-    await data.create<ConversationMemberRow>('conversation_members', {
-      conversation_id: conversationId,
-      member_id: memberId,
-      left_at: null,
-    });
+    // Réadhésion : la pierre s'efface et l'archive aussi (`clear_archive_on_rejoin`,
+    // 0131). Une écriture, pas un supprimer-puis-recréer : personne ne doit
+    // voir la ligne disparaître.
+    await writeMyMembership(conversationId, memberId, { left_at: null, archived_at: null });
   }
 }
 
@@ -375,11 +373,12 @@ export async function archiveConversation(conversationId: string): Promise<void>
   if (actives.length === 0) return;
   await Promise.all(
     actives.map(async (row) => {
-      await data.removeWhere('conversation_members', { conversation_id: conversationId, member_id: row.member_id });
-      await data.create<ConversationMemberRow>('conversation_members', {
-        conversation_id: conversationId,
-        member_id: row.member_id,
+      // La tombe collective est posée sur chaque ligne en une écriture : un
+      // supprimer-puis-recréer ferait disparaître le participant un instant,
+      // et l'archive personnelle qu'il portait avec (le serveur la conserve).
+      await writeMyMembership(conversationId, row.member_id, {
         left_at: stampedAt,
+        archived_at: row.archived_at,
       });
     }),
   );
