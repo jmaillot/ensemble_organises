@@ -797,6 +797,38 @@ action ne supprime pas les messages de la base », ce qui devenait faux.
 
 ---
 
+## Ouvert, consigné pendant l'audit des écritures en deux temps
+
+- [ ] **22. Six remplacements d'ensemble suppriment puis réinsèrent, en deux temps**
+
+Trouvés en cherchant la classe du correctif de `conversation_members` (un
+`removeWhere` suivi d'un `create` laissait la ligne absente un instant). Ici
+l'intention est un **remplacement** de tout l'ensemble — ce qui ne peut pas
+tenir en une écriture sans transaction :
+
+- `app/src/modules/taches/api.ts:53` (assignataires) et `:63` (rappel unique) ;
+- `app/src/modules/routines/api.ts:104` (assignataires) et `:119` (rappels) ;
+- `app/src/modules/recettes/api.ts:99` (liens d'étiquettes) ;
+- `app/src/modules/voyages/components/trip-tasks-tab.tsx:115` (assignataires
+  d'une tâche de voyage).
+
+**En ligne, c'est plus qu'un intervalle** : les deux appels sont deux
+aller-retours PostgREST sans transaction. Si le second échoue (réseau, RLS,
+contrainte), l'ensemble précédent est **perdu** — les assignataires d'une tâche
+disparaissent durablement. En démo, la conséquence est l'intervalle seul : un
+lecteur voit brièvement « sans assigné », exactement la forme que #16 a
+corrigée à l'affichage.
+
+**Ce qui reste à décider** : un RPC par ensemble (`set_task_assignees`,
+`set_routine_assignees`, …) tranche le fond côté serveur, au prix d'une
+migration et de six appelants à basculer ; un `replaceWhere` dans l'adaptateur
+ne corrige que la démo.
+
+**Terminé quand** un remplacement d'ensemble est atomique côté serveur, ou que
+la perte en cas d'échec du second appel est assumée et écrite.
+
+---
+
 ## Décidé, sans action
 
 **Les listes de privilèges en dur restent.** Elles ne sont pas redondantes avec
