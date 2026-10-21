@@ -524,6 +524,19 @@ transaction, vérifie la propriété (ou le rôle admin pour un dossier `foyer`)
 refuse Général. Côté client, `DataAdapter.deleteFolder` appelle cette RPC en
 ligne et reproduit la même sémantique en transaction Dexie en mode démo.
 
+### Calendrier : le même régime depuis `0135`
+
+`0084` avait déjà rendu un calendrier `perso` invisible aux autres membres,
+admin compris, en lecture comme en écriture. Deux autorisations de suppression
+restaient pourtant écrites — `events_delete_admin` et `private.can_admin_event`,
+qui porte `event_reminders_delete` : elles ne mordaient pas, faute de ligne
+visible, mais elles autorisaient la modération sur le papier. `0135` les ramène
+à « admin du Commun, propriétaire du perso ». La règle est désormais celle des
+dossiers, et un futur changement de politique ne peut plus rouvrir la porte par
+inadvertance. Le **Commun** garde sa modération, c'est un calendrier partagé ;
+`event_calendars_delete` (`0090`) conserve sa branche admin, inerte pour la même
+raison.
+
 ---
 
 ## 6. Edge Functions

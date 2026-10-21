@@ -330,12 +330,12 @@ sont absentes, l'application démarre en mode démonstration.
 |---|---|
 | `POSTGRES_PASSWORD` | mot de passe de la base |
 | `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | clés d'API asymétriques |
-| `GOOGLE_*` / `FACEBOOK_*` | SSO OAuth (callback `https://api.votredomaine.fr/auth/v1/callback`) |
+| `GOOGLE_*` | SSO OAuth Google (callback `https://api.votredomaine.fr/auth/v1/callback`) |
 | `SMTP_*` | confirmations et réinitialisations de mot de passe |
 | `API_EXTERNAL_URL`, `SITE_URL`, `ADDITIONAL_REDIRECT_URLS` | URLs publiques de la stack |
 | `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` | authentification Basic du dashboard de la gateway |
 | `FUNCTIONS_VERIFY_JWT=false` | obligatoire ici : la stack mélange appels navigateur (`publishable`), session (`user`) et cron serveur (`secret`) ; chaque fonction déclare son mode |
-| `INVITE_TOKEN_HMAC_SECRET` | ≥ 256 bits (`openssl rand -base64 48`), stocké dans Vault, injecté **uniquement** dans l'Edge Function d'invitation ; sa rotation invalide tous les tokens actifs |
+| `INVITE_TOKEN_HMAC_SECRET` et les quatre secrets de partage | ≥ 256 bits chacun (`openssl rand -base64 48`), **jamais** réutilisés l'un pour l'autre : foyer, ardoise (`ARDOISE_HMAC_SECRET`), cadeaux (`GIFT_LIST_INVITE_HMAC_SECRET`), recettes (`RECIPE_INVITE_HMAC_SECRET`), voyages (`TRIP_INVITE_HMAC_SECRET`). Lus **uniquement** par le service `functions`, depuis le `.env` de la stack ; leur rotation invalide tous les codes déjà émis de leur famille (voir §10) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | signature des envois push, lues **uniquement** par `push-notify`. Générées par `sh scripts/generate-vapid-keys.sh`, dont les trois lignes sont à reporter dans le `.env` de la stack ; l'override `docker-compose.traefik.yml` ne les déclare que pour le service `functions` — même chemin que `INVITE_TOKEN_HMAC_SECRET` |
 | `project_url` / `service_role_key` (dans **Vault**, pas dans le `.env`) | lues par les deux jobs de dispatch au moment de l'exécution ; sans elles, les rappels sont calculés et rien n'est envoyé |
 
@@ -444,6 +444,21 @@ Points de conception :
 - Les clés de chiffrement d'un abonnement push (`p256dh`, secret
   d'authentification) ne quittent jamais le serveur : le navigateur n'en a aucun
   motif, et `list_push_subscriptions` ne les renvoie pas.
+- **Les cinq secrets HMAC se tournent, ils ne se devinent pas.** Le token de
+  foyer, les codes d'ardoise et les liens de cadeau, de recette et de voyage ont
+  chacun leur secret dédié (`INVITE_TOKEN_HMAC_SECRET`, `ARDOISE_HMAC_SECRET`,
+  `GIFT_LIST_INVITE_HMAC_SECRET`, `RECIPE_INVITE_HMAC_SECRET`,
+  `TRIP_INVITE_HMAC_SECRET`), lu par la seule Edge Function concernée. La base
+  ne conserve que l'empreinte HMAC-SHA-256, jamais le code. Faire tourner un
+  secret — `openssl rand -base64 48`, reporter la valeur dans le `.env` de la
+  stack, puis `sh run.sh recreate functions` — invalide **d'un coup** tous les
+  codes déjà émis de sa famille : les liens affichés cessent de valoir et il
+  faut en régénérer. Rien d'autre ne bouge : mots de passe, sessions, données et
+  abonnements push restent intacts, et un secret laissé vide fait échouer la
+  fonction en `500` explicite plutôt que de signer avec du vide. En cas de fuite
+  suspectée, tourner d'abord et prévenir ensuite ; par hygiène, prévenir et
+  choisir le moment — un code qui cesse de valoir se voit, un code qui continue
+  de valoir ne se voit pas.
 - Aucun changement de rôle ni aucun secret depuis le client : un membre ne peut
   pas s'attribuer `admin`, un administrateur d'un foyer ne touche pas à un autre.
 - `profiles` n'expose **aucune liste globale d'e-mails** : lecture limitée à son
