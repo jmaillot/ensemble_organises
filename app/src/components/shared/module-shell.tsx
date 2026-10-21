@@ -133,9 +133,26 @@ export function MetricRow({ items, className }: { items: MetricItem[]; className
   );
 }
 
-export function SectionHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+export function SectionHeading({
+  title,
+  description,
+  action,
+  stackOnMobile = false,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  stackOnMobile?: boolean;
+}) {
   return (
-    <div className="mb-3.5 flex items-end justify-between gap-4">
+    <div
+      className={cn(
+        'mb-3.5 flex gap-4',
+        stackOnMobile
+          ? 'flex-col items-start min-[651px]:flex-row min-[651px]:items-end min-[651px]:justify-between'
+          : 'items-end justify-between',
+      )}
+    >
       <div>
         <h2 className="mb-0 font-display text-[length:var(--text-section)] tracking-[-0.035em]">{title}</h2>
         {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}

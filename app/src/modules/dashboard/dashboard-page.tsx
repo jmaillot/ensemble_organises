@@ -107,7 +107,7 @@ export default function DashboardPage() {
       <header className="mb-6 flex items-end justify-between gap-6 max-[650px]:block">
         <div>
           <p className="eyebrow mb-2">{formatDashboardEyebrow(new Date(), householdName)}</p>
-          <h1 className="mb-2 text-[clamp(30px,3.2vw,47px)] leading-[1.02]">
+          <h1 className="mb-2 text-[clamp(34px,4.2vw,54px)] leading-[1.02]">
             Bonjour {firstName(displayName)}
             <span className="text-coral">.</span>
           </h1>
@@ -232,7 +232,7 @@ export default function DashboardPage() {
             />
             <ul
               aria-label="Espaces du foyer"
-              className="m-0 grid list-none grid-cols-4 gap-3 p-0 max-[1180px]:grid-cols-3 max-[650px]:grid-cols-1"
+              className="m-0 grid list-none grid-cols-4 gap-3 p-0 max-[1180px]:grid-cols-3 max-[650px]:grid-cols-3 max-[650px]:gap-2.5"
             >
               {visibleTiles
                 .map((entry) => (
@@ -348,11 +348,11 @@ function TodayGroup({ title, listLabel, items }: { title: string; listLabel: str
   return (
     <div className="min-w-0">
       <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{title}</h3>
-      <ul className="m-0 grid list-none gap-1.5 p-0" aria-label={listLabel}>
+      <ul className="m-0 grid min-w-0 list-none grid-cols-[minmax(0,1fr)] gap-1.5 p-0" aria-label={listLabel}>
         {visible.map((item) => (
-          <li key={item.id} className="flex items-baseline gap-2 text-[13px] text-ink-soft">
+          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-ink-soft">
             <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
-            <span className="min-w-0 truncate">
+            <span className="line-clamp-2 min-w-0 min-[651px]:line-clamp-1">
               <strong className="font-semibold text-fg">{item.title}</strong>
               {item.detail ? <span> · {item.detail}</span> : null}
             </span>

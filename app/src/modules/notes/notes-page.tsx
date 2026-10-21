@@ -136,6 +136,7 @@ export default function NotesPage() {
       <SectionHeading
         title="Vos pensées, au même endroit"
         description="Une note peut rester privée ou devenir un point de repère partagé."
+        stackOnMobile
         action={
           <SearchInput
             aria-label="Rechercher une note"

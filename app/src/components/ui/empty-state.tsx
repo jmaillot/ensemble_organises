@@ -14,7 +14,7 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-/** État vide soigné : une invitation claire et une action, jamais un écran blanc. */
+/** État vide soigné : une illustration discrète, une invitation claire et une action. */
 export function EmptyState({
   icon = 'heart',
   title,
@@ -26,18 +26,14 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div
-      className={cn(
-        'grid min-h-70 place-items-center rounded-[16px] border border-dashed border-accent/40 bg-surface px-7 py-8 text-center',
-        className,
-      )}
-    >
+    <div className={cn('grid min-h-[280px] place-items-center px-6 py-10 text-center', className)}>
       <div>
-        <div className="mx-auto mb-4 grid size-14 place-items-center rounded-[18px] bg-accent-soft text-accent-strong">
+        <div className="relative mx-auto mb-5 grid size-[76px] place-items-center rounded-[30px] bg-sage/70 text-accent-strong">
+          <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-butter" />
           <Icon name={icon} size="lg" />
         </div>
-        <h3 className="mb-1.5 font-display text-lg tracking-[-0.035em]">{title}</h3>
-        <p className="mx-auto mb-4 max-w-[370px] text-xs text-muted">{description}</p>
+        <h3 className="mb-1.5 font-display text-[22px] leading-tight tracking-[-0.03em]">{title}</h3>
+        <p className="mx-auto mb-5 max-w-[350px] text-[13px] leading-relaxed text-muted">{description}</p>
         {(actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction) ? (
           <div className="flex flex-wrap justify-center gap-2">
             {actionLabel && onAction ? (

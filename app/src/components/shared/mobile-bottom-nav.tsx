@@ -28,7 +28,7 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
   return (
     <nav
       aria-label="Navigation rapide"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] backdrop-blur-xl min-[651px]:hidden"
+      className="fixed inset-x-3 bottom-[max(10px,env(safe-area-inset-bottom))] z-40 rounded-[26px] border border-border/60 bg-[color-mix(in_srgb,var(--color-surface)_92%,transparent)] px-1.5 py-1 shadow-[var(--shadow-lg)] backdrop-blur-xl min-[651px]:hidden"
     >
       <ul className="m-0 grid list-none grid-cols-5 gap-0.5 p-0">
         {items.map((item) => (
@@ -37,8 +37,8 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[10.5px] font-[650] text-muted transition-colors',
-                  isActive && 'bg-accent-soft text-accent-strong',
+                  'flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[10.5px] font-[650] text-muted transition-colors',
+                  isActive && 'bg-accent text-surface',
                 )
               }
             >
@@ -51,7 +51,7 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
           <button
             type="button"
             onClick={onMore}
-            className="flex min-h-[54px] w-full flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[10.5px] font-[650] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
+            className="flex min-h-[52px] w-full flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[10.5px] font-[650] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
           >
             <Icon name="grid" size="sm" />
             Plus
