@@ -416,6 +416,50 @@ export function quantityLabel(item: ShoppingItem): string {
 export const itemStateLabel = (checked: boolean) => (checked ? 'dans le panier' : 'à acheter');
 
 /**
+ * Ce que la feuille imprimée doit porter (Lot 2, export Courses).
+ *
+ * Le regroupement est **toujours** par rayon, même quand l'écran affiche
+ * l'ordre d'ajout : le papier sert à parcourir le magasin, pas à retrouver la
+ * chronologie de la saisie. Pas d'horodatage non plus — la date d'impression
+ * est celle du navigateur, et une ligne « imprimée le … » figée au dernier
+ * rendu mentirait sur une page restée ouverte.
+ */
+export interface ShoppingPrintItem {
+  name: string;
+  quantity: string;
+  checked: boolean;
+}
+
+export interface ShoppingPrintSection {
+  key: string;
+  title: string;
+  items: ShoppingPrintItem[];
+}
+
+export interface ShoppingPrintModel {
+  title: string;
+  meta: string;
+  sections: ShoppingPrintSection[];
+}
+
+export function toShoppingPrintModel(list: ShoppingListView, householdName: string): ShoppingPrintModel {
+  const pending = list.items.filter((item) => !item.checked).length;
+  return {
+    title: list.name,
+    meta: `${householdName} · ${pending} à acheter sur ${list.items.length}`,
+    sections: sectionsForList(list.items, 'rayon').map((section) => ({
+      key: section.key,
+      title: section.title,
+      items: section.items.map((item) => ({
+        name: item.name,
+        quantity: quantityLabel(item),
+        checked: item.checked,
+      })),
+    })),
+  };
+}
+
+/**
  * Découpe les articles d'une liste en sections visuelles : une section par
  * rayon (vue par défaut) ou une section unique dans l'ordre d'ajout.
  */

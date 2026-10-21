@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
@@ -276,5 +276,37 @@ describe('Module Courses', () => {
       const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
       expect(within(row).getByText(/5/)).toBeInTheDocument();
     });
+  });
+
+  it('imprime la liste par rayon même en vue « ordre d’ajout », puis retire la feuille', async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    try {
+      renderWithProviders(<CoursesPage />);
+      await selectList(user, 'Maison');
+      await user.selectOptions(screen.getByLabelText('Regroupement'), 'ajout');
+      await waitFor(() => {
+        expect(within(listRegion('Maison')).queryByText('Hygiène & Beauté')).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Imprimer' }));
+
+      expect(print).toHaveBeenCalledTimes(1);
+      const sheet = document.querySelector('.courses-print');
+      expect(sheet).not.toBeNull();
+      // La feuille range par rayon : c'est le parcours en magasin qui compte,
+      // pas l'ordre dans lequel les articles ont été saisis.
+      expect(within(sheet as HTMLElement).getByText('Hygiène & Beauté')).toBeInTheDocument();
+      expect(within(sheet as HTMLElement).getByText('Savon liquide')).toBeInTheDocument();
+      expect(sheet?.textContent).toContain('☐');
+
+      // `afterprint` est émis à la fermeture du dialogue (annulation comprise).
+      act(() => {
+        window.dispatchEvent(new Event('afterprint'));
+      });
+      expect(document.querySelector('.courses-print')).toBeNull();
+    } finally {
+      print.mockRestore();
+    }
   });
 });

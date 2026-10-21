@@ -1,0 +1,66 @@
+/**
+ * Export imprimable de la liste de courses (Lot 2) : `@media print`, sans
+ * dépendance PDF — même parti que la fiche recette (`recipe-export.css`).
+ *
+ * La page rend son écran normalement ; un bloc `.courses-print`, masqué à
+ * l'écran, porte la feuille. À l'impression, tout le contenu du module sauf ce
+ * bloc disparaît (`> :not(.courses-print)`), avec le chrome applicatif. Les
+ * cases sont des caractères (☐ / ☑) et non des contrôles : une feuille
+ * imprimée n'a pas d'état, et un faux bouton y serait un mensonge.
+ */
+
+.courses-print {
+  display: none;
+}
+
+@media print {
+  body aside,
+  body header,
+  body nav,
+  body [role='region'],
+  [data-module='courses'] > :not(.courses-print) {
+    display: none !important;
+  }
+
+  [data-module='courses'] {
+    max-width: none !important;
+  }
+
+  .courses-print {
+    display: block !important;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.45;
+  }
+
+  .courses-print h2 {
+    font-size: 18pt;
+    margin: 0 0 4pt;
+  }
+
+  .courses-print p {
+    margin: 0 0 12pt;
+  }
+
+  .courses-print h3 {
+    font-size: 13pt;
+    margin: 12pt 0 4pt;
+    break-after: avoid;
+  }
+
+  .courses-print ul {
+    margin: 0 0 10pt;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .courses-print li {
+    margin-bottom: 5pt;
+    break-inside: avoid;
+  }
+
+  .courses-print .quantite {
+    color: #333;
+    margin-left: 6pt;
+  }
+}

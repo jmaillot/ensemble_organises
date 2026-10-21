@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +21,8 @@ import { ProductSheet } from './components/product-sheet';
 import { ShoppingGroupCard } from './components/shopping-group-card';
 import { fetchOffResult, isQueryableEan, type OffProduct } from './off-client';
 import { findProductByEan, offProductFromRow } from './products-api';
-import type { Grouping, ItemFormValues, ShoppingItem, ShoppingListView } from './types';
+import { toShoppingPrintModel, type Grouping, type ItemFormValues, type ShoppingItem, type ShoppingListView } from './types';
+import './components/courses-export.css';
 
 const listSchema = z.object({
   name: z.string().trim().min(2, 'Donnez un nom à la liste.').max(60, '60 caractères maximum.'),
@@ -181,6 +182,29 @@ export default function CoursesPage() {
     }
   };
 
+  /**
+   * Liste affichée : sert à la fois l'écran et la feuille imprimée, pour que
+   * les deux ne puissent pas diverger.
+   */
+  const visibleList = lists.find((list) => list.id === activeListId) ?? lists[0] ?? null;
+  const printModel = visibleList ? toShoppingPrintModel(visibleList, householdName ?? 'Foyer') : null;
+
+  /**
+   * La feuille n'existe dans le DOM que le temps de l'impression : rendue en
+   * permanence, elle doublerait chaque article pour les lecteurs d'écran et
+   * pour les requêtes de test. `afterprint` la retire, y compris après une
+   * annulation ; un navigateur qui ne l'émet pas laisse un bloc masqué à
+   * l'écran, sans autre conséquence.
+   */
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    if (!printing) return;
+    const finish = () => setPrinting(false);
+    window.addEventListener('afterprint', finish);
+    window.print();
+    return () => window.removeEventListener('afterprint', finish);
+  }, [printing]);
+
   return (
     <ModuleShell
       module="courses"
@@ -191,6 +215,14 @@ export default function CoursesPage() {
           </Button>
           <Button variant="secondary" icon="grid" onClick={() => navigate('/courses/catalogue')}>
             Catalogue
+          </Button>
+          <Button
+            variant="secondary"
+            icon="download"
+            disabled={!printModel}
+            onClick={() => setPrinting(true)}
+          >
+            Imprimer
           </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
             Nouvelle liste
@@ -283,29 +315,26 @@ export default function CoursesPage() {
                   })}
                 </div>
               ) : null}
-              {(() => {
-                const visible = lists.find((list) => list.id === activeListId) ?? lists[0];
-                return (
-                  <div className="grid grid-cols-1 gap-[17px]">
-                    <ShoppingGroupCard
-                      key={visible.id}
-                      list={visible}
-                      grouping={grouping}
-                      suggestions={suggestionsFor(visible.id)}
-                      catalogue={products}
-                      photoUrls={productPhotoUrls}
-                      disabled={isMutating}
-                      onToggle={handleToggle}
-                      onQuickAdd={handleQuickAdd}
-                      onQuickAddProduct={handleQuickAddProduct}
-                      onUpdateQuantity={handleUpdateQuantity}
-                      onDelete={setPendingItem}
-                      onEdit={setEditingItem}
-                      onDeleteList={setPendingList}
-                    />
-                  </div>
-                );
-              })()}
+              {visibleList ? (
+                <div className="grid grid-cols-1 gap-[17px]">
+                  <ShoppingGroupCard
+                    key={visibleList.id}
+                    list={visibleList}
+                    grouping={grouping}
+                    suggestions={suggestionsFor(visibleList.id)}
+                    catalogue={products}
+                    photoUrls={productPhotoUrls}
+                    disabled={isMutating}
+                    onToggle={handleToggle}
+                    onQuickAdd={handleQuickAdd}
+                    onQuickAddProduct={handleQuickAddProduct}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onDelete={setPendingItem}
+                    onEdit={setEditingItem}
+                    onDeleteList={setPendingList}
+                  />
+                </div>
+              ) : null}
             </>
           ) : null}
         </Panel>
@@ -359,6 +388,26 @@ export default function CoursesPage() {
           </Panel>
         </aside>
       </div>
+
+      {printing && printModel ? (
+        <div className="courses-print" aria-hidden="true">
+          <h2>{printModel.title}</h2>
+          <p>{printModel.meta}</p>
+          {printModel.sections.map((section) => (
+            <section key={section.title}>
+              <h3>{section.title}</h3>
+              <ul>
+                {section.items.map((item, index) => (
+                  <li key={`${section.key}-${index}`}>
+                    <span>{item.checked ? '☑' : '☐'}</span> {item.name}
+                    {item.quantity ? <span className="quantite">{item.quantity}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : null}
 
       <ItemFormDialog
         open={itemDialog.open || editingItem !== null}
