@@ -356,26 +356,26 @@ export default function ArdoiseDetailPage() {
                 }}
               />
             ) : (
-              <div role="list" aria-label="Dépenses de l’ardoise" className="grid gap-2.5">
+              <div role="list" aria-label="Dépenses de l’ardoise" className="grid gap-1">
                 {expenses.map((expense) => (
                   <div
                     key={expense.id}
                     role="listitem"
-                    className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border px-3.5 py-3"
+                    className="group flex min-h-[64px] flex-wrap items-center gap-3 rounded-[16px] px-2 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
                   >
                     <div className="min-w-[150px] flex-1">
-                      <p className="m-0 text-[13px] font-[760]">{expense.title}</p>
-                      <small className="text-[11px] text-muted">
+                      <p className="m-0 text-[14px] font-[700]">{expense.title}</p>
+                      <small className="text-[11.5px] text-muted">
                         {expense.paidByName} · {expense.participants.length} participant{expense.participants.length > 1 ? 's' : ''}
                       </small>
                     </div>
-                    <strong className="text-[15px]">{formatEuro(expense.amount)}</strong>
+                    <strong className="font-display text-[16px] font-semibold tabular-nums">{formatEuro(expense.amount)}</strong>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => openEditor(expense)}
                         aria-label={`Modifier ${expense.title}`}
-                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-accent-faint hover:text-fg"
+                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-accent hover:bg-accent-faint hover:text-fg focus-visible:opacity-100 max-[650px]:opacity-100"
                       >
                         <Icon name="edit" size="sm" />
                       </button>
@@ -383,7 +383,7 @@ export default function ArdoiseDetailPage() {
                         type="button"
                         onClick={() => setPendingDeletion(expense)}
                         aria-label={`Supprimer ${expense.title}`}
-                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-coral hover:bg-coral-soft hover:text-coral focus-visible:opacity-100 max-[650px]:opacity-100"
                       >
                         <Icon name="trash" size="sm" />
                       </button>

@@ -16,7 +16,7 @@ export interface BalanceCardProps {
 /** Carte sombre d'ouverture : le total de l'ardoise et les deux actions clés. */
 export function BalanceCard({ total, monthLabel, onAddExpense, onInvite }: BalanceCardProps) {
   return (
-    <div className="mb-[18px] rounded-[22px] bg-fg p-[23px] text-surface max-[650px]:mb-3 max-[650px]:p-4">
+    <div className="mb-[18px] rounded-[28px] bg-fg p-[23px] text-surface max-[650px]:mb-3 max-[650px]:rounded-[24px] max-[650px]:p-4">
       <p className="eyebrow mb-2 text-on-dark">{`Ardoise\u00a0· ${monthLabel}`}</p>
       <strong data-testid="balance-total" className="font-display text-[46px] tracking-[-0.06em] max-[650px]:text-[34px]">
         {formatEuro(total)}
@@ -57,7 +57,7 @@ export function MemberBalances({ balances, source = 'local' }: MemberBalancesPro
             <div
               key={balance.key}
               data-testid={`balance-row-${balance.key}`}
-              className="flex items-center justify-between gap-2 border-t border-border py-[7px] text-xs first-of-type:border-t-0"
+              className="flex items-center justify-between gap-2 rounded-[14px] px-1 py-2.5 text-[13px] transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
             >
               <span className="flex items-center gap-2">
                 <i

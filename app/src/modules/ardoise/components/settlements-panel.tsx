@@ -39,7 +39,7 @@ export function SettlementsPanel({ settlements, className }: SettlementsPanelPro
           {settlements.map((settlement) => (
             <li
               key={settlement.id}
-              className="flex min-w-0 items-center justify-between gap-2 border-t border-border py-[11px] text-xs first-of-type:border-t-0"
+              className="flex min-w-0 items-center justify-between gap-2 rounded-[14px] px-1 py-3 text-[13px] transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
             >
               <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                 <Icon name="arrow" size="sm" className="shrink-0 text-muted" />
