@@ -240,3 +240,88 @@ describe('useNotes — la note et ses pièces jointes meurent ensemble (D-03)', 
     expect(remaining[0].id).not.toBe(removedId);
   });
 });
+
+/** Pièce jointe image dont le dépôt simulé rend un chemin. */
+async function attachImage(noteId: string, fileName: string): Promise<string> {
+  depositMock.mockResolvedValueOnce({
+    url: `https://signe.example/notes/${fileName}?token=expire`,
+    path: `foyer-1/notes/${noteId}/${fileName}`,
+    name: fileName,
+    mime: 'image/jpeg',
+    size: 2048,
+  });
+  const row = await createNoteAttachment(DEMO_HOUSEHOLD_ID, noteId, new File(['img'], fileName, { type: 'image/jpeg' }));
+  return row.id;
+}
+
+async function storedNote(id: string): Promise<NoteRow> {
+  const [row] = await data.list<NoteRow>('notes', { id });
+  expect(row).toBeDefined();
+  return row;
+}
+
+/**
+ * 0136 — la couverture est une **désignation** parmi les pièces jointes. Le
+ * choix d'un nouveau fichier porte un index, parce que son identifiant n'existe
+ * qu'après le dépôt : c'est cette résolution-là que le test observe.
+ */
+describe('useNotes — la photo de couverture (0136)', () => {
+  it('désigne la photo déposée dans le même envoi que la création', async () => {
+    seedHouseholdStore();
+    depositMock.mockResolvedValueOnce({
+      url: 'https://signe.example/notes/lac.jpg?token=expire',
+      path: 'foyer-1/notes/week-end/lac.jpg',
+      name: 'lac.jpg',
+      mime: 'image/jpeg',
+      size: 2048,
+    });
+    const { result } = renderNotes();
+
+    await act(async () => {
+      await result.current.addNote(formValues('Week-end'), [new File(['img'], 'lac.jpg', { type: 'image/jpeg' })], {
+        kind: 'new',
+        fileIndex: 0,
+      });
+    });
+
+    await waitFor(() => expect(result.current.notes.some((note) => note.title === 'Week-end')).toBe(true));
+    const created = result.current.notes.find((note) => note.title === 'Week-end') as Note;
+    const [row] = await data.list<NoteRow>('notes', { id: created.id });
+    const [photo] = await data.list<{ id: string }>('note_attachments', { note_id: created.id });
+
+    expect(row.cover_attachment_id).toBe(photo.id);
+    expect(created.coverAttachmentId).toBe(photo.id);
+    expect(created.cover?.id).toBe(photo.id);
+  });
+
+  it('passe d’une photo à l’autre, puis revient au repli quand la photo choisie disparaît', async () => {
+    seedHouseholdStore();
+    const note = await seedNote('note-cover-1');
+    const first = await attachImage(note.id, 'premiere.jpg');
+    // Date fixée : deux dépôts dans la même milliseconde rendraient « la
+    // première image » dépendante de l'ordre de lecture de la table, et le
+    // test échouerait une fois sur trois sans qu'aucune règle ne soit cassée.
+    await data.update('note_attachments', first, { created_at: '2026-10-01T09:00:00.000Z' });
+    const second = await attachImage(note.id, 'seconde.jpg');
+
+    const { result } = renderNotes();
+    const target = await noteFrom(result, note.id);
+    // Sans désignation, la couverture est la première image jointe.
+    expect(target.cover?.id).toBe(first);
+
+    await act(async () => {
+      await result.current.editNote(target, formValues(), [], [], { kind: 'attachment', id: second });
+    });
+    expect((await storedNote(note.id)).cover_attachment_id).toBe(second);
+
+    const edited = await noteFrom(result, note.id);
+    expect(edited.cover?.id).toBe(second);
+
+    // La photo choisie est retirée, et le dialogue retombe sur « première photo ».
+    await act(async () => {
+      await result.current.editNote(edited, formValues(), [], [second], { kind: 'auto' });
+    });
+    expect((await storedNote(note.id)).cover_attachment_id).toBeNull();
+    expect((await noteFrom(result, note.id)).cover?.id).toBe(first);
+  });
+});

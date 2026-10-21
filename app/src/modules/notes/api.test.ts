@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { data } from '@/lib/data';
 import type { NoteAttachmentRow } from '@/types';
-import { createNoteAttachment } from './api';
+import { coverToPayload, createNoteAttachment } from './api';
 
 /**
  * WR-08/D-01 — la colonne `note_attachments.file_url` porte le CHEMIN du
@@ -26,10 +26,16 @@ function pdf(name = 'ordonnance.pdf'): File {
   return new File(['%PDF-1.4'], name, { type: 'application/pdf' });
 }
 
+/**
+ * La ligne déposée par ce fichier, et elle seule : la démo pose désormais une
+ * photo de couverture sur les notes 1 et 2 (0136), donc compter les pièces
+ * jointes d'une note ne dirait plus rien du dépôt.
+ */
 async function storedRow(id: string): Promise<NoteAttachmentRow> {
   const rows = await data.list<NoteAttachmentRow>('note_attachments', { note_id: id });
-  expect(rows).toHaveLength(1);
-  return rows[0];
+  const deposited = rows.filter((row) => row.file_name === 'ordonnance.pdf');
+  expect(deposited).toHaveLength(1);
+  return deposited[0];
 }
 
 describe('pièces jointes de notes — chemin persisté (D-01)', () => {
@@ -67,5 +73,28 @@ describe('pièces jointes de notes — chemin persisté (D-01)', () => {
     expect(row.file_url).toBe('blob:apercu-demo');
 
     await data.remove('note_attachments', row.id);
+  });
+});
+
+describe('coverToPayload (0136)', () => {
+  it('n’écrit rien pour « première photo »', () => {
+    expect(coverToPayload({ kind: 'auto' }, { keptAttachmentIds: ['a'], createdAttachmentIds: [] })).toBeNull();
+  });
+
+  it('désigne une pièce jointe conservée', () => {
+    expect(coverToPayload({ kind: 'attachment', id: 'a' }, { keptAttachmentIds: ['a'], createdAttachmentIds: [] })).toBe('a');
+  });
+
+  it('ignore une pièce jointe retirée dans le même envoi', () => {
+    expect(coverToPayload({ kind: 'attachment', id: 'a' }, { keptAttachmentIds: [], createdAttachmentIds: [] })).toBeNull();
+  });
+
+  it('résout l’index d’un nouveau fichier en identifiant déposé', () => {
+    expect(
+      coverToPayload(
+        { kind: 'new', fileIndex: 1 },
+        { keptAttachmentIds: [], createdAttachmentIds: ['x', 'y'] },
+      ),
+    ).toBe('y');
   });
 });

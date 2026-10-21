@@ -246,6 +246,19 @@ export default function NotesPage() {
                     featured && 'border-accent/20 bg-accent-faint',
                   )}
                 >
+                  {/*
+                    Bandeau décoratif : le titre de la carte nomme déjà la note,
+                    et la photo reparaît dans la liste des pièces jointes avec son
+                    nom de fichier. Un `alt` la ferait annoncer deux fois.
+                  */}
+                  {note.cover?.url ? (
+                    <img
+                      src={note.cover.url}
+                      alt=""
+                      className="-mx-[18px] -mt-[18px] mb-[15px] h-[110px] w-[calc(100%_+_36px)] rounded-t-[22px] object-cover"
+                    />
+                  ) : null}
+
                   <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
                     <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-bg px-2 py-[3px]">
                       <span
@@ -327,11 +340,11 @@ export default function NotesPage() {
         initialFolderId={activeFolderId}
         folders={folders}
         isSaving={isMutating}
-        onSubmit={async (values, files, removedAttachmentIds) => {
+        onSubmit={async (values, files, removedAttachmentIds, cover) => {
           const editing = dialog.note;
           try {
-            if (editing) await editNote(editing, values, files, removedAttachmentIds);
-            else await addNote(values, files);
+            if (editing) await editNote(editing, values, files, removedAttachmentIds, cover);
+            else await addNote(values, files, cover);
             closeDialog();
             toast(editing ? 'Note mise à jour.' : 'Note enregistrée dans votre espace.');
           } catch (submissionError) {

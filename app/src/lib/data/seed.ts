@@ -24,6 +24,7 @@ import type {
   LoyaltyCardRow,
   MessageRow,
   NoteRow,
+  NoteAttachmentRow,
   PetAttachmentRow,
   PetRecordRow,
   PetRow,
@@ -284,6 +285,9 @@ export const demoNotes: NoteRow[] = [
     category: 'Maison',
     color: 'accent',
     folder_id: null,
+    // La liste de rentrée porte sa photo de couverture (0136) : la démo montre
+    // un bandeau choisi, et les autres notes le repli sur la première image.
+    cover_attachment_id: 'note-attachment-1',
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-2)}T18:45:00`,
     updated_at: `${day(0)}T18:45:00`,
@@ -296,6 +300,7 @@ export const demoNotes: NoteRow[] = [
     category: 'Loisirs',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
     created_by: DEMO_MEMBERS.lina,
     created_at: `${day(-3)}T10:12:00`,
     updated_at: `${day(-2)}T09:20:00`,
@@ -308,9 +313,33 @@ export const demoNotes: NoteRow[] = [
     category: 'Foyer',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-4)}T21:02:00`,
     updated_at: `${day(-4)}T21:02:00`,
+  },
+];
+
+export const demoNoteAttachments: NoteAttachmentRow[] = [
+  {
+    id: 'note-attachment-1',
+    note_id: 'note-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    file_url: '/assets/adresses.jpg',
+    file_name: 'Cartables prêts.jpg',
+    mime_type: 'image/jpeg',
+    size_bytes: 184_320,
+    created_at: `${day(-2)}T18:50:00`,
+  },
+  {
+    id: 'note-attachment-2',
+    note_id: 'note-2',
+    household_id: DEMO_HOUSEHOLD_ID,
+    file_url: '/assets/lisbonne.jpg',
+    file_name: 'Le lac au lever du jour.jpg',
+    mime_type: 'image/jpeg',
+    size_bytes: 226_100,
+    created_at: `${day(-3)}T10:20:00`,
   },
 ];
 
@@ -1110,6 +1139,7 @@ export const demoTripNotes: NoteRow[] = [
     category: 'Voyage',
     color: 'accent',
     folder_id: null,
+    cover_attachment_id: null,
     created_by: DEMO_MEMBERS.camille,
     created_at: now(),
     updated_at: now(),
@@ -1123,6 +1153,7 @@ export const demoTripNotes: NoteRow[] = [
     category: 'Loisirs',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
     created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
     updated_at: now(),
@@ -1431,6 +1462,7 @@ const seedTables: Record<string, Row[]> = {
   pets: demoPets as unknown as Row[],
   pet_records: demoPetRecords as unknown as Row[],
   pet_attachments: demoPetAttachments as unknown as Row[],
+  note_attachments: demoNoteAttachments as unknown as Row[],
   provider_types: demoProviderTypes as unknown as Row[],
   providers: demoProviders as unknown as Row[],
   loyalty_cards: demoLoyaltyCards as unknown as Row[],

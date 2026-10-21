@@ -13,10 +13,12 @@ import { NoteMarkdown } from './note-markdown';
 import {
   NOTE_CATEGORIES,
   OTHER_CATEGORY,
+  isCoverImage,
   noteVisibilityOptions,
   type Note,
   type NoteAttachment,
   type NoteCategoryChoice,
+  type NoteCoverChoice,
   type NoteFormValues,
 } from '../types';
 
@@ -61,7 +63,12 @@ export interface NoteFormDialogProps {
   initialFolderId?: string | null;
   folders?: { id: string; name: string }[];
   isSaving?: boolean;
-  onSubmit: (values: NoteFormValues, files: File[], removedAttachmentIds: string[]) => Promise<void> | void;
+  onSubmit: (
+    values: NoteFormValues,
+    files: File[],
+    removedAttachmentIds: string[],
+    cover: NoteCoverChoice,
+  ) => Promise<void> | void;
 }
 
 /** Création et modification d'une note du foyer, pièces jointes comprises. */
@@ -76,12 +83,14 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
   const [isPreview, setIsPreview] = useState(false);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [cover, setCover] = useState<NoteCoverChoice>({ kind: 'auto' });
 
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(note, initialFolderId));
     setNewFiles([]);
     setRemovedIds([]);
+    setCover(note?.coverAttachmentId ? { kind: 'attachment', id: note.coverAttachmentId } : { kind: 'auto' });
     setIsPreview(false);
     // `note` — objet recréé par la page à chaque rendu — identifie une ouverture
     // par son `note?.id` stable : le formulaire n'est pas réinitialisé à chaque
@@ -91,6 +100,35 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
   const existing: NoteAttachment[] = (note?.attachments ?? []).filter(
     (attachment) => !removedIds.includes(attachment.id),
   );
+
+  /**
+   * Choix effectif : une couverture désignée puis retirée dans le même envoi
+   * retombe sur « première photo », plutôt que de désigner une ligne absente.
+   */
+  const effectiveCover: NoteCoverChoice =
+    cover.kind === 'attachment' && removedIds.includes(cover.id) ? { kind: 'auto' } : cover;
+
+  /** Photos candidates : les pièces jointes images déjà là, puis les nouveaux fichiers. */
+  type CoverCandidate = { key: string; label: string; url: string | null; choice: NoteCoverChoice };
+  const coverCandidates: CoverCandidate[] = [
+    ...existing.filter(isCoverImage).map((attachment): CoverCandidate => ({
+      key: `existing:${attachment.id}`,
+      label: attachment.fileName,
+      url: attachment.url,
+      choice: { kind: 'attachment', id: attachment.id },
+    })),
+    ...newFiles.flatMap((file, index): CoverCandidate[] =>
+      file.type.startsWith('image/')
+        ? [{ key: `new:${index}`, label: file.name, url: null, choice: { kind: 'new', fileIndex: index } }]
+        : [],
+    ),
+  ];
+
+  const isCoverChosen = (choice: NoteCoverChoice) => {
+    if (choice.kind === 'auto') return effectiveCover.kind === 'auto';
+    if (choice.kind === 'attachment') return effectiveCover.kind === 'attachment' && effectiveCover.id === choice.id;
+    return effectiveCover.kind === 'new' && effectiveCover.fileIndex === choice.fileIndex;
+  };
 
   const addFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -113,7 +151,7 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
           noValidate
           className="grid gap-3.5"
           onSubmit={handleSubmit(async (values) => {
-            await onSubmit(values, newFiles, removedIds);
+            await onSubmit(values, newFiles, removedIds, effectiveCover);
           })}
         >
           <Field label="Titre" error={errors.title?.message}>
@@ -317,6 +355,56 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
               </div>
             )}
           </Field>
+
+          {coverCandidates.length > 0 ? (
+            <Field
+              label="Photo de couverture"
+              optional
+              hint="Elle sert de bandeau sur la carte. À défaut, la première photo jointe."
+            >
+              {(props) => (
+                <div className="grid gap-2" {...props}>
+                  <div role="group" aria-label="Choisir la photo de couverture" className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={isCoverChosen({ kind: 'auto' })}
+                      onClick={() => setCover({ kind: 'auto' })}
+                      className={cn(
+                        'min-h-9 rounded-full border px-3 text-[11.5px] font-bold transition-colors duration-[var(--duration-quick)]',
+                        isCoverChosen({ kind: 'auto' })
+                          ? 'border-accent bg-accent-soft text-accent-strong'
+                          : 'border-border bg-surface text-muted hover:border-accent hover:text-fg',
+                      )}
+                    >
+                      Première photo
+                    </button>
+                    {coverCandidates.map((candidate) => (
+                      <button
+                        key={candidate.key}
+                        type="button"
+                        aria-pressed={isCoverChosen(candidate.choice)}
+                        aria-label={`Choisir ${candidate.label} comme couverture`}
+                        title={candidate.label}
+                        onClick={() => setCover(candidate.choice)}
+                        className={cn(
+                          'grid size-12 place-items-center overflow-hidden rounded-[10px] border-2 transition-colors duration-[var(--duration-quick)]',
+                          isCoverChosen(candidate.choice)
+                            ? 'border-accent'
+                            : 'border-border hover:border-accent',
+                        )}
+                      >
+                        {candidate.url ? (
+                          <img src={candidate.url} alt="" className="size-full object-cover" />
+                        ) : (
+                          <Icon name="image" size="sm" className="text-muted" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Field>
+          ) : null}
 
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>

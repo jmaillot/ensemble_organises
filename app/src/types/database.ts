@@ -230,6 +230,8 @@ export interface NoteRow {
   category: string;
   color: string | null;
   folder_id: Uuid | null;
+  /** Photo de couverture, choisie parmi les pièces jointes (0136). */
+  cover_attachment_id: Uuid | null;
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;

@@ -440,7 +440,9 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 - `event_reminders` (id, event_id, remind_at)
 
 ### Notes
-- `notes` (id, household_id, title, content, category, color, created_by)
+- `notes` (id, household_id, title, content, category, color, folder_id, trip_id, cover_attachment_id, created_by)
+- `note_attachments` (id, note_id, household_id, file_url [chemin du bucket, jamais une URL signée], file_name, mime_type, size_bytes) — `notes.cover_attachment_id` désigne l'une d'elles comme photo de couverture (0136 : FK `on delete set null`, et déclencheur `private.check_note_cover` qui impose que la pièce jointe appartienne à la même note)
+- `note_folders` (id, household_id, name, visibility [foyer/perso], owner_member_id, is_default)
 
 ### Tâches
 - `tasks` (id, household_id, name, description, due_date, priority_order, status [à faire/en cours/fait], created_by)

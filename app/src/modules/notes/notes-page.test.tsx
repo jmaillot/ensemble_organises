@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import { data } from '@/lib/data';
+import type { NoteAttachmentRow, NoteRow } from '@/types';
 import userEvent from '@testing-library/user-event';
 import NotesPage from './notes-page';
 import { renderWithProviders } from '@/test/render';
@@ -207,6 +209,75 @@ describe('NotesPage', () => {
       expect(screen.queryByRole('heading', { name: 'Ce dossier est vide' })).not.toBeInTheDocument();
     } finally {
       window.localStorage.removeItem(`eo:notes:folder:${DEMO_HOUSEHOLD_ID}`);
+    }
+  });
+
+  /**
+   * 0136 — la couverture est un bandeau sur la carte. La graine donne une photo
+   * désignée à « Liste de rentrée » et une photo non désignée à « Idées de
+   * week-end » : le second cas prouve le repli sur la première image, sans quoi
+   * la fonctionnalité ne s'afficherait que pour qui a fait le geste exprès.
+   */
+  it('affiche la photo de couverture, et la première image à défaut de choix', async () => {
+    const { container } = renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+
+    const coverOf = (title: string) =>
+      (screen.getByText(title).closest('article') as HTMLElement).querySelector('img');
+    // `alt=""` : le bandeau est décoratif, le titre de la carte nomme déjà la
+    // note et la pièce jointe reparaît plus bas avec son nom de fichier.
+    expect(coverOf('Liste de rentrée')).toHaveAttribute('src', '/assets/adresses.jpg');
+    expect(coverOf('Liste de rentrée')).toHaveAttribute('alt', '');
+    expect(coverOf('Idées de week-end')).toHaveAttribute('src', '/assets/lisbonne.jpg');
+    expect(container.querySelectorAll('article img[alt=""]')).toHaveLength(2);
+  });
+
+  it('désigne une autre photo comme couverture depuis le dialogue', async () => {
+    supportScrollIntoView();
+    const second: NoteAttachmentRow = await data.create<NoteAttachmentRow>('note_attachments', {
+      id: 'note-attachment-test-2',
+      note_id: 'note-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      file_url: '/assets/courses.jpg',
+      file_name: 'Liste imprimée.jpg',
+      mime_type: 'image/jpeg',
+      size_bytes: 1024,
+      created_at: '2026-10-21T09:00:00.000Z',
+    });
+
+    try {
+      const user = userEvent.setup();
+      const { container } = renderWithProviders(<NotesPage />, { route: '/notes' });
+
+      expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+      const coverOf = () =>
+        (screen.getByText('Liste de rentrée').closest('article') as HTMLElement).querySelector('img');
+      expect(coverOf()).toHaveAttribute('src', '/assets/adresses.jpg');
+
+      await user.click(
+        within(screen.getByText('Liste de rentrée').closest('article') as HTMLElement).getByRole('button', {
+          name: 'Modifier',
+        }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      const group = within(dialog).getByRole('group', { name: 'Choisir la photo de couverture' });
+      // La photo désignée est celle qui est enfoncée à l'ouverture.
+      expect(within(group).getByRole('button', { name: 'Choisir Cartables prêts.jpg comme couverture' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      await user.click(within(group).getByRole('button', { name: 'Choisir Liste imprimée.jpg comme couverture' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les modifications' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      await waitFor(() => expect(coverOf()).toHaveAttribute('src', '/assets/courses.jpg'));
+      const [stored] = await data.list<NoteRow>('notes', { id: 'note-1' });
+      expect(stored.cover_attachment_id).toBe(second.id);
+      expect(container.querySelectorAll('article img[alt=""]')).toHaveLength(2);
+    } finally {
+      await data.remove('note_attachments', second.id);
     }
   });
 });

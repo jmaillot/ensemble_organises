@@ -60,6 +60,40 @@ export interface Note {
   ageLabel: string;
   /** Pièces jointes de la note, comme pour le Cercle. */
   attachments: NoteAttachment[];
+  /** Pièce jointe **désignée** comme couverture (`notes.cover_attachment_id`). */
+  coverAttachmentId: string | null;
+  /**
+   * Couverture affichable : la photo désignée, sinon la première image jointe,
+   * sinon `null`. Résolue à la lecture, donc jamais une image morte : une photo
+   * supprimée laisse `coverAttachmentId` à `NULL` côté base et la carte retombe
+   * sur l'image suivante.
+   */
+  cover: NoteAttachment | null;
+}
+
+/**
+ * Choix de couverture fait dans le dialogue. `auto` désigne la première image
+ * jointe sans rien écrire ; `new` porte l'index du fichier dans la sélection
+ * courante, parce que son identifiant n'existe qu'après le dépôt.
+ */
+export type NoteCoverChoice =
+  | { kind: 'auto' }
+  | { kind: 'attachment'; id: string }
+  | { kind: 'new'; fileIndex: number };
+
+/** Vrai pour une pièce jointe affichable comme couverture. */
+export function isCoverImage(attachment: Pick<NoteAttachment, 'mime'>): boolean {
+  return attachment.mime.startsWith('image/');
+}
+
+/**
+ * Couverture effective d'une note : la photo désignée si elle est encore là et
+ * qu'elle est une image, sinon la première image jointe.
+ */
+export function pickCover(attachments: NoteAttachment[], coverId: string | null): NoteAttachment | null {
+  const images = attachments.filter(isCoverImage);
+  const chosen = coverId ? images.find((attachment) => attachment.id === coverId) : undefined;
+  return chosen ?? images[0] ?? null;
 }
 
 /** Pièce jointe d'une note : photo ou PDF. */
@@ -152,6 +186,8 @@ export function toNote(row: NoteRow, attachments: NoteAttachment[] = []): Note {
     updatedAt: row.updated_at,
     ageLabel: ageLabel(row.updated_at),
     attachments,
+    coverAttachmentId: row.cover_attachment_id ?? null,
+    cover: pickCover(attachments, row.cover_attachment_id ?? null),
   };
 }
 
