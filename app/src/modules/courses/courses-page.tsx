@@ -311,10 +311,10 @@ export default function CoursesPage() {
         </Panel>
 
         <aside className="grid min-w-0 grid-cols-1 gap-[14px]">
-          <div className="relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
+          <div className="relative min-h-[160px] overflow-hidden rounded-[24px] bg-accent p-5 text-surface max-[650px]:min-h-0 max-[650px]:p-[18px]">
             <span aria-hidden="true" className="coupon-ring" />
-            <p className="mb-4 text-[11px] text-on-dark">Liste partagée · {householdName}</p>
-            <strong className="block font-display text-[27px] tracking-[-0.06em]">
+            <p className="mb-4 text-[11px] tracking-[0.04em] text-on-dark">Liste partagée · {householdName}</p>
+            <strong className="block font-display text-[32px] leading-tight font-semibold tracking-[-0.03em]">
               {pluralize(lists.length, 'liste')}
             </strong>
             <small className="text-[10px] text-on-dark">

@@ -1,8 +1,11 @@
 # Benchmark Melimelo → Ensemble & Organisés
 
 > Analyse menée le 21 octobre 2026 sur la branche `feat/melimelo-design`.
-> **Aucune modification de design n'a encore été faite.** Ce document est le plan
-> à valider avant de toucher aux tokens, aux composants ou aux écrans.
+> **État au 21 octobre 2026 :** le lot 0 est engagé. Les polices, les jetons, les
+> boutons, l'en-tête de module, le shell desktop/mobile et l'écran pilote
+> Courses sont faits. Les primitives `Card`, `PillTabs`, `ListRow` et
+> `EmptyState` restent à extraire, et les autres écrans n'ont pas encore été
+> repris un par un — ils héritent seulement des nouveaux jetons.
 
 ## 0. Réponse courte
 
@@ -569,6 +572,11 @@ tests Vitest du hook et de la page, e2e du parcours principal.
 ## 8. Feuille de route proposée
 
 ### Lot 0 — Fondations visuelles (2–3 j)
+
+**Fait le 21 octobre 2026 :** polices, jetons, `Button`, `ModuleHeader`,
+`Panel`, shell (rail crème + barre mobile) et pilote **Courses**. Les points 3
+et 4 restent partiels : les primitives nommées ci-dessous n'existent pas encore
+comme fichiers dédiés.
 
 1. Ajouter les polices auto-hébergées.
 2. Remplacer les jetons de couleur, rayon, ombre.

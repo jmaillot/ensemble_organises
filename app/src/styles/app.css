@@ -6,36 +6,45 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Couleurs */
-  --color-bg: oklch(98% 0.004 240);
-  --color-surface: oklch(100% 0 0);
-  --color-fg: oklch(20% 0.02 240);
-  --color-muted: oklch(50% 0.018 240);
-  --color-border: oklch(90% 0.006 240);
-  --color-accent: oklch(56% 0.12 170);
-  --color-accent-strong: oklch(47% 0.11 170);
-  --color-accent-deep: oklch(40% 0.1 170);
-  --color-accent-soft: oklch(94% 0.045 170);
-  --color-accent-faint: oklch(97% 0.018 170);
-  --color-coral: oklch(64% 0.15 32);
-  --color-coral-strong: oklch(91% 0.055 32);
-  --color-coral-soft: oklch(95% 0.04 32);
-  --color-amber: oklch(68% 0.12 78);
-  --color-amber-soft: oklch(95% 0.045 78);
-  --color-ink-soft: oklch(28% 0.025 240);
-  --color-on-dark: oklch(100% 0 0 / 0.72);
+  /* Couleurs — relevé Melimelo : vert sapin, crème, accents pastel. */
+  --color-bg: #f2f0ec;
+  --color-surface: #ffffff;
+  --color-fg: #20413d;
+  --color-muted: #5e6f6b;
+  --color-border: #e3dfd7;
+  --color-accent: #20413d;
+  --color-accent-strong: #16302d;
+  --color-accent-deep: #0e201e;
+  --color-accent-soft: #dfeae5;
+  --color-accent-faint: #eef3f0;
+  --color-coral: #d95f5c;
+  --color-coral-strong: #f7c3bf;
+  --color-coral-soft: #f8e3e1;
+  --color-amber: #b9822f;
+  --color-amber-soft: #f7ebd3;
+  --color-ink-soft: #2c4a46;
+  --color-on-dark: rgb(255 255 255 / 0.72);
 
-  /* Rayons */
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-control: 11px;
-  --radius-tile: 13px;
+  /* Pastels de catégories : les aplats des tuiles et des en-têtes de rayon. */
+  --color-sage: #cfe0d6;
+  --color-sage-strong: #2f5d50;
+  --color-blush: #f6d9d6;
+  --color-butter: #f6e7c4;
+  --color-sky: #d6e6ec;
+  --color-lilac: #e2dceb;
+  --color-sand: #efe7da;
+
+  /* Rayons — les cartes respirent, les contrôles restent des pilules. */
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-control: 14px;
+  --radius-tile: 20px;
 
   /* Ombres */
-  --shadow-sm: 0 2px 10px oklch(20% 0.02 240 / 0.06);
-  --shadow-md: 0 14px 34px oklch(20% 0.02 240 / 0.08);
-  --shadow-lg: 0 25px 70px oklch(20% 0.02 240 / 0.22);
+  --shadow-sm: 0 1px 2px rgb(32 65 61 / 0.05);
+  --shadow-md: 0 12px 32px rgb(32 65 61 / 0.07);
+  --shadow-lg: 0 30px 80px rgb(32 65 61 / 0.16);
 
   /* Mouvement */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -43,18 +52,18 @@
   --duration-slow: 300ms;
 
   /* Typographie */
-  --font-display: 'Söhne', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', 'Fraunces', ui-serif, Georgia, serif;
+  --font-body: 'Inter Tight Variable', 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --text-display: clamp(30px, 3.2vw, 47px);
-  --text-display--line-height: 1.02;
-  --text-module: clamp(29px, 3vw, 42px);
-  --text-module--line-height: 1.06;
-  --text-section: 21px;
-  --text-section--line-height: 1.2;
-  --text-body: 15px;
-  --text-body--line-height: 1.45;
+  --text-display: clamp(38px, 5.2vw, 76px);
+  --text-display--line-height: 0.98;
+  --text-module: clamp(38px, 4.4vw, 62px);
+  --text-module--line-height: 1.02;
+  --text-section: 24px;
+  --text-section--line-height: 1.18;
+  --text-body: 15.5px;
+  --text-body--line-height: 1.5;
 
   /* Rythme */
   --spacing-gutter: 38px;
@@ -76,7 +85,7 @@
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-body);
-    font-size: 15px;
+    font-size: 15.5px;
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -131,7 +140,9 @@
   h3,
   h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.035em;
+    font-optical-sizing: auto;
+    font-variation-settings: 'SOFT' 20, 'WONK' 1;
+    letter-spacing: -0.022em;
   }
 
   ::selection {

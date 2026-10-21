@@ -11,8 +11,8 @@ import { Icon } from './icon';
  */
 export const navItemClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
-    isActive && 'bg-accent-soft font-[750] text-accent-strong',
+    'flex min-h-11 w-full items-center gap-3 rounded-full px-3.5 text-left text-[13.5px] text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
+    isActive && 'bg-accent font-[650] text-surface hover:bg-accent-strong hover:text-surface',
   );
 
 /**

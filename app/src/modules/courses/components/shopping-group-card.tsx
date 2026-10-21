@@ -21,8 +21,27 @@ import {
 import { productPhotoUrl } from '../products-api';
 import type { ProductRow } from '@/types';
 
-/** Sur-titre de rayon : même traitement que `.section-kicker` de l'export. */
-const kickerClass = 'mb-1 mt-3 text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase';
+/**
+ * Chaque rayon porte son aplat et son pictogramme, comme les en-têtes de rayon
+ * de Melimelo : la couleur n'est jamais seule, le texte reste lisible.
+ */
+function rayonVisual(title: string): { emoji: string; tone: string } {
+  if (title.startsWith('Crèmerie')) return { emoji: '🥛', tone: 'bg-sky' };
+  if (title.startsWith('Viande')) return { emoji: '🍗', tone: 'bg-blush' };
+  if (title.startsWith('Charcuterie')) return { emoji: '🥓', tone: 'bg-blush' };
+  if (title.startsWith('Boulangerie')) return { emoji: '🥖', tone: 'bg-butter' };
+  if (title.startsWith('Fruits')) return { emoji: '🥕', tone: 'bg-sage' };
+  if (title.startsWith('Épicerie salée')) return { emoji: '🍝', tone: 'bg-sand' };
+  if (title.startsWith('Épicerie sucrée')) return { emoji: '🍪', tone: 'bg-butter' };
+  if (title.startsWith('Boissons')) return { emoji: '🧃', tone: 'bg-lilac' };
+  if (title.startsWith('Surgelés')) return { emoji: '❄️', tone: 'bg-sky' };
+  if (title.startsWith('Bébé')) return { emoji: '🍼', tone: 'bg-blush' };
+  if (title.startsWith('Hygiène') || title.startsWith('Parapharmacie')) return { emoji: '🧴', tone: 'bg-lilac' };
+  if (title.startsWith('Animalerie')) return { emoji: '🐾', tone: 'bg-sand' };
+  if (title.startsWith('Entretien')) return { emoji: '🧽', tone: 'bg-sage' };
+  if (title.startsWith('Maison')) return { emoji: '🏠', tone: 'bg-butter' };
+  return { emoji: '🛒', tone: 'bg-sand' };
+}
 
 export interface ShoppingGroupCardProps {
   list: ShoppingListView;
@@ -130,7 +149,7 @@ export function ShoppingGroupCard({
       <div className="flex items-center justify-between gap-3">
         {/* Le compteur reste hors du titre : l'étiquette du groupe doit rester
             égale au nom de la liste pour les lecteurs d'écran. */}
-        <h3 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[15px]">
+        <h3 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
           {list.name}
         </h3>
         <div className="flex items-center gap-1.5">
@@ -159,11 +178,12 @@ export function ShoppingGroupCard({
             id={inputId}
             value={draft}
             disabled={disabled}
-            placeholder="Ajouter un article puis Entrée"
+            placeholder="Ajouter dans ta liste…"
             role="combobox"
             aria-expanded={liveHits.length > 0}
             aria-controls={`catalogue-matches-${list.id}`}
             aria-autocomplete="list"
+            className="min-h-12 rounded-full border-transparent bg-bg pl-4 text-[14px] focus-visible:bg-surface"
             onChange={(event) => {
               setDraft(event.target.value);
               setMatch(null);
@@ -184,6 +204,7 @@ export function ShoppingGroupCard({
             disabled={disabled || !draft.trim()}
             onClick={submitDraft}
             aria-label={`Ajouter l’article à la liste ${list.name}`}
+            className="shrink-0"
           >
             Ajouter
           </Button>
@@ -352,13 +373,23 @@ export function ShoppingGroupCard({
       ) : (
         sections.map((section, sectionIndex) => (
           <div key={section.key}>
-            {section.title ? <p className={cn(kickerClass, sectionIndex === 0 && 'mt-0')}>{section.title}</p> : null}
-            <ul className="m-0 grid list-none gap-0 p-0">
+            {section.title ? (
+              <div className={cn('mb-2 flex items-center gap-2.5', sectionIndex === 0 ? 'mt-0' : 'mt-5')}>
+                <span
+                  aria-hidden="true"
+                  className={cn('grid size-9 shrink-0 place-items-center rounded-full text-[16px]', rayonVisual(section.title).tone)}
+                >
+                  {rayonVisual(section.title).emoji}
+                </span>
+                <h4 className="m-0 font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{section.title}</h4>
+              </div>
+            ) : null}
+            <ul className="m-0 grid list-none gap-0.5 p-0">
               {section.items.map((item) => (
                 <li
                   key={item.id}
                   className={cn(
-                    'group flex min-h-11 items-center gap-2.5 border-t border-border first:border-t-0',
+                    'group flex min-h-[56px] items-center gap-2.5 rounded-[14px] px-2 transition-colors hover:bg-accent-faint',
                     item.checked && 'done',
                   )}
                 >
@@ -367,23 +398,23 @@ export function ShoppingGroupCard({
                     disabled={disabled}
                     onCheckedChange={() => onToggle(item)}
                     aria-label={`${item.checked ? 'Rouvrir' : 'Terminer'} ${item.name}`}
-                    className="size-6"
+                    className="size-6 rounded-[7px]"
                   />
-                  <span className={cn('min-w-0 flex-1 text-[13px]', item.checked && 'text-muted line-through')}>
+                  <span className={cn('min-w-0 flex-1 text-[14px] font-medium', item.checked && 'text-muted line-through')}>
                     {item.name}
                   </span>
-                  <small className="text-[10px] text-muted">
+                  <small className="truncate text-[11px] text-muted max-[650px]:max-w-[96px]">
                     {quantityLabel(item) ? `${quantityLabel(item)} · ${item.rayon}` : item.rayon}
                   </small>
                   <span
                     className={cn(
-                      'text-[10px] font-semibold whitespace-nowrap',
+                      'text-[10px] font-semibold whitespace-nowrap max-[650px]:hidden',
                       item.checked ? 'text-accent-strong' : 'text-muted',
                     )}
                   >
                     {itemStateLabel(item.checked)}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover:opacity-100 group-focus-within:opacity-100 max-[650px]:opacity-100">
                     <Button
                       variant="ghost"
                       size="icon"

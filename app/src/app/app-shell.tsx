@@ -15,9 +15,11 @@ import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
+import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
+import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
@@ -37,6 +39,7 @@ export function AppShell() {
   const members = useHouseholdStore((state) => state.members);
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
+  const isMobileLayout = useIsMobileLayout();
   // Navigation fiable (D-09) : précharge les morceaux de routes en
   // arrière-plan, à l'idle et en ligne seulement. Monté une fois, échec avalé
   // (T-09-07) : le préchargement ne doit jamais casser le shell.
@@ -138,14 +141,14 @@ export function AppShell() {
       >
         Aller au contenu principal
       </a>
-      <aside className="sticky top-0 flex h-screen w-[246px] shrink-0 flex-col gap-7 border-r border-border bg-surface px-4 py-6 max-[1180px]:w-[218px] max-[920px]:w-[76px] max-[920px]:items-center max-[920px]:px-2.5 max-[650px]:hidden">
+      <aside className="sticky top-0 flex h-screen w-[246px] shrink-0 flex-col gap-7 border-r border-border/70 bg-bg px-4 py-6 max-[1180px]:w-[218px] max-[920px]:w-[76px] max-[920px]:items-center max-[920px]:px-2.5 max-[650px]:hidden">
         <div className="flex items-center gap-2.5 px-2.5 max-[920px]:px-0">
-          <div className="relative grid size-[38px] place-items-center overflow-hidden rounded-[13px] bg-fg text-surface">
+          <div className="relative grid size-[40px] place-items-center overflow-hidden rounded-full bg-accent text-surface">
             <Icon name={homeIcon} />
-            <span aria-hidden="true" className="absolute right-[5px] bottom-[5px] size-[17px] rounded-full border-2 border-accent" />
+            <span aria-hidden="true" className="absolute right-[4px] bottom-[4px] size-[16px] rounded-full border-2 border-bg bg-transparent" />
           </div>
           <div className="max-[920px]:hidden">
-            <div className="font-display text-base font-extrabold tracking-[-0.02em]">Ensemble &amp; Organisés</div>
+            <div className="font-display text-[15px] font-semibold tracking-[-0.02em]">Ensemble &amp; Organisés</div>
             <div className="mt-px text-[11px] text-muted">Votre foyer, en mouvement</div>
           </div>
         </div>
@@ -194,9 +197,9 @@ export function AppShell() {
             « Préférences » en dessous de la sienne. */}
         <div className="w-full">
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Votre espace</p>
-          <div className="mx-0.5 mb-3 rounded-[16px] border border-border bg-bg p-3.5 max-[920px]:hidden">
+          <div className="mx-0.5 mb-3 rounded-[22px] border border-border/60 bg-surface p-3.5 shadow-[var(--shadow-sm)] max-[920px]:hidden">
             <div className="flex items-center gap-2.5">
-              <span className={`grid size-[30px] place-items-center rounded-[10px] ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
+              <span className={`grid size-[34px] place-items-center rounded-full ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
                 {initials(householdName)}
               </span>
               <div>
@@ -241,9 +244,20 @@ export function AppShell() {
             aria-haspopup="dialog"
             aria-controls={MOBILE_DRAWER_ID}
             aria-label="Ouvrir le menu"
-            className="grid size-11 shrink-0 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-border/70 bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
           >
             <Icon name="menu" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label={`Espaces du foyer ${householdName}`}
+            className="flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-border/70 bg-surface py-1 pr-3.5 pl-1.5 text-[13px] font-[650] min-[651px]:hidden"
+          >
+            <span className={`grid size-8 shrink-0 place-items-center rounded-full ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
+              {initials(householdName)}
+            </span>
+            <span className="truncate">{householdName}</span>
           </button>
           <nav aria-label="Fil d’Ariane" className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted max-[650px]:hidden">
             <Link to="/accueil" className="transition-colors hover:text-fg">
@@ -260,7 +274,7 @@ export function AppShell() {
             ) : null}
             <button
               type="button"
-              className="relative grid min-h-11 min-w-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-[background,border-color,transform] duration-[var(--duration-quick)] hover:-translate-y-px hover:border-accent hover:bg-accent-faint"
+              className="relative grid min-h-11 min-w-11 place-items-center rounded-full border border-border/70 bg-surface text-fg transition-[background,border-color,transform] duration-[var(--duration-quick)] hover:-translate-y-px hover:border-accent hover:bg-accent-faint"
               aria-label={unread > 0 ? `Notifications : ${unread} nouvelles` : 'Notifications'}
               onClick={() => setNotificationsOpen(true)}
             >
@@ -300,7 +314,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(28px+env(safe-area-inset-bottom))]">
+        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(92px+env(safe-area-inset-bottom))]">
           <Outlet />
         </main>
       </div>
@@ -312,6 +326,8 @@ export function AppShell() {
         memberCount={members.length}
         isAdmin={isAdmin}
       />
+
+      {isMobileLayout ? <MobileBottomNav onMore={() => setDrawerOpen(true)} /> : null}
     </div>
   );
 }
