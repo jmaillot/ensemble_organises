@@ -27,22 +27,22 @@ export interface FolderTabsProps {
   /** Faux pour le rôle `enfant` (lecture seule) : masque création/gestion. */
   canManage: boolean;
   /**
-   * Capacité **distincte** de `canManage` : créer et renommer un dossier est
-   * ouvert au membre, mais le supprimer est admin-seul (`task_lists_delete`,
-   * `note_folders_delete`, `routine_folders_delete` — 0051:82-87). Une seule
-   * capacité `canManage` ne peut pas porter les deux.
+   * Capacité de suppression, **par dossier** (`0134`) : le propriétaire peut
+   * supprimer son dossier perso — son contenu part avec lui — tandis qu'un
+   * dossier foyer reste réservé à l'admin, et son contenu retombe dans Général.
+   * Une seule capacité globale ne peut pas porter les deux règles.
    *
    * Défaut `canManage` : un appelant qui n'a pas encore migré conserve
    * exactement son rendu antérieur.
    */
-  canDelete?: boolean;
+  canDelete?: (folder: FolderLike) => boolean;
   label: string;
 }
 
 /**
  * Onglets Général + dossiers : `tablist` accessible, pastille 🔒 sur les
- * persos, création/renommage/suppression avec confirmation (la suppression
- * range le contenu dans Général, elle ne le détruit pas).
+ * persos, création/renommage/suppression avec confirmation. Supprimer un
+ * dossier perso emporte son contenu ; un dossier foyer le range dans Général.
  */
 export function FolderTabs({
   folders,
@@ -52,7 +52,7 @@ export function FolderTabs({
   onRename,
   onDelete,
   canManage,
-  canDelete = canManage,
+  canDelete = () => canManage,
   label,
 }: FolderTabsProps) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -211,7 +211,7 @@ function FolderManageDialog({
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (folder: FolderLike) => Promise<void>;
   /** Seule la corbeille en dépend ; le renommage suit `canManage`. */
-  canDelete: boolean;
+  canDelete: (folder: FolderLike) => boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -276,7 +276,7 @@ function FolderManageDialog({
                     >
                       <Icon name="edit" size="sm" />
                     </button>
-                    {canDelete ? (
+                    {canDelete(folder) ? (
                       <button
                         type="button"
                         onClick={() => setPendingDelete(folder)}
@@ -304,7 +304,11 @@ function FolderManageDialog({
           if (!next) setPendingDelete(null);
         }}
         title={`Supprimer « ${pendingDelete?.name ?? ''} » ?`}
-        description="Son contenu retombera dans Général, il ne sera pas perdu."
+        description={
+          pendingDelete?.visibility === 'perso'
+            ? 'Son contenu sera supprimé définitivement avec lui.'
+            : 'Son contenu retombera dans Général, il ne sera pas perdu.'
+        }
         confirmLabel="Supprimer le dossier"
         onConfirm={() => {
           const target = pendingDelete;

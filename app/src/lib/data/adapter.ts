@@ -1,5 +1,6 @@
 import type { Row, RowFilter } from '@/types';
 import type { SetTable } from './set-tables';
+import type { FolderKind } from './folder-kinds';
 
 /** Une entité porte un `id` texte ; les tables de jointure n'en ont pas. */
 export interface Entity {
@@ -77,6 +78,18 @@ export interface DataAdapter {
    * remplacement légitime par zéro ligne, jamais un no-op silencieux.
    */
   replaceSet(table: SetTable, parentId: string, values: string[]): Promise<void>;
+  /**
+   * Supprime un dossier et, s'il est `perso`, son contenu.
+   *
+   * La règle dépend de la visibilité du dossier, et ne peut donc pas vivre
+   * dans la clé étrangère `folder_id` (`on delete set null`) : supprimer un
+   * dossier `foyer` doit ranger ses items dans Général, visible de tous, alors
+   * qu'un dossier `perso` doit les emporter — sinon supprimer « mes tâches
+   * privées » les publierait. Côté serveur, `public.delete_folder` fait les
+   * deux dans une transaction ; côté démo, une transaction Dexie reproduit la
+   * même sémantique.
+   */
+  deleteFolder(kind: FolderKind, folderId: string): Promise<void>;
   /**
    * Crée un foyer et son premier membre d'un seul tenant.
    *

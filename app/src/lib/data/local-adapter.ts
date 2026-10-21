@@ -3,6 +3,7 @@ import { seedRows, DEMO_HOUSEHOLD_ID } from './seed';
 import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable, rowKey } from './keys';
 import { SET_TABLES, type SetTable } from './set-tables';
+import { FOLDER_KINDS, type FolderKind } from './folder-kinds';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
@@ -177,6 +178,44 @@ export class LocalAdapter implements DataAdapter {
     });
 
     this.emit(table);
+  }
+
+  /**
+   * Suppression d'un dossier en mode démo : le contenu d'un dossier perso est
+   * effacé avec lui, celui d'un dossier foyer retombe dans Général (la FK
+   * `on delete set null` n'existe pas dans IndexedDB, il faut l'écrire).
+   *
+   * La lecture du dossier précède la transaction : Dexie réemballe les erreurs
+   * levées dedans, et l'appelant ne recevrait plus une `DataError`.
+   */
+  async deleteFolder(kind: FolderKind, folderId: string): Promise<void> {
+    await this.ensureSeeded();
+    const db = getDatabase();
+    const spec = FOLDER_KINDS[kind];
+
+    const folder = await db.rows.get(rowKey(spec.folderTable, { id: folderId }));
+    if (!folder) throw new DataError('Dossier introuvable.');
+    if (folder.data.is_default === true) throw new DataError('Le dossier Général ne se supprime pas.');
+
+    const items = (await db.rows.where('table').equals(spec.itemTable).toArray()).filter(
+      (entry) => entry.data.folder_id === folderId,
+    );
+    const isPersonal = folder.data.visibility === 'perso';
+
+    await db.transaction('rw', db.rows, async () => {
+      if (items.length > 0) {
+        if (isPersonal) {
+          await db.rows.bulkDelete(items.map((entry) => entry.key));
+        } else {
+          // Dossier foyer : les items restent, sans dossier, donc dans Général.
+          await db.rows.bulkPut(items.map((entry) => ({ ...entry, data: { ...entry.data, folder_id: null } })));
+        }
+      }
+      await db.rows.delete(rowKey(spec.folderTable, { id: folderId }));
+    });
+
+    this.emit(spec.folderTable);
+    this.emit(spec.itemTable);
   }
 
   /**

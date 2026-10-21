@@ -77,6 +77,8 @@ export interface UseRoutinesResult extends RoutineMetrics {
   createFolder: (name: string, visibility: RoutineFolderRow['visibility']) => Promise<RoutineFolderRow>;
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
+  /** Capacité de suppression, **par dossier** (`0134`). */
+  canDeleteFolder: (folder: Pick<RoutineFolderRow, 'visibility' | 'owner_member_id'>) => boolean;
   period: HistoryPeriod;
   setPeriod: (period: HistoryPeriod) => void;
   query: string;
@@ -141,6 +143,17 @@ export function useRoutines(): UseRoutinesResult {
 
   const canWrite = currentMember?.role !== 'enfant';
   const isAdmin = useIsAdmin();
+
+  /**
+   * Suppression par dossier, et non par rôle seul : un dossier perso
+   * n'appartient qu'à son propriétaire (l'admin ne le voit même plus), un
+   * dossier foyer reste à l'admin. Le serveur applique la même règle.
+   */
+  const canDeleteFolder = useCallback(
+    (folder: Pick<RoutineFolderRow, 'visibility' | 'owner_member_id'>) =>
+      folder.visibility === 'perso' ? folder.owner_member_id === currentMember?.id : isAdmin,
+    [currentMember?.id, isAdmin],
+  );
 
   const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<RoutineRow>(ROUTINES_TABLE);
@@ -282,13 +295,22 @@ export function useRoutines(): UseRoutinesResult {
   const deleteFolder = useCallback(
     async (id: string) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
-      // `routine_folders_delete` (0051:82-87) : admin seul.
-      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
-      await data.remove(ROUTINE_FOLDERS_TABLE, id);
+      const folder = folders.find((entry) => entry.id === id);
+      if (!folder) throw new Error('Dossier introuvable.');
+      // Deux capacités distinctes depuis `0134` : perso = propriétaire, foyer
+      // = admin. Le refus est dit ici ; la RPC le refait et fait autorité.
+      if (!canDeleteFolder(folder)) {
+        throw new Error(
+          folder.visibility === 'perso'
+            ? 'Seul le propriétaire peut supprimer ce dossier perso.'
+            : 'Seul un administrateur du foyer peut supprimer ce dossier.',
+        );
+      }
+      await data.deleteFolder('routines', id);
       if (activeFolderId === id) setActiveFolderId(null);
       await refresh();
     },
-    [activeFolderId, canWrite, isAdmin, refresh, setActiveFolderId],
+    [activeFolderId, canDeleteFolder, canWrite, folders, refresh, setActiveFolderId],
   );
 
   const removeOccurrence = useCallback(
@@ -318,6 +340,7 @@ export function useRoutines(): UseRoutinesResult {
     setAssigneeFilter,
     canWrite,
     isAdmin,
+    canDeleteFolder,
     createFolder,
     renameFolder,
     deleteFolder,

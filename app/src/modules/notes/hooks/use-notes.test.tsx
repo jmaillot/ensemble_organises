@@ -69,12 +69,11 @@ async function noteFrom(result: { current: ReturnType<typeof useNotes> }, id: st
 }
 
 /**
- * `useNotes.deleteFolder` était gardé par `canWrite` seul, alors que la
- * politique `note_folders_delete` (0051:82-87) réserve la suppression à
- * l'administrateur : troisième occurrence de la même classe que les dossiers de
- * tâches et de routines (D-03, « corriger la classe »). Le garde est prouvé
- * ici, car le test d'affichage de la page ne l'exercerait pas — la corbeille y
- * est de toute façon masquée pour un membre.
+ * `0134` a déplacé la règle : un dossier perso appartient à son propriétaire,
+ * qui peut le supprimer — son contenu part avec lui, sans quoi supprimer
+ * « mes notes privées » les publierait dans Général. Un dossier foyer reste
+ * réservé à l'administrateur, et son contenu retombe dans Général. Le garde du
+ * hook tombe avant l'I/O : un refus ne doit rien écrire.
  */
 function renderNotes() {
   const queryClient = createTestQueryClient();
@@ -85,31 +84,54 @@ function renderNotes() {
   });
 }
 
-const GUARD = 'Seul un administrateur du foyer peut supprimer.';
+const GUARD_FOYER = 'Seul un administrateur du foyer peut supprimer ce dossier.';
 
 beforeEach(() => {
   depositMock.mockReset();
   removeFileMock.mockReset().mockResolvedValue(undefined);
 });
 
-describe('useNotes — suppression de dossier réservée à l’administrateur', () => {
-  it('rejette un membre non admin sans rien écrire', async () => {
+describe('useNotes — suppression d’un dossier selon sa visibilité (0134)', () => {
+  it('refuse à un membre le dossier foyer d’un autre, sans rien écrire', async () => {
+    seedHouseholdStore();
+    const folder = await data.create<NoteFolderRow>('note_folders', {
+      id: 'folder-0134-foyer',
+      household_id: DEMO_HOUSEHOLD_ID,
+      name: 'Foyer',
+      visibility: 'foyer',
+      is_default: false,
+      owner_member_id: DEMO_MEMBERS.camille,
+    });
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    const { result } = renderNotes();
+    await waitFor(() => expect(result.current.folders.some((entry) => entry.id === folder.id)).toBe(true));
+
+    await expect(result.current.deleteFolder(folder.id)).rejects.toThrow(GUARD_FOYER);
+    expect(await data.list<NoteFolderRow>('note_folders', { id: folder.id })).toHaveLength(1);
+  });
+
+  it('laisse un membre supprimer son dossier perso, contenu compris', async () => {
     seedHouseholdStore();
     useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
     const { result } = renderNotes();
 
-    await expect(result.current.deleteFolder('dossier-inexistant')).rejects.toThrow(GUARD);
-    // Le garde tombe avant l'I/O : aucun `DataError` de ligne absente (18-02).
-    expect(await data.list<NoteFolderRow>('note_folders', { id: 'dossier-inexistant' })).toHaveLength(0);
-  });
-
-  it('laisse un administrateur supprimer un dossier existant', async () => {
-    seedHouseholdStore();
-    const { result } = renderNotes();
-
     let created!: NoteFolderRow;
     await act(async () => {
-      created = await result.current.createFolder('Divers', 'foyer');
+      created = await result.current.createFolder('Privé', 'perso');
+    });
+    await waitFor(() => expect(result.current.folders.some((entry) => entry.id === created.id)).toBe(true));
+    const note = await data.create<NoteRow>('notes', {
+      id: 'note-0134-privee',
+      household_id: DEMO_HOUSEHOLD_ID,
+      trip_id: null,
+      title: 'Privée',
+      content: '',
+      category: 'Maison',
+      color: 'accent',
+      folder_id: created.id,
+      created_by: DEMO_MEMBERS.thomas,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
 
     await act(async () => {
@@ -117,6 +139,40 @@ describe('useNotes — suppression de dossier réservée à l’administrateur',
     });
 
     expect(await data.list<NoteFolderRow>('note_folders', { id: created.id })).toHaveLength(0);
+    // La note privée ne doit pas resurgir dans Général, visible de tous.
+    expect(await data.list<NoteRow>('notes', { id: note.id })).toHaveLength(0);
+  });
+
+  it('laisse un administrateur supprimer un dossier foyer, dont le contenu retombe dans Général', async () => {
+    seedHouseholdStore();
+    const { result } = renderNotes();
+
+    let created!: NoteFolderRow;
+    await act(async () => {
+      created = await result.current.createFolder('Divers', 'foyer');
+    });
+    await waitFor(() => expect(result.current.folders.some((entry) => entry.id === created.id)).toBe(true));
+    const note = await data.create<NoteRow>('notes', {
+      id: 'note-0134-foyer',
+      household_id: DEMO_HOUSEHOLD_ID,
+      trip_id: null,
+      title: 'Partagée',
+      content: '',
+      category: 'Maison',
+      color: 'accent',
+      folder_id: created.id,
+      created_by: DEMO_MEMBERS.camille,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    await act(async () => {
+      await result.current.deleteFolder(created.id);
+    });
+
+    expect(await data.list<NoteFolderRow>('note_folders', { id: created.id })).toHaveLength(0);
+    const [survivor] = await data.list<NoteRow>('notes', { id: note.id });
+    expect(survivor?.folder_id).toBeNull();
   });
 });
 

@@ -62,6 +62,7 @@ export default function TachesPage() {
     setActiveFolderId,
     canWrite,
     isAdmin,
+    canDeleteFolder,
     createFolder,
     renameFolder,
     deleteFolder,
@@ -227,14 +228,18 @@ export default function TachesPage() {
           onDelete={async (folder) => {
             try {
               await deleteFolder(folder.id);
-              toast('Dossier supprimé, contenu rangé dans Général.');
+              toast(
+                folder.visibility === 'perso'
+                  ? 'Dossier perso supprimé avec son contenu.'
+                  : 'Dossier supprimé, contenu rangé dans Général.',
+              );
             } catch (folderError) {
               toast(folderError instanceof Error ? folderError.message : 'Le dossier n’a pas pu être supprimé.', 'error');
               throw folderError;
             }
           }}
           canManage={canWrite}
-          canDelete={isAdmin}
+          canDelete={canDeleteFolder}
           label="Dossiers de tâches"
         />
       </div>

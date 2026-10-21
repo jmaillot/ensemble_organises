@@ -54,12 +54,20 @@ describe('FolderTabs', () => {
 });
 
 /**
- * `canDelete` est distinct de `canManage` : la politique `<dossier>_delete`
- * (0051:82-87) réserve la suppression à l'administrateur, alors que créer et
- * renommer son propre dossier est ouvert au membre.
+ * `canDelete` est une capacité **par dossier** (`0134`) : le propriétaire peut
+ * supprimer son dossier perso — son contenu part avec lui — tandis qu'un
+ * dossier foyer reste réservé à l'administrateur, et son contenu retombe dans
+ * Général.
  */
-describe('FolderTabs — canDelete distinct de canManage', () => {
+describe('FolderTabs — canDelete par dossier', () => {
   const manageDialog = () => screen.findByRole('dialog', { name: 'Gérer les dossiers' });
+  const persoFolder = {
+    id: 'folder-perso',
+    name: 'Privé',
+    visibility: 'perso',
+    is_default: false,
+    owner_member_id: 'm-alice',
+  } as const;
 
   it('conserve exactement le rendu antérieur quand canDelete est omis', async () => {
     const user = userEvent.setup();
@@ -71,25 +79,47 @@ describe('FolderTabs — canDelete distinct de canManage', () => {
     expect(screen.getByRole('button', { name: 'Supprimer Week-end' })).toBeInTheDocument();
   });
 
-  it('propose Renommer mais pas Supprimer pour un membre (canManage vrai, canDelete faux)', async () => {
+  it('n’offre la corbeille que sur les dossiers autorisés', async () => {
     const user = userEvent.setup();
-    renderTabs({ canManage: true, canDelete: false });
+    renderTabs({
+      folders: [generalSeed, customFolder, persoFolder],
+      canManage: true,
+      // Un membre : propriétaire de son perso, pas administrateur du foyer.
+      canDelete: (folder) => folder.visibility === 'perso',
+    });
 
-    // Un membre gère ses propres dossiers : création et renommage restent.
-    expect(screen.getByRole('button', { name: 'Nouveau dossier' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
     expect(await manageDialog()).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Renommer Week-end' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Supprimer Privé' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Supprimer Week-end' })).not.toBeInTheDocument();
+    // Renommer reste ouvert : seule la corbeille dépend de la capacité.
+    expect(screen.getByRole('button', { name: 'Renommer Week-end' })).toBeInTheDocument();
   });
 
-  it('rétablit la corbeille quand canDelete est vrai', async () => {
+  it('annonce la perte du contenu pour un dossier perso', async () => {
     const user = userEvent.setup();
-    renderTabs({ canManage: true, canDelete: true });
+    renderTabs({
+      folders: [generalSeed, customFolder, persoFolder],
+      canManage: true,
+      canDelete: () => true,
+    });
 
     await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
-    expect(await manageDialog()).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Supprimer Week-end' })).toBeInTheDocument();
+    await manageDialog();
+    await user.click(screen.getByRole('button', { name: 'Supprimer Privé' }));
+
+    expect(await screen.findByText('Son contenu sera supprimé définitivement avec lui.')).toBeInTheDocument();
+  });
+
+  it('annonce le rangement dans Général pour un dossier foyer', async () => {
+    const user = userEvent.setup();
+    renderTabs({ canManage: true, canDelete: () => true });
+
+    await user.click(screen.getByRole('button', { name: 'Gérer les dossiers' }));
+    await manageDialog();
+    await user.click(screen.getByRole('button', { name: 'Supprimer Week-end' }));
+
+    expect(await screen.findByText('Son contenu retombera dans Général, il ne sera pas perdu.')).toBeInTheDocument();
   });
 });
 

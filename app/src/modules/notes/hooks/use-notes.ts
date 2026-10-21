@@ -60,6 +60,8 @@ export interface UseNotesResult extends NoteMetrics {
   createFolder: (name: string, visibility: NoteFolderRow['visibility']) => Promise<NoteFolderRow>;
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
+  /** Capacité de suppression, **par dossier** (`0134`). */
+  canDeleteFolder: (folder: Pick<NoteFolderRow, 'visibility' | 'owner_member_id'>) => boolean;
   filters: NoteFilters;
   setFilters: (filters: Partial<NoteFilters>) => void;
   resetFilters: () => void;
@@ -121,6 +123,17 @@ export function useNotes(): UseNotesResult {
 
   const canWrite = currentMember?.role !== 'enfant';
   const isAdmin = useIsAdmin();
+
+  /**
+   * Suppression par dossier, et non par rôle seul : un dossier perso
+   * n'appartient qu'à son propriétaire (l'admin ne le voit même plus), un
+   * dossier foyer reste à l'admin. Le serveur applique la même règle.
+   */
+  const canDeleteFolder = useCallback(
+    (folder: Pick<NoteFolderRow, 'visibility' | 'owner_member_id'>) =>
+      folder.visibility === 'perso' ? folder.owner_member_id === currentMember?.id : isAdmin,
+    [currentMember?.id, isAdmin],
+  );
 
   // Les lignes portent des chemins (D-01) : on forge les URL affichables à la
   // lecture, en échec fermé (annulation stricte, jamais d'état éventé). Les
@@ -290,15 +303,22 @@ export function useNotes(): UseNotesResult {
   const deleteFolder = useCallback(
     async (id: string) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
-      // `note_folders_delete` (0051:82-87) est admin-seul, alors que créer et
-      // renommer un dossier reste ouvert au membre : même classe de défaut que
-      // `task_lists_delete` et `routine_folders_delete`.
-      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
-      await data.remove(NOTE_FOLDERS_TABLE, id);
+      const folder = folders.find((entry) => entry.id === id);
+      if (!folder) throw new Error('Dossier introuvable.');
+      // Deux capacités distinctes depuis `0134` : perso = propriétaire, foyer
+      // = admin. Le refus est dit ici ; la RPC le refait et fait autorité.
+      if (!canDeleteFolder(folder)) {
+        throw new Error(
+          folder.visibility === 'perso'
+            ? 'Seul le propriétaire peut supprimer ce dossier perso.'
+            : 'Seul un administrateur du foyer peut supprimer ce dossier.',
+        );
+      }
+      await data.deleteFolder('notes', id);
       if (activeFolderId === id) setActiveFolderId(null);
       await refresh();
     },
-    [activeFolderId, canWrite, isAdmin, refresh, setActiveFolderId],
+    [activeFolderId, canDeleteFolder, canWrite, folders, refresh, setActiveFolderId],
   );
 
   return {
@@ -309,6 +329,7 @@ export function useNotes(): UseNotesResult {
     activeFolderId,
     setActiveFolderId,
     canWrite,
+    canDeleteFolder,
     createFolder,
     renameFolder,
     deleteFolder,

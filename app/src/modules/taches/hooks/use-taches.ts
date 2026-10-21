@@ -81,8 +81,16 @@ export interface UseTachesResult extends TaskMetrics {
   createFolder: (name: string, visibility: TaskListRow['visibility']) => Promise<TaskListRow>;
   /** Renomme un dossier. */
   renameFolder: (id: string, name: string) => Promise<void>;
-  /** Supprime un dossier (contenu rangé dans Général) et replie l'onglet. */
+  /**
+   * Supprime un dossier : un perso emporte son contenu, un dossier foyer range
+   * le sien dans Général.
+   */
   deleteFolder: (id: string) => Promise<void>;
+  /**
+   * Capacité de suppression, **par dossier** (`0134`) : le propriétaire peut
+   * supprimer son dossier perso, un dossier foyer reste réservé à l'admin.
+   */
+  canDeleteFolder: (folder: Pick<TaskListRow, 'visibility' | 'owner_member_id'>) => boolean;
 }
 
 /** Données du module Tâches : tâches, assignataires, rappels et réordonnancement. */
@@ -125,6 +133,17 @@ export function useTaches(): UseTachesResult {
 
   const canWrite = currentMember?.role !== 'enfant';
   const isAdmin = useIsAdmin();
+
+  /**
+   * Suppression par dossier, et non par rôle seul : un dossier perso
+   * n'appartient qu'à son propriétaire (l'admin ne le voit même plus), un
+   * dossier foyer reste à l'admin. Le serveur applique la même règle.
+   */
+  const canDeleteFolder = useCallback(
+    (folder: Pick<TaskListRow, 'visibility' | 'owner_member_id'>) =>
+      folder.visibility === 'perso' ? folder.owner_member_id === currentMember?.id : isAdmin,
+    [currentMember?.id, isAdmin],
+  );
   const { rows: allRows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
     useResource<TaskRow>(TASKS_TABLE);
 
@@ -267,6 +286,7 @@ export function useTaches(): UseTachesResult {
     setAssigneeFilter,
     canWrite,
     isAdmin,
+    canDeleteFolder,
     refreshFolders: async () => {
       await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
     },
@@ -284,11 +304,18 @@ export function useTaches(): UseTachesResult {
     },
     deleteFolder: async (id) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
-      // Supprimer un dossier est admin-seul (`task_lists_delete` : admin et non
-      // default), alors que le créer et le renommer est ouvert au membre : deux
-      // capacités, jamais une seule.
-      if (!isAdmin) throw new Error('Seul un administrateur du foyer peut supprimer.');
-      await data.remove(TASK_LISTS_TABLE, id);
+      const folder = folders.find((entry) => entry.id === id);
+      if (!folder) throw new Error('Dossier introuvable.');
+      // Le refus est dit ici pour l'usage ; la RPC `delete_folder` le refait
+      // côté serveur, où il fait autorité.
+      if (!canDeleteFolder(folder)) {
+        throw new Error(
+          folder.visibility === 'perso'
+            ? 'Seul le propriétaire peut supprimer ce dossier perso.'
+            : 'Seul un administrateur du foyer peut supprimer ce dossier.',
+        );
+      }
+      await data.deleteFolder('taches', id);
       if (activeFolderId === id) setActiveFolderId(null);
       await queryClient.invalidateQueries({ queryKey: [TASK_LISTS_TABLE] });
       await queryClient.invalidateQueries({ queryKey: [TASKS_TABLE] });

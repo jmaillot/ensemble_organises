@@ -67,18 +67,25 @@ begin
     'écriture inter-foyer refusée');
   reset role;
 
-  -- 2. Perso : owner lit/écrit, autre membre ne lit rien, admin lit (modération).
+  -- 2. Perso : owner lit/écrit, les autres ne lisent rien — admin compris
+  --    depuis 0134 : un dossier perso n'est plus modéré, il est privé.
   perform testkit.as_user(bob, 'fold-a-bob@example.fr');
   set local role authenticated;
   perform testkit.eq(
     testkit.count('select 1 from public.tasks where id = ''' || task_perso || ''''),
     1::bigint, 'owner lit son item perso');
+  perform testkit.eq(
+    testkit.count('select 1 from public.task_lists where owner_member_id = ''' || bob_m || ''' and visibility = ''perso'''),
+    1::bigint, 'owner lit son dossier perso');
   reset role;
   perform testkit.as_user(alice, 'fold-a-alice@example.fr');
   set local role authenticated;
   perform testkit.eq(
     testkit.count('select 1 from public.tasks where id = ''' || task_perso || ''''),
-    1::bigint, 'admin lit le perso pour modération');
+    0::bigint, 'admin ne lit pas le perso d''autrui (0134)');
+  perform testkit.eq(
+    testkit.count('select 1 from public.task_lists where owner_member_id = ''' || bob_m || ''' and visibility = ''perso'''),
+    0::bigint, 'admin ne voit pas le dossier perso d''autrui (0134)');
   reset role;
 
   -- 3. Enfant : lit le foyer, n'écrit ni dossier ni item.
@@ -133,12 +140,24 @@ begin
     perform testkit.ok(true, 'owner inter-foyer refusé 23514');
   end;
 
-  -- 6. Suppression dossier -> contenu retombe dans Général (SET NULL) ; Général insupprimable.
+  -- 6. Suppression : l'admin ne voit plus le perso d'autrui (0134), donc il ne
+  --    le supprime pas ; son propriétaire, lui, le supprime. La RPC
+  --    `delete_folder` emporte le contenu (prouvé par le test 0134) ; ici la FK
+  --    laisse l'item dans Général, c'est la politique seule qui est éprouvée.
   perform testkit.as_user(alice, 'fold-a-alice@example.fr');
   set local role authenticated;
   perform testkit.eq(
     testkit.affected(format('delete from public.task_lists where id = %L', perso_bob)),
-    1::bigint, 'admin supprime le dossier perso');
+    0::bigint, 'admin ne supprime pas le perso d''autrui (0134)');
+  reset role;
+  perform testkit.eq(
+    testkit.count('select 1 from public.tasks where id = ''' || task_perso || ''''),
+    1::bigint, 'le contenu perso est resté en place');
+  perform testkit.as_user(bob, 'fold-a-bob@example.fr');
+  set local role authenticated;
+  perform testkit.eq(
+    testkit.affected(format('delete from public.task_lists where id = %L', perso_bob)),
+    1::bigint, 'le propriétaire supprime son dossier perso');
   reset role;
   perform testkit.eq(
     testkit.count('select 1 from public.tasks where id = ''' || task_perso || ''' and folder_id is null'),

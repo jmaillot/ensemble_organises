@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client';
 import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable } from './keys';
 import { SET_TABLES, type SetTable } from './set-tables';
+import type { FolderKind } from './folder-kinds';
 import { randomId } from '@/lib/utils';
 import type { Row, RowFilter } from '@/types';
 
@@ -207,6 +208,21 @@ export class SupabaseAdapter implements DataAdapter {
     const { error } = await client.rpc(spec.rpc, {
       [spec.parentParam]: parentId,
       [spec.valuesParam]: values,
+    });
+    if (error) throw new DataError(error.message, error);
+  }
+
+  /**
+   * Suppression d'un dossier : UN appel à `public.delete_folder` (`0134`), donc
+   * une transaction. Le propriétaire d'un dossier perso peut le supprimer, et
+   * son contenu part avec lui ; un dossier foyer reste réservé à l'admin, et
+   * ses items retombent dans Général.
+   */
+  async deleteFolder(kind: FolderKind, folderId: string): Promise<void> {
+    const client = this.client();
+    const { error } = await client.rpc('delete_folder', {
+      p_kind: kind,
+      p_folder_id: folderId,
     });
     if (error) throw new DataError(error.message, error);
   }
