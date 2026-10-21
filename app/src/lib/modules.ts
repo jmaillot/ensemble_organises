@@ -54,7 +54,7 @@ export const modules: ModuleEntry[] = [
   { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', image: 'taches.jpg', icon: 'checkCircle', short: 'À faire', navLabel: 'À faire', tile: true, nav: true },
   { key: 'routines', label: 'Routines', detail: 'Habitudes du foyer', kicker: 'Le rythme juste', image: 'routines.jpg', icon: 'wand', short: 'Routines', tile: true, nav: false },
   { key: 'ardoise', label: 'Ardoise', detail: 'Dépenses & partage', kicker: 'Transparent par nature', image: 'ardoise.jpg', icon: 'wallet', short: 'Ardoise', tile: true, nav: false },
-  { key: 'recettes', label: 'Recettes', detail: 'Bientôt disponible', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
+  { key: 'recettes', label: 'Recettes', detail: 'Carnet de cuisine', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
   { key: 'cadeaux', label: 'Cadeaux', detail: 'Idées à offrir', kicker: 'Pour dire merci', image: 'cadeaux.jpg', icon: 'gift', short: 'Cadeaux', tile: true, nav: false },
   { key: 'anniversaires', label: 'Anniversaires', detail: 'Ne rien oublier', kicker: 'Les petits moments', image: 'calendrier.jpg', icon: 'heart', short: 'Anniversaires', tile: true, nav: false },
   { key: 'contacts', label: 'Contacts', detail: 'Famille & proches', kicker: 'Les visages du foyer', image: 'cercle.jpg', icon: 'people', short: 'Contacts', tile: true, nav: false },

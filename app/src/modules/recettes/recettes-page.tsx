@@ -178,7 +178,7 @@ export default function RecettesPage() {
               type="button"
               onClick={() => setFilter((current) => ({ ...current, favoritesOnly: !current.favoritesOnly }))}
               aria-pressed={filter.favoritesOnly}
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-[10px] border border-border bg-surface px-[11px] text-[12px] font-[760] text-fg aria-pressed:border-accent aria-pressed:bg-accent-faint aria-pressed:text-accent-strong"
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-[14px] border border-border bg-surface px-3.5 text-[12px] font-bold text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent-faint aria-pressed:text-accent-strong"
             >
               <Icon name="heart" size="sm" className={filter.favoritesOnly ? 'fill-current' : undefined} />
               Favoris
