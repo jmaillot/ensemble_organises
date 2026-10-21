@@ -44,7 +44,7 @@ const shareButtonBase =
   'inline-flex min-h-[33px] items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[10px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong';
 
 const cardAction =
-  'grid size-[31px] shrink-0 place-items-center rounded-[9px] bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';
+  'grid size-8 shrink-0 place-items-center rounded-full bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';
 
 /** Actions des cartes d'idées : zones tactiles ≥ 44px (D-05). */
 const ideaAction =
@@ -553,13 +553,14 @@ export default function CadeauxPage() {
           <SectionHeading
             title="Les idées à offrir"
             description="Partagez une liste précise avec le foyer ou un proche."
+            stackOnMobile
             action={
               <SearchInput
                 aria-label="Rechercher une idée cadeau"
                 placeholder="Rechercher une idée"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="w-[220px]"
+                className="w-full min-[651px]:w-[220px]"
               />
             }
           />
@@ -735,17 +736,17 @@ export default function CadeauxPage() {
               {visibleItems.map((item) => {
                 const reservedByMe = item.reservedBy !== null && item.reservedBy === currentMemberId;
                 return (
-                  <li key={item.id} className="panel-surface overflow-hidden rounded-[16px]">
+                  <li key={item.id} className="panel-surface overflow-hidden rounded-[20px] transition-shadow duration-[var(--duration-slow)] hover:shadow-md">
                     {item.photoUrl ? (
-                      <img src={item.photoUrl} alt={item.name} className="h-[146px] w-full object-cover" />
+                      <img src={item.photoUrl} alt={item.name} className="h-[160px] w-full object-cover" />
                     ) : (
-                      <div className="grid h-[146px] w-full place-items-center bg-accent-faint text-accent-soft">
+                      <div className="grid h-[160px] w-full place-items-center bg-accent-faint text-accent-soft">
                         <Icon name="gift" size="lg" />
                       </div>
                     )}
-                    <div className="p-[15px]">
+                    <div className="p-4">
                       <div className="mb-1 flex items-start justify-between gap-2">
-                        <h3 className="mb-0 font-display text-[16px] tracking-[-0.035em]">
+                        <h3 className="mb-0 font-display text-[17px] tracking-[-0.035em]">
                           {item.url ? (
                             <a href={item.url} target="_blank" rel="noreferrer" className="hover:text-accent-strong">
                               {item.name}
@@ -770,7 +771,7 @@ export default function CadeauxPage() {
                           </div>
                         ) : null}
                       </div>
-                      {item.comment ? <p className="mb-3 text-[11px] text-muted">{item.comment}</p> : <div className="mb-3" />}
+                      {item.comment ? <p className="mb-3 text-[12px] text-muted">{item.comment}</p> : <div className="mb-3" />}
 
                       {activeList?.isOwned ? (
                         // Surprise (0080) : le propriétaire voit QU'un article
@@ -894,17 +895,17 @@ export default function CadeauxPage() {
           ) : (
             <ul className="m-0 grid list-none grid-cols-3 gap-[14px] p-0 max-[650px]:grid-cols-1">
               {ideas.map((idea) => (
-                <li key={idea.id} className="panel-surface overflow-hidden rounded-[16px]">
+                <li key={idea.id} className="panel-surface overflow-hidden rounded-[20px] transition-shadow duration-[var(--duration-slow)] hover:shadow-md">
                   {idea.photoUrl ? (
-                    <img src={idea.photoUrl} alt={idea.name} className="h-[146px] w-full object-cover" />
+                    <img src={idea.photoUrl} alt={idea.name} className="h-[160px] w-full object-cover" />
                   ) : (
-                    <div className="grid h-[146px] w-full place-items-center bg-accent-faint text-accent-soft">
+                    <div className="grid h-[160px] w-full place-items-center bg-accent-faint text-accent-soft">
                       <Icon name="gift" size="lg" />
                     </div>
                   )}
-                  <div className="p-[15px]">
+                  <div className="p-4">
                     <div className="mb-1 flex items-start justify-between gap-2">
-                      <h3 className="mb-0 font-display text-[16px] tracking-[-0.035em]">{idea.name}</h3>
+                      <h3 className="mb-0 font-display text-[17px] tracking-[-0.035em]">{idea.name}</h3>
                       <Badge tone={idea.status === 'offert' ? 'accent' : 'muted'}>{ideaStatusLabel[idea.status]}</Badge>
                     </div>
                     {idea.gifteeName ? (
@@ -915,7 +916,7 @@ export default function CadeauxPage() {
                         Prochaine occasion · {formatShortDate(idea.nextOccasionDate)}
                       </p>
                     ) : null}
-                    {idea.comment ? <p className="mb-3 text-[11px] text-muted">{idea.comment}</p> : <div className="mb-3" />}
+                    {idea.comment ? <p className="mb-3 text-[12px] text-muted">{idea.comment}</p> : <div className="mb-3" />}
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <strong className="font-display text-[18px] tracking-[-0.04em]">
                         {idea.price === null ? '—' : formatEuro(idea.price)}
