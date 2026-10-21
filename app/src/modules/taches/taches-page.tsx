@@ -20,10 +20,24 @@ import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
-import { memberFirstName, isOpenForMe, taskFilters, taskGroup, type Task, type TaskGroup } from './types';
+import { memberFirstName, isOpenForMe, taskFilters, taskGroup, type Task, type TaskGroup, type TaskStatus } from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
+import { TaskBoard } from './components/task-board';
 import { useTaches } from './hooks/use-taches';
+
+type TaskView = 'liste' | 'tableau';
+
+const VIEW_STORAGE_KEY = 'eo:taches:view';
+
+/** Vue choisie la dernière fois ; la liste reste le défaut d'un premier passage. */
+function readStoredView(): TaskView {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'tableau' ? 'tableau' : 'liste';
+  } catch {
+    return 'liste';
+  }
+}
 
 const screenReaderInstructions = {
   draggable:
@@ -76,7 +90,9 @@ export default function TachesPage() {
     error,
     isMutating,
     refetch,
+    boardTasks,
     toggleStatus,
+    setTaskStatus,
     saveTask,
     removeTask,
     reorder,
@@ -88,6 +104,7 @@ export default function TachesPage() {
   });
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [dragged, setDragged] = useState<Task | null>(null);
+  const [view, setView] = useState<TaskView>(readStoredView);
 
   // Raccourci depuis le calendrier : l'échéance voyage dans l'état de
   // navigation et ouvre la création, consommé une seule fois (sans quoi chaque
@@ -112,6 +129,21 @@ export default function TachesPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  const changeView = (next: TaskView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Stockage indisponible : la vue reste en mémoire pour la session.
+    }
+  };
+
+  const moveTask = (task: Task, status: TaskStatus) => {
+    void setTaskStatus(task, status).catch((moveError: unknown) =>
+      toast(moveError instanceof Error ? moveError.message : 'Le statut n’a pas pu être mis à jour.', 'error'),
+    );
+  };
 
   const openCreate = () => setDialog({ open: true, task: null, dueDate: null });
   const openEdit = (task: Task) => setDialog({ open: true, task, dueDate: null });
@@ -244,31 +276,74 @@ export default function TachesPage() {
         />
       </div>
 
+      <div className="mb-4 flex items-center justify-end">
+        <div
+          role="group"
+          aria-label="Affichage des tâches"
+          className="flex gap-1 rounded-full border border-border bg-surface p-1"
+        >
+          {(
+            [
+              { value: 'liste', label: 'Liste' },
+              { value: 'tableau', label: 'Tableau' },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={view === option.value}
+              onClick={() => changeView(option.value)}
+              className={
+                view === option.value
+                  ? 'rounded-full bg-accent px-3 py-1.5 text-[11.5px] font-extrabold text-white'
+                  : 'rounded-full px-3 py-1.5 text-[11.5px] font-bold text-muted hover:text-fg'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {isError ? (
         <ErrorState
           message={error?.message ?? 'Les tâches du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
         />
       ) : (
-        <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] items-start gap-[18px] max-[920px]:grid-cols-1">
+        // Le tableau prend toute la largeur : trois colonnes dans la colonne
+        // de gauche écrasaient les titres à un mot par ligne.
+        <div
+          className={
+            view === 'tableau'
+              ? 'grid grid-cols-1 items-start gap-[18px]'
+              : 'grid grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] items-start gap-[18px] max-[920px]:grid-cols-1'
+          }
+        >
           <Panel
             id="task-list-panel"
-            title="Vos prochaines tâches"
-            description="Glissez les lignes pour réordonner, ou changez la priorité."
+            title={view === 'tableau' ? 'Tableau des tâches' : 'Vos prochaines tâches'}
+            description={
+              view === 'tableau'
+                ? 'Trois colonnes valent tous les statuts : glissez une carte par sa poignée, ou choisissez le statut sur la carte.'
+                : 'Glissez les lignes pour réordonner, ou changez la priorité.'
+            }
             action={
-              <div className="flex flex-wrap gap-2">
-                <Select
+              <div className="flex flex-wrap items-end gap-2">
+                {view === 'liste' ? (
+                  <Select
                   aria-label="Filtrer les tâches"
                   className="w-auto min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value as typeof filter)}
-                >
-                  {taskFilters.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
+                  >
+                    {taskFilters.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : null}
                 <Select
                   aria-label="Filtrer par assigné"
                   className="w-auto min-w-[170px] max-[650px]:w-full max-[650px]:min-w-0"
@@ -288,6 +363,18 @@ export default function TachesPage() {
           >
             {isLoading ? (
               <LoadingRows rows={4} />
+            ) : view === 'tableau' ? (
+              boardTasks.length === 0 ? (
+                <EmptyState
+                  icon="checkCircle"
+                  title="Aucune tâche dans ce dossier"
+                  description="Les tâches de ce dossier se rangeront ici, par statut. Ajoutez-en une pour commencer."
+                  actionLabel={canWrite ? 'Ajouter une tâche' : undefined}
+                  onAction={canWrite ? openCreate : undefined}
+                />
+              ) : (
+                <TaskBoard tasks={boardTasks} canWrite={canWrite} onEdit={openEdit} onMove={moveTask} />
+              )
             ) : visibleTasks.length === 0 ? (
               <EmptyState
                 icon="checkCircle"

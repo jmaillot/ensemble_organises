@@ -33,6 +33,7 @@ import {
   type Task,
   type TaskFilter,
   type TaskFormValues,
+  type TaskStatus,
   type TaskMetrics,
 } from '../types';
 
@@ -41,6 +42,12 @@ export interface UseTachesResult extends TaskMetrics {
   tasks: Task[];
   /** Tâches de l'onglet et des filtres courants, triées pour l'affichage. */
   visibleTasks: Task[];
+  /**
+   * Tâches du tableau : dossier et assigné courants, **sans** le filtre de
+   * statut — les trois colonnes le portent, il masquerait sinon la colonne
+   * « Terminée » dès l'ouverture.
+   */
+  boardTasks: Task[];
   /** Tâches portant un rappel, pour le panneau « Rappels du jour ». */
   reminders: Task[];
   /** La lecture des assignations n'a pas encore rendu (ou a échoué). */
@@ -71,6 +78,8 @@ export interface UseTachesResult extends TaskMetrics {
   refetch: () => void;
   /** Bascule optimiste « à faire » / « terminée ». */
   toggleStatus: (task: Task) => Promise<void>;
+  /** Déplace une tâche vers un statut (tableau ou sélecteur de carte). */
+  setTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
   saveTask: (task: Task | null, values: TaskFormValues) => Promise<void>;
   removeTask: (task: Task) => Promise<void>;
   /** Enregistre l'ordre issu du glisser-déposer. */
@@ -180,6 +189,10 @@ export function useTaches(): UseTachesResult {
     () => sortTasks(filterByAssignee(filterByFolder(filterTasks(tasks, filter), activeFolderId), assigneeFilter)),
     [activeFolderId, assigneeFilter, filter, tasks],
   );
+  const boardTasks = useMemo(
+    () => sortTasks(filterByAssignee(filterByFolder(tasks, activeFolderId), assigneeFilter)),
+    [activeFolderId, assigneeFilter, tasks],
+  );
   /**
    * Rappels du jour (D-07) : la borne est l'instant du rendu, comme le reste de
    * la page — le panneau ne se rafraîchit pas tout seul.
@@ -207,6 +220,15 @@ export function useTaches(): UseTachesResult {
     async (task: Task) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       await update(task.id, { status: task.status === 'fait' ? 'a_faire' : 'fait' });
+    },
+    [canWrite, update],
+  );
+
+  const setTaskStatus = useCallback(
+    async (task: Task, status: TaskStatus) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (task.status === status) return;
+      await update(task.id, { status });
     },
     [canWrite, update],
   );
@@ -273,6 +295,7 @@ export function useTaches(): UseTachesResult {
   return {
     tasks,
     visibleTasks,
+    boardTasks,
     reminders,
     assigneesUnknown,
     members,
@@ -327,6 +350,7 @@ export function useTaches(): UseTachesResult {
     isMutating,
     refetch,
     toggleStatus,
+    setTaskStatus,
     saveTask,
     removeTask,
     reorder,

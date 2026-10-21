@@ -346,3 +346,49 @@ describe('TachesPage — corbeille réservée à l’administrateur', () => {
     expect(screen.getByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
   });
 });
+
+describe('TachesPage — la vue Tableau (Lot 2)', () => {
+  afterEach(() => {
+    // La vue choisie est retenue d'une session à l'autre : sans ce nettoyage,
+    // le test suivant démarrerait sur le tableau.
+    window.localStorage.removeItem('eo:taches:view');
+  });
+
+  it('change le statut depuis une carte et range la tâche dans sa colonne', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    await user.click(screen.getByRole('button', { name: 'Tableau' }));
+
+    const aFaire = screen.getByRole('region', { name: 'À faire' });
+    expect(within(aFaire).getByText('Ajouter le lait d’agne')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Statut de « Ajouter le lait d’agne »'), 'en_cours');
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('region', { name: 'En cours' })).getByText('Ajouter le lait d’agne'),
+      ).toBeInTheDocument();
+    });
+    expect(within(aFaire).queryByText('Ajouter le lait d’agne')).not.toBeInTheDocument();
+    const rows = await data.list<{ name: string; status: string }>('tasks');
+    expect(rows.find((row) => row.name === 'Ajouter le lait d’agne')?.status).toBe('en_cours');
+  });
+
+  it('montre les tâches terminées même quand le filtre par défaut masque les tâches closes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // Filtrer les tâches terminées est impossible : la colonne le porte.
+    expect(screen.getByLabelText('Filtrer les tâches')).toHaveValue('ouvertes');
+
+    await user.click(screen.getByRole('button', { name: 'Tableau' }));
+
+    expect(screen.queryByLabelText('Filtrer les tâches')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Terminée' })).getByText('Ranger les photos de l’été'),
+    ).toBeInTheDocument();
+  });
+});

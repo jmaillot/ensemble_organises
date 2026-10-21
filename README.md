@@ -47,7 +47,7 @@ seul jeu de membres, de rappels, de couleurs et de permissions pour tous :
 | Espace | Route | Ce qu'on y fait |
 |---|---|---|
 | **Accueil** | `/accueil` | Widgets du jour réordonnables, point du jour, accès aux 17 espaces |
-| **À faire** | `/taches` | Tâches par échéance, priorité, assignataires, rappels, réordonnancement au glisser-déposer |
+| **À faire** | `/taches` | Tâches par échéance, priorité, assignataires, rappels, réordonnancement au glisser-déposer ; vue Tableau à trois statuts |
 | **Calendrier** | `/calendrier` | Vue mois, semaine, jour et liste, jours fériés français, anniversaires, création par appui long, export imprimable de la période affichée |
 | **Notes** | `/notes` | Notes en Markdown (aperçu dans l’éditeur), catégories colorées, recherche plein texte, épinglage, visibilité privée/partagée |
 | **Courses** | `/courses` | Listes partagées, regroupement par rayon, ajout rapide au clavier, suggestions d'historique, export imprimable rangé par rayon |
