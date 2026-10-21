@@ -599,8 +599,10 @@ Adresses, Cercle, Voyages, Messages, Paramètres.
 lignes aérées avec pastilles typées, filtres en une rangée défilante sur
 mobile, zone scolaire rapprochée de son explication) et Tâches (lignes de
 64 px, case 22 px, priorité en pilule, actions révélées au survol et toujours
-visibles au tactile). L'accueil a reçu les primitives communes (états vides,
-tuiles, navigation basse) sans reprise complète.
+visibles au tactile). Routines (cartes du jour en 20 px, série en pastille,
+listes à lignes survolables et historique en lignes rondes). L'accueil a reçu
+les primitives communes (états vides, tuiles, navigation basse) sans reprise
+complète.
 
 Pour chaque écran : en-tête Fraunces, pilules d'onglets, cartes 28 px, lignes
 aérées, tuiles pastel. Aucun changement de données.

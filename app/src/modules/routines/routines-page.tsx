@@ -260,16 +260,16 @@ export default function RoutinesPage() {
                       : `Aucune routine ne correspond à « ${query.trim()} ». Modifiez la recherche ou créez un nouveau rituel.`}
                   </p>
                 ) : (
-                  <div role="list" aria-label="Routines du foyer" className="grid">
+                  <div role="list" aria-label="Routines du foyer" className="grid gap-1">
                     {filteredRoutines.map((routine) => (
                       <div
                         key={routine.id}
                         role="listitem"
-                        className="flex flex-wrap items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                        className="group flex flex-wrap items-center gap-3 rounded-[16px] px-2 py-3 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
                       >
                         <div className="min-w-[150px] flex-1">
-                          <p className="m-0 text-[13px] font-[760]">{routine.name}</p>
-                          <small className="text-[10px] text-muted">
+                          <p className="m-0 text-[14px] font-[700]">{routine.name}</p>
+                          <small className="text-[11.5px] text-muted">
                             {routine.frequencyLabel} · {routine.nextLabel}
                           </small>
                         </div>
@@ -286,7 +286,9 @@ export default function RoutinesPage() {
                           </span>
                         ) : null}
 
-                        <span className="text-[11px] text-muted">{routine.streakLabel}</span>
+                        <span className="inline-flex min-h-[24px] items-center rounded-full bg-accent-faint px-2.5 text-[11px] font-semibold text-accent-strong">
+                          {routine.streakLabel}
+                        </span>
                         {routine.isLate ? <Badge tone="coral">{routine.lateLabel ?? 'En retard'}</Badge> : null}
 
                         <div className="ml-auto flex items-center gap-1">
@@ -295,7 +297,7 @@ export default function RoutinesPage() {
                               type="button"
                               onClick={() => openEdit(routine)}
                               aria-label={`Modifier la routine ${routine.name}`}
-                              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg"
+                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-accent hover:bg-accent-faint hover:text-fg focus-visible:opacity-100 max-[650px]:opacity-100"
                             >
                               <Icon name="edit" size="sm" />
                             </button>
@@ -305,7 +307,7 @@ export default function RoutinesPage() {
                               type="button"
                               onClick={() => setPendingDelete(routine)}
                               aria-label={`Supprimer la routine ${routine.name}`}
-                              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-coral hover:bg-coral-soft hover:text-coral focus-visible:opacity-100 max-[650px]:opacity-100"
                             >
                               <Icon name="trash" size="sm" />
                             </button>

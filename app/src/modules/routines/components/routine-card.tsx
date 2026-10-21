@@ -28,7 +28,7 @@ export function RoutineCard({ routine, onToggle, showStreakBadge = false, classN
       data-done={done ? 'true' : 'false'}
       className={cn(
         // `.routine-card` de l'export : surface, rayon 16px, gouttière 19px.
-        'panel-surface rounded-[16px] p-[19px]',
+        'panel-surface rounded-[20px] p-[18px]',
         // La carte cochée reprend le fond `accent-faint` de l'export.
         done && 'border-accent/25 bg-accent-faint',
         className,
@@ -47,7 +47,7 @@ export function RoutineCard({ routine, onToggle, showStreakBadge = false, classN
         <div className="min-w-0 flex-1">
           {/* `w-fit` : la barre de « terminé » ne doit pas s'étirer sur toute
               la largeur de la carte. */}
-          <h3 className={cn('mb-0.5 w-fit font-display text-[15px] tracking-[-0.035em]', done && 'text-muted line-through')}>
+          <h3 className={cn('mb-0.5 w-fit font-display text-[16px] tracking-[-0.035em]', done && 'text-muted line-through')}>
             {routine.name}
           </h3>
           <p className="m-0 text-[11px] text-muted">{routine.frequencyLabel}</p>
