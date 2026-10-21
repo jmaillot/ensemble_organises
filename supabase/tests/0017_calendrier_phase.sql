@@ -7,12 +7,14 @@
 --   (with check refuse), et ne peut pas non plus le SUPPRIMER en pratique :
 --   PostgreSQL conditionne UPDATE/DELETE au passage des politiques SELECT
 --   (filtre observe au plan : USING du delete + SELECT giclés en AND), donc
---   une ligne invisible n'est ni modifiable ni supprimable. Les politiques
---   `events_delete_admin` / `event_calendars_delete` autorisent encore
---   l'admin sur le papier (filet de moderation voulu par 0084), mais ce
---   filet est INERTE pour les lignes invisibles : prouve par des 0 affectes,
---   pas par des +1. Rendre la moderation reelle demanderait un RPC
---   SECURITY DEFINER dedie (hors plan, a trancher en phase suivante).
+--   une ligne invisible n'est ni modifiable ni supprimable. Au moment de ce
+--   fichier, `events_delete_admin` / `event_calendars_delete` autorisaient
+--   encore l'admin sur le papier (filet de moderation voulu par 0084), mais
+--   ce filet etait INERTE pour les lignes invisibles : prouve par des 0
+--   affectes, pas par des +1. Depuis `0135`, l'evenement et ses rappels ne
+--   sont plus autorises a l'admin du tout ; `event_calendars_delete` garde sa
+--   branche admin, inerte de la meme facon. Les zeros de ce fichier restent
+--   donc vrais, et `0135` les double d'un refus explicite.
 -- - D-02/D-05 : le trigger 0085 cree un Perso par adulte (admin comme
 --   membre), jamais pour un enfant ; prouve sur l'existant ET en dynamique
 --   (insertion d'un adulte puis d'un enfant).
