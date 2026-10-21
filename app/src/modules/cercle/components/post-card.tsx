@@ -310,7 +310,7 @@ function PostCardComponent({
                       pas dessus) et restent visibles au tactile, où le survol
                       n'existe pas. */}
                   {!editingComment && (canEditInline(comment) || canDeleteInline(comment)) ? (
-                    <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 max-[650px]:opacity-100">
+                    <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 [@media(hover:none)]:opacity-100 max-[650px]:opacity-100">
                       {canEditInline(comment) ? (
                         <button
                           type="button"
