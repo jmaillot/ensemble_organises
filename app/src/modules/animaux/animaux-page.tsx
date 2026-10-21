@@ -50,9 +50,9 @@ function RecordList({ records, kind }: { records: PetRecord[]; kind: PetRecord['
         return (
           <div
             key={record.id}
-            className="flex items-start justify-between gap-2.5 border-t border-border py-3 text-xs first:border-t-0"
+            className="flex items-start justify-between gap-2.5 rounded-[14px] px-2 py-3 text-xs transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
           >
-            <span className="min-w-0 text-muted">{record.name}</span>
+            <span className="min-w-0 font-semibold text-fg">{record.name}</span>
             <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
               <strong className="text-xs">
                 {record.nextDueDate

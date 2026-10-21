@@ -129,7 +129,7 @@ export default function AnniversairesPage() {
                       <div
                         key={birthday.id}
                         role="listitem"
-                        className="flex items-center gap-3 border-t border-border py-3.5 first:border-t-0 first:pt-0"
+                        className="group grid min-h-[68px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] px-2 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
                       >
                         {birthday.displayPhotoUrl ? (
                           <img
@@ -146,7 +146,7 @@ export default function AnniversairesPage() {
                           />
                         )}
                         <div className="min-w-0 flex-1">
-                          <strong className="block text-[13px]">
+                          <strong className="block text-[14px] font-[700]">
                             {birthday.name}{' '}
                             {birthday.twoSources ? (
                               <span className="ml-1 inline-flex items-center rounded-full bg-accent-faint px-2 py-0.5 align-middle text-[10px] font-extrabold text-accent-strong">
@@ -154,17 +154,21 @@ export default function AnniversairesPage() {
                               </span>
                             ) : null}
                           </strong>
-                          <small className="text-[11px] text-muted">
-                            {birthdayCountdown(birthday)} · {birthday.turning} ans
-                            {birthday.origin === 'contact' ? ' · via Contacts' : ''}
+                          <small className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-muted">
+                            <span>
+                              {birthdayCountdown(birthday)} · {birthday.turning} ans
+                              {birthday.origin === 'contact' ? ' · via Contacts' : ''}
+                            </span>
+                            <span className="inline-flex min-h-[22px] items-center rounded-full bg-butter px-2 text-[11px] font-bold text-[oklch(40%_0.09_78)]">
+                              {formatDayMonth(birthday.nextDate)}
+                            </span>
                           </small>
                         </div>
-                        <span className="text-[12px] font-extrabold text-accent-strong">{formatDayMonth(birthday.nextDate)}</span>
                         {birthday.origin === 'contact' ? (
                           <Link
                             to="/contacts"
                             aria-label={`Voir la fiche de ${birthday.name} dans les contacts`}
-                            className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                            className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
                           >
                             <Icon name="people" size="sm" />
                           </Link>
@@ -174,7 +178,7 @@ export default function AnniversairesPage() {
                               type="button"
                               onClick={() => openEdit(birthday)}
                               aria-label={`Modifier l’anniversaire de ${birthday.name}`}
-                              className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
                             >
                               <Icon name="edit" size="sm" />
                             </button>
@@ -182,7 +186,7 @@ export default function AnniversairesPage() {
                               type="button"
                               onClick={() => setPendingDelete(birthday)}
                               aria-label={`Supprimer l’anniversaire de ${birthday.name}`}
-                              className="grid size-[30px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
                             >
                               <Icon name="trash" size="sm" />
                             </button>
