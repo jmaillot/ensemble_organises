@@ -35,7 +35,7 @@ begin
           ('public_holidays', ARRAY['holiday_date', 'name', 'year']::text[]),
           ('school_holidays', ARRAY['id', 'zone', 'school_year', 'name', 'start_date', 'end_date']::text[]),
           ('event_reminders', ARRAY['id', 'event_id', 'remind_at']::text[]),
-          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at', 'trip_id', 'cover_attachment_id']::text[]),
+          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at', 'trip_id', 'cover_attachment_id', 'is_locked']::text[]),
           ('note_attachments', ARRAY['id', 'note_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'folder_id', 'created_by', 'created_at', 'trip_id']::text[]),
           ('task_assignees', ARRAY['task_id', 'member_id']::text[]),

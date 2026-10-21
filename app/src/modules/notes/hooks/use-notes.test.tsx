@@ -325,3 +325,63 @@ describe('useNotes — la photo de couverture (0136)', () => {
     expect((await noteFrom(result, note.id)).cover?.id).toBe(first);
   });
 });
+
+/**
+ * 0137 — le verrou fige le contenu pour tous, auteur compris, et ne se lève
+ * que par son auteur ou un administrateur. Le refus local tombe avant l'I/O :
+ * le test vérifie donc aussi que la ligne n'a pas bougé.
+ */
+describe('useNotes — le verrou d’une note (0137)', () => {
+  it('refuse la modification et la suppression d’une note verrouillée, sans rien écrire', async () => {
+    seedHouseholdStore();
+    const note = await seedNote('note-lock-1');
+    await data.update<NoteRow>('notes', note.id, { is_locked: true });
+
+    const { result } = renderNotes();
+    const target = await noteFrom(result, note.id);
+    expect(target.locked).toBe(true);
+
+    await expect(result.current.editNote(target, formValues('Renommée'))).rejects.toThrow(
+      'Cette note est verrouillée : levez le verrou avant de la modifier.',
+    );
+    await expect(result.current.removeNote(target)).rejects.toThrow(
+      'Cette note est verrouillée : levez le verrou avant de la supprimer.',
+    );
+
+    const [stored] = await data.list<NoteRow>('notes', { id: note.id });
+    expect(stored.title).toBe('Ordonnances');
+    expect(stored.is_locked).toBe(true);
+  });
+
+  it('réserve la levée du verrou à l’auteur et à l’administrateur', async () => {
+    seedHouseholdStore();
+    const note = await seedNote('note-lock-2');
+    await data.update<NoteRow>('notes', note.id, { is_locked: true });
+
+    // Thomas est membre, pas auteur : il voit le verrou mais ne le lève pas.
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    const { result } = renderNotes();
+    const target = await noteFrom(result, note.id);
+    expect(result.current.canUnlock(target)).toBe(false);
+    await expect(result.current.setNoteLock(target, false)).rejects.toThrow(
+      'Seul l’auteur de la note ou un administrateur peut lever son verrou.',
+    );
+    expect((await data.list<NoteRow>('notes', { id: note.id }))[0].is_locked).toBe(true);
+
+    // Camille est l'autrice : elle lève le verrou, et la note redevient
+    // modifiable dans la même foulée.
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.camille });
+    // Le hook relit le membre courant par abonnement : attendre le rendu avant
+    // d'appeler, sinon on interroge encore la fermeture du membre précédent.
+    await waitFor(() => expect(result.current.canUnlock(target)).toBe(true));
+    await act(async () => {
+      await result.current.setNoteLock(target, false);
+    });
+    const unlocked = await noteFrom(result, note.id);
+    expect(unlocked.locked).toBe(false);
+    await act(async () => {
+      await result.current.editNote(unlocked, formValues('Renommée'));
+    });
+    expect((await data.list<NoteRow>('notes', { id: note.id }))[0].title).toBe('Renommée');
+  });
+});

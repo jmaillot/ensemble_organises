@@ -58,6 +58,8 @@ export default function NotesPage() {
     isMutating,
     refetch,
     addNote,
+    setNoteLock,
+    canUnlock,
     editNote,
     removeNote,
   } = useNotes();
@@ -65,8 +67,22 @@ export default function NotesPage() {
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
 
   const openCreate = () => setDialog({ open: true, note: null });
-  const openEdit = (note: Note) => setDialog({ open: true, note });
+  // Une note verrouillée ne s'ouvre pas : le verrou se lève d'abord, et la
+  // base refuserait de toute façon l'écriture.
+  const openEdit = (note: Note) => {
+    if (note.locked) return;
+    setDialog({ open: true, note });
+  };
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+
+  const toggleLock = async (note: Note, locked: boolean) => {
+    try {
+      await setNoteLock(note, locked);
+      toast(locked ? 'Note verrouillée : son contenu ne bouge plus.' : 'Note déverrouillée.');
+    } catch (lockError) {
+      toast(lockError instanceof Error ? lockError.message : 'Le verrou n’a pas pu être changé.', 'error');
+    }
+  };
 
   const latestAuthor = latest?.authorId
     ? memberFirstName(members.find((member) => member.id === latest.authorId)?.display_name ?? '')
@@ -267,7 +283,15 @@ export default function NotesPage() {
                       />
                       <span className="truncate">{note.category}</span>
                     </span>
-                    <span className="shrink-0">{featured ? 'Épinglée' : note.ageLabel}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {note.locked ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[9.5px] text-amber">
+                          <Icon name="lock" size="sm" className="size-3" />
+                          Verrouillée
+                        </span>
+                      ) : null}
+                      <span>{featured ? 'Épinglée' : note.ageLabel}</span>
+                    </span>
                   </div>
 
                   <h3 className="mt-[15px] mb-1.5 font-display text-[17px] tracking-[-0.035em]">{note.title}</h3>
@@ -306,23 +330,47 @@ export default function NotesPage() {
                     <span>{noteVisibilityLabels[note.visibility]}</span>
                     {canWrite ? (
                       <span className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral"
-                          aria-label={`Supprimer ${note.title}`}
-                          onClick={() => setPendingDelete(note)}
-                        >
-                          <Icon name="trash" size="sm" />
-                        </Button>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
-                          onClick={() => openEdit(note)}
-                        >
-                          Modifier
-                          <Icon name="arrow" size="sm" />
-                        </button>
+                        {note.locked ? (
+                          canUnlock(note) ? (
+                            <button
+                              type="button"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
+                              onClick={() => void toggleLock(note, false)}
+                            >
+                              Déverrouiller
+                              <Icon name="unlock" size="sm" />
+                            </button>
+                          ) : null
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-accent hover:bg-accent-faint hover:text-accent-strong"
+                              aria-label={`Verrouiller ${note.title}`}
+                              onClick={() => void toggleLock(note, true)}
+                            >
+                              <Icon name="lock" size="sm" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral"
+                              aria-label={`Supprimer ${note.title}`}
+                              onClick={() => setPendingDelete(note)}
+                            >
+                              <Icon name="trash" size="sm" />
+                            </Button>
+                            <button
+                              type="button"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
+                              onClick={() => openEdit(note)}
+                            >
+                              Modifier
+                              <Icon name="arrow" size="sm" />
+                            </button>
+                          </>
+                        )}
                       </span>
                     ) : null}
                   </div>

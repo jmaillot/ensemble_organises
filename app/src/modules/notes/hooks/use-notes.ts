@@ -82,7 +82,16 @@ export interface UseNotesResult extends NoteMetrics {
     cover?: NoteCoverChoice,
   ) => Promise<void>;
   removeNote: (note: Note) => Promise<void>;
+  /** Verrouille ou déverrouille une note (0137), sous les mêmes droits que la base. */
+  setNoteLock: (note: Note, locked: boolean) => Promise<void>;
+  /** Auteur de la note ou administrateur : eux seuls lèvent un verrou. */
+  canUnlock: (note: Pick<Note, 'authorId'>) => boolean;
 }
+
+/** Refus local, avant l'I/O ; le message est celui que la base rend aussi. */
+const LOCKED_EDIT = 'Cette note est verrouillée : levez le verrou avant de la modifier.';
+const LOCKED_DELETE = 'Cette note est verrouillée : levez le verrou avant de la supprimer.';
+const UNLOCK_FORBIDDEN = 'Seul l’auteur de la note ou un administrateur peut lever son verrou.';
 
 /** Espace de notes du foyer : recherche, catégories, visibilité. */
 export function useNotes(): UseNotesResult {
@@ -262,6 +271,7 @@ export function useNotes(): UseNotesResult {
       cover: NoteCoverChoice = { kind: 'auto' },
     ) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (note.locked) throw new Error(LOCKED_EDIT);
       await update(note.id, { ...toNotePayload(values), updated_at: nowIso() });
       for (const attachmentId of removedAttachmentIds) {
         // La pièce jointe retirée emporte son objet (D-03, WR-10) : la ligne
@@ -301,6 +311,7 @@ export function useNotes(): UseNotesResult {
   const removeNote = useCallback(
     async (note: Note) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (note.locked) throw new Error(LOCKED_DELETE);
       // Les objets suivent leurs lignes (D-03, WR-10) : les chemins sont lus
       // AVANT la suppression des lignes, les objets retirés APRÈS.
       const attachments = await data
@@ -315,6 +326,21 @@ export function useNotes(): UseNotesResult {
       await refresh();
     },
     [canWrite, refresh, remove],
+  );
+
+  const canUnlock = useCallback(
+    (note: Pick<Note, 'authorId'>) => isAdmin || Boolean(currentMember && note.authorId === currentMember.id),
+    [currentMember, isAdmin],
+  );
+
+  const setNoteLock = useCallback(
+    async (note: Note, locked: boolean) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (!locked && !canUnlock(note)) throw new Error(UNLOCK_FORBIDDEN);
+      await update(note.id, { is_locked: locked, updated_at: nowIso() });
+      await refresh();
+    },
+    [canUnlock, canWrite, refresh, update],
   );
 
   const createFolder = useCallback(
@@ -383,6 +409,8 @@ export function useNotes(): UseNotesResult {
     addNote,
     editNote,
     removeNote,
+    setNoteLock,
+    canUnlock,
     ...metrics,
   };
 }

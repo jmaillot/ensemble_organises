@@ -288,6 +288,7 @@ export const demoNotes: NoteRow[] = [
     // La liste de rentrée porte sa photo de couverture (0136) : la démo montre
     // un bandeau choisi, et les autres notes le repli sur la première image.
     cover_attachment_id: 'note-attachment-1',
+    is_locked: false,
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-2)}T18:45:00`,
     updated_at: `${day(0)}T18:45:00`,
@@ -301,6 +302,7 @@ export const demoNotes: NoteRow[] = [
     color: null,
     folder_id: null,
     cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.lina,
     created_at: `${day(-3)}T10:12:00`,
     updated_at: `${day(-2)}T09:20:00`,
@@ -314,6 +316,9 @@ export const demoNotes: NoteRow[] = [
     color: null,
     folder_id: null,
     cover_attachment_id: null,
+    // Verrouillée dans la démo, et par son autrice : le cas « je peux lever le
+    // verrou » est visible sans geste, l'autre est décrit par le badge.
+    is_locked: true,
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-4)}T21:02:00`,
     updated_at: `${day(-4)}T21:02:00`,
@@ -1140,6 +1145,7 @@ export const demoTripNotes: NoteRow[] = [
     color: 'accent',
     folder_id: null,
     cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.camille,
     created_at: now(),
     updated_at: now(),
@@ -1154,6 +1160,7 @@ export const demoTripNotes: NoteRow[] = [
     color: null,
     folder_id: null,
     cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
     updated_at: now(),

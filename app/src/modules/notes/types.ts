@@ -62,6 +62,8 @@ export interface Note {
   attachments: NoteAttachment[];
   /** Pièce jointe **désignée** comme couverture (`notes.cover_attachment_id`). */
   coverAttachmentId: string | null;
+  /** Note verrouillée : son contenu ne peut plus être modifié (0137). */
+  locked: boolean;
   /**
    * Couverture affichable : la photo désignée, sinon la première image jointe,
    * sinon `null`. Résolue à la lecture, donc jamais une image morte : une photo
@@ -187,6 +189,7 @@ export function toNote(row: NoteRow, attachments: NoteAttachment[] = []): Note {
     ageLabel: ageLabel(row.updated_at),
     attachments,
     coverAttachmentId: row.cover_attachment_id ?? null,
+    locked: row.is_locked ?? false,
     cover: pickCover(attachments, row.cover_attachment_id ?? null),
   };
 }

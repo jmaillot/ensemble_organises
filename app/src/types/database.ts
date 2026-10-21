@@ -232,6 +232,8 @@ export interface NoteRow {
   folder_id: Uuid | null;
   /** Photo de couverture, choisie parmi les pièces jointes (0136). */
   cover_attachment_id: Uuid | null;
+  /** Verrou de la note : contenu figé tant qu'il n'est pas levé (0137). */
+  is_locked: boolean;
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;

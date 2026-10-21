@@ -16,6 +16,7 @@ const note = (overrides: Partial<Note>): Note => ({
   attachments: [],
   coverAttachmentId: null,
   cover: null,
+  locked: false,
   ...overrides,
 });
 

@@ -189,6 +189,23 @@ describe('NotesPage', () => {
       await user.click(within(createDialog).getByRole('button', { name: 'Créer le dossier' }));
       await screen.findByRole('tab', { name: 'Vacances' });
 
+      // « À demander à Léa » arrive verrouillée par la graine (0137) : une note
+      // verrouillée n'offre pas « Modifier », donc on lève d'abord le verrou.
+      // Ce n'est pas un contournement du test : c'est l'état initial voulu de
+      // la démo, et le refus lui-même est vérifié dans son propre test.
+      await user.click(
+        within(screen.getByText('À demander à Léa').closest('article') as HTMLElement).getByRole('button', {
+          name: 'Déverrouiller',
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          within(screen.getByText('À demander à Léa').closest('article') as HTMLElement).getByRole('button', {
+            name: 'Modifier',
+          }),
+        ).toBeInTheDocument(),
+      );
+
       // Ranger toutes les notes du Général dans le dossier : Général devient
       // vide alors que des notes existent toujours (le titre du dossier, lui,
       // porte les notes).
@@ -279,5 +296,32 @@ describe('NotesPage', () => {
     } finally {
       await data.remove('note_attachments', second.id);
     }
+  });
+
+  /**
+   * 0137 — le verrou se voit et se lève sans passer par le dialogue : une note
+   * verrouillée n'ouvre pas son formulaire, et l'action de modification
+   * disparaît tant qu'elle l'est. La démo verrouille « À demander à Léa », dont
+   * Camille est l'autrice : le cas « je peux lever » est donc jouable tel quel.
+   */
+  it('affiche le verrou, retire les actions de modification et laisse l’autrice le lever', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('À demander à Léa')).toBeInTheDocument();
+    const card = screen.getByText('À demander à Léa').closest('article') as HTMLElement;
+
+    expect(within(card).getByText('Verrouillée')).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Supprimer À demander à Léa' })).not.toBeInTheDocument();
+    // Pas de dialogue non plus : c'est l'action qui manque, pas un refus tardif.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Déverrouiller' }));
+
+    await waitFor(() => expect(within(card).getByRole('button', { name: 'Modifier' })).toBeInTheDocument());
+    expect(within(card).queryByText('Verrouillée')).not.toBeInTheDocument();
+    const [stored] = await data.list<NoteRow>('notes', { id: 'note-3' });
+    expect(stored.is_locked).toBe(false);
   });
 });
