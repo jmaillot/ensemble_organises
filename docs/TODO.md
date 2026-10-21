@@ -828,6 +828,14 @@ replié, hors-foyer refusé l'ensemble restant intact, rappels 2 → 1 → 0,
 sur le retour arrière Dexie puis vert ; 68 suites SQL vertes, 163 fichiers /
 1337 tests, contrôle statique sans défaut.
 
+**Déployé et vérifié en production le 2026-10-21** : `0133` appliquée (les cinq
+`replace_*` sont dans `public`), droits contrôlés (`authenticated` peut,
+`anon` non), bundle servi contenant l'appel RPC, et les deux gestes d'usage —
+assigné retiré puis remis sur une tâche, rappels d'une routine de un à deux puis
+à zéro — passés **sans erreur**. La preuve d'affichage fine (« en cours
+d'écriture » plutôt que « sans assigné ») n'a pas été observée à l'écran : elle
+reste couverte par `pending-assignee.tsx` et ses tests, pas par cette session.
+
 ---
 
 ## Décidé, sans action
