@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
 import { useHouseholdStore, useMemberName } from '@/stores/household-store';
 import { formatMediumDate, formatWeekday, pluralize, relativeDayLabel, toLocalDate } from '@/lib/utils';
+import { usePrintSheet } from '@/hooks/use-print-sheet';
 import { useCourses } from './hooks/use-courses';
 import { ItemFormDialog } from './components/item-form-dialog';
 import { ScanDialog } from './components/scan-dialog';
@@ -188,22 +189,7 @@ export default function CoursesPage() {
    */
   const visibleList = lists.find((list) => list.id === activeListId) ?? lists[0] ?? null;
   const printModel = visibleList ? toShoppingPrintModel(visibleList, householdName ?? 'Foyer') : null;
-
-  /**
-   * La feuille n'existe dans le DOM que le temps de l'impression : rendue en
-   * permanence, elle doublerait chaque article pour les lecteurs d'écran et
-   * pour les requêtes de test. `afterprint` la retire, y compris après une
-   * annulation ; un navigateur qui ne l'émet pas laisse un bloc masqué à
-   * l'écran, sans autre conséquence.
-   */
-  const [printing, setPrinting] = useState(false);
-  useEffect(() => {
-    if (!printing) return;
-    const finish = () => setPrinting(false);
-    window.addEventListener('afterprint', finish);
-    window.print();
-    return () => window.removeEventListener('afterprint', finish);
-  }, [printing]);
+  const { printing, print } = usePrintSheet();
 
   return (
     <ModuleShell
@@ -220,7 +206,7 @@ export default function CoursesPage() {
             variant="secondary"
             icon="download"
             disabled={!printModel}
-            onClick={() => setPrinting(true)}
+            onClick={print}
           >
             Imprimer
           </Button>

@@ -483,4 +483,34 @@ describe('CalendrierPage', () => {
       ),
     ).toBe(false);
   });
+
+  it('imprime la période de la vue affichée, puis retire la feuille', async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    try {
+      renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+      const todayTask = await screen.findByText('Valider les rendez-vous du carnet');
+      expect(todayTask).toBeInTheDocument();
+
+      // Vue Jour : la feuille ne porte que la date sélectionnée, pas le mois.
+      await user.click(screen.getByRole('tab', { name: 'Jour' }));
+      await user.click(screen.getByRole('button', { name: 'Imprimer' }));
+
+      expect(print).toHaveBeenCalledTimes(1);
+      const sheet = document.querySelector('.calendar-print');
+      expect(sheet).not.toBeNull();
+      const label = formatLongDate(today);
+      expect(sheet?.querySelector('h2')?.textContent).toBe(`${label[0].toUpperCase()}${label.slice(1)}`);
+      expect(sheet?.querySelector('h3')?.textContent).toBe(`${label[0].toUpperCase()}${label.slice(1)}`);
+      // La tâche due aujourd’hui part sur la feuille avec son jour.
+      expect(sheet?.textContent).toContain('Valider les rendez-vous du carnet');
+
+      act(() => {
+        window.dispatchEvent(new Event('afterprint'));
+      });
+      expect(document.querySelector('.calendar-print')).toBeNull();
+    } finally {
+      print.mockRestore();
+    }
+  });
 });

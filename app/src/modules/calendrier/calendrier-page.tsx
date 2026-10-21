@@ -10,6 +10,7 @@ import { Field } from '@/components/ui/field';
 import { Select, Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useCalendarGrid } from '@/hooks/use-calendar';
+import { usePrintSheet } from '@/hooks/use-print-sheet';
 import { useMembers, useIsAdmin, useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { addDays, formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize, todayIso } from '@/lib/utils';
 import { CalendarGrid } from './components/calendar-grid';
@@ -20,9 +21,11 @@ import { useRefDays } from './hooks/use-ref-days';
 import { useSchoolZone } from './hooks/use-school-zone';
 import { createPersonalCalendar, createCategory, deleteCalendar, moveCalendarEvents, CATEGORY_COLORS } from './api';
 import { suggestZoneForCity } from './lib/zone-resolver';
+import { toCalendarPrintModel } from './lib/print';
 import { buildAgenda, buildDayMarkers, isExitingPerso } from './types';
 import type { CalendarEvent, EventFormValues } from './types';
 import type { EventCalendarRow } from '@/types';
+import './components/calendar-export.css';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
@@ -63,6 +66,7 @@ export default function CalendrierPage() {
   const currentMember = useCurrentMember();
   const householdId = useHouseholdStore((state) => state.householdId);
   const city = useHouseholdStore((state) => state.city);
+  const householdName = useHouseholdStore((state) => state.householdName);
   const [isDetectingZone, setIsDetectingZone] = useState(false);
   // Curseur calé sur le 1er du mois courant : la grille démarre bien le lundi.
   const today = new Date();
@@ -187,8 +191,61 @@ export default function CalendrierPage() {
       .filter((section) => section.items.length > 0);
   }, [selected, visibleEvents, tasks, visibleBirthdays, visibleHolidays, visibleVacations]);
 
-  const openCreate = (date: string) => setDialog({ open: true, event: null, date });
-  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
+  /**
+   * Feuille imprimée : la période de la vue affichée, jour par jour. Le mois
+   * se compte sur ses propres jours (pas sur les cases de la grille, qui
+   * débordent sur les mois voisins) ; la liste garde ses 30 jours.
+   */
+  const printModel = useMemo(() => {
+    const sources = { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() };
+    const monthDays = Array.from(
+      { length: new Date(grid.year, grid.month + 1, 0).getDate() },
+      (_, index) => `${grid.year}-${pad(grid.month + 1)}-${pad(index + 1)}`,
+    );
+    let isos: string[];
+    let title: string;
+    if (view === 'jour') {
+      isos = [selected];
+      title = titleCase(formatLongDate(selected));
+    } else if (view === 'semaine') {
+      isos = weekDays;
+      title = `Semaine du ${formatShortDate(weekDays[0])}`;
+    } else if (view === 'mois') {
+      isos = monthDays;
+      title = titleCase(formatMonthLabel(new Date(grid.year, grid.month, 1)));
+    } else {
+      isos = Array.from({ length: 30 }, (_, index) => addDays(selected, index));
+      title = `30 jours à partir du ${formatShortDate(selected)}`;
+    }
+    const period = isos.map((iso) => ({ iso, items: buildAgenda(iso, sources) }));
+    const count = period.reduce((total, day) => total + day.items.length, 0);
+    // La feuille ne montre que ce que l'écran montre : si un filtre est actif,
+    // elle le dit, sinon un événement « manquant » passerait pour un oubli.
+    const filtered =
+      categoryFilter !== 'toutes' || memberFilter !== 'tous' || calendarFilter !== 'tous' || !showBirthdays;
+    const meta = `${householdName} · ${pluralize(count, 'élément')}${filtered ? ' · filtres actifs' : ''}`;
+    return toCalendarPrintModel(title, meta, period);
+  }, [
+    selected,
+    view,
+    weekDays,
+    grid.year,
+    grid.month,
+    visibleEvents,
+    tasks,
+    visibleBirthdays,
+    visibleHolidays,
+    visibleVacations,
+    categoryFilter,
+    memberFilter,
+    calendarFilter,
+    showBirthdays,
+    householdName,
+  ]);
+
+  const { printing, print } = usePrintSheet();
+
+  const openCreate = (date: string) => setDialog({ open: true, event: null, date });  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
 
   // Les enfants taguent sans créer (D-06) : aucun bouton de création affiché.
   const isChild = currentMember?.role === 'enfant';
@@ -261,21 +318,26 @@ export default function CalendrierPage() {
     <ModuleShell
       module="calendrier"
       actions={
-        isChild ? undefined : (
-          <>
-            <Button icon="plus" onClick={() => openCreate(selected)}>
-              <span className="max-[650px]:hidden">Ajouter un événement</span>
-              <span className="min-[651px]:hidden">Nouvel événement</span>
-            </Button>
-            <Button
-              icon="plus"
-              onClick={() => navigate('/taches', { state: { dueDate: selected } })}
-            >
-              <span className="max-[650px]:hidden">Ajouter une tâche</span>
-              <span className="min-[651px]:hidden">Nouvelle tâche</span>
-            </Button>
-          </>
-        )
+        <>
+          <Button variant="secondary" icon="download" disabled={isLoading || isError} onClick={print}>
+            Imprimer
+          </Button>
+          {isChild ? null : (
+            <>
+              <Button icon="plus" onClick={() => openCreate(selected)}>
+                <span className="max-[650px]:hidden">Ajouter un événement</span>
+                <span className="min-[651px]:hidden">Nouvel événement</span>
+              </Button>
+              <Button
+                icon="plus"
+                onClick={() => navigate('/taches', { state: { dueDate: selected } })}
+              >
+                <span className="max-[650px]:hidden">Ajouter une tâche</span>
+                <span className="min-[651px]:hidden">Nouvelle tâche</span>
+              </Button>
+            </>
+          )}
+        </>
       }
     >
       <div className="flex flex-col">
@@ -809,6 +871,30 @@ export default function CalendrierPage() {
             );
         }}
       />
+
+      {printing ? (
+        <div className="calendar-print" aria-hidden="true">
+          <h2>{printModel.title}</h2>
+          <p>{printModel.meta}</p>
+          {printModel.days.length === 0 ? (
+            <p>Aucun élément sur cette période.</p>
+          ) : (
+            printModel.days.map((day) => (
+              <section key={day.iso}>
+                <h3>{day.label}</h3>
+                <ul>
+                  {day.items.map((item) => (
+                    <li key={item.key}>
+                      <span className="heure">{item.time}</span> {item.title}
+                      {item.subtitle ? <span className="precision">{item.subtitle}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      ) : null}
     </ModuleShell>
   );
 }
