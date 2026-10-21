@@ -478,6 +478,35 @@ Tous les utilitaires d'autorisation sont des `SECURITY DEFINER` avec
 tout le reste est qualifié) : ils portent donc la vérification d'appartenance et
 de rôle, et contournent la RLS pour ne pas se récurser.
 
+### Remplacement d'un ensemble : cinq RPC, deux régimes d'autorisation
+
+Six endroits remplaçaient un ensemble (« les assignataires de cette tâche »)
+par un `delete` suivi d'un `insert` : deux appels PostgREST, donc deux
+transactions. Si le second échoue, le premier a déjà supprimé l'ensemble
+précédent — et un rappel perdu ne se voit pas. Depuis la migration `0133`, ces
+remplacements passent par cinq RPC (`replace_task_assignees`,
+`replace_task_reminders`, `replace_routine_assignees`,
+`replace_routine_reminders`, `replace_recipe_tag_links`), une transaction
+chacune.
+
+Elles ne suivent pas le même régime, et c'est délibéré :
+
+* les quatre premières sont `SECURITY DEFINER` : leur politique de `DELETE`
+  est réservée aux administrateurs (`0007`) alors que l'`INSERT` est ouvert aux
+  membres (`0026`). Un remplacement est une écriture **de l'ensemble**, il suit
+  donc le droit d'écriture ; supprimer une ligne à la fois reste administrateur.
+  Chacune vérifie elle-même `can_write_task` / `can_write_routine`, et que
+  chaque assignataire appartient au foyer du parent ;
+* `replace_recipe_tag_links` est `SECURITY INVOKER` : `0122` donne la même
+  condition à l'`INSERT` et au `DELETE` (`can_write_household`), la RLS suffit,
+  et le foyer est dérivé de la recette, jamais fourni par le client.
+
+Le garde s'écrit `is not true`, jamais `not (…)` : les utilitaires renvoient
+NULL pour un non-membre, et `not NULL` vaut NULL — la condition ne se
+déclenche alors pas. Une politique RLS traite NULL comme faux, un corps
+`SECURITY DEFINER` non : avant cette forme, un test a vu un membre d'un autre
+foyer remplacer l'ensemble d'autrui.
+
 ---
 
 ## 6. Edge Functions

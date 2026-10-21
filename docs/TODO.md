@@ -799,33 +799,34 @@ action ne supprime pas les messages de la base », ce qui devenait faux.
 
 ## Ouvert, consigné pendant l'audit des écritures en deux temps
 
-- [ ] **22. Six remplacements d'ensemble suppriment puis réinsèrent, en deux temps**
+- [x] **22. Six remplacements d'ensemble suppriment puis réinsèrent, en deux temps**
 
-Trouvés en cherchant la classe du correctif de `conversation_members` (un
-`removeWhere` suivi d'un `create` laissait la ligne absente un instant). Ici
-l'intention est un **remplacement** de tout l'ensemble — ce qui ne peut pas
-tenir en une écriture sans transaction :
+**Clos le 2026-10-21.** Un remplacement est désormais **une** transaction,
+décidée côté base : migration `0133_replace_sets.sql`, cinq fonctions
+`replace_task_assignees`, `replace_task_reminders`,
+`replace_routine_assignees`, `replace_routine_reminders`,
+`replace_recipe_tag_links` — cinq fonctions pour six appelants, les tâches de
+voyage réutilisant celle des tâches. Le nom dit le geste : on **remplace** un
+ensemble, on ne le modifie pas.
 
-- `app/src/modules/taches/api.ts:53` (assignataires) et `:63` (rappel unique) ;
-- `app/src/modules/routines/api.ts:104` (assignataires) et `:119` (rappels) ;
-- `app/src/modules/recettes/api.ts:99` (liens d'étiquettes) ;
-- `app/src/modules/voyages/components/trip-tasks-tab.tsx:115` (assignataires
-  d'une tâche de voyage).
+Le client n'a plus qu'un appel : `replaceSet`, du contrat d'écriture
+(`app/src/lib/data/set-tables.ts`), branché en ligne sur `rpc(...)` et en démo
+sur une transaction Dexie unique (`local-adapter.ts`). Le régime d'autorisation
+diffère selon les tables — `SECURITY DEFINER` pour les quatre dont le `DELETE`
+est réservé aux administrateurs, `SECURITY INVOKER` pour les étiquettes de
+recette — et le pourquoi est écrit dans `docs/BACKEND.md` §5.
 
-**En ligne, c'est plus qu'un intervalle** : les deux appels sont deux
-aller-retours PostgREST sans transaction. Si le second échoue (réseau, RLS,
-contrainte), l'ensemble précédent est **perdu** — les assignataires d'une tâche
-disparaissent durablement. En démo, la conséquence est l'intervalle seul : un
-lecteur voit brièvement « sans assigné », exactement la forme que #16 a
-corrigée à l'affichage.
+**Le test a trouvé un défaut dans le garde, pas dans le test.** Sa première
+version écrivait `if not can_write_task(...)` : l'aide renvoie NULL pour un
+non-membre, `not NULL` vaut NULL, la condition ne se déclenche pas — et un
+membre d'un autre foyer remplaçait l'ensemble d'autrui. La forme `is not true`
+corrige la classe ; elle est expliquée dans la migration et dans `BACKEND.md`.
 
-**Ce qui reste à décider** : un RPC par ensemble (`set_task_assignees`,
-`set_routine_assignees`, …) tranche le fond côté serveur, au prix d'une
-migration et de six appelants à basculer ; un `replaceWhere` dans l'adaptateur
-ne corrige que la démo.
-
-**Terminé quand** un remplacement d'ensemble est atomique côté serveur, ou que
-la perte en cas d'échec du second appel est assumée et écrite.
+Preuves : `supabase/tests/0133_replace_sets.sql` (membre autorisé, doublon
+replié, hors-foyer refusé l'ensemble restant intact, rappels 2 → 1 → 0,
+étiquette d'un autre foyer refusée, anon refusé), contrat du client vu rouge
+sur le retour arrière Dexie puis vert ; 68 suites SQL vertes, 163 fichiers /
+1337 tests, contrôle statique sans défaut.
 
 ---
 
