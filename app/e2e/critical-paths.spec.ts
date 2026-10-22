@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * Parcours critiques (AGENTS.md §2.4) : connexion, création/rejoint de foyer,
@@ -22,6 +22,68 @@ async function openDemoSession(page: Page) {
     await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toBeVisible();
   }
   await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
+}
+
+/**
+ * Attend que la mise en page de l'accueil ait fini de bouger. Après le titre
+ * « Bonjour », les lectures de démonstration atterrissent dans un second
+ * temps (tâches, anniversaires…), puis la météo revient du réseau (deux
+ * allers-retours HTTP), et chaque arrivée change la hauteur d'une carte —
+ * mesurée le 2026-10-22 : la poignée passe de y≈506 à y≈549 en une seule
+ * salve. Un geste visé avant la salve tombe sur la colonne vide et le drag
+ * ne démarre jamais (TODO #23).
+ *
+ * L'état observé est la stabilité elle-même : deux mesures de la boîte de la
+ * poignée séparées d'une fenêtre d'observation doivent coïncider. La salve
+ * tombe forcément entre deux mesures d'une passe en désaccord, donc la
+ * convergence n'exige aucune hypothèse sur sa date ; rien ne bouge ensuite
+ * (aucun rechargement périodique sous la minute, aucun flux en démo). Ce
+ * n'est pas un délai d'action : l'action reste portée par la visée vérifiée
+ * de `viserPoigneeWidget`, le temps ne délimite ici qu'une fenêtre de mesure.
+ */
+async function attendreMiseEnPageStable(page: Page, handle: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const a = await handle.boundingBox();
+        await page.waitForTimeout(250);
+        const b = await handle.boundingBox();
+        return (
+          a !== null &&
+          b !== null &&
+          Math.abs(a.x - b.x) < 1 &&
+          Math.abs(a.y - b.y) < 1
+        );
+      },
+      { timeout: 15_000, message: 'la mise en page de l’accueil n’a jamais cessé de bouger' },
+    )
+    .toBe(true);
+}
+
+/**
+ * Vise le centre de la poignée et ne rend la main que lorsque le pointeur
+ * tombe dessus. Même une fois la mise en page stable, une boîte mesurée
+ * reste une hypothèse : `elementFromPoint` confirme la poignée sous le
+ * curseur, et l'échec final est explicite. À appeler en DERNIER avant
+ * `mouse.down()` — chaque aller-retour entre la visée et l'enfoncement est
+ * une fenêtre pour un décalage imprévu.
+ */
+async function viserPoigneeWidget(page: Page, handle: Locator) {
+  for (let tentative = 0; tentative < 10; tentative++) {
+    await handle.scrollIntoViewIfNeeded();
+    const boite = (await handle.boundingBox())!;
+    const x = boite.x + boite.width / 2;
+    const y = boite.y + boite.height / 2;
+    await page.mouse.move(x, y);
+    const viseLaPoignee = await page.evaluate(
+      ([cx, cy]) =>
+        document.elementFromPoint(cx, cy) instanceof Element &&
+        document.elementFromPoint(cx, cy)?.closest('button[aria-label^="Réordonner"]') !== null,
+      [x, y],
+    );
+    if (viseLaPoignee) return { x, y };
+  }
+  throw new Error('le pointeur n’a jamais visé la poignée : la mise en page n’a jamais cessé de bouger');
 }
 
 test.describe('Connexion et foyer', () => {
@@ -429,16 +491,28 @@ test.describe('Mises en page', () => {
     await openDemoSession(page);
 
     const widgets = page.locator('[data-widget]');
-    const before = await widgets.first().getAttribute('data-widget');
     const handle = page.getByRole('button', { name: /Réordonner : / }).first();
-    // Le clic sur « Personnaliser » a fait défiler la page : la poignée est
-    // hors viewport, et un drag hors viewport ne touche aucun élément.
-    await handle.scrollIntoViewIfNeeded();
+    // Les lectures de travail (état avant, cible du dépôt) passent AVANT la
+    // visée : la visée confirmée doit rester le dernier pas avant l'appui,
+    // sinon chaque aller-retour rouvre la fenêtre du décalage.
+    await attendreMiseEnPageStable(page, handle);
+    const before = await widgets.first().getAttribute('data-widget');
     const target = widgets.nth(1);
-    const from = (await handle.boundingBox())!;
     const to = (await target.boundingBox())!;
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    // Le clic sur « Personnaliser » a fait défiler la page : la poignée est
+    // hors viewport, et un drag hors viewport ne touche aucun élément —
+    // `viserPoigneeWidget` fait défiler et confirme la cible avant le geste.
+    const from = await viserPoigneeWidget(page, handle);
     await page.mouse.down();
+    // Dépasse d'abord le seuil d'activation (6 px), puis attend l'état
+    // observable : tant que la grille n'est pas en `widgets-dragging`, le
+    // drag n'a pas démarré, et relâcher ici ferait un simple clic. On ne
+    // poursuit donc jamais sans la preuve qu'il est tenu (même attente que
+    // le test du curseur, plus bas).
+    await page.mouse.move(from.x + 30, from.y + 30, { steps: 5 });
+    await expect
+      .poll(async () => page.evaluate(() => document.querySelector('.widgets-dragging') !== null), { timeout: 5000 })
+      .toBe(true);
     await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
     await page.mouse.up();
 
@@ -453,9 +527,8 @@ test.describe('Mises en page', () => {
     await openDemoSession(page);
 
     const handle = page.getByRole('button', { name: /Réordonner : / }).first();
-    await handle.scrollIntoViewIfNeeded();
-    const from = (await handle.boundingBox())!;
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await attendreMiseEnPageStable(page, handle);
+    const from = await viserPoigneeWidget(page, handle);
     await page.mouse.down();
     // Au-delà du seuil d'activation (6 px), dnd-kit démarre le drag : la
     // grille bascule en `widgets-dragging` et tout passe en `grabbing`.

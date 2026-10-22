@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 19 octobre 2026.
+Dernière mise à jour : 22 octobre 2026.
 
 ---
 
@@ -620,37 +620,51 @@ bien `buildTasks`).
 
 ---
 
-- [ ] **23. Deux tests de glisser-déposer sont sensibles à la charge de la machine**
+- [x] **23. Deux tests de glisser-déposer sont sensibles à la charge de la machine**
 
-**Constaté le 2026-10-22**, pendant l'extension de la palette de commandes. Les
-deux tests e2e du glisser-déposer des widgets — « glisser un widget le réordonne
-et le persiste » et « pendant le drag souris, le curseur montre la main fermée »
-— échouent par intermittence quand la machine est chargée. **Observé deux fois**
-en série complète : une fois avec un serveur de développement qui tournait en
-arrière-plan, une fois pendant une série complète seule. Dans les deux cas, le
-test **passe seul** et la série complète **passe sur une machine au repos**.
+**Clos le 2026-10-22.** La cause n'est pas celle supposée ici — ni le seuil
+d'activation de `dnd-kit`, ni une image sautée. La sonde (initialisation d'un
+journal d'événements de pointeur côté page, puis reproduction du geste sous
+charge) l'a attribuée sans ambiguïté : **la mise en page de l'accueil bouge
+encore après que le test la croit prête**. Au moment où le titre « Bonjour »
+est visible, la météo affiche encore « Chargement de la météo… » et les
+widgets Tâches et Anniversaires sont vides ; une salve unique (lectures de
+démonstration, puis deux allers-retours HTTP de la météo) fait passer la
+poignée de y≈506 à y≈549. Le test mesurait la boîte de la poignée **avant** la
+salve : le `pointerdown` tombait sur la colonne vide, le drag ne démarrait
+jamais, et l'ancien test échouait en silence sur le résultat attendu — un
+échec qui n'apprenait rien, exactement le cas que cette section existe pour
+refuser.
 
-**Ce que ce n'est pas.** Ce n'est pas le glisser-déposer qui est cassé : le
-défaut fonctionnelle serait visible à l'écran (le widget ne suit pas le
-curseur), et il ne l'est pas. C'est une course : `dnd-kit` a un seuil
-d'activation de 6 px et une bascule de classe (`widgets-dragging`) ; sous
-contention, une image est sautée et le geste n'est jamais reconnu.
+**Le correctif est dans les tests** (`app/e2e/critical-paths.spec.ts`), le
+produit n'a pas bougé — le décalage est un comportement de chargement normal,
+pas un défaut visible à l'écran :
 
-**Ce qui le distingue d'un vrai défaut.** Un test qui échoue une fois sur deux
-n'apprend rien. Il faut donc le critère : **un échec répété sur une machine au
-repos** signifierait que le geste est en cause, et non la charge. Ce critère
-n'a pas été atteint — les deux échecs observés étaient sous charge, et la série
-complète est verte sur une machine au repos (2026-10-22).
+1. `attendreMiseEnPageStable` : deux mesures de la boîte de la poignée,
+   séparées d'une fenêtre d'observation de 250 ms, doivent coïncider. L'état
+   observé est la stabilité elle-même ; la salve tombe forcément entre deux
+   mesures d'une passe en désaccord, donc la convergence n'exige aucune
+   hypothèse sur sa date — et rien ne bouge ensuite (aucun rechargement
+   périodique sous la minute en démo).
+2. `viserPoigneeWidget` : mesurer ne suffit pas, la visée est **vérifiée** —
+   `elementFromPoint` doit renvoyer la poignée sous le curseur, sinon on
+   re-mesure et on revise (jusqu'à dix fois, échec final explicite). Les
+   lectures de travail du test (état « avant », boîte de la cible) passent
+   **avant** la visée : celle-ci reste le dernier pas avant l'appui.
+3. Le geste attend l'état observable `widgets-dragging` après l'appui avant
+   de se poursuivre — un drag qui ne s'engage pas échoue là, avec sa cause,
+   et non plus loin sur le résultat.
 
-**Comment trancher.** Relancer la série e2e sur une machine au repos, sans
-serveur de développement en arrière-plan : elle doit être verte. Si elle
-échoue, ce n'est plus un flake mais un défaut du geste, et il se voit à
-l'écran. Si elle est verte, le correctif n'est pas dans le produit mais dans
-les tests : attendre l'état observable (`widgets-dragging`) plutôt qu'un
-chronomètre, comme le fait déjà le test du curseur.
-
-**Terminé quand** les deux tests passent dix fois de suite sur une machine au
-repos, ou qu'ils ne dépendent plus de la cadence de la machine.
+**Preuves.** Sous saturation (6 brûleurs CPU sur 6 cœurs, le pire cas observé)
+: l'ancienne forme perdait 3 à 5 passages sur 8 ; la nouvelle passe **8/8**
+avec un worker et **8/8** avec le parallélisme par défaut. Machine au repos :
+**10/10**. Suite e2e complète : 136 passées, 6 sautées (mobile, par contrat).
+Chaîne : typecheck, 1498 tests unitaires, build — verts. Pendant
+l'investigation, le contrôle a aussi été vu rouge à bon escient : la version
+intermédiaire qui ne faisait qu'attendre `widgets-dragging` échouait
+**explicitement** sur l'attente, ce qui a fourni la signature de l'échec
+(`pointerdown` sur `DIV`, poignée déplacée) que le silence de l'ancien test
+cachait.
 
 ---
 
