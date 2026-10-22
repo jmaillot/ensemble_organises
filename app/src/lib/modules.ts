@@ -95,6 +95,40 @@ export const CHILD_HIDDEN_MODULES: ModuleKey[] = ['ardoise', 'cadeaux', 'fidelit
 /** Vrai pour les 5 modules masqués au rôle `enfant`. */
 export const isChildHiddenModule = (key: ModuleKey): boolean => CHILD_HIDDEN_MODULES.includes(key);
 
+/**
+ * Vrai quand le foyer a éteint ce module (menu des applications, migration
+ * 0140). La liste vient de `households.disabled_modules` — vide par défaut :
+ * un foyer existant et un module futur restent actifs. Masquer le module
+ * partout (tuile, navigation, recherche, route) est un choix de PRÉSENTATION
+ * : la frontière d'autorisation reste la RLS, qui ne connaît pas cette
+ * colonne.
+ */
+export const isModuleDisabled = (key: ModuleKey, disabledModules: readonly string[]): boolean =>
+  disabledModules.includes(key);
+
+/**
+ * Filtre les clés visibles : hors périmètre `enfant` ET espaces éteints par
+ * le foyer. Une seule couture pour les surfaces de navigation (rail, tiroir,
+ * palette, tuiles) — chaque surface compose son propre rendu, jamais sa
+ * propre règle.
+ */
+export const filterModuleKeys = (
+  keys: readonly ModuleKey[],
+  { isChild = false, disabledModules = [] as readonly string[] } = {},
+): ModuleKey[] =>
+  keys.filter(
+    (key) => !(isChild && isChildHiddenModule(key)) && !isModuleDisabled(key, disabledModules),
+  );
+
+/** Filtre les entrées du catalogue par le même signal que `filterModuleKeys`. */
+export const filterModuleEntries = (
+  entries: readonly ModuleEntry[],
+  { isChild = false, disabledModules = [] as readonly string[] } = {},
+): ModuleEntry[] =>
+  entries.filter(
+    (entry) => !(isChild && isChildHiddenModule(entry.key)) && !isModuleDisabled(entry.key, disabledModules),
+  );
+
 export const modulePath = (key: ModuleKey) => `/${key}`;
 export const assetUrl = (file: string) => `/assets/${file}`;
 

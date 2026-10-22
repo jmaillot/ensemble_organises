@@ -4,18 +4,20 @@ import { cn, initials } from '@/lib/utils';
 import {
   moduleMap,
   modulePath,
-  isChildHiddenModule,
+  filterModuleKeys,
+  isModuleDisabled,
   navLabelOf,
   navModules,
   type ModuleKey,
 } from '@/lib/modules';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
 import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
+import { ModuleDisabled } from '@/components/shared/module-disabled';
 import { CommandPalette } from '@/components/shared/command-palette';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -38,6 +40,27 @@ const homeIcon: IconName = 'home';
  */
 const searchShortcutLabel =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
+/**
+ * Garde « espace éteint » (menu des applications, migration 0140) : un accès
+ * direct à l'URL d'un espace désactivé par le foyer rend un avis sobre —
+ * jamais une 404 mensongère, jamais une redirection silencieuse (même
+ * philosophie que `RequireGrownUp`, phase 14 D-06). Posée ICI, sur la sortie
+ * du shell, plutôt qu'autour de chaque route : une seule couture couvre les
+ * 17 espaces et leurs sous-routes (`/courses/catalogue`, `/recettes/:id`…),
+ * dont le premier segment du chemin nomme toujours le module.
+ *
+ * `accueil` et `parametres` ne figurent pas dans `moduleMap` : ils ne sont
+ * jamais gated — on doit toujours pouvoir rejoindre le tableau de bord et
+ * réactiver l'espace depuis les paramètres.
+ */
+function ModuleGate({ disabledModules, isAdmin }: { disabledModules: string[]; isAdmin: boolean }) {
+  const location = useLocation();
+  const key = (location.pathname.replace(/^\//, '').split('/')[0] || 'accueil') as ModuleKey;
+  const entry = moduleMap[key];
+  if (!entry || !isModuleDisabled(key, disabledModules)) return <Outlet />;
+  return <ModuleDisabled label={entry.label} isAdmin={isAdmin} />;
+}
 
 export function AppShell() {
   const location = useLocation();
@@ -158,9 +181,12 @@ export function AppShell() {
   const isAdmin = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'admin');
   // Rôle `enfant` (phase 14, D-05) : les accès rapides épinglés suivent le
   // même masquage que le catalogue (aucun des 5 n'y figure aujourd'hui, mais
-  // un ajout futur ne doit pas les réexposer par mégarde).
+  // un ajout futur ne doit pas les réexposer par mégarde). Menu des
+  // applications (0140) : les espaces éteints par le foyer sortent aussi de
+  // la navigation — présentation seulement, la RLS reste la frontière.
   const isChild = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'enfant');
-  const visibleNavModules = isChild ? navModules.filter((key) => !isChildHiddenModule(key)) : navModules;
+  const disabledModules = useDisabledModules();
+  const visibleNavModules = filterModuleKeys(navModules, { isChild, disabledModules });
 
   return (
     <div className="flex min-h-screen">
@@ -357,7 +383,7 @@ export function AppShell() {
         </header>
 
         <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(92px+env(safe-area-inset-bottom))]">
-          <Outlet />
+          <ModuleGate disabledModules={disabledModules} isAdmin={isAdmin} />
         </main>
       </div>
 

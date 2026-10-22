@@ -73,6 +73,13 @@ export interface HouseholdRow {
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
+  /**
+   * Clés des espaces éteints par le foyer (menu des applications, migration
+   * 0140). Vide = tout activé : un foyer existant et un module futur restent
+   * actifs par défaut. L'écriture est administrateur-seul par la RLS
+   * (`households_update`, 0007).
+   */
+  disabled_modules: string[];
 }
 
 export interface HouseholdMemberRow {

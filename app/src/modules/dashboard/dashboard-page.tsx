@@ -22,9 +22,9 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
 import { ModuleTile } from '@/components/shared/module-tile';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
-import { isChildHiddenModule, modules } from '@/lib/modules';
+import { filterModuleEntries, modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { useDashboard } from './hooks/use-dashboard';
@@ -57,7 +57,13 @@ export default function DashboardPage() {
   // (totaux Ardoise, activité) avec elles — présentation seulement, le
   // serveur renvoie de toute façon 0 ligne à un enfant.
   const isChild = useCurrentMember()?.role === 'enfant';
-  const visibleTiles = isChild ? modules.filter((entry) => entry.tile && !isChildHiddenModule(entry.key)) : modules.filter((entry) => entry.tile);
+  // Menu des applications (0140) : les espaces éteints par le foyer sortent
+  // de la grille des tuiles — même signal que le masquage enfant (D-05).
+  const disabledModules = useDisabledModules();
+  const visibleTiles = filterModuleEntries(
+    modules.filter((entry) => entry.tile),
+    { isChild, disabledModules },
+  );
 
   // Souris : déplacement immédiat. Tactile : appui long (le défilement
   // garde la priorité sur un toucher bref) ; `touch-action: none` sur les

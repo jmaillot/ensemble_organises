@@ -2,11 +2,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Icon } from '@/components/shared/icon';
-import { catalogueModules, moduleMap, modulePath, type ModuleEntry } from '@/lib/modules';
+import { catalogueModules, filterModuleEntries, isModuleDisabled, moduleMap, modulePath, type ModuleEntry } from '@/lib/modules';
 import { recordPath } from '@/lib/record-paths';
 import { searchModules, searchRecords, type SearchRecord } from '@/lib/global-search';
 import { useGlobalSearch } from '@/hooks/use-global-search';
-import { useCurrentMember } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules } from '@/stores/household-store';
 import { cn } from '@/lib/utils';
 
 /**
@@ -40,16 +40,28 @@ const RECORD_QUERY_MIN_LENGTH = 2;
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate();
   const isChild = useCurrentMember()?.role === 'enfant';
+  // Menu des applications (0140) : un espace éteint par le foyer ne se
+  // propose pas à la recherche — ni comme espace, ni via ses entrées (une
+  // tâche d'un module coupé mènerait à l'avis « désactivé », surprenant).
+  const disabledModules = useDisabledModules();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
 
   const trimmed = query.trim();
-  const spaces = useMemo(() => searchModules(catalogueModules, trimmed, { isChild }), [trimmed, isChild]);
+  const searchableModules = useMemo(
+    () => filterModuleEntries(catalogueModules, { isChild, disabledModules }),
+    [isChild, disabledModules],
+  );
+  const spaces = useMemo(() => searchModules(searchableModules, trimmed, { isChild }), [searchableModules, trimmed, isChild]);
   const recordsEnabled = open && trimmed.length >= RECORD_QUERY_MIN_LENGTH;
   const { records, failedModules, isLoading, isError, refetch } = useGlobalSearch(recordsEnabled);
-  const { results, matched } = useMemo(() => searchRecords(records, trimmed), [records, trimmed]);
+  const visibleRecords = useMemo(
+    () => records.filter((record) => !isModuleDisabled(record.module, disabledModules)),
+    [records, disabledModules],
+  );
+  const { results, matched } = useMemo(() => searchRecords(visibleRecords, trimmed), [visibleRecords, trimmed]);
 
   const items = useMemo<PaletteItem[]>(
     () => [

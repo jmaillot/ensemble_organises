@@ -133,6 +133,9 @@ export const demoHousehold: HouseholdRow = {
   created_by: DEMO_USER_ID,
   created_at: now(),
   updated_at: now(),
+  // Menu des applications (0140) : le foyer de démonstration démarre avec
+  // tous les espaces activés, comme tout foyer réel.
+  disabled_modules: [],
 };
 
 export const demoMembers: HouseholdMemberRow[] = [
