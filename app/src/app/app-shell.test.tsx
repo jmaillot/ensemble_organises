@@ -77,6 +77,15 @@ describe('AppShell', () => {
     expect(within(breadcrumb).getByText('À faire')).toBeInTheDocument();
   });
 
+  it('nomme le module, pas la page, sur une sous-route', () => {
+    renderShell('/courses/aide');
+    const breadcrumb = screen.getByRole('navigation', { name: 'Fil d’Ariane' });
+    // Le chemin entier était cherché dans le catalogue des espaces : une
+    // sous-route retombait sur « Maison », et le lecteur perdait le module.
+    expect(within(breadcrumb).getByText('Courses')).toBeInTheDocument();
+    expect(within(breadcrumb).queryByText('Maison')).not.toBeInTheDocument();
+  });
+
   it('propose un hamburger qui ouvre le tiroir des espaces', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');

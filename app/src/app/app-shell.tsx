@@ -144,7 +144,12 @@ export function AppShell() {
     return () => container.removeEventListener('message', onServiceWorkerMessage);
   }, [toast]);
 
-  const currentKey = (location.pathname.replace(/^\//, '') || 'accueil') as ModuleKey;
+  // Le fil d'Ariane nomme l'ESPACE, pas la page : une sous-route
+  // (`/courses/aide`, `/courses/catalogue`, `/recettes/:id`) reste dans son
+  // module. Le chemin ENTIER était cherché dans le catalogue, et une
+  // sous-route retombait sur « Maison » — le lecteur perdait le module
+  // sous ses yeux.
+  const currentKey = (location.pathname.replace(/^\//, '').split('/')[0] || 'accueil') as ModuleKey;
   // `parametres` n'appartient pas au catalogue des espaces du foyer : il a son
   // propre libellé de navigation.
   const fallbackLabels: Partial<Record<string, string>> = { parametres: 'Paramètres' };
