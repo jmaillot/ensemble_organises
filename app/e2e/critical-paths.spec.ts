@@ -146,6 +146,20 @@ test.describe('Parcours des modules', () => {
     await expect(page.getByRole('dialog')).toBeHidden();
   });
 
+  test('le mode d’emploi des courses s’ouvre depuis l’espace', async ({ page }) => {
+    await openDemoSession(page);
+    await page.goto('/courses');
+
+    await page.getByRole('button', { name: 'Comment ça marche' }).click();
+    await expect(page).toHaveURL(/\/courses\/aide/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Comment ça marche' })).toBeVisible();
+
+    // Une question s’ouvre, et sa réponse est lisible.
+    const question = page.getByRole('button', { name: 'Les quantités sont-elles obligatoires ?' });
+    await question.click();
+    await expect(page.getByText(/Un article s’ajoute avec son seul nom/)).toBeVisible();
+  });
+
   test('le calendrier affiche les jours fériés et l’agenda du jour', async ({ page }) => {
     await page.goto('/calendrier');
     await expect(page.getByRole('heading', { name: 'Calendrier' })).toBeVisible();

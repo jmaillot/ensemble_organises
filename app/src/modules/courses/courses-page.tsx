@@ -196,6 +196,16 @@ export default function CoursesPage() {
       module="courses"
       actions={
         <>
+          {/* Le mode d'emploi passe par un bouton d'icône : l'en-tête porte
+              déjà cinq actions, et un sixième libellé l'étoufferait. Le nom
+              reste lisible pour le lecteur d'écran. */}
+          <Button
+            variant="secondary"
+            size="icon"
+            icon="info"
+            aria-label="Comment ça marche"
+            onClick={() => navigate('/courses/aide')}
+          />
           <Button variant="secondary" icon="scan" disabled={isLoading} onClick={() => setScanOpen(true)}>
             Scanner
           </Button>

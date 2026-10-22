@@ -309,6 +309,12 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/courses/aide"
+          element={
+            <LazyRoute load={routeChunkLoaders.coursesGuide} />
+          }
+        />
+        <Route
           path="/routines"
           element={
             <LazyRoute load={routeChunkLoaders.routines} />

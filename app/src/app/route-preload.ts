@@ -33,6 +33,7 @@ export const routeChunkLoaders = {
   calendrier: () => import('@/modules/calendrier/calendrier-page'),
   notes: () => import('@/modules/notes/notes-page'),
   courses: () => import('@/modules/courses/courses-page'),
+  coursesGuide: () => import('@/modules/courses/courses-guide-page'),
   productCatalog: () => import('@/modules/courses/product-catalog-page'),
   routines: () => import('@/modules/routines/routines-page'),
   recettes: () => import('@/modules/recettes/recettes-page'),

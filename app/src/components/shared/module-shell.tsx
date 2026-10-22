@@ -57,10 +57,20 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
   );
 }
 
-export function ModuleShell({ module, children, actions, backTo, backLabel }: { module: ModuleKey; children: ReactNode; actions?: ReactNode; backTo?: string; backLabel?: string }) {
+export function ModuleShell({ module, children, actions, backTo, backLabel, title, description }: { module: ModuleKey; children: ReactNode; actions?: ReactNode; backTo?: string; backLabel?: string; title?: string; description?: string }) {
   return (
     <section className="mx-auto w-full max-w-[1180px]" data-module={module}>
-      <ModuleHeader module={module} actions={actions} backTo={backTo} backLabel={backLabel} />
+      {/* `title` et `description` sont facultatifs et forwarding direct : sans
+          eux, l'en-tête prend le libellé du module — le rendu des modules
+          existants reste donc strictement identique. */}
+      <ModuleHeader
+        module={module}
+        actions={actions}
+        backTo={backTo}
+        backLabel={backLabel}
+        title={title}
+        description={description}
+      />
       {children}
     </section>
   );
