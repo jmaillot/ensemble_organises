@@ -547,7 +547,7 @@ export const demoRoutineCompletions: RoutineCompletionRow[] = [
 ];
 
 export const demoRecipes: RecipeRow[] = [
-  { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', created_at: now() },
+  { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', servings: 4, created_at: now() },
 ];
 
 /** Categorie par defaut + 14 tags (miroir des seeds SQL 0122, R2/R4). */
@@ -573,7 +573,19 @@ export const demoRecipeTags: RecipeTagRow[] = [
 ].map((name, index) => ({ id: `recipe-tag-${index + 1}`, household_id: DEMO_HOUSEHOLD_ID, name }));
 
 export const demoRecipeTagLinks: RecipeTagLinkRow[] = [];
-export const demoRecipeIngredients: RecipeIngredientRow[] = [];
+/**
+ * Ingrédients de la tartiflette (pour 4) : sans eux, « Générer les courses »
+ * du menu planifiait des repas-recette et n'envoyait jamais rien — le semis
+ * doit exercer le chemin Recettes → Courses de bout en bout.
+ */
+export const demoRecipeIngredients: RecipeIngredientRow[] = [
+  { id: 'recipe-ingredient-1', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Pommes de terre', quantity: 1000, unit: 'g', position: 0 },
+  { id: 'recipe-ingredient-2', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Reblochon', quantity: 450, unit: 'g', position: 1 },
+  { id: 'recipe-ingredient-3', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Lardons', quantity: 200, unit: 'g', position: 2 },
+  { id: 'recipe-ingredient-4', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Oignon', quantity: 1, unit: 'pièce', position: 3 },
+  { id: 'recipe-ingredient-5', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Vin blanc sec', quantity: 20, unit: 'cl', position: 4 },
+  { id: 'recipe-ingredient-6', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Beurre', quantity: null, unit: null, position: 5 },
+];
 export const demoRecipeSteps: RecipeStepRow[] = [];
 export const demoRecipeFavorites: RecipeFavoriteRow[] = [];
 

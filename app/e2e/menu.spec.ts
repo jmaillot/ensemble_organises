@@ -50,4 +50,22 @@ test.describe('Menu', () => {
     await expect(page.getByRole('heading', { name: currentWeek ?? '' }).first()).toBeVisible();
     await expect(page.getByText('Tartiflette de saison').first()).toBeVisible();
   });
+
+  test('la génération remplit la liste de courses', async ({ page }) => {
+    await page.goto('/connexion');
+    await page.getByRole('button', { name: 'Entrer dans la démonstration' }).click();
+    await page.waitForURL('**/accueil');
+
+    await page.goto('/menu');
+    await expect(page.getByText('Tartiflette de saison').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Générer les courses' }).click();
+    const dialog = page.getByRole('dialog');
+    // Deux repas-recette semés cette semaine : la génération a de quoi faire.
+    await expect(dialog.getByText(/^2 repas-recette cette semaine/)).toBeVisible();
+    await dialog.getByLabel(/Liste de courses/).selectOption({ label: 'Fresque' });
+    await dialog.getByRole('button', { name: 'Envoyer vers la liste' }).click();
+    // Les ingrédients de la tartiflette arrivent dans la liste, mis à
+    // l'échelle sur les portions de chaque repas (×4 puis ×2, fusionnés).
+    await expect(page.getByText(/ingrédients? envoyé/)).toBeVisible();
+  });
 });

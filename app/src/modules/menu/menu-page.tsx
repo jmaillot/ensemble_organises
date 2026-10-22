@@ -100,7 +100,16 @@ export default function MenuPage() {
     try {
       const result = await menu.generateCourses(coursesListId, weekStart);
       if (result.lines === 0) {
-        toast('Aucune recette planifiée cette semaine : rien à envoyer.');
+        // Deux zéros de sens différent : sans repas-recette planifié, la
+        // génération n'a rien à faire ; avec, ce sont les fiches qui ne
+        // portent aucun ingrédient — le message doit dire laquelle des deux
+        // situations on vit, pas désigner le planning à tort.
+        toast(
+          recipeEntriesCount === 0
+            ? 'Aucune recette planifiée cette semaine : rien à envoyer.'
+            : 'Les recettes planifiées ne portent aucun ingrédient : complétez les fiches pour remplir la liste.',
+          recipeEntriesCount === 0 ? undefined : 'error',
+        );
       } else {
         const parts = [`${result.lines} ingrédient${result.lines > 1 ? 's' : ''} envoyé${result.lines > 1 ? 's' : ''}`];
         if (result.createdCount > 0) parts.push(`${result.createdCount} nouvelle${result.createdCount > 1 ? 's' : ''} ligne${result.createdCount > 1 ? 's' : ''}`);
