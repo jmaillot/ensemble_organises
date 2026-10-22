@@ -13,6 +13,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { useContacts } from './hooks/use-contacts';
 import { formatFrDate } from './types';
 import type { Contact } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 export default function ContactsPage() {
   const toast = useToast();
@@ -53,6 +54,8 @@ export default function ContactsPage() {
 
   const openCreate = () => setDialog({ open: true, contact: null });
   const openEdit = (contact: Contact) => setDialog({ open: true, contact });
+  // Lien profond : `/contacts?ouvrir=<id>` ouvre la fiche du contact.
+  useOpenRecord(contacts, openEdit);
 
   return (
     <ModuleShell

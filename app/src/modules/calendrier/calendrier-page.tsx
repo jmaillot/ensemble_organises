@@ -26,6 +26,7 @@ import { buildAgenda, buildDayMarkers, eventCategoryIcon, isExitingPerso } from 
 import type { CalendarEvent, EventFormValues } from './types';
 import type { EventCalendarRow } from '@/types';
 import './components/calendar-export.css';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
@@ -246,7 +247,9 @@ export default function CalendrierPage() {
 
   const { printing, print } = usePrintSheet();
 
-  const openCreate = (date: string) => setDialog({ open: true, event: null, date });  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
+  const openCreate = (date: string) => setDialog({ open: true, event: null, date });  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });  // Lien profond : `/calendrier?ouvrir=<id>` ouvre la fiche de l’événement.
+  useOpenRecord(events, openEdit);
+
 
   // Les enfants taguent sans créer (D-06) : aucun bouton de création affiché.
   const isChild = currentMember?.role === 'enfant';

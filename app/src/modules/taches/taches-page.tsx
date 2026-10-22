@@ -25,6 +25,7 @@ import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
 import { TaskBoard } from './components/task-board';
 import { useTaches } from './hooks/use-taches';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 type TaskView = 'liste' | 'tableau';
 
@@ -148,6 +149,8 @@ export default function TachesPage() {
   const openCreate = () => setDialog({ open: true, task: null, dueDate: null });
   const openEdit = (task: Task) => setDialog({ open: true, task, dueDate: null });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+  // Lien profond : `/taches?ouvrir=<id>` ouvre la fiche de la tâche.
+  useOpenRecord(tasks, openEdit);
 
   // Compteur « À faire » personnel : ouvertes sans assigné (foyer) ou pour
   // moi — jamais celles des autres membres.

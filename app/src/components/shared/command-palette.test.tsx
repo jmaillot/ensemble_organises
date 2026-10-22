@@ -1,17 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useSearchParams } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { CommandPalette } from './command-palette';
 
+/** La fiche demandée par l'URL, affichée pour que le test la voie. */
+function FicheDemandée() {
+  const [params] = useSearchParams();
+  return <p>fiche : {params.get('ouvrir') ?? 'aucune'}</p>;
+}
+
 function renderPalette(onOpenChange = vi.fn()) {
   const result = renderWithProviders(
     <Routes>
       <Route path="/" element={<CommandPalette open onOpenChange={onOpenChange} />} />
-      <Route path="/courses" element={<h1>Courses ouvertes</h1>} />
+      <Route
+        path="/courses"
+        element={
+          <>
+            <h1>Courses ouvertes</h1>
+            <FicheDemandée />
+          </>
+        }
+      />
       <Route path="/fidelite" element={<h1>Fidélité ouverte</h1>} />
       <Route path="/taches" element={<h1>Tâches ouvertes</h1>} />
     </Routes>,
@@ -73,6 +87,19 @@ describe('CommandPalette', () => {
     // acheter ») : l'assertion porte sur ce texte rendu, pas sur des
     // fragments que l'écran ne sépare pas.
     expect(within(option).getByText('Course · à acheter')).toBeInTheDocument();
+  });
+
+  it('ouvre la fiche trouvée, pas seulement son espace', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByRole('combobox'), 'yaour');
+    const option = await screen.findByRole('option', { name: /yaourts/i }, { timeout: 8000 });
+    await user.click(option);
+
+    // La palette mène à la FICHE : l'URL demande l'article, et la page
+    // l'ouvre. (Le module reste derrière : c'est là que vit la fiche.)
+    expect(await screen.findByRole('heading', { name: 'Courses ouvertes' })).toBeInTheDocument();
+    expect(screen.getByText('fiche : item-1')).toBeInTheDocument();
   });
 
   it('ouvre le module de l’entrée choisie', async () => {

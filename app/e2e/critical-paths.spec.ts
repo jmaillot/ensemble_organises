@@ -261,6 +261,19 @@ test.describe('Recherche globale', () => {
     await expect(palette.getByRole('option', { name: /sortie canine/i })).toBeVisible();
   });
 
+  test('la palette ouvre la fiche trouvée, pas seulement son espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await palette.getByRole('combobox').fill('yaour');
+    await palette.getByRole('option', { name: /yaourts/i }).click();
+
+    // L'URL demande la fiche, et la page l'ouvre : le formulaire de l'article.
+    await expect(page).toHaveURL(/ouvrir=/);
+    await expect(page.getByRole('dialog', { name: /Modifier l’article/ })).toBeVisible();
+  });
+
   test('le raccourci ouvre la palette depuis n’importe quelle page', async ({ page }) => {
     test.skip(viewportIsMobile(page), 'raccourci clavier : bureau uniquement');
 

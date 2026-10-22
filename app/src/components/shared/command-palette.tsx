@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Icon } from '@/components/shared/icon';
 import { catalogueModules, moduleMap, modulePath, type ModuleEntry } from '@/lib/modules';
+import { recordPath } from '@/lib/record-paths';
 import { searchModules, searchRecords, type SearchRecord } from '@/lib/global-search';
 import { useGlobalSearch } from '@/hooks/use-global-search';
 import { useCurrentMember } from '@/stores/household-store';
@@ -95,7 +96,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const choose = (item: PaletteItem | undefined) => {
     if (!item) return;
     onOpenChange(false);
-    navigate(modulePath(item.kind === 'space' ? item.entry.key : item.record.module));
+    // Un espace ouvre son espace ; une entrée du foyer ouvre la FICHE quand
+    // le module sait l'ouvrir, et son espace sinon (`recordPath`).
+    navigate(
+      item.kind === 'space'
+        ? modulePath(item.entry.key)
+        : recordPath(item.record.module, item.record.rowId),
+    );
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {

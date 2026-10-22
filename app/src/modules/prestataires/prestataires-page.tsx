@@ -12,6 +12,7 @@ import { usePrestataires } from './hooks/use-prestataires';
 import { ProviderFormDialog } from './components/provider-form-dialog';
 import { ProviderTypeDialog } from './components/provider-type-dialog';
 import { hasAddress, isCallable, isShared, matchesProviderQuery, type Provider, type ProviderDraft } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const ALL_TYPES = 'tous';
 
@@ -24,6 +25,8 @@ export default function PrestatairesPage() {
   const [form, setForm] = useState<{ open: boolean; provider: Provider | null }>({ open: false, provider: null });
   const [typesOpen, setTypesOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<Provider | null>(null);
+  // Lien profond : `/prestataires?ouvrir=<id>` ouvre la fiche du prestataire.
+  useOpenRecord(providers, (provider) => setForm({ open: true, provider }));
 
   const visible = useMemo(
     () =>

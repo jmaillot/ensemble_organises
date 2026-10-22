@@ -17,6 +17,7 @@ import { HistoryCalendar, RoutineHistory } from './components/routine-history';
 import { RoutineFormDialog } from './components/routine-form-dialog';
 import { useRoutines } from './hooks/use-routines';
 import { memberFirstName, type HistoryEntry, type Routine } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 export default function RoutinesPage() {
   const toast = useToast();
@@ -74,6 +75,8 @@ export default function RoutinesPage() {
   );
   const openCreate = () => setDialog({ open: true, routine: null });
   const openEdit = (routine: Routine) => setDialog({ open: true, routine });
+  // Lien profond : `/routines?ouvrir=<id>` ouvre la fiche de la routine.
+  useOpenRecord(routines, openEdit);
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
 
   const report = (error: unknown, fallback: string) => {

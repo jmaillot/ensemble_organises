@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -41,6 +41,7 @@ import {
   type ShoppingListView,
 } from './types';
 import './components/courses-export.css';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const listSchema = z.object({
   name: z.string().trim().min(2, 'Donnez un nom à la liste.').max(60, '60 caractères maximum.'),
@@ -97,6 +98,12 @@ export default function CoursesPage() {
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
+
+  // Lien profond : `/courses?ouvrir=<id>` ouvre la fiche de l'article. La
+  // recherche porte sur TOUTES les listes : un lien vers un article d'une
+  // autre liste doit l'ouvrir aussi.
+  const tousLesItems = useMemo(() => lists.flatMap((list) => list.items), [lists]);
+  useOpenRecord(tousLesItems, (item) => setEditingItem(item));
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
   const navigate = useNavigate();
 

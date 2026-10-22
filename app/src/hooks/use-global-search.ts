@@ -101,6 +101,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<TaskRow>('tasks', { household_id: householdId });
       return rows.map((row) => ({
         id: `tasks:${row.id}`,
+        rowId: row.id,
         module: 'taches',
         label: row.name,
         hint: hintOf('Tâche', TASK_STATUS[row.status], row.due_date ? formatShortDate(row.due_date) : null),
@@ -114,6 +115,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<NoteRow>('notes', { household_id: householdId });
       return rows.map((row) => ({
         id: `notes:${row.id}`,
+        rowId: row.id,
         module: 'notes',
         label: row.title,
         hint: hintOf('Note', row.category),
@@ -127,6 +129,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<EventRow>('events', { household_id: householdId });
       return rows.map((row) => ({
         id: `events:${row.id}`,
+        rowId: row.id,
         module: 'calendrier',
         label: row.title,
         hint: hintOf('Événement', formatShortDate(row.start_at.slice(0, 10))),
@@ -140,6 +143,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<ShoppingListItemRow>('shopping_list_items', { household_id: householdId });
       return rows.map((row) => ({
         id: `shopping_list_items:${row.id}`,
+        rowId: row.id,
         module: 'courses',
         label: row.name,
         hint: hintOf('Course', row.checked ? 'cochée' : 'à acheter'),
@@ -153,6 +157,7 @@ const sources: SearchSource[] = [
       const rows = await shared.contacts();
       return rows.map((row) => ({
         id: `contacts:${row.id}`,
+        rowId: row.id,
         module: 'contacts',
         label: row.name,
         hint: 'Contact',
@@ -165,6 +170,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<RecipeRow>('recipes', { household_id: householdId });
       return rows.map((row) => ({
         id: `recipes:${row.id}`,
+        rowId: row.id,
         module: 'recettes',
         label: row.title,
         hint: 'Recette',
@@ -177,6 +183,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<PlaceRow>('places', { household_id: householdId });
       return rows.map((row) => ({
         id: `places:${row.id}`,
+        rowId: row.id,
         module: 'adresses',
         label: row.name,
         hint: hintOf('Adresse', row.city),
@@ -190,6 +197,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<ProviderRow>('providers', { household_id: householdId });
       return rows.map((row) => ({
         id: `providers:${row.id}`,
+        rowId: row.id,
         module: 'prestataires',
         label: row.name,
         hint: hintOf('Prestataire', row.city),
@@ -203,6 +211,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<PetRow>('pets', { household_id: householdId });
       return rows.map((row) => ({
         id: `pets:${row.id}`,
+        rowId: row.id,
         module: 'animaux',
         label: row.name,
         hint: hintOf('Animal', row.species),
@@ -216,6 +225,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<LoyaltyCardRow>('loyalty_cards', { household_id: householdId });
       return rows.map((row) => ({
         id: `loyalty_cards:${row.id}`,
+        rowId: row.id,
         module: 'fidelite',
         label: row.name,
         hint: 'Carte de fidélité',
@@ -228,6 +238,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<TripRow>('trips', { household_id: householdId });
       return rows.map((row) => ({
         id: `trips:${row.id}`,
+        rowId: row.id,
         module: 'voyages',
         label: row.name,
         hint: hintOf('Voyage', row.destination),
@@ -241,6 +252,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<RoutineRow>('routines', { household_id: householdId });
       return rows.map((row) => ({
         id: `routines:${row.id}`,
+        rowId: row.id,
         module: 'routines',
         label: row.name,
         // La RRULE est une règle iCalendar : c'est l'écran des routines qui la
@@ -256,6 +268,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<BirthdayRow>('birthdays', { household_id: householdId });
       return rows.map((row) => ({
         id: `birthdays:${row.id}`,
+        rowId: row.id,
         module: 'anniversaires',
         label: row.name,
         // La date de naissance, pas le compte à rebours : c'est elle qui
@@ -271,6 +284,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<ExpenseRow>('expenses', { household_id: householdId });
       return rows.map((row) => ({
         id: `expenses:${row.id}`,
+        rowId: row.id,
         module: 'ardoise',
         label: row.title,
         hint: hintOf('Dépense', formatEuro(row.amount), formatShortDate(row.expense_date)),
@@ -299,6 +313,7 @@ const sources: SearchSource[] = [
         .filter((row) => !(row.giftee_contact_id && ownContactIds.has(row.giftee_contact_id)))
         .map((row) => ({
           id: `gift_ideas:${row.id}`,
+          rowId: row.id,
           module: 'cadeaux',
           label: row.name,
           hint: hintOf('Idée cadeau', row.price != null ? formatEuro(row.price) : null, row.status === 'offert' ? 'offert' : 'à offrir'),
@@ -312,6 +327,7 @@ const sources: SearchSource[] = [
       const rows = await data.list<PostRow>('posts', { household_id: householdId });
       return rows.map((row) => ({
         id: `posts:${row.id}`,
+        rowId: row.id,
         module: 'cercle',
         // Le texte entier reste dans `extra` : c'est lui qu'on cherche, et la
         // ligne affichée, elle, est coupée.
@@ -340,6 +356,7 @@ const sources: SearchSource[] = [
         .filter((row) => myConversations.has(row.conversation_id))
         .map((row) => ({
           id: `messages:${row.id}`,
+          rowId: row.id,
           module: 'messages',
           label: truncateText(row.content, LABEL_MAX_LENGTH),
           hint: hintOf('Message', relativeDayLabel(row.created_at)),

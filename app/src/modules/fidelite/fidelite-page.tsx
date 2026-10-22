@@ -15,6 +15,7 @@ import { CardFormDialog } from './components/card-form-dialog';
 import { useFidelite } from './hooks/use-fidelite';
 import { useBarcodeScanner } from './hooks/use-barcode-scanner';
 import { loyaltyCategories, loyaltyCategoryLabel, loyaltyCodeTypeLabel, loyaltyIconTone, type LoyaltyCard, type LoyaltyCardInput } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 export default function FidelitePage() {
   const { cards, total, barcodes, qrCodes, isLoading, isFetching, isError, error, isMutating, refetch, addCard, editCard, removeCard, markUsed } =
@@ -45,6 +46,9 @@ export default function FidelitePage() {
     setFormKey((key) => key + 1);
     setFormOpen(true);
   }, []);
+
+  // Lien profond : `/fidelite?ouvrir=<id>` ouvre la fiche de la carte.
+  useOpenRecord(cards, openEdit);
 
   const saveCard = useCallback(
     async (input: LoyaltyCardInput) => {

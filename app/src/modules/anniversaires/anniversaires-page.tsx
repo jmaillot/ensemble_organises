@@ -16,12 +16,13 @@ import { BirthdayFormDialog } from './components/birthday-form-dialog';
 import { useAnniversaires } from './hooks/use-anniversaires';
 import { birthdayCountdown, formatDayMonth, isInMonth, monthDayKey } from './types';
 import type { AggregatedBirthday, Birthday } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const PREVIEW_LIMIT = 5;
 
 export default function AnniversairesPage() {
   const toast = useToast();
-  const { aggregated, isLoading, isError, error, refetch, isMutating, saveBirthday, removeBirthday } =
+  const { aggregated, birthdays, isLoading, isError, error, refetch, isMutating, saveBirthday, removeBirthday } =
     useAnniversaires();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('liste');
@@ -47,6 +48,8 @@ export default function AnniversairesPage() {
 
   const openCreate = () => setDialog({ open: true, birthday: null });
   const openEdit = (birthday: Birthday) => setDialog({ open: true, birthday });
+  // Lien profond : `/anniversaires?ouvrir=<id>` ouvre la fiche de l’anniversaire.
+  useOpenRecord(birthdays, openEdit);
 
   return (
     <ModuleShell

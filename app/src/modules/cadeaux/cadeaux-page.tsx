@@ -39,6 +39,7 @@ import {
 import { GiftFormDialog, type GiftFormResult } from './components/gift-form-dialog';
 import { GiftIdeaFormDialog, type GiftIdeaFormResult } from './components/gift-idea-form-dialog';
 import { GiftShareDialog } from './components/gift-share-dialog';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const shareButtonBase =
   'inline-flex min-h-[33px] items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[10px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong';
@@ -157,6 +158,9 @@ export default function CadeauxPage() {
     setEditedIdea(idea);
     setIdeaFormOpen(true);
   };
+
+  // Lien profond : `/cadeaux?ouvrir=<id>` ouvre la fiche de l'idée.
+  useOpenRecord(ideas, openEditIdea);
 
   const handleSubmitItem = async ({ values, photoFile }: GiftFormResult) => {
     let photoUrl = values.photoUrl;

@@ -5,9 +5,9 @@ import { isChildHiddenModule, type ModuleEntry, type ModuleKey } from './modules
  *
  * Deux natures de résultats, volontairement séparées : les **espaces** (la
  * navigation entre 17 modules, qui est le problème que la palette résout) et
- * les **entrées du foyer** (une tâche, une note, un contact…), qui disent où
- * aller sans promettre d'ouvrir la fiche — les modules n'ont pas de lien
- * profond et la palette ne fait pas semblant d'en avoir un.
+ * les **entrées du foyer** (une tâche, une note, un contact…), qui mènent à
+ * la FICHE quand le module sait l'ouvrir, et à son espace sinon
+ * (`record-paths.ts` — la table des modules qui ont un lien profond).
  *
  * Le repli des accents vit ici, en un seul endroit : « ecole » doit trouver
  * « École », et « dejeuner » « Déjeuner ». La normalisation NFD + suppression
@@ -82,6 +82,11 @@ export function searchModules(
 export interface SearchRecord {
   /** Identifiant unique inter-tables (`tasks:task-1`). */
   id: string;
+  /**
+   * Identifiant de la LIGNE dans son module (`task-1`). C'est lui qui porte
+   * le lien profond : la palette ouvre la fiche, pas seulement l'espace.
+   */
+  rowId: string;
   module: ModuleKey;
   label: string;
   /** Nature et détail : « Tâche · À faire · 24/10 ». */

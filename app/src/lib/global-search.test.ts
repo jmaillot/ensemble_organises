@@ -4,6 +4,7 @@ import { foldSearchText, searchModules, searchRecords, type SearchRecord } from 
 
 const record = (id: string, label: string, extra?: string): SearchRecord => ({
   id,
+  rowId: id,
   module: 'taches',
   label,
   hint: 'Tâche',

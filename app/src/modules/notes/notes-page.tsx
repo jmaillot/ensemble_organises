@@ -21,6 +21,7 @@ import {
   type Note,
   type NoteTone,
 } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const toneDot: Record<NoteTone, string> = {
   accent: 'bg-accent',
@@ -74,6 +75,8 @@ export default function NotesPage() {
     setDialog({ open: true, note });
   };
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+  // Lien profond : `/notes?ouvrir=<id>` ouvre la fiche de la note.
+  useOpenRecord(notes, openEdit);
 
   const toggleLock = async (note: Note, locked: boolean) => {
     try {

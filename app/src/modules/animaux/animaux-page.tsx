@@ -28,6 +28,7 @@ import {
   type PetRecord,
   type PetRecordDraft,
 } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -84,6 +85,8 @@ export default function AnimauxPage() {
   const { pets, isLoading, isError, error, refetch, isMutating, savePet, deletePet } = usePets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [petForm, setPetForm] = useState<{ open: boolean; pet: Pet | null }>({ open: false, pet: null });
+  // Lien profond : `/animaux?ouvrir=<id>` ouvre la fiche de l’animal.
+  useOpenRecord(pets, (pet) => setPetForm({ open: true, pet }));
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<PetRecord | null>(null);
   const [pendingPetDeletion, setPendingPetDeletion] = useState<Pet | null>(null);
