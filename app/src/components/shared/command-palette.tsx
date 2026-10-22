@@ -262,9 +262,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             <kbd className="font-[650]">↵</kbd> ouvrir l’espace
           </span>
           <span className="ml-auto">
-            {trimmed.length >= RECORD_QUERY_MIN_LENGTH && results.length > 0
-              ? `${results.length} sur ${matched} résultat${matched > 1 ? 's' : ''}`
-              : `${spaces.length} espace${spaces.length > 1 ? 's' : ''}`}
+            {/* Le pied dit CE QUE LA LISTE CONTIENT : les deux sections, pas
+                l'une ou l'autre. Afficher « 0 espace » sous « Aucun
+                résultat » ferait croire à un compteur cassé. */}
+            {spaces.length} espace{spaces.length > 1 ? 's' : ''}
+            {trimmed.length >= RECORD_QUERY_MIN_LENGTH
+              ? ` · ${
+                  matched > 0
+                    ? `${results.length} sur ${matched} résultat${matched > 1 ? 's' : ''}`
+                    : '0 résultat'
+                }`
+              : ''}
           </span>
         </div>
 

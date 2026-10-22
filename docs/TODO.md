@@ -620,6 +620,40 @@ bien `buildTasks`).
 
 ---
 
+- [ ] **23. Deux tests de glisser-déposer sont sensibles à la charge de la machine**
+
+**Constaté le 2026-10-22**, pendant l'extension de la palette de commandes. Les
+deux tests e2e du glisser-déposer des widgets — « glisser un widget le réordonne
+et le persiste » et « pendant le drag souris, le curseur montre la main fermée »
+— échouent par intermittence quand la machine est chargée. **Observé deux fois**
+en série complète : une fois avec un serveur de développement qui tournait en
+arrière-plan, une fois pendant une série complète seule. Dans les deux cas, le
+test **passe seul** et la série complète **passe sur une machine au repos**.
+
+**Ce que ce n'est pas.** Ce n'est pas le glisser-déposer qui est cassé : le
+défaut fonctionnelle serait visible à l'écran (le widget ne suit pas le
+curseur), et il ne l'est pas. C'est une course : `dnd-kit` a un seuil
+d'activation de 6 px et une bascule de classe (`widgets-dragging`) ; sous
+contention, une image est sautée et le geste n'est jamais reconnu.
+
+**Ce qui le distingue d'un vrai défaut.** Un test qui échoue une fois sur deux
+n'apprend rien. Il faut donc le critère : **un échec répété sur une machine au
+repos** signifierait que le geste est en cause, et non la charge. Ce critère
+n'a pas été atteint — les deux échecs observés étaient sous charge, et la série
+complète est verte sur une machine au repos (2026-10-22).
+
+**Comment trancher.** Relancer la série e2e sur une machine au repos, sans
+serveur de développement en arrière-plan : elle doit être verte. Si elle
+échoue, ce n'est plus un flake mais un défaut du geste, et il se voit à
+l'écran. Si elle est verte, le correctif n'est pas dans le produit mais dans
+les tests : attendre l'état observable (`widgets-dragging`) plutôt qu'un
+chronomètre, comme le fait déjà le test du curseur.
+
+**Terminé quand** les deux tests passent dix fois de suite sur une machine au
+repos, ou qu'ils ne dépendent plus de la cadence de la machine.
+
+---
+
 ## Plus tard
 
 (Rien pour le moment — le #4 est soldé en production le 2026-10-21, voir

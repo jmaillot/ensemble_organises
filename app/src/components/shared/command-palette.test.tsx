@@ -141,6 +141,10 @@ describe('CommandPalette', () => {
     // qu'une fois la lecture du foyer terminée.
     await user.type(screen.getByRole('combobox'), 'montre');
     expect(await screen.findByText(/Aucun résultat/)).toBeInTheDocument();
+    // Le pied dit ce que la liste contient : aucun espace, aucun résultat.
+    // « 0 espace » seul, sous « Aucun résultat », ferait croire à un
+    // compteur cassé.
+    expect(screen.getByText(/0 espace · 0 résultat/)).toBeInTheDocument();
   });
 
   it('montre l’idée cadeau à celui à qui elle n’est pas destinée', async () => {
