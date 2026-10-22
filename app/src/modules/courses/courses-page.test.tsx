@@ -219,8 +219,15 @@ describe('Module Courses', () => {
       const created = rows.find((row) => row.name === 'Comté affiné');
       expect(created?.product_id).not.toBeNull();
     } finally {
-      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
-      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      // Le nettoie ne retire que le produit créé par le test : le catalogue
+      // du foyer peut contenir d'autres produits (la graine en a).
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        ean: string;
+      }[];
+      await Promise.all(
+        rows.filter((row) => row.ean === '3017620422003').map((row) => data.remove('products', row.id)),
+      );
       const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
         id: string;
         name: string;
@@ -291,8 +298,15 @@ describe('Module Courses', () => {
         expect(within(listRegion('Fresque')).getByText('Marss')).toBeInTheDocument();
       });
     } finally {
-      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
-      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      // Le nettoie ne retire que le produit créé par le test : le catalogue
+      // du foyer peut contenir d'autres produits (la graine en a).
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        ean: string;
+      }[];
+      await Promise.all(
+        rows.filter((row) => row.ean === '3017620422003').map((row) => data.remove('products', row.id)),
+      );
       const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
         id: string;
         name: string;

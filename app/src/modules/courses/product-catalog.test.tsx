@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
-import type { ProductRow } from '@/types';
+import type { ProductRow, ShoppingListItemRow } from '@/types';
 import { Route, Routes } from 'react-router';
 import ProductCatalogPage from './product-catalog-page';
 
@@ -162,6 +162,90 @@ describe('ProductCatalog — photos', () => {
       await data.remove('products', avec.id).catch(() => undefined);
       await data.remove('products', repli.id).catch(() => undefined);
       await data.remove('products', sans.id).catch(() => undefined);
+    }
+  });
+});
+
+describe('ProductCatalog — le tri', () => {
+  async function seedTwo() {
+    const yaourt = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: '3178530414123',
+      name: 'Yaourt fermier',
+      brand: 'Valora',
+      category: 'Divers',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    const amandes = await data.create<ProductRow>('products', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      ean: '3017620422003',
+      name: 'Amandes torréfiées',
+      brand: 'Ferrero',
+      category: 'Divers',
+      photo_url: null,
+      off_data: {},
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    // Un article de la liste PORTE le « Yaourt » : sa fréquence est de 1.
+    // Les « Amandes » ne sont dans aucune liste : fréquence 0.
+    const item = await data.create<ShoppingListItemRow>('shopping_list_items', {
+      household_id: DEMO_HOUSEHOLD_ID,
+      list_id: 'list-fresque',
+      name: 'Yaourt fermier',
+      quantity: 2,
+      unit: 'pots',
+      category: 'Frais',
+      checked: false,
+      added_by: null,
+      product_id: yaourt.id,
+      position: 9,
+      created_at: new Date().toISOString(),
+    });
+    return { yaourt: yaourt.id, amandes: amandes.id, item: item.id };
+  }
+
+  it('trie par nom, puis par fréquence d’usage', async () => {
+    const ids = await seedTwo();
+    try {
+      renderCatalogue();
+      await screen.findByRole('heading', { name: 'Catalogue des produits scannés' });
+      // Les produits arrivent : on attend LE TEXTE, pas le titre du panneau.
+      await screen.findByText('Amandes torréfiées');
+
+      const rangs = () => {
+        const noms = within(document.getElementById('products-catalog-panel') as HTMLElement)
+          .getAllByRole('listitem')
+          .map((row) => row.textContent ?? '');
+        return {
+          yaourt: noms.findIndex((texte) => texte.includes('Yaourt fermier')),
+          amandes: noms.findIndex((texte) => texte.includes('Amandes torréfiées')),
+        };
+      };
+
+      // Par nom : l'ordre alphabétique français — « Amandes » avant « Yaourt ».
+      expect(rangs().amandes).toBeLessThan(rangs().yaourt);
+
+      // Par fréquence : le produit le plus souvent dans les listes d'abord.
+      // « Yaourt » y est une fois, « Amandes » jamais — rien n'est deviné.
+      await userEvent.setup().selectOptions(screen.getByLabelText('Tri'), 'frequence');
+      await waitFor(() => {
+        expect(rangs().yaourt).toBeLessThan(rangs().amandes);
+      });
+      // La ligne dit combien de fois le produit est dans les listes.
+      const ligne = within(document.getElementById('products-catalog-panel') as HTMLElement)
+        .getAllByRole('listitem')
+        .find((row) => row.textContent?.includes('Yaourt fermier'));
+      expect(within(ligne as HTMLElement).getByText(/1× dans vos listes/)).toBeInTheDocument();
+    } finally {
+      for (const id of [ids.yaourt, ids.amandes, ids.item]) {
+        await data.remove(id === ids.item ? 'shopping_list_items' : 'products', id).catch(() => undefined);
+      }
     }
   });
 });

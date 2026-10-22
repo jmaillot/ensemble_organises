@@ -15,6 +15,7 @@ import type {
   EventRow,
   ExpenseParticipantRow,
   ExpenseRow,
+  ProductRow,
   GiftIdeaRow,
   GiftItemRow,
   GiftListRow,
@@ -193,11 +194,48 @@ export const demoShoppingLists: ShoppingListRow[] = [
 ];
 
 export const demoShoppingItems: ShoppingListItemRow[] = [
-  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: 'product-1', position: 0, created_at: now() },
   { id: 'item-2', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fruits', quantity: 1, unit: 'sachet', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
   { id: 'item-3', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Lait d’agne', quantity: 3, unit: 'briques', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.thomas, product_id: null, position: 2, created_at: now() },
-  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: 'product-2', position: 0, created_at: now() },
   { id: 'item-5', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Savon liquide', quantity: 1, unit: 'flacon', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
+];
+
+/**
+ * Catalogue de démonstration (0071) : des produits que le foyer a « scannés ».
+ *
+ * Ils sont reliés à des articles des listes (`product_id`), et c'est ce lien
+ * qui compte pour le tri par fréquence : un produit jamais mis en liste
+ * compte zéro. Les deux autres articles de la démo sont SAISIS À LA MAIN
+ * (pas de `product_id`) — c'est le régime de la maison.
+ */
+export const demoProducts: ProductRow[] = [
+  {
+    id: 'product-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ean: '3027620042733',
+    name: 'Yaourts x8',
+    brand: 'Danone',
+    category: 'Crèmerie & Produits laitiers',
+    photo_url: null,
+    off_data: {},
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+    updated_at: now(),
+  },
+  {
+    id: 'product-2',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ean: '3245412872018',
+    name: 'Papier toilette 4 pak',
+    brand: 'Velux',
+    category: 'Hygiène & Beauté',
+    photo_url: null,
+    off_data: {},
+    created_by: DEMO_MEMBERS.lina,
+    created_at: now(),
+    updated_at: now(),
+  },
 ];
 
 export const demoEvents: EventRow[] = [
@@ -1435,6 +1473,7 @@ const seedTables: Record<string, Row[]> = {
   household_members: demoMembers as unknown as Row[],
   shopping_lists: [...demoShoppingLists, ...demoTripShoppingLists] as unknown as Row[],
   shopping_list_items: [...demoShoppingItems, ...demoTripShoppingItems] as unknown as Row[],
+  products: demoProducts as unknown as Row[],
   events: demoEvents as unknown as Row[],
   event_reminders: demoEventReminders as unknown as Row[],
   event_categories: demoEventCategories as unknown as Row[],

@@ -15,7 +15,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
 import { isQueryableEan } from '../off-client';
-import { normalizeRayon, RAYONS } from '../types';
+import { normalizeRayon, sortProducts, RAYONS, type CatalogSort } from '../types';
 import type { ProductRow } from '@/types';
 
 const editSchema = z.object({
@@ -35,24 +35,43 @@ type EditFormValues = z.infer<typeof editSchema>;
  * modifiables. L'édition suit la RLS (créateur ou ligne sans auteur) :
  * un refus serveur remonte en toast, sans écran d'erreur.
  */
-export function ProductCatalog({ products, photoUrls, onEdit }: { products: ProductRow[]; photoUrls: Record<string, string>; onEdit: (
+export function ProductCatalog({ products, photoUrls, usage, onEdit }: { products: ProductRow[]; photoUrls: Record<string, string>; usage: Record<string, number>; onEdit: (
   id: string,
   values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null },
 ) => Promise<void> }) {
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [rayonFilter, setRayonFilter] = useState<string | null>(null);
+  const [sort, setSort] = useState<CatalogSort>('nom');
 
   const rayons = [...new Set(products.map((product) => normalizeRayon(product.category)))].sort((a, b) =>
     a.localeCompare(b, 'fr'),
   );
-  const visible =
-    rayonFilter === null ? products : products.filter((product) => normalizeRayon(product.category) === rayonFilter);
+  // Le filtre et le tri se cumulent : on filtre d'abord, on trie ensuite.
+  const visible = sortProducts(
+    rayonFilter === null ? products : products.filter((product) => normalizeRayon(product.category) === rayonFilter),
+    usage,
+    sort,
+  );
 
   return (
     <Panel
       id="products-catalog-panel"
       title="Catalogue des produits scannés"
       description="Vos produits, modifiables : photo, code-barres, rayon."
+      action={
+        <label htmlFor="products-catalog-sort" className="flex items-center gap-2">
+          <span className="text-[11px] font-extrabold text-muted">Tri</span>
+          <Select
+            id="products-catalog-sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value === 'frequence' ? 'frequence' : 'nom')}
+            className="min-w-[150px]"
+          >
+            <option value="nom">Par nom</option>
+            <option value="frequence">Par fréquence</option>
+          </Select>
+        </label>
+      }
     >
       {products.length === 0 ? (
         <EmptyState
@@ -117,6 +136,7 @@ export function ProductCatalog({ products, photoUrls, onEdit }: { products: Prod
                 <p className="m-0 truncate text-[13px] font-[760]">{product.name}</p>
                 <small className="text-[11px] text-muted">
                   {product.ean} · {product.category ?? 'Divers'}
+                  {usage[product.id] ? ` · ${usage[product.id]}× dans vos listes` : ''}
                 </small>
               </div>
               <Button

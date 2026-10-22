@@ -1,4 +1,4 @@
-import type { ShoppingListItemRow, ShoppingListRow } from '@/types';
+import type { ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 
 /**
  * Rayons proposés par le module. L'ordre suit le parcours en magasin : il sert
@@ -471,6 +471,36 @@ export function toShoppingPrintModel(list: ShoppingListView, householdName: stri
       })),
     })),
   };
+}
+
+/** Mode de tri du catalogue des produits. */
+export type CatalogSort = 'nom' | 'frequence';
+
+/**
+ * Trie le catalogue des produits.
+ *
+ * `nom` : l'ordre alphabétique français — le catalogue se feuillette.
+ * `frequence` : le produit le plus souvent dans les listes d'abord — c'est
+ * le plus à ressemer, et le catalogue sert alors de mémoire d'achat.
+ *
+ * La fréquence est le nombre d'articles de vos listes qui pointent ce
+ * produit (`shopping_list_items.product_id`). C'est un COMPTE, pas une
+ * préférence apprise : rien n'est deviné, et un produit jamais mis en liste
+ * tombe à la fin, alphabétiquement.
+ */
+export function sortProducts(
+  products: ProductRow[],
+  usage: Record<string, number>,
+  sort: CatalogSort,
+): ProductRow[] {
+  const copy = [...products];
+  if (sort === 'frequence') {
+    return copy.sort(
+      (a, b) =>
+        (usage[b.id] ?? 0) - (usage[a.id] ?? 0) || a.name.localeCompare(b.name, 'fr'),
+    );
+  }
+  return copy.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 }
 
 /**

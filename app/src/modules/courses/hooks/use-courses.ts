@@ -76,6 +76,11 @@ export interface UseCoursesResult {
   editItem: (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => Promise<void>;
   /** Catalogue brut trié (lignes `products` du foyer) pour l'espace catalogue. */
   products: ProductRow[];
+  /**
+   * Fréquence d'usage des produits du foyer : identifiant produit → nombre
+   * d'articles qui le portent dans les listes.
+   */
+  productUsage: Record<string, number>;
   /** Photos affichables du catalogue, forgées à la lecture (D-01) — clé = id produit. */
   productPhotoUrls: Record<string, string>;
   editProduct: (id: string, values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null }) => Promise<void>;
@@ -204,6 +209,23 @@ export function useCourses(): UseCoursesResult {
     return [...frequency.values()].sort(
       (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr'),
     );
+  }, [foyerItems]);
+
+  /**
+   * Fréquence d'usage des produits : combien de fois un produit figure dans
+   * les listes du foyer.
+   *
+   * C'est un COMPTE des articles (`shopping_list_items.product_id`), rien de
+   * deviné : un produit jamais mis en liste compte zéro, et le catalogue peut
+   * donc être trié par ce que le foyer achète vraiment.
+   */
+  const productUsage = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const row of foyerItems) {
+      if (!row.product_id) continue;
+      counts[row.product_id] = (counts[row.product_id] ?? 0) + 1;
+    }
+    return counts;
   }, [foyerItems]);
 
   /**
@@ -517,6 +539,7 @@ export function useCourses(): UseCoursesResult {
     removeList,
     editItem,
     products,
+    productUsage,
     productPhotoUrls,
     editProduct,
   };

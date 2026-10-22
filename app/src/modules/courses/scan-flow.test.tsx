@@ -129,16 +129,20 @@ describe('fiche produit 1-tap', () => {
 
     await screen.findByText(/ajouté à la liste/);
 
+    // Le compte porte sur l'EAN BALAYÉ : le catalogue du foyer peut contenir
+    // d'autres produits, et l'affirmation du test est « le scan a créé CE
+    // produit, une seule fois ».
     const products = await data.list<ProductRow>(PRODUCTS_TABLE, { household_id: DEMO_HOUSEHOLD_ID });
-    expect(products).toHaveLength(1);
-    expect(products[0].ean).toBe(KNOWN_EAN);
-    expect(products[0].name).toBe('Nutella');
+    const scannés = products.filter((product) => product.ean === KNOWN_EAN);
+    expect(scannés).toHaveLength(1);
+    expect(scannés[0].name).toBe('Nutella');
     // T-04-06 : l'image OFF reste un affichage transitoire, jamais persistée.
-    expect(products[0].photo_url).toBeNull();
+    expect(scannés[0].photo_url).toBeNull();
 
     const items = await data.list<ShoppingListItemRow>('shopping_list_items', { list_id: list.id });
     expect(items).toHaveLength(1);
-    expect(items[0].product_id).toBe(products[0].id);
+    // L'article est lié AU PRODUIT SCANNÉ, pas au premier produit du foyer.
+    expect(items[0].product_id).toBe(scannés[0].id);
   });
 
   it('refus serveur relayé en toast, fiche conservée (T-04-07)', async () => {
@@ -176,8 +180,9 @@ describe('fiche produit 1-tap', () => {
     await screen.findByText(/ajouté à la liste/);
     await waitFor(async () => {
       const products = await data.list<ProductRow>(PRODUCTS_TABLE, { household_id: DEMO_HOUSEHOLD_ID });
-      expect(products).toHaveLength(1);
-      expect(products[0].name).toBe('Miel artisanal');
+      const crees = products.filter((product) => product.ean === UNKNOWN_EAN);
+      expect(crees).toHaveLength(1);
+      expect(crees[0].name).toBe('Miel artisanal');
     });
   });
 

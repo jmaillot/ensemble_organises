@@ -82,9 +82,14 @@ export const COURSES_GUIDE_SECTIONS: GuideSection[] = [
         text: "Sur mobile, pointez l'appareil photo sur un code-barres et la fiche se crée toute seule. Idéal pour constituer le catalogue en rangeant ses courses.",
       },
       {
-        icon: 'grid',
+        icon: 'filter',
         title: 'Filtrer par rayon',
         text: 'Les rayons s’affichent en onglets au-dessus du catalogue. Cliquez sur un rayon pour ne voir que ses produits.',
+      },
+      {
+        icon: 'grid',
+        title: 'Trier par nom ou par fréquence',
+        text: "L’ordre alphabétique pour feuilleter, ou la fréquence d’usage pour savoir ce que le foyer achète le plus : c’est le nombre d’articles de vos listes qui portent le produit, rien n’est deviné.",
       },
       {
         icon: 'edit',
