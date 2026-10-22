@@ -91,6 +91,20 @@ export function relativeDayLabel(iso: string) {
 export const pluralize = (count: number, singular: string, plural = `${singular}s`) =>
   `${count} ${count > 1 ? plural : singular}`;
 
+/**
+ * Texte raccourci pour l'affichage, la coupure marquée par une ellipse.
+ *
+ * La longueur est comptée en POINTS DE CODE, comme `char_length` en base : un
+ * emoji tient en un signe côté SQL et en deux unités UTF-16 côté JS, et couper
+ * au milieu d'une paire ferait un caractère de remplacement sur l'écran.
+ */
+export function truncateText(value: string, max: number): string {
+  if (max <= 0) return '';
+  const points = [...value];
+  if (points.length <= max) return value;
+  return `${points.slice(0, Math.max(1, max - 1)).join('').trimEnd()}…`;
+}
+
 export function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }

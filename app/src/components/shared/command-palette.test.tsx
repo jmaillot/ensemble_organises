@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
@@ -19,6 +19,13 @@ function renderPalette(onOpenChange = vi.fn()) {
   );
   return { ...result, onOpenChange };
 }
+
+beforeEach(() => {
+  // Le membre courant vit dans le store, partagé par tous les tests du
+  // fichier : un test qui le change (rôle enfant, autre membre) doit le
+  // rendre, sinon le suivant hérite de son rôle — et de ce qu'il peut voir.
+  useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.camille });
+});
 
 describe('CommandPalette', () => {
   it('liste les espaces dès l’ouverture, sans lire les données du foyer', async () => {
@@ -108,6 +115,43 @@ describe('CommandPalette', () => {
     const option = await screen.findByRole('option', { name: /yaourts/i }, { timeout: 8000 });
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-activedescendant', option.id);
+  });
+
+  it('trouve une routine du foyer et dit sa fréquence', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByRole('combobox'), 'canine');
+    const option = await screen.findByRole('option', { name: /sortie canine/i }, { timeout: 8000 });
+    expect(within(option).getByText('Routine · Tous les jours')).toBeInTheDocument();
+  });
+
+  it('trouve une publication du Cercle', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByRole('combobox'), 'soleil');
+    const option = await screen.findByRole('option', { name: /soleil/i }, { timeout: 8000 });
+    expect(within(option).getByText(/Publication/)).toBeInTheDocument();
+  });
+
+  it('ne montre pas l’idée cadeau offerte au membre courant', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    // Camille est le membre courant : l'idée « Montre connectée » lui est
+    // destinée, donc la palette ne la montre pas. Le vide n'est annoncé
+    // qu'une fois la lecture du foyer terminée.
+    await user.type(screen.getByRole('combobox'), 'montre');
+    expect(await screen.findByText(/Aucun résultat/)).toBeInTheDocument();
+  });
+
+  it('montre l’idée cadeau à celui à qui elle n’est pas destinée', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    // Le membre change APRÈS le rendu : le rendu remet le foyer de
+    // démonstration en place, et le store est partagé.
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.thomas });
+    await user.type(screen.getByRole('combobox'), 'montre');
+    const option = await screen.findByRole('option', { name: /montre connectée/i }, { timeout: 8000 });
+    expect(within(option).getByText(/Idée cadeau/)).toBeInTheDocument();
   });
 
   it('demande la fermeture à Échap', async () => {

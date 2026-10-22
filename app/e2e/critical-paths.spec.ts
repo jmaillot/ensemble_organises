@@ -187,6 +187,16 @@ test.describe('Recherche globale', () => {
     await expect(page).toHaveURL(/\/fidelite/);
   });
 
+  test('trouve une entrée du foyer et mène à son espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await palette.getByRole('combobox').fill('canine');
+    // Une routine du foyer : le nom est dans la graine de démonstration.
+    await expect(palette.getByRole('option', { name: /sortie canine/i })).toBeVisible();
+  });
+
   test('le raccourci ouvre la palette depuis n’importe quelle page', async ({ page }) => {
     test.skip(viewportIsMobile(page), 'raccourci clavier : bureau uniquement');
 
