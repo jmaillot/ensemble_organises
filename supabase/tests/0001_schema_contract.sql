@@ -91,7 +91,9 @@ begin
           ('products', ARRAY['id', 'household_id', 'ean', 'name', 'brand', 'category', 'photo_url', 'off_data', 'created_by', 'created_at', 'updated_at']::text[]),
           ('gift_ideas', ARRAY['id', 'household_id', 'name', 'price', 'url', 'comment', 'photo_url', 'status', 'giftee_text', 'giftee_contact_id', 'created_by', 'created_at', 'updated_at']::text[]),
           ('contact_lists', ARRAY['id', 'household_id', 'name', 'owner_member_id', 'is_default', 'created_at']::text[]),
-          ('contacts', ARRAY['id', 'list_id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[])
+          ('contacts', ARRAY['id', 'list_id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[]),
+          ('pantry_items', ARRAY['id', 'household_id', 'name', 'category', 'quantity', 'unit', 'location', 'expires_on', 'opened_on', 'notes', 'created_by', 'created_at']::text[]),
+          ('meal_entries', ARRAY['id', 'household_id', 'entry_date', 'slot', 'recipe_id', 'free_text', 'servings', 'member_ids', 'created_by', 'created_at']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(
