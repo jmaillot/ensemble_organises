@@ -372,6 +372,36 @@ describe('Module Courses', () => {
 });
 
 describe('Module Courses — l’ordre du foyer (0139)', () => {
+  it('fait descendre les articles cochés, et les nomme', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+    await user.selectOptions(screen.getByLabelText('Regroupement'), 'ordre');
+
+    // « Papier toilette » est coché : il descend en bas, ce qu’il reste à
+    // prendre reste sous les yeux. Le groupe est NOMMÉ : le lecteur sait
+    // pourquoi l’article est là.
+    await waitFor(() => {
+      const noms = visibleItemNames('Maison');
+      expect(noms[noms.length - 1]).toContain('Papier toilette');
+    });
+    expect(within(listRegion('Maison')).getByText('Dans le panier')).toBeInTheDocument();
+  });
+
+  it('garde les articles cochés dans leur rayon quand on regroupe', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+
+    // Vue par rayon : l'article coché reste dans son rayon, avec la part
+    // déjà cochée de ce rayon.
+    await waitFor(() => {
+      expect(within(listRegion('Maison')).getByText('Hygiène & Beauté')).toBeInTheDocument();
+    });
+    const noms = visibleItemNames('Maison');
+    expect(noms[0]).toContain('Papier toilette');
+  });
+
   it('réordonne les articles à la poignée, et l’ordre tient après le rechargement', async () => {
     stubItemRects();
     const user = userEvent.setup();

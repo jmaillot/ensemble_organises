@@ -516,7 +516,19 @@ export function sectionsForList(items: ShoppingItem[], grouping: Grouping): Item
   const ranges = [...items].sort(
     (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   );
-  if (grouping === 'ordre') return [{ key: 'ordre', title: '', items: ranges }];
+  if (grouping === 'ordre') {
+    // Les articles COCHÉS descendent en bas : ce qu'il reste à prendre reste
+    // sous les yeux. Ils gardent pourtant leur RANG — les décocher les rend
+    // à leur place dans l'ordre du foyer, pas à la fin.
+    const aAcheter = ranges.filter((item) => !item.checked);
+    const dansLePanier = ranges.filter((item) => item.checked);
+    // Une section vide ne s'affiche pas : un titre « Dans le panier » sans
+    // rien en dessous ferait une promesse vide.
+    return [
+      { key: 'ordre', title: '', items: aAcheter },
+      ...(dansLePanier.length > 0 ? [{ key: 'panier', title: 'Dans le panier', items: dansLePanier }] : []),
+    ].filter((section) => section.items.length > 0);
+  }
 
   const buckets = new Map<Rayon, ShoppingItem[]>();
   for (const item of ranges) {

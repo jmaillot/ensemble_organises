@@ -117,11 +117,6 @@ export const COURSES_GUIDE_QUESTIONS: GuideQuestion[] = [
       "Oui. Toutes les listes du foyer sont visibles par ses membres, et les changements apparaissent en temps réel, sans recharger la page.",
   },
   {
-    question: 'Que deviennent les articles que je coche ?',
-    answer:
-      "Ils restent à leur place, barrés, et le compteur « dans le panier » monte. Rien n’est supprimé : un article coché se rouvre d’un clic.",
-  },
-  {
     question: 'Quelle différence entre un article et un produit ?',
     answer:
       "Un article est une occurrence dans UNE liste (« 2 kg de pommes »). Un produit est la référence du catalogue, partagée par toutes les listes du foyer.",
@@ -140,6 +135,11 @@ export const COURSES_GUIDE_QUESTIONS: GuideQuestion[] = [
     question: 'Un article déjà dans la liste peut-il être ajouté deux fois ?',
     answer:
       "Non. L’ajout d’un article déjà présent propose de modifier sa quantité, et la ligne reste unique.",
+  },
+  {
+    question: 'Que deviennent les articles que je coche ?',
+    answer:
+      "Dans la vue « L’ordre du foyer », ils descendent en bas, dans un groupe nommé « Dans le panier » : ce qu’il reste à prendre reste sous les yeux. Dans la vue par rayon, ils restent dans leur rayon. Les décocher les rend à leur place dans l’ordre du foyer.",
   },
   {
     question: 'Comment réordonner ma liste ?',
