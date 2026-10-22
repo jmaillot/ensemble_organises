@@ -112,6 +112,7 @@ mécanismes sont ici.
 cd app && npm run typecheck && npm test && npm run build
 cd app && npm run test:e2e
 python3 scripts/check-sql-statique.py
+python3 scripts/test-check-sql-statique.py   # ses propres cas qui doivent échouer
 sh scripts/test-db.sh          # sur une machine qui a Docker
 sh scripts/test-dispatch-push.sh   # en plus, et ce n'est pas équivalent
 ```
@@ -213,6 +214,18 @@ Trois règles qui rendent le contrôle digne de confiance :
   n'a jamais refusé quelque chose n'a pas été exercé. Et un vérificateur qui
   refuse du code que les tests couvrent est pire qu'aucun : on apprend à
   l'ignorer avant qu'il ne trouve un vrai défaut.
+
+Un refus à tort, trouvé le 2026-10-22 : le contrôle 3 signalait l'**ouverture**
+d'un dollar-quote nommé (`$q$`) dès la fin de sa ligne d'ouverture. Or un tag
+nommé traverse légitimement une ligne — le dépôt l'emploie pour passer un SQL
+multi-lignes à une assertion (`testkit.expect_denied($q$insert … $q$, '…')`) —
+et PostgreSQL l'autorise. Le contrôle était donc rouge sur un test **sain**
+(`0138`), et c'est ce rouge-là qui aurait fait perdre foi dans le contrôle. Le
+tag nommé n'est plus signalé qu'à la fin du fichier, où l'on sait qu'il n'a
+jamais été refermé — le symptôme d'un guillemet mal placé en amont.
+`python3 scripts/test-check-sql-statique.py` donne au contrôle ses cas qui
+doivent échouer **et** le cas qui doit passer ; il a été vu rouge avant d'être
+vu vert, sur le contrôle lui-même.
 
 #### C. La frontière du conteneur
 

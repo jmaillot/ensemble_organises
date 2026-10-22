@@ -68,6 +68,7 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
+from typing import NamedTuple
 
 MIGRATIONS = pathlib.Path(__file__).resolve().parent.parent / "supabase" / "migrations"
 TESTS = pathlib.Path(__file__).resolve().parent.parent / "supabase" / "tests"
@@ -95,7 +96,21 @@ RE_TABLE = re.compile(r"\b(?:from|join)\s+(?:lateral\s+)?([\w.]+)\s*(\(?)", re.I
 RE_VARIABLE = re.compile(r"^[pv]_", re.I)
 
 
-def _litteraux_ouverts(texte: str) -> list[tuple[int, int, str]]:
+class LitteralOuvert(NamedTuple):
+    """Un littéral (ou un dollar-quote) ouvert et jamais refermé.
+
+    `ligne` et `colonne` désignent l'OUVERTURE ; `colonne` vaut -1 quand le
+    défaut n'a pu être situé qu'en fin de fichier. `nature` est le titre du
+    défaut, `texte` l'extrait de source à afficher.
+    """
+
+    ligne: int
+    colonne: int
+    nature: str
+    texte: str
+
+
+def _litteraux_ouverts(texte: str) -> list[LitteralOuvert]:
     """Lignes où un littéral ou un dollar-quote nommé n'est pas refermé.
 
     SQL n'autorise pas un littéral `'` sur plusieurs lignes.
@@ -107,17 +122,26 @@ def _litteraux_ouverts(texte: str) -> list[tuple[int, int, str]]:
 
     Un dollar-quote `$$` peut legitimement s'ouvrir sur une ligne et se fermer
     sur une autre : c'est la convention du dépôt pour les corps de fonction. Un
-    tag NOMMÉ (`$v_birthday$`) ne peut pas, et n'a aucune raison de le faire :
-    il entre en collision avec la syntaxe de PostgreSQL. Si le guillemet fermant
-    d'une chaîne est mal placé, le lexer sort du littéral, prend `$v_birthday$`
-    pour une ouverture, avale le reste du fichier, et annonce « unterminated
-    dollar-quoted string » — une erreur qui désigne le `$` d'une variable au
-    lieu du guillemet qui manque.
+    tag NOMMÉ (`$q$`) peut AUSSI traverser une ligne, et PostgreSQL l'autorise :
+    le dépôt l'emploie pour passer un SQL multi-lignes à une assertion
+    (`testkit.expect_denied($q$insert … $q$, '…')`). Le premier jet traitait
+    l'ouverture d'un tag nommé comme un défaut dès la fin de sa ligne
+    d'ouverture : il refusait donc un fichier SAIN — celui du test `0138` — et
+    un contrôle qui refuse du code que les tests couvrent est pire qu'aucun
+    (AGENTS.md §2.7 B) : on apprend à l'ignorer avant qu'il ne trouve un vrai
+    défaut.
+
+    Un tag nommé JAMAIS refermé reste un défaut, et il est signalé à la fin du
+    fichier, où l'on sait qu'il ne l'a pas été : c'est le symptôme que produit
+    un guillemet mal placé en amont (le lexer sort du littéral, prend `$q$`
+    pour une ouverture, avale le reste du fichier, et PostgreSQL annonce
+    « unterminated dollar-quoted string »).
     """
     corps = False          # dans un `$$ … $$`
     chaine = False
     nomme = False          # dans un dollar-quote à tag nommé
     tag = ""
+    ouverture = (0, -1, "")   # (ligne, colonne, texte) d'ouverture du tag nommé
     # Une seule cause par fichier : voir la sortie de la boucle.
 
     for n, ligne in enumerate(texte.splitlines(), 1):
@@ -163,24 +187,36 @@ def _litteraux_ouverts(texte: str) -> list[tuple[int, int, str]]:
                 fin = ligne.find("$", i + 1)
                 if fin > 0:
                     tag, nomme, colonne = ligne[i:fin + 1], True, i
+                    ouverture = (n, i, ligne)
                     i = fin + 1
                     continue
             i += 1
 
-        if chaine or nomme:
-            # Une seule cause par fichier. Tout ce qui suit est la conséquence
-            # de ce guillemet mal placé : rapporter chaque ligne aval|—
-            # parfois la totalité du fichier — noierait la vraie cause sous
-            # cent signalements, et le contrôle deviendrait illisible.
-            return [(n, colonne, ligne)]
+        if chaine:
+            # Un littéral simple ne traverse pas une ligne : le défaut est
+            # signalé ICI, à la ligne où il reste ouvert. Une seule cause par
+            # fichier : tout ce qui suit est la conséquence de ce guillemet mal
+            # placé, et rapporter chaque ligne aval noierait la vraie cause
+            # sous cent signalements.
+            return [LitteralOuvert(n, colonne, "littéral `'` non fermé", ligne)]
 
     n = len(texte.splitlines())
     if chaine:
-        return [(n, -1, "<littéral `'` jamais fermé en fin de fichier>")]
+        return [LitteralOuvert(
+            n, -1, "littéral `'` non fermé",
+            "<littéral `'` jamais fermé en fin de fichier>",
+        )]
     if nomme:
-        return [(n, -1, f"<dollar-quote {tag} jamais fermé en fin de fichier>")]
+        return [LitteralOuvert(
+            ouverture[0], ouverture[1],
+            f"dollar-quote {tag} jamais fermé",
+            ouverture[2],
+        )]
     if corps:
-        return [(n, -1, "<corps `$$ … $$` jamais fermé en fin de fichier>")]
+        return [LitteralOuvert(
+            n, -1, "corps `$$ … $$` jamais fermé",
+            "<corps `$$ … $$` jamais fermé en fin de fichier>",
+        )]
     return []
 
 
@@ -1133,13 +1169,25 @@ def main() -> int:
     # à la migration, puisque le test n'est pas rejoué avant la recette. Le
     # cinquième ne concerne que les tests.
     for f in [*migrations, *tests]:
-        for ligne, colonne, texte in _litteraux_ouverts(f.read_text()):
+        for ouverture in _litteraux_ouverts(f.read_text()):
+            if ouverture.nature.startswith("littéral"):
+                conseil = (
+                    f"      → SQL n'autorise pas un littéral sur plusieurs lignes. Si le\n"
+                    f"        guillemet fermant est mal placé, PostgreSQL complain d'un\n"
+                    f"        dollar-quoting et désigne le `$` d'une variable interpolée."
+                )
+            else:
+                conseil = (
+                    f"      → le dollar-quote est ouvert et jamais refermé : PostgreSQL\n"
+                    f"        avale le reste du fichier et annonce « unterminated\n"
+                    f"        dollar-quoted string ». Un guillemet mal placé en amont\n"
+                    f"        produit ce symptôme : c'est lui qu'il faut chercher."
+                )
             defauts.append(
-                f"{f.name}:{ligne}  littéral `'` non fermé ({'colonne ' + str(colonne + 1) if colonne >= 0 else 'fin de fichier'})\n"
-                f"      | {texte.strip()}\n"
-                f"      → SQL n'autorise pas un littéral sur plusieurs lignes. Si le\n"
-                f"        guillemet fermant est mal placé, PostgreSQL complain d'un\n"
-                f"        dollar-quoting et désigne le `$` d'une variable interpolée."
+                f"{f.name}:{ouverture.ligne}  {ouverture.nature} "
+                f"({'colonne ' + str(ouverture.colonne + 1) if ouverture.colonne >= 0 else 'fin de fichier'})\n"
+                f"      | {ouverture.texte.strip()}\n"
+                + conseil
             )
 
     for f in tests:
