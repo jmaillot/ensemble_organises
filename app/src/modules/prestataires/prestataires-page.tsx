@@ -34,11 +34,15 @@ export default function PrestatairesPage() {
     [providers, query, typeFilter],
   );
 
+  // La métrique « appels à passer » ne comptait AUCUNE semaine : elle
+  // comptait les fiches qui ont un téléphone. Le libellé disait « Cette
+  // semaine », et il mentait (AGENTS.md §2.7 I). Il dit maintenant ce qu'il
+  // compte.
   const metrics = useMemo(
     () => [
       { label: 'Prestataires', value: providers.length, caption: 'contacts enregistrés' },
       { label: 'Types', value: types.length, caption: 'types personnalisés' },
-      { label: 'Cette semaine', value: providers.filter(isCallable).length, caption: 'appels à passer' },
+      { label: 'Avec téléphone', value: providers.filter(isCallable).length, caption: 'appels possibles' },
       { label: 'Joignables', value: providers.filter(isShared).length, caption: 'e-mail renseigné' },
     ],
     [providers, types],
