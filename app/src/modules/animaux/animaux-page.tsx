@@ -197,6 +197,7 @@ export default function AnimauxPage() {
   return (
     <ModuleShell
       module="animaux"
+      infoTo="/animaux/aide"
       actions={
         <Button icon="plus" onClick={() => setPetForm({ open: true, pet: null })}>
           Ajouter une fiche

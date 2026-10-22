@@ -250,6 +250,7 @@ export default function ArdoiseDetailPage() {
   return (
     <ModuleShell
       module="ardoise"
+      infoTo="/ardoise/aide"
       actions={
         <>
           <Button variant="secondary" icon="arrowLeft" onClick={() => navigate('/ardoise')}>

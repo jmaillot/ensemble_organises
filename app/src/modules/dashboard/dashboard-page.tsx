@@ -116,6 +116,16 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2.5 max-[650px]:mt-4 max-[650px]:justify-start">
+          {/* L'accueil n'a pas de ModuleShell : son bouton de mode d'emploi
+              est posé ici, avec le même libellé et la même icône que
+              partout ailleurs. */}
+          <Button
+            variant="secondary"
+            size="icon"
+            icon="info"
+            aria-label="Comment ça marche"
+            onClick={() => navigate('/accueil/aide')}
+          />
           <Button
             variant="secondary"
             icon="grid"

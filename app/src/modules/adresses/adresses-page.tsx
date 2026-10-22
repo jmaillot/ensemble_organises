@@ -110,6 +110,7 @@ export default function AdressesPage() {
   return (
     <ModuleShell
       module="adresses"
+      infoTo="/adresses/aide"
       actions={
         <>
           <Button

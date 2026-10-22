@@ -504,6 +504,7 @@ export default function CadeauxPage() {
   return (
     <ModuleShell
       module="cadeaux"
+      infoTo="/cadeaux/aide"
       actions={
         tab === 'idees' ? (
           <Button icon="plus" onClick={openCreateIdea}>

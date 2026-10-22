@@ -83,6 +83,7 @@ export default function RoutinesPage() {
   return (
     <ModuleShell
       module="routines"
+      infoTo="/routines/aide"
       actions={
         canWrite ? (
           <Button icon="plus" onClick={openCreate}>

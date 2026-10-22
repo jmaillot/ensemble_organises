@@ -12,6 +12,7 @@ export default function ProductCatalogPage() {
   return (
     <ModuleShell
       module="courses"
+      infoTo="/courses/aide"
       actions={
         <Button variant="secondary" icon="arrowLeft" onClick={() => navigate('/courses')}>
           Listes

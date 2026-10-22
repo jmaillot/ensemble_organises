@@ -213,6 +213,7 @@ export default function RecetteDetailPage() {
     <div className="recipe-screen">
     <ModuleShell
       module="recettes"
+      infoTo="/recettes/aide"
       actions={
         <>
           <Button variant="secondary" icon="arrowLeft" onClick={() => navigate('/recettes')}>

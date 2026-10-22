@@ -113,6 +113,7 @@ export default function VoyagesPage() {
   return (
     <ModuleShell
       module="voyages"
+      infoTo="/voyages/aide"
       actions={
         <Button icon="plus" onClick={openCreate}>
           Créer un voyage

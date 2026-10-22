@@ -89,6 +89,7 @@ export default function FidelitePage() {
   return (
     <ModuleShell
       module="fidelite"
+      infoTo="/fidelite/aide"
       actions={
         <>
           <Button variant="secondary" icon="scan" onClick={() => setScannerOpen(true)}>

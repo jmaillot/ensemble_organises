@@ -146,6 +146,25 @@ test.describe('Parcours des modules', () => {
     await expect(page.getByRole('dialog')).toBeHidden();
   });
 
+  test('chaque espace a son mode d’emploi', async ({ page }) => {
+    await openDemoSession(page);
+    // Deux espaces différents, pour prouver que le bouton suit le module et
+    // ne mène pas toujours à la même page.
+    const espaces = [
+      { cle: 'taches', question: 'Qui peut supprimer une tâche ?', reponse: 'Le refus est dit, jamais silencieux' },
+      { cle: 'voyages', question: 'Qui peut ouvrir un voyage ?', reponse: 'il administre le voyage sans y écrire' },
+    ];
+    for (const espace of espaces) {
+      await page.goto(`/${espace.cle}`);
+      await page.getByRole('button', { name: 'Comment ça marche' }).click();
+      await expect(page).toHaveURL(new RegExp(`/${espace.cle}/aide`));
+      await expect(page.getByRole('heading', { level: 1, name: 'Comment ça marche' })).toBeVisible();
+      // Une question s’ouvre, et sa réponse est lisible.
+      await page.getByRole('button', { name: espace.question }).click();
+      await expect(page.getByText(espace.reponse)).toBeVisible();
+    }
+  });
+
   test('le mode d’emploi des courses s’ouvre depuis l’espace', async ({ page }) => {
     await openDemoSession(page);
     await page.goto('/courses');

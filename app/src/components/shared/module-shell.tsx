@@ -57,7 +57,8 @@ export function ModuleHeader({ module, actions, title, description, kicker, clas
   );
 }
 
-export function ModuleShell({ module, children, actions, backTo, backLabel, title, description }: { module: ModuleKey; children: ReactNode; actions?: ReactNode; backTo?: string; backLabel?: string; title?: string; description?: string }) {
+export function ModuleShell({ module, children, actions, backTo, backLabel, title, description, infoTo }: { module: ModuleKey; children: ReactNode; actions?: ReactNode; backTo?: string; backLabel?: string; title?: string; description?: string; infoTo?: string }) {
+  const navigate = useNavigate();
   return (
     <section className="mx-auto w-full max-w-[1180px]" data-module={module}>
       {/* `title` et `description` sont facultatifs et forwarding direct : sans
@@ -65,7 +66,25 @@ export function ModuleShell({ module, children, actions, backTo, backLabel, titl
           existants reste donc strictement identique. */}
       <ModuleHeader
         module={module}
-        actions={actions}
+        actions={
+          <>
+            {/* Le bouton de mode d'emploi passe par le SHELL et non par chaque
+                module : le libellé et l'icône sont les mêmes partout, et un
+                module qui l'oublierait n'aurait pas de mode d'emploi. Il est
+                hors du conditionnel d'écriture : le mode d'emploi se lit
+                aussi quand on ne peut rien écrire. */}
+            {infoTo ? (
+              <Button
+                variant="secondary"
+                size="icon"
+                icon="info"
+                aria-label="Comment ça marche"
+                onClick={() => navigate(infoTo)}
+              />
+            ) : null}
+            {actions}
+          </>
+        }
         backTo={backTo}
         backLabel={backLabel}
         title={title}

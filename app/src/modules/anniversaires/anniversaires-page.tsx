@@ -51,6 +51,7 @@ export default function AnniversairesPage() {
   return (
     <ModuleShell
       module="anniversaires"
+      infoTo="/anniversaires/aide"
       actions={
         <Button icon="plus" onClick={openCreate}>
           Ajouter un anniversaire

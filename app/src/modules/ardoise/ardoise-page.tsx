@@ -31,6 +31,7 @@ export default function ArdoisePage() {
   return (
     <ModuleShell
       module="ardoise"
+      infoTo="/ardoise/aide"
       actions={
         <>
           <Button icon="plus" onClick={() => setCreateOpen(true)}>

@@ -91,6 +91,7 @@ export default function NotesPage() {
   return (
     <ModuleShell
       module="notes"
+      infoTo="/notes/aide"
       actions={
         canWrite ? (
           <Button icon="plus" onClick={openCreate}>

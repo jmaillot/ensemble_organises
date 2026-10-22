@@ -57,6 +57,7 @@ export default function ContactsPage() {
   return (
     <ModuleShell
       module="contacts"
+      infoTo="/contacts/aide"
       actions={
         <Button icon="plus" onClick={openCreate}>
           Ajouter un contact

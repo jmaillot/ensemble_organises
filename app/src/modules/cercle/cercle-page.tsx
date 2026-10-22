@@ -27,6 +27,7 @@ export default function CerclePage() {
   return (
     <ModuleShell
       module="cercle"
+      infoTo="/cercle/aide"
       actions={
         <Button icon="plus" onClick={() => setFocusSignal((value) => value + 1)}>
           Publier un moment

@@ -221,6 +221,7 @@ export default function TachesPage() {
   return (
     <ModuleShell
       module="taches"
+      infoTo="/taches/aide"
       actions={
         canWrite ? (
           <Button icon="plus" onClick={openCreate}>

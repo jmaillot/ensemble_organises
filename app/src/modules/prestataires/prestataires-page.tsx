@@ -97,6 +97,7 @@ export default function PrestatairesPage() {
   return (
     <ModuleShell
       module="prestataires"
+      infoTo="/prestataires/aide"
       actions={
         <>
           <Button variant="secondary" icon="settings" onClick={() => setTypesOpen(true)}>

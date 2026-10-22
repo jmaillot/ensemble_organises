@@ -318,6 +318,7 @@ export default function CalendrierPage() {
   return (
     <ModuleShell
       module="calendrier"
+      infoTo="/calendrier/aide"
       actions={
         <>
           <Button variant="secondary" icon="download" disabled={isLoading || isError} onClick={print}>

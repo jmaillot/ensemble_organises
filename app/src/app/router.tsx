@@ -279,10 +279,22 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/accueil/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.dashboardGuide} />
+            }
+        />
+        <Route
           path="/taches"
           element={
             <LazyRoute load={routeChunkLoaders.taches} />
           }
+        />
+        <Route
+            path="/taches/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.tachesGuide} />
+            }
         />
         <Route
           path="/calendrier"
@@ -291,10 +303,22 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/calendrier/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.calendrierGuide} />
+            }
+        />
+        <Route
           path="/notes"
           element={
             <LazyRoute load={routeChunkLoaders.notes} />
           }
+        />
+        <Route
+            path="/notes/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.notesGuide} />
+            }
         />
         <Route
           path="/courses"
@@ -321,10 +345,22 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/routines/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.routinesGuide} />
+            }
+        />
+        <Route
           path="/recettes"
           element={
             <LazyRoute load={routeChunkLoaders.recettes} />
           }
+        />
+        <Route
+            path="/recettes/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.recettesGuide} />
+            }
         />
         <Route
           path="/recettes/:id"
@@ -339,6 +375,12 @@ export function AppRoutes() {
               <LazyRoute load={routeChunkLoaders.ardoise} />
             </RequireGrownUp>
           }
+        />
+        <Route
+            path="/ardoise/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.ardoiseGuide} />
+            }
         />
         <Route
           path="/ardoise/:id"
@@ -357,16 +399,34 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/cadeaux/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.cadeauxGuide} />
+            }
+        />
+        <Route
           path="/anniversaires"
           element={
             <LazyRoute load={routeChunkLoaders.anniversaires} />
           }
         />
         <Route
+            path="/anniversaires/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.anniversairesGuide} />
+            }
+        />
+        <Route
           path="/contacts"
           element={
             <LazyRoute load={routeChunkLoaders.contacts} />
           }
+        />
+        <Route
+            path="/contacts/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.contactsGuide} />
+            }
         />
         <Route
           path="/animaux"
@@ -377,12 +437,24 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/animaux/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.animauxGuide} />
+            }
+        />
+        <Route
           path="/prestataires"
           element={
             <RequireGrownUp>
               <LazyRoute load={routeChunkLoaders.prestataires} />
             </RequireGrownUp>
           }
+        />
+        <Route
+            path="/prestataires/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.prestatairesGuide} />
+            }
         />
         <Route
           path="/fidelite"
@@ -393,10 +465,22 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/fidelite/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.fideliteGuide} />
+            }
+        />
+        <Route
           path="/adresses"
           element={
             <LazyRoute load={routeChunkLoaders.adresses} />
           }
+        />
+        <Route
+            path="/adresses/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.adressesGuide} />
+            }
         />
         <Route
           path="/cercle"
@@ -405,10 +489,22 @@ export function AppRoutes() {
           }
         />
         <Route
+            path="/cercle/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.cercleGuide} />
+            }
+        />
+        <Route
           path="/voyages"
           element={
             <LazyRoute load={routeChunkLoaders.voyages} />
           }
+        />
+        <Route
+            path="/voyages/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.voyagesGuide} />
+            }
         />
         <Route
           path="/voyages/:tripId"
@@ -421,6 +517,12 @@ export function AppRoutes() {
           element={
             <LazyRoute load={routeChunkLoaders.messages} />
           }
+        />
+        <Route
+            path="/messages/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.messagesGuide} />
+            }
         />
         <Route
           path="/parametres"

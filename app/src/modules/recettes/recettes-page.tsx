@@ -95,6 +95,7 @@ export default function RecettesPage() {
   return (
     <ModuleShell
       module="recettes"
+      infoTo="/recettes/aide"
       actions={
         canWrite ? (
           <>
