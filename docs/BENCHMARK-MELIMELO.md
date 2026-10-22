@@ -1,12 +1,15 @@
 # Benchmark Melimelo → Ensemble & Organisés
 
 > Analyse menée le 21 octobre 2026 sur la branche `feat/melimelo-design`.
-> **État au 21 octobre 2026 :** le lot 0 est engagé. Les polices, les jetons, les
-> boutons, l'en-tête de module, le shell desktop/mobile et l'écran pilote
-> Courses sont faits. Les primitives `Card`, `PillTabs`, `ListRow` et
-> `EmptyState` restent à extraire, et les écrans n'ont pas encore été repris un
-> par un — ils héritent seulement des nouveaux jetons. Le **Calendrier** est le
-> premier écran repris en profondeur (grille, agenda, filtres, vues).
+> **État au 22 octobre 2026 :** le lot 0 et le lot 1 sont terminés. Le lot 2
+> (quick wins) est terminé aussi : export PDF des courses et du calendrier,
+> vue Tableau des tâches, verrou de note, Markdown, photo de couverture,
+> confettis et libellés d'anniversaire, emoji de catégorie d'événement,
+> recherche globale (palette Ctrl/Cmd + K), **import vCard dans Contacts**
+> (aperçu avant écriture, doublons marqués, structures ignorées) et
+> **recherche d'adresse en ligne** (Edge Function `place-search` sur
+> Nominatim, préremplissage du formulaire de lieu). Restent les lots 3
+> (nouveaux modules) et 4 (modèle économique).
 
 ## 0. Réponse courte
 
@@ -643,6 +646,14 @@ zéro débordement horizontal ; parcours clavier sur les 5 écrans principaux.
 PDF courses/calendrier, kanban, verrou de note, Markdown, couverture de note,
 libellés/confettis, emoji d'événement, recherche globale, import vCard, recherche
 d'adresse.
+
+**Fait, intégralement, entre le 21 et le 22 octobre 2026.** Les dix items sont
+livrés ; en complément du plan, quelques-uns ont été poussés plus loin que le
+minimum : la palette de recherche couvre les espaces restants et ouvre les
+fiches, l'import vCard montre chaque fiche avant d'écrire (doublons probables
+marqués et écartés par défaut, structures comptées), et la recherche d'adresse
+passe par une Edge Function dédiée (`place-search`, Nominatim) qui borne le
+rythme et met en cache, conformément à la politique d'usage d'OSM.
 
 ### Lot 3 — Nouveaux modules, par vagues
 

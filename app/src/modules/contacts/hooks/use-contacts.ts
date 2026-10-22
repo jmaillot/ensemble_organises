@@ -6,7 +6,8 @@ import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { invalidateTables } from '@/modules/calendrier/hooks/use-calendrier';
 import { toContact, toContactList, type Contact, type ContactFormValues, type ContactList } from '../types';
-import { createContact, deleteContact, moveContactToFamily, updateContact } from '../api';
+import { createContact, createContactsBulk, deleteContact, moveContactToFamily, updateContact } from '../api';
+import type { VcardPerson } from '../vcard';
 import type { ContactListRow, ContactRow } from '@/types';
 
 const TABLES = ['contact_lists', 'contacts'];
@@ -25,6 +26,8 @@ export interface ContactsResource {
   removeContact: (id: string) => Promise<void>;
   /** Déplace une fiche personnelle vers la liste Famille (D-04). */
   moveToFamily: (id: string) => Promise<void>;
+  /** Import vCard : crée les fiches d'un coup dans la liste choisie. */
+  importContacts: (listId: string, people: VcardPerson[]) => Promise<number>;
 }
 
 /** Listes et fiches contacts du foyer, avec la liste « Famille » en tête. */
@@ -52,6 +55,14 @@ export function useContacts(): ContactsResource {
   });
 
   const removeMutation = useMutation({ mutationFn: (id: string) => deleteContact(id), onSuccess: refresh });
+
+  const importMutation = useMutation({
+    mutationFn: async ({ listId, people }: { listId: string; people: VcardPerson[] }) => {
+      if (!householdId) throw new Error('Aucun foyer actif : reconnectez-vous.');
+      return createContactsBulk(people, householdId, listId);
+    },
+    onSuccess: refresh,
+  });
 
   // La liste « Famille » partagée reçoit les fiches déplacées (D-04).
   const moveMutation = useMutation({
@@ -117,7 +128,7 @@ export function useContacts(): ContactsResource {
       listsResource.refetch();
       contactsResource.refetch();
     },
-    isMutating: saveMutation.isPending || removeMutation.isPending || moveMutation.isPending,
+    isMutating: saveMutation.isPending || removeMutation.isPending || moveMutation.isPending || importMutation.isPending,
     saveContact: (id, values) => saveMutation.mutateAsync({ id, values }),
     removeContact: async (id) => {
       await removeMutation.mutateAsync(id);
@@ -125,5 +136,6 @@ export function useContacts(): ContactsResource {
     moveToFamily: async (id) => {
       await moveMutation.mutateAsync(id);
     },
+    importContacts: (listId, people) => importMutation.mutateAsync({ listId, people }),
   };
 }

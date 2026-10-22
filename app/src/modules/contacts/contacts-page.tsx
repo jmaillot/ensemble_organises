@@ -9,6 +9,7 @@ import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { cn, pluralize } from '@/lib/utils';
 import { ContactFormDialog } from './components/contact-form-dialog';
+import { ContactImportDialog } from './components/contact-import-dialog';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useContacts } from './hooks/use-contacts';
 import { formatFrDate } from './types';
@@ -17,12 +18,13 @@ import { useOpenRecord } from '@/hooks/use-open-record';
 
 export default function ContactsPage() {
   const toast = useToast();
-  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact, moveToFamily } =
+  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact, moveToFamily, importContacts } =
     useContacts();
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<{ open: boolean; contact: Contact | null }>({ open: false, contact: null });
+  const [importOpen, setImportOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Contact | null>(null);
   const [pendingMove, setPendingMove] = useState<Contact | null>(null);
 
@@ -62,9 +64,14 @@ export default function ContactsPage() {
       module="contacts"
       infoTo="/contacts/aide"
       actions={
-        <Button icon="plus" onClick={openCreate}>
-          Ajouter un contact
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon="people" onClick={() => setImportOpen(true)}>
+            Importer un vCard
+          </Button>
+          <Button icon="plus" onClick={openCreate}>
+            Ajouter un contact
+          </Button>
+        </div>
       }
     >
       <MetricRow
@@ -226,6 +233,15 @@ export default function ContactsPage() {
             toast(error instanceof Error ? error.message : 'Le contact n’a pas pu être enregistré.', 'error');
           }
         }}
+      />
+
+      <ContactImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        lists={lists}
+        existingContacts={contacts}
+        isImporting={isMutating}
+        onImport={(listId, people) => importContacts(listId, people)}
       />
 
       <ConfirmDialog

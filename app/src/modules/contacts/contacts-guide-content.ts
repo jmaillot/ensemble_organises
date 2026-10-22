@@ -35,6 +35,11 @@ export const CONTACTS_GUIDE_SECTIONS: GuideSection[] = [
         title: 'Retrouver une fiche',
         text: "La recherche porte sur le nom. Elle se combine avec le choix de la liste, et la liste « Famille » est proposée par défaut.",
       },
+      {
+        icon: 'send',
+        title: 'Importer un fichier vCard',
+        text: "Un .vcf exporté du téléphone se lit avant d’être écrit : chaque fiche est montrée, les doublons probables sont marqués et écartés par défaut, les fiches de structure (sociétés) sont comptées puis ignorées. Seuls le nom et la date de naissance sont repris.",
+      },
     ],
   },
 ];
@@ -59,6 +64,11 @@ export const CONTACTS_GUIDE_QUESTIONS: GuideQuestion[] = [
     question: 'Que devient l’anniversaire quand je supprime une fiche ?',
     answer:
       "Son anniversaire miroir disparaît aussi. Une date saisie à la main dans l’espace Anniversaires, elle, reste : c’est une autre ligne.",
+  },
+  {
+    question: 'Que retient l’import d’un fichier vCard ?',
+    answer:
+      "Le nom et la date de naissance — une date crée aussi l’anniversaire. Les photos, téléphones et adresses du fichier ne sont pas repris ; une fiche de structure (société) n’est pas importée, l’espace porte des personnes. Le fichier est montré avant toute écriture.",
   },
   {
     question: 'Peut-on envoyer une fiche à quelqu’un ?',
