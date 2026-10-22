@@ -173,6 +173,46 @@ test.describe('Parcours des modules', () => {
   });
 });
 
+test.describe('Recherche globale', () => {
+  test('le bouton de recherche mène à un espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await expect(palette).toBeVisible();
+
+    await palette.getByRole('combobox').fill('fidelite');
+    await expect(palette.getByRole('option', { name: /Fidélité/ })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/fidelite/);
+  });
+
+  test('le raccourci ouvre la palette depuis n’importe quelle page', async ({ page }) => {
+    test.skip(viewportIsMobile(page), 'raccourci clavier : bureau uniquement');
+
+    await openDemoSession(page);
+    await page.goto('/courses');
+    // Le raccourci n'existe qu'une fois l'effet posé sur `window` : on attend
+    // que la page soit montée, sinon la frappe part dans le vide.
+    await expect(page.getByRole('heading', { level: 1, name: 'Courses' })).toBeVisible();
+
+    const palette = page.getByRole('dialog');
+    // La frappe est un événement UNIQUE : si elle part trop tôt, elle est
+    // perdue. On réessaie jusqu'à ce que la palette réponde — sans jamais
+    // re-frapper une palette déjà ouverte, qui se refermerait.
+    await expect(async () => {
+      if (await palette.isVisible()) return;
+      await page.keyboard.press('Control+k');
+      await expect(palette).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20000 });
+    await expect(palette.getByRole('combobox')).toBeFocused();
+
+    // La palette se referme sur Échap.
+    await page.keyboard.press('Escape');
+    await expect(palette).toBeHidden();
+  });
+});
+
 test.describe('Accessibilité et responsive', () => {
   test('aucun débordement horizontal de 360px à 1920px', async ({ page }) => {
     await openDemoSession(page);

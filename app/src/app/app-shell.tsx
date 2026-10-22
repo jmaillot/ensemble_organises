@@ -16,6 +16,7 @@ import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
 import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
+import { CommandPalette } from '@/components/shared/command-palette';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
@@ -29,6 +30,14 @@ import { syncRotatedPushSubscription } from '@/modules/parametres/lib/push';
 import type { TaskRow } from '@/types';
 
 const homeIcon: IconName = 'home';
+
+/**
+ * Libellé du raccourci, selon la plateforme. `platform` n'est pas normalisé
+ * (`MacIntel`, `iPad`…), et le test jsdom rend une chaîne vide : il obtient
+ * donc « Ctrl K », la forme juste sur la machine qui l'exécute.
+ */
+const searchShortcutLabel =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
 export function AppShell() {
   const location = useLocation();
@@ -52,6 +61,7 @@ export function AppShell() {
   }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const notifications = useNotifications();
   const unread = notifications.total;
   const { rows: openTasks } = useResource<TaskRow>('tasks', {
@@ -84,6 +94,20 @@ export function AppShell() {
     return () => {
       document.body.dataset.scrollLock = 'false';
     };
+  }, []);
+
+  // Ctrl/Cmd + K ouvre la palette partout dans l'application. L'écouteur est
+  // posé une fois sur `window` : la palette n'est pas un composant de route, et
+  // un raccourci qui ne marcherait que sur l'accueil ne serait pas un raccourci.
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      setSearchOpen((value) => !value);
+    };
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
   }, []);
 
   useEffect(() => {
@@ -267,6 +291,19 @@ export function AppShell() {
             <strong className="font-[750] text-fg">{currentLabel}</strong>
           </nav>
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label={`Rechercher (${searchShortcutLabel})`}
+              aria-keyshortcuts="Control+K Meta+K"
+              className="flex min-h-11 items-center gap-2 rounded-full border border-border/70 bg-surface px-3 text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg max-[650px]:w-11 max-[650px]:justify-center max-[650px]:px-0"
+            >
+              <Icon name="search" size="sm" />
+              <span className="text-[12.5px] font-[650] max-[650px]:sr-only">Rechercher</span>
+              <kbd className="hidden rounded-[5px] border border-border bg-surface-2 px-1 py-px text-[10px] font-[650] min-[1180px]:inline">
+                {searchShortcutLabel}
+              </kbd>
+            </button>
             {canInstall ? (
               <Button variant="secondary" size="sm" icon="download" className="max-[650px]:hidden" onClick={install}>
                 Installer l’app
@@ -326,6 +363,8 @@ export function AppShell() {
         memberCount={members.length}
         isAdmin={isAdmin}
       />
+
+      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
 
       {isMobileLayout ? <MobileBottomNav onMore={() => setDrawerOpen(true)} /> : null}
     </div>
