@@ -17,6 +17,8 @@ import { ADRESSES_GUIDE_QUESTIONS, ADRESSES_GUIDE_SECTIONS } from './adresses/ad
 import { CERCLE_GUIDE_QUESTIONS, CERCLE_GUIDE_SECTIONS } from './cercle/cercle-guide-content';
 import { VOYAGES_GUIDE_QUESTIONS, VOYAGES_GUIDE_SECTIONS } from './voyages/voyages-guide-content';
 import { MESSAGES_GUIDE_QUESTIONS, MESSAGES_GUIDE_SECTIONS } from './messages/messages-guide-content';
+import { FRIGO_GUIDE_QUESTIONS, FRIGO_GUIDE_SECTIONS } from './frigo/frigo-guide-content';
+import { MENU_GUIDE_QUESTIONS, MENU_GUIDE_SECTIONS } from './menu/menu-guide-content';
 import type { GuideQuestion, GuideSection } from '@/components/shared/module-guide';
 
 /**
@@ -33,14 +35,16 @@ import type { GuideQuestion, GuideSection } from '@/components/shared/module-gui
  * page à moitié remplie se remarque à l'écran, et surtout quand on la cherche.
  *
  * « Honnête » : la page décrit NOTRE application. Les fonctions Premium de la
- * référence (frigo, export PDF en fichier, suggestions de l'assistant) n'existent
+ * référence (export PDF en fichier, suggestions de l'assistant) n'existent
  * pas ici : si quelqu'un recopie le texte de la référence, ces mots-là doivent
  * rendre le test ROUGE. Une page d'aide qui promet ce que l'application ne fait
- * pas est pire qu'une page d'aide absente (AGENTS.md §2.7 I).
+ * pas est pire qu'une page d'aide absente (AGENTS.md §2.7 I). « frigo » a
+ * quitté la liste le jour où l'espace Frigo est devenu un module réel de
+ * l'application (vague 3.1).
  */
 
 /** Les fonctions de la référence que cette application n'a pas. */
-const FONCTIONS_ABSENTES = ['premium', 'frigo', 'melia', 'export pdf', 'fichier pdf'];
+const FONCTIONS_ABSENTES = ['premium', 'melia', 'export pdf', 'fichier pdf'];
 
 interface Guide {
   module: string;
@@ -67,13 +71,15 @@ const GUIDES: Guide[] = [
   { module: 'cercle', sections: CERCLE_GUIDE_SECTIONS, questions: CERCLE_GUIDE_QUESTIONS },
   { module: 'voyages', sections: VOYAGES_GUIDE_SECTIONS, questions: VOYAGES_GUIDE_QUESTIONS },
   { module: 'messages', sections: MESSAGES_GUIDE_SECTIONS, questions: MESSAGES_GUIDE_QUESTIONS },
+  { module: 'frigo', sections: FRIGO_GUIDE_SECTIONS, questions: FRIGO_GUIDE_QUESTIONS },
+  { module: 'menu', sections: MENU_GUIDE_SECTIONS, questions: MENU_GUIDE_QUESTIONS },
 ];
 
 describe('les modes d’emploi des espaces', () => {
   it('couvre tous les espaces du foyer', () => {
-    // Dix-huit espaces : l'accueil et les dix-sept du catalogue. Un module
+    // Vingt espaces : l'accueil et les dix-neuf du catalogue. Un module
     // sans mode d'emploi serait un trou, pas un détail.
-    expect(GUIDES).toHaveLength(18);
+    expect(GUIDES).toHaveLength(20);
     expect(new Set(GUIDES.map((guide) => guide.module)).size).toBe(GUIDES.length);
   });
 

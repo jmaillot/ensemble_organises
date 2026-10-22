@@ -32,7 +32,7 @@ function entryFor(key: DrawerKey): DrawerEntry {
  * (chaque espace du catalogue + la maison) reste branché dessus.
  */
 export const MOBILE_DRAWER_GROUPS: Array<{ title: string; keys: DrawerKey[] }> = [
-  { title: 'Au quotidien', keys: ['accueil', 'taches', 'calendrier', 'courses', 'routines', 'notes'] },
+  { title: 'Au quotidien', keys: ['accueil', 'taches', 'calendrier', 'courses', 'routines', 'notes', 'frigo', 'menu'] },
   { title: 'Le foyer', keys: ['ardoise', 'cadeaux', 'anniversaires', 'contacts', 'cercle', 'messages'] },
   { title: 'Pratique', keys: ['prestataires', 'fidelite', 'adresses', 'voyages', 'animaux', 'recettes'] },
 ];

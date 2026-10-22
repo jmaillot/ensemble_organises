@@ -148,8 +148,8 @@ describe('preloadRouteChunks — préchargement idle', () => {
     // couverture précache (`scripts/check-precache-coverage.sh`) compare
     // la table au build. Le nombre se met à jour ICI, à l'ajout d'une
     // route — jamais dans le silence.
-    expect(ROUTE_CHUNK_COUNT).toBe(53);
-    expect(Object.keys(routeChunkLoaders)).toHaveLength(53);
+    expect(ROUTE_CHUNK_COUNT).toBe(57);
+    expect(Object.keys(routeChunkLoaders)).toHaveLength(57);
   });
 
   it("ne télécharge rien avant l'idle, puis chaque morceau en ligne", async () => {

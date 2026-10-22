@@ -572,6 +572,36 @@ export interface ContactRow {
   linked_member_id: string | null;
 }
 
+/** Frigo du foyer (migration 0141) : un article par ligne. */
+export interface PantryItemRow {
+  id: string;
+  household_id: Uuid;
+  name: string;
+  category: 'produit_frais' | 'surgele' | 'epicerie' | 'boisson' | 'autre';
+  quantity: number;
+  unit: string | null;
+  location: 'frigo' | 'congelateur' | 'garde_manger';
+  expires_on: IsoDate | null;
+  opened_on: IsoDate | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
+/** Menu du foyer (migration 0142) : un repas par date et moment de journée. */
+export interface MealEntryRow {
+  id: string;
+  household_id: Uuid;
+  entry_date: IsoDate;
+  slot: 'matin' | 'midi' | 'soir';
+  recipe_id: string | null;
+  free_text: string | null;
+  servings: number;
+  member_ids: string[];
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
 export interface PetRow {
   id: Uuid;
   household_id: Uuid;

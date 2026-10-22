@@ -22,6 +22,8 @@ export type ModuleKey =
   | 'cercle'
   | 'voyages'
   | 'messages'
+  | 'frigo'
+  | 'menu'
   | 'parametres';
 
 export interface ModuleEntry {
@@ -65,6 +67,8 @@ export const modules: ModuleEntry[] = [
   { key: 'cercle', label: 'Cercle', detail: 'Photos & réactions', kicker: 'Le fil du foyer', image: 'cercle.jpg', icon: 'people', short: 'Cercle', tile: true, nav: true },
   { key: 'voyages', label: 'Voyages', detail: 'Projets à préparer', kicker: 'Partir ensemble', image: 'voyages.jpg', icon: 'map', short: 'Voyages', tile: true, nav: false },
   { key: 'messages', label: 'Messages', detail: 'Échanges privés', kicker: 'Se retrouver', image: 'cercle.jpg', icon: 'message', short: 'Messages', tile: true, nav: false },
+  { key: 'frigo', label: 'Frigo', detail: 'Stocks & péremptions', kicker: 'Rien ne se perd', image: 'courses.jpg', icon: 'archive', short: 'Frigo', tile: true, nav: false },
+  { key: 'menu', label: 'Menu', detail: 'Repas de la semaine', kicker: 'La semaine à table', image: 'courses.jpg', icon: 'calendar', short: 'Menu', tile: true, nav: false },
 ];
 
 export const moduleMap: Record<ModuleKey, ModuleEntry> = Object.fromEntries(

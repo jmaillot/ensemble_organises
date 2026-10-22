@@ -525,6 +525,30 @@ export function AppRoutes() {
             }
         />
         <Route
+          path="/frigo"
+          element={
+            <LazyRoute load={routeChunkLoaders.frigo} />
+          }
+        />
+        <Route
+            path="/frigo/aide"
+            element={
+              <LazyRoute load={routeChunkLoaders.frigoGuide} />
+            }
+        />
+        <Route
+          path="/menu"
+          element={
+            <LazyRoute load={routeChunkLoaders.menu} />
+          }
+        />
+        <Route
+          path="/menu/aide"
+          element={
+            <LazyRoute load={routeChunkLoaders.menuGuide} />
+          }
+        />
+        <Route
           path="/parametres"
           element={
             <LazyRoute load={routeChunkLoaders.parametres} />

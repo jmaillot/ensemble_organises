@@ -138,6 +138,31 @@ export const demoHousehold: HouseholdRow = {
   disabled_modules: [],
 };
 
+/**
+ * Frigo de démonstration (0141, vague 3.1) : trois emplacements représentés,
+ * avec un article périmé, un bientôt périmé et des articles sans date pour
+ * exercer tous les états de pastille.
+ */
+export const demoPantryItems = [
+  { id: 'pantry-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts nature', category: 'produit_frais', quantity: 8, unit: 'pots', location: 'frigo', expires_on: day(4), opened_on: null, notes: null, created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Jambon blanc', category: 'produit_frais', quantity: 1, unit: 'barquette', location: 'frigo', expires_on: day(1), opened_on: todayIso(), notes: 'Ouvert mardi', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème fraîche', category: 'produit_frais', quantity: 1, unit: 'pot', location: 'frigo', expires_on: day(-2), opened_on: day(-5), notes: 'À jeter', created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'pantry-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Pois du jardin', category: 'surgele', quantity: 2, unit: 'sacs', location: 'congelateur', expires_on: day(120), opened_on: null, notes: null, created_by: DEMO_MEMBERS.lina, created_at: now() },
+  { id: 'pantry-5', household_id: DEMO_HOUSEHOLD_ID, name: 'Pâtes penne', category: 'epicerie', quantity: 3, unit: 'paquets', location: 'garde_manger', expires_on: null, opened_on: null, notes: null, created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-6', household_id: DEMO_HOUSEHOLD_ID, name: 'Jus de pomme', category: 'boisson', quantity: 2, unit: 'briques', location: 'garde_manger', expires_on: day(30), opened_on: null, notes: null, created_by: DEMO_MEMBERS.thomas, created_at: now() },
+];
+
+/**
+ * Menu de démonstration (0142, vague 3.1) : la semaine courante, recette du
+ * foyer et textes libres mêlés, pour exercer les deux contenus et les trois
+ * moments de la journée.
+ */
+export const demoMealEntries = [
+  { id: 'meal-1', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(0), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 4, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas, DEMO_MEMBERS.lina], created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'meal-2', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(1), slot: 'midi', recipe_id: null, free_text: 'Restes du frigo', servings: 2, member_ids: [], created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'meal-3', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(2), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 2, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas], created_by: DEMO_MEMBERS.camille, created_at: now() },
+];
+
 export const demoMembers: HouseholdMemberRow[] = [
   {
     id: DEMO_MEMBERS.camille,
@@ -1474,6 +1499,8 @@ const seedTables: Record<string, Row[]> = {
     } as unknown as Row,
   ],
   household_members: demoMembers as unknown as Row[],
+  pantry_items: demoPantryItems as unknown as Row[],
+  meal_entries: demoMealEntries as unknown as Row[],
   shopping_lists: [...demoShoppingLists, ...demoTripShoppingLists] as unknown as Row[],
   shopping_list_items: [...demoShoppingItems, ...demoTripShoppingItems] as unknown as Row[],
   products: demoProducts as unknown as Row[],
