@@ -250,6 +250,62 @@ export function nextPriorityOrder(orders: number[], priority: TaskPriority): num
  * Ranks à persister après un glisser-déposer : les tâches déplacées occupent les
  * places des tâches visibles, les autres gardent la leur.
  */
+/**
+ * LE TRI EN UN CLIC.
+ *
+ * La référence range les tâches « à la main par glisser-déposer, ou
+ * réordonne d'un coup par date limite ou par responsable ». Les deux gestes
+ * existent chez nous, mais le second manquait.
+ *
+ * L'ordre trié REMPLACE l'ordre du foyer : les rangs sont ÉCRITS, comme au
+ * glisser-déposer. Un tri qui ne serait qu'un filtre d'affichage se
+ * disputerait avec le geste — les deux voudraient tenir l'ordre.
+ *
+ * DEUX RÈGLES, et elles sont dans le code plutôt que dans un commentaire :
+ *
+ * - une tâche SANS échéance passe APRÈS celles qui en ont une ; une tâche
+ *   SANS assigné passe après celles qui en ont un. L'absence est une
+ *   absence, pas un « début de liste » ;
+ * - le départage final est l'IDENTIFIANT, donc deux tâches à la même
+ *   échéance ne s'échangent pas d'une lecture à l'autre.
+ */
+export type TaskSort = 'echeance' | 'responsable';
+
+/** Le nom du premier assigné, ou `null` si la tâche n'en a pas. */
+function firstAssigneeName(task: Task): string | null {
+  const name = task.assignees[0]?.member.display_name?.trim();
+  return name ? name : null;
+}
+
+export function sortedIdsFor(tasks: Task[], sort: TaskSort): string[] {
+  const byId = (a: Task, b: Task) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const sorted = [...tasks];
+  if (sort === 'echeance') {
+    sorted.sort((a, b) => {
+      if (a.dueDate === b.dueDate) return byId(a, b);
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate < b.dueDate ? -1 : 1;
+    });
+  } else {
+    sorted.sort((a, b) => {
+      const na = firstAssigneeName(a);
+      const nb = firstAssigneeName(b);
+      if (na === nb) {
+        // Même responsable : l'échéance départage, sinon l'identifiant.
+        if (a.dueDate === b.dueDate) return byId(a, b);
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate < b.dueDate ? -1 : 1;
+      }
+      if (!na) return 1;
+      if (!nb) return -1;
+      return na.localeCompare(nb, 'fr');
+    });
+  }
+  return sorted.map((task) => task.id);
+}
+
 export function manualRanks(tasks: Task[], orderedIds: string[]): Record<string, number> {
   const ordered = [...tasks].sort((a, b) => a.priorityOrder - b.priorityOrder);
   const wanted = new Set(orderedIds);

@@ -20,7 +20,17 @@ import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
-import { memberFirstName, isOpenForMe, taskFilters, taskGroup, type Task, type TaskGroup, type TaskStatus } from './types';
+import {
+  memberFirstName,
+  isOpenForMe,
+  sortedIdsFor,
+  taskFilters,
+  taskGroup,
+  type Task,
+  type TaskGroup,
+  type TaskSort,
+  type TaskStatus,
+} from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
 import { TaskBoard } from './components/task-board';
@@ -106,6 +116,7 @@ export default function TachesPage() {
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [dragged, setDragged] = useState<Task | null>(null);
   const [view, setView] = useState<TaskView>(readStoredView);
+  const [sort, setSort] = useState<TaskSort | 'manuel'>('manuel');
 
   // Raccourci depuis le calendrier : l'échéance voyage dans l'état de
   // navigation et ouvre la création, consommé une seule fois (sans quoi chaque
@@ -191,6 +202,26 @@ export default function TachesPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setDragged(visibleTasks.find((task) => task.id === String(event.active.id)) ?? null);
+  };
+
+  /**
+   * LE TRI EN UN CLIC : réordonner tout d'un coup, par échéance ou par
+   * responsable. Les rangs sont ÉCRITS, comme au glisser-déposer — l'ordre
+   * trié devient l'ordre du foyer.
+   */
+  const appliquerTri = (value: TaskSort | 'manuel') => {
+    setSort(value);
+    if (value === 'manuel') return;
+    void reorder(sortedIdsFor(visibleTasks, value))
+      .then(() =>
+        toast(value === 'echeance' ? 'Tâches triées par échéance.' : 'Tâches triées par responsable.'),
+      )
+      .catch((sortError: unknown) =>
+        toast(
+          sortError instanceof Error ? sortError.message : 'Le tri n’a pas pu être enregistré.',
+          'error',
+        ),
+      );
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -348,6 +379,23 @@ export default function TachesPage() {
                     ))}
                   </Select>
                 ) : null}
+                <Select
+                  aria-label="Trier les tâches"
+                  className="w-auto min-w-[150px] max-[650px]:w-full max-[650px]:min-w-0"
+                  value={sort}
+                  onChange={(event) => appliquerTri(event.target.value as TaskSort | 'manuel')}
+                  title={
+                    assigneesUnknown
+                      ? 'Les assignés ne sont pas encore connus : le tri attendra leur lecture.'
+                      : undefined
+                  }
+                >
+                  <option value="manuel">L’ordre du foyer</option>
+                  <option value="echeance">Par échéance</option>
+                  <option value="responsable" disabled={assigneesUnknown}>
+                    Par responsable
+                  </option>
+                </Select>
                 <Select
                   aria-label="Filtrer par assigné"
                   className="w-auto min-w-[170px] max-[650px]:w-full max-[650px]:min-w-0"

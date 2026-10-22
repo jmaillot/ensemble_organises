@@ -25,6 +25,11 @@ export const TACHES_GUIDE_SECTIONS: GuideSection[] = [
         text: "La poignée saisit la ligne et la déplace, à la souris, au doigt ou au clavier. Les tâches en retard restent en tête et les terminées en dernier : on ne mélange pas les deux.",
       },
       {
+        icon: 'filter',
+        title: 'Un tri en un clic',
+        text: "Par échéance ou par responsable, d’un coup : l’ordre trié devient le vôtre, comme quand vous rangez les lignes à la main. Le tri par responsable attend que les assignés soient connus — il ne devine personne.",
+      },
+      {
         icon: 'grid',
         title: 'Liste ou tableau',
         text: "La vue Tableau range les tâches en trois colonnes — À faire, En cours, Terminée — et une carte se déplace par sa poignée, ou change de statut au clavier. La vue choisie est mémorisée.",

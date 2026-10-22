@@ -313,6 +313,35 @@ describe('TachesPage — le dépôt tient la promesse du tri (WR-13, D-11)', () 
 });
 
 /**
+ * LE TRI EN UN CLIC : la référence range les tâches « d'un coup par date
+ * limite ou par responsable », à côté du glisser-déposer.
+ *
+ * Le tri ÉCRIT les rangs : l'ordre trié devient l'ordre du foyer, comme au
+ * dépôt. Un simple filtre d'affichage se disputerait avec le geste — les deux
+ * voudraient tenir l'ordre.
+ */
+describe('TachesPage — le tri en un clic', () => {
+  it('range par responsable et écrit les rangs', async () => {
+    const updateSpy = vi.spyOn(data, 'update');
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+    await findTaskList();
+
+    await user.selectOptions(screen.getByLabelText('Trier les tâches'), 'responsable');
+
+    // Les rangs sont écrits : l'ordre trié devient l'ordre du foyer.
+    await waitFor(() => {
+      const ecrits = updateSpy.mock.calls.filter(([table]) => table === 'tasks');
+      expect(ecrits.length).toBeGreaterThan(0);
+    });
+    // Et le foyer est prévenu, parce qu'un ordre qui change en silence
+    // ressemblerait à un tri qui n'a rien fait.
+    const toastRegion = () => within(screen.getByRole('region', { name: 'Notifications de l’application' }));
+    expect(await toastRegion().findByText(/Tâches triées par responsable/)).toBeInTheDocument();
+  });
+});
+
+/**
  * WR-02 : la corbeille suit le rôle, pas la capacité d'écriture.
  *
  * Le mode démo (Dexie) ne porte **ni RLS ni contrainte** : c'est la raison
