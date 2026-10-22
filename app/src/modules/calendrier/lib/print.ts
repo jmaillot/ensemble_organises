@@ -1,5 +1,5 @@
 import { formatLongDate } from '@/lib/utils';
-import type { AgendaItem } from '../types';
+import { agendaItemIcon, type AgendaItem } from '../types';
 
 /**
  * Feuille imprimable d'une période (Lot 2, export Calendrier).
@@ -15,6 +15,8 @@ import type { AgendaItem } from '../types';
 export interface CalendarPrintItem {
   key: string;
   time: string;
+  /** Emoji du genre d'élément : catégorie de l'événement, ou signe fixe. */
+  icon: string;
   title: string;
   subtitle: string | null;
 }
@@ -50,6 +52,7 @@ export function toCalendarPrintModel(
         items: day.items.map((item) => ({
           key: item.key,
           time: item.time,
+          icon: agendaItemIcon(item),
           title: item.title,
           subtitle: item.subtitle,
         })),

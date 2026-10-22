@@ -9,7 +9,7 @@ import type { AgendaItem } from '../types';
  * tests.
  */
 const entry = (over: Partial<AgendaItem> & { key: string; time: string; title: string }): AgendaItem =>
-  ({ subtitle: null, ...over }) as unknown as AgendaItem;
+  ({ subtitle: null, kind: 'event', icon: '🗓️', ...over }) as unknown as AgendaItem;
 
 describe('toCalendarPrintModel', () => {
   it('écarte les jours vides et garde l’ordre de la période', () => {
@@ -38,9 +38,24 @@ describe('toCalendarPrintModel', () => {
     expect(model.days[0].items[0]).toEqual({
       key: 'a',
       time: '10:00',
+      icon: '🗓️',
       title: 'Courses du samedi',
       subtitle: 'Marché de proximité',
     });
+  });
+
+  it('reporte l’emoji de la catégorie et le signe fixe des autres genres', () => {
+    const model = toCalendarPrintModel('Jour', 'Foyer Martin · 2 éléments', [
+      {
+        iso: '2026-10-21',
+        items: [
+          entry({ key: 'a', time: '08:00', title: 'Rentrée', icon: '🎒' }),
+          entry({ key: 'b', time: 'Échéance', title: 'Sortir les poubelles', kind: 'tache' }),
+        ],
+      },
+    ]);
+
+    expect(model.days[0].items.map((item) => item.icon)).toEqual(['🎒', '✅']);
   });
 
   it('rend une feuille sans jour quand la période est vide', () => {

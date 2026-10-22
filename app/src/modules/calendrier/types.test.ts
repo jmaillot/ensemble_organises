@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDayMarkers, isExitingPerso, toCalendarEvent } from './types';
+import { agendaItemIcon, buildAgenda, buildDayMarkers, eventCategoryIcon, isExitingPerso, toCalendarEvent } from './types';
 import type { EventRow } from '@/types';
 
 const calendars = [
@@ -64,5 +64,53 @@ describe('couleur catégorie (D-07)', () => {
     );
     expect(markers['2026-10-06'].categoryColor).toBe('#3E7CB1');
     expect(markers['2026-10-06'].colorTag).toBe('accent');
+  });
+});
+
+/**
+ * 0138 — l'emoji vient de la catégorie quand le foyer l'a posé, sinon du nom,
+ * sinon de la pastille neutre. Le repli n'est pas un détail : les catégories
+ * créées avant la colonne, ou sans choisir d'emoji, en dépendent.
+ */
+describe('emoji de catégorie (0138)', () => {
+  it('donne la priorité à l’icône posée, espaces de bord retirés', () => {
+    expect(eventCategoryIcon('🎒', 'Repas')).toBe('🎒');
+    expect(eventCategoryIcon('  ⚽  ', 'École')).toBe('⚽');
+  });
+
+  it('déduit un emoji du nom quand la catégorie n’en porte pas', () => {
+    expect(eventCategoryIcon(null, 'Repas')).toBe('🍽️');
+    expect(eventCategoryIcon(null, 'Médical')).toBe('🩺');
+    expect(eventCategoryIcon(null, 'École')).toBe('🎒');
+    expect(eventCategoryIcon(undefined, 'Sport')).toBe('⚽');
+    // Insensible à la casse et aux accents déjà présents dans les mots-clés.
+    expect(eventCategoryIcon(null, 'devoirs')).toBe('🎒');
+  });
+
+  it('retombe sur la pastille neutre pour un nom inconnu ou absent', () => {
+    expect(eventCategoryIcon(null, 'Divers')).toBe('🗓️');
+    expect(eventCategoryIcon('', null)).toBe('🗓️');
+  });
+
+  it('un événement catégorisé porte l’icône de sa catégorie jusque dans l’agenda', () => {
+    const event = toCalendarEvent(eventRow(), [], [{ id: 'category-ecole', name: 'École', icon: '🎒' }]);
+    expect(event.categoryIcon).toBe('🎒');
+
+    const [item] = buildAgenda('2026-10-06', {
+      events: [event],
+      tasks: [],
+      birthdays: [],
+      holidays: [],
+      today: '2026-10-06',
+    });
+    expect(item.kind).toBe('event');
+    expect(agendaItemIcon(item)).toBe('🎒');
+    // Les autres genres gardent leur signe fixe : l'icône d'événement ne fuit pas.
+    expect(agendaItemIcon({ kind: 'ferie', key: 'f', time: '', title: 'Toussaint', subtitle: null } as never)).toBe('🏛️');
+  });
+
+  it('sans catégorie, l’événement garde la pastille neutre', () => {
+    const event = toCalendarEvent(eventRow({ category_id: null }), []);
+    expect(event.categoryIcon).toBe('🗓️');
   });
 });

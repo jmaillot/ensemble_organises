@@ -3,18 +3,20 @@ import { MemberAvatar } from '@/components/shared/member-avatar';
 import { PendingAssignee } from '@/components/shared/pending-assignee';
 import { Icon } from '@/components/shared/icon';
 import { LoadingRows } from '@/components/ui/empty-state';
+import { agendaItemIcon } from '../types';
 import type { AgendaItem, CalendarEvent } from '../types';
 
 /**
- * Chaque type d'entrée porte son aplat pastel et son pictogramme : la couleur
- * ne suffit jamais à distinguer un jour férié d'un anniversaire.
+ * Chaque type d'entrée porte son aplat pastel : la couleur ne suffit jamais à
+ * distinguer un jour férié d'un anniversaire. Le pictogramme, lui, vient de
+ * `agendaItemIcon` — une seule table de signes, partagée avec l'export.
  */
-const chipVisual: Record<AgendaItem['kind'], { className: string; emoji: string }> = {
-  event: { className: 'bg-accent-soft text-accent-strong', emoji: '🗓️' },
-  tache: { className: 'bg-lilac text-[oklch(42%_0.12_300)]', emoji: '✅' },
-  anniversaire: { className: 'bg-blush text-[oklch(42%_0.13_20)]', emoji: '🎂' },
-  ferie: { className: 'bg-amber-soft text-[oklch(45%_0.11_78)]', emoji: '🏛️' },
-  vacances: { className: 'bg-sky text-[#1f4e79]', emoji: '🏖️' },
+const chipVisual: Record<AgendaItem['kind'], { className: string }> = {
+  event: { className: 'bg-accent-soft text-accent-strong' },
+  tache: { className: 'bg-lilac text-[oklch(42%_0.12_300)]' },
+  anniversaire: { className: 'bg-blush text-[oklch(42%_0.13_20)]' },
+  ferie: { className: 'bg-amber-soft text-[oklch(45%_0.11_78)]' },
+  vacances: { className: 'bg-sky text-[#1f4e79]' },
 };
 
 export interface AgendaListProps {
@@ -51,6 +53,9 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
     <div className="grid gap-1" data-date={date}>
       {items.map((item) => {
         const chip = chipVisual[item.kind];
+        // L'événement porte l'emoji de sa catégorie ; les autres genres gardent
+        // leur signe fixe (tâche, anniversaire, jour férié, vacances).
+        const emoji = agendaItemIcon(item);
         return (
           <div
             key={item.key}
@@ -67,7 +72,7 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
                     chip.className,
                   )}
                 >
-                  <span aria-hidden="true">{chip.emoji}</span>
+                  <span aria-hidden="true">{emoji}</span>
                   {item.chipLabel}
                 </span>
                 {item.kind === 'event' && item.author ? (

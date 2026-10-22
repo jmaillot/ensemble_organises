@@ -22,7 +22,7 @@ import { useSchoolZone } from './hooks/use-school-zone';
 import { createPersonalCalendar, createCategory, deleteCalendar, moveCalendarEvents, CATEGORY_COLORS } from './api';
 import { suggestZoneForCity } from './lib/zone-resolver';
 import { toCalendarPrintModel } from './lib/print';
-import { buildAgenda, buildDayMarkers, isExitingPerso } from './types';
+import { buildAgenda, buildDayMarkers, eventCategoryIcon, isExitingPerso } from './types';
 import type { CalendarEvent, EventFormValues } from './types';
 import type { EventCalendarRow } from '@/types';
 import './components/calendar-export.css';
@@ -92,6 +92,7 @@ export default function CalendrierPage() {
   const [pendingCalendarDelete, setPendingCalendarDelete] = useState<EventCalendarRow | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryIcon, setCategoryIcon] = useState('');
   const [categoryColor, setCategoryColor] = useState<string>(CATEGORY_COLORS[0]);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
@@ -389,7 +390,7 @@ export default function CalendrierPage() {
             <option value="sans">Sans catégorie</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {eventCategoryIcon(category.icon, category.name)} {category.name}
               </option>
             ))}
           </Select>
@@ -463,6 +464,7 @@ export default function CalendrierPage() {
             type="button"
             onClick={() => {
               setCategoryName('');
+              setCategoryIcon('');
               setCategoryColor(CATEGORY_COLORS[0]);
               setCategoryDialogOpen(true);
             }}
@@ -757,7 +759,7 @@ export default function CalendrierPage() {
                 return;
               }
               setIsCreatingCategory(true);
-              void createCategory(householdId, currentMember?.id ?? null, categoryName, categoryColor)
+              void createCategory(householdId, currentMember?.id ?? null, categoryName, categoryColor, categoryIcon)
                 .then((category) => {
                   setCategoryDialogOpen(false);
                   setCategoryFilter(category.id);
@@ -780,6 +782,42 @@ export default function CalendrierPage() {
                   autoComplete="off"
                   maxLength={40}
                 />
+              )}
+            </Field>
+            <Field
+              label="Emoji"
+              optional
+              hint="Facultatif : sans choix, l’emoji se déduit du nom de la catégorie."
+            >
+              {(props) => (
+                <div className="grid gap-2">
+                  <Input
+                    {...props}
+                    value={categoryIcon}
+                    onChange={(change) => setCategoryIcon(change.target.value)}
+                    placeholder="🍽️"
+                    autoComplete="off"
+                    maxLength={32}
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['🍽️', '🩺', '🎒', '⚽', '🎉', '✈️', '🎵', '💼'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        aria-pressed={categoryIcon === emoji}
+                        aria-label={`Choisir l’emoji ${emoji}`}
+                        onClick={() => setCategoryIcon(emoji)}
+                        className={
+                          categoryIcon === emoji
+                            ? 'grid size-9 place-items-center rounded-full border-2 border-accent bg-accent-soft text-[16px]'
+                            : 'grid size-9 place-items-center rounded-full border border-border bg-surface text-[16px] hover:border-accent'
+                        }
+                      >
+                        <span aria-hidden="true">{emoji}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </Field>
             <div>
@@ -885,7 +923,7 @@ export default function CalendrierPage() {
                 <ul>
                   {day.items.map((item) => (
                     <li key={item.key}>
-                      <span className="heure">{item.time}</span> {item.title}
+                      <span className="heure">{item.time}</span> {item.icon} {item.title}
                       {item.subtitle ? <span className="precision">{item.subtitle}</span> : null}
                     </li>
                   ))}
