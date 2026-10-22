@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noteExcerpt, notePlainText, pickCover } from './types';
+import { mentionAt, mentionCandidates, noteExcerpt, noteMentionText, notePlainText, pickCover } from './types';
 
 describe('notePlainText', () => {
   it('retire les repères Markdown en gardant le texte qu’ils portaient', () => {
@@ -71,5 +71,79 @@ describe('pickCover (0136)', () => {
 
   it('ne propose pas un PDF comme couverture', () => {
     expect(pickCover([attachment('pdf', 'application/pdf')], 'pdf')).toBeNull();
+  });
+});
+
+
+/**
+ * LES MENTIONS : `@` pour un membre, `$` pour une autre note.
+ *
+ * Le déclencheur doit OUVRIR un mot : « e-mail@ » n'est pas une mention.
+ * Et la frappe s'arrête à l'espace : on ne saisit pas un nom complet à la
+ * main, on le choisit dans la liste.
+ */
+describe('mentionAt', () => {
+  it('reconnaît un membre après un arobase', () => {
+    const texte = 'Demander à @Cam';
+    const found = mentionAt(texte, texte.length);
+    expect(found?.kind).toBe('membre');
+    expect(found?.query).toBe('Cam');
+    expect(found?.start).toBe(texte.indexOf('@'));
+  });
+
+  it('reconnaît une note après un dollar', () => {
+    const texte = 'Voir $Liste';
+    const found = mentionAt(texte, texte.length);
+    expect(found?.kind).toBe('note');
+    expect(found?.query).toBe('Liste');
+  });
+
+  it('ne prend pas un arobase au milieu d’un mot', () => {
+    const texte = 'écrire à e-mail@domaine';
+    expect(mentionAt(texte, texte.length)).toBeNull();
+  });
+
+  it('s’arrête à l’espace : un nom complet ne se saisit pas à la main', () => {
+    const texte = '@Camille Martin';
+    // Le curseur juste après « Camille » : la frappe en cours.
+    const found = mentionAt(texte, texte.indexOf(' '));
+    expect(found?.query).toBe('Camille');
+    // Un espace ferme la mention : le nom se CHOISIT dans la liste, il ne se
+    // saisit pas à la main.
+    expect(mentionAt(texte, texte.indexOf(' ') + 1)).toBeNull();
+    expect(mentionAt(texte, texte.length)).toBeNull();
+  });
+
+  it('ne propose rien sans déclencheur', () => {
+    expect(mentionAt('une note ordinaire', 18)).toBeNull();
+    expect(mentionAt('', 0)).toBeNull();
+  });
+});
+
+describe('mentionCandidates', () => {
+  const membres = [
+    { id: 'm1', display_name: 'Camille Martin' },
+    { id: 'm2', display_name: 'Thomas Martin' },
+  ];
+  const notes = [
+    { id: 'n1', title: 'Liste de rentrée' },
+    { id: 'n2', title: 'Idées de week-end' },
+  ];
+
+  it('propose les membres pour un arobase', () => {
+    const candidats = mentionCandidates('membre', 'cam', membres, notes, null);
+    expect(candidats.map((c) => c.label)).toEqual(['Camille Martin']);
+    expect(candidats[0].text).toBe('@Camille Martin');
+  });
+
+  it('propose les notes pour un dollar, jamais la note en cours', () => {
+    const candidats = mentionCandidates('note', '', membres, notes, 'n1');
+    expect(candidats.map((c) => c.label)).toEqual(['Idées de week-end']);
+    // La mention d'une note est un lien vers son lien profond.
+    expect(candidats[0].text).toBe('[Idées de week-end](/notes?ouvrir=n2)');
+  });
+
+  it('échappe les crochets d’un titre, pour ne pas casser le lien', () => {
+    expect(noteMentionText('n3', 'Liste [du] marché')).toBe('[Liste du marché](/notes?ouvrir=n3)');
   });
 });

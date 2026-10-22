@@ -23,6 +23,11 @@ export const NOTES_GUIDE_SECTIONS: GuideSection[] = [
         text: "Le contenu s’écrit en Markdown — gras, italique, listes, liens — et l’aperçu se lit avant d’enregistrer, pour voir ce que les autres liront.",
       },
       {
+        icon: 'user',
+        title: 'Mentionner un membre ou une note',
+        text: "Un arobase propose les membres du foyer, un dollar propose vos autres notes. La mention choisie s’insère dans le texte : celle d’une note devient un lien, et s’ouvre sur elle.",
+      },
+      {
         icon: 'lock',
         title: 'Privée ou partagée',
         text: "Une note reste privée, ou devient un repère partagé avec le foyer. Le badge sur la carte dit toujours dans quel état elle est, sans avoir à l’ouvrir.",
@@ -84,6 +89,11 @@ export const NOTES_GUIDE_QUESTIONS: GuideQuestion[] = [
     question: 'Comment s’écrit le contenu ?',
     answer:
       "En Markdown : **gras**, *italique*, listes, liens. L’aperçu montre le rendu avant l’enregistrement, et les liens externes s’ouvrent dans un nouvel onglet.",
+  },
+  {
+    question: 'Comment je mentionne quelqu’un ou une autre note ?',
+    answer:
+      "Tapez un arobase dans le contenu : les membres du foyer sont proposés, et vous choisissez. Un dollar propose vos autres notes — la mention devient alors un lien, qui ouvre la note. La mention est du texte dans la note : elle se cherche, elle se copie, elle ne dépend d’aucune table.",
   },
   {
     question: 'Que deviennent les pièces jointes ?',

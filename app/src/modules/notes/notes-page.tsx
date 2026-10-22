@@ -391,6 +391,8 @@ export default function NotesPage() {
         note={dialog.note}
         initialFolderId={activeFolderId}
         folders={folders}
+        members={members}
+        notes={notes.map((entry) => ({ id: entry.id, title: entry.title }))}
         isSaving={isMutating}
         onSubmit={async (values, files, removedAttachmentIds, cover) => {
           const editing = dialog.note;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,11 +10,16 @@ import { Icon } from '@/components/shared/icon';
 import { cn } from '@/lib/utils';
 import { formatBytes, isImageMime } from '@/lib/storage';
 import { NoteMarkdown } from './note-markdown';
+import { MentionPicker } from './mention-picker';
 import {
   NOTE_CATEGORIES,
   OTHER_CATEGORY,
   isCoverImage,
+  mentionAt,
+  mentionCandidates,
   noteVisibilityOptions,
+  type MentionCandidate,
+  type MentionContext,
   type Note,
   type NoteAttachment,
   type NoteCategoryChoice,
@@ -62,6 +67,10 @@ export interface NoteFormDialogProps {
   /** Dossier pré-rempli à la création (onglet courant). */
   initialFolderId?: string | null;
   folders?: { id: string; name: string }[];
+  /** Les membres du foyer : cibles des mentions `@`. */
+  members?: { id: string; display_name: string }[];
+  /** Les autres notes : cibles des mentions `$`. */
+  notes?: { id: string; title: string }[];
   isSaving?: boolean;
   onSubmit: (
     values: NoteFormValues,
@@ -72,11 +81,22 @@ export interface NoteFormDialogProps {
 }
 
 /** Création et modification d'une note du foyer, pièces jointes comprises. */
-export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = null, folders = [], isSaving = false, onSubmit }: NoteFormDialogProps) {
-  const { register, handleSubmit, reset, watch, formState } = useForm<NoteFormValues>({
+export function NoteFormDialog({
+  open,
+  onOpenChange,
+  note,
+  initialFolderId = null,
+  folders = [],
+  members = [],
+  notes = [],
+  isSaving = false,
+  onSubmit,
+}: NoteFormDialogProps) {
+  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<NoteFormValues>({
     resolver: zodResolver(noteSchema),
     mode: 'onSubmit',
   });
+  const contentField = register('content');
   const errors = formState.errors;
   const category = watch('category');
   const contentValue = watch('content') ?? '';
@@ -84,6 +104,78 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [cover, setCover] = useState<NoteCoverChoice>({ kind: 'auto' });
+
+  /**
+   * LES MENTIONS : `@` propose un membre du foyer, `$` propose une autre
+   * note. L'éditeur garde le focus — on tape, on choisit dans la liste.
+   */
+  const [mention, setMention] = useState<MentionContext | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const listboxId = 'notes-mentions';
+
+  const candidates = useMemo(
+    () =>
+      mention
+        ? mentionCandidates(mention.kind, mention.query, members, notes, note?.id ?? null)
+        : [],
+    [mention, members, notes, note?.id],
+  );
+
+  // La liste s'allonge et se raccourcit : l'option active doit rester dans
+  // la liste, sinon le curseur entre dans le vide.
+  useEffect(() => {
+    if (mentionIndex > candidates.length - 1) setMentionIndex(Math.max(0, candidates.length - 1));
+  }, [candidates.length, mentionIndex]);
+
+  const detectMention = (element: HTMLTextAreaElement) => {
+    const cursor = element.selectionStart ?? element.value.length;
+    setMention(mentionAt(element.value, cursor));
+    setMentionIndex(0);
+  };
+
+  const insertMention = (candidate: MentionCandidate) => {
+    const context = mention;
+    if (!context) return;
+    const current = textareaRef.current?.value ?? contentValue;
+    const next = current.slice(0, context.start) + candidate.text + current.slice(context.end);
+    setValue('content', next, { shouldDirty: true, shouldTouch: true });
+    setMention(null);
+    // Le curseur revient APRÈS l'insertion : le texte inséré est long (un
+    // lien Markdown), et le curseur resterait avant lui.
+    const position = context.start + candidate.text.length;
+    requestAnimationFrame(() => {
+      const element = textareaRef.current;
+      if (!element) return;
+      element.focus();
+      element.setSelectionRange(position, position);
+    });
+  };
+
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mention || candidates.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setMentionIndex((index) => (index + 1) % candidates.length);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setMentionIndex((index) => (index - 1 + candidates.length) % candidates.length);
+      return;
+    }
+    if (event.key === 'Enter') {
+      // Sans `preventDefault`, Entrée ENVERRAIT le formulaire au lieu de
+      // choisir la mention.
+      event.preventDefault();
+      insertMention(candidates[mentionIndex]);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setMention(null);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -264,11 +356,35 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
                 */}
                 <Textarea
                   {...props}
-                  {...register('content')}
+                  {...contentField}
                   rows={6}
                   placeholder="Cartables, crayons, gourdes et un goûter pour le premier jour."
                   hidden={isPreview}
+                  ref={(element) => {
+                    contentField.ref(element);
+                    textareaRef.current = element;
+                  }}
+                  onChange={(event) => {
+                    contentField.onChange(event);
+                    detectMention(event.currentTarget);
+                  }}
+                  onKeyDown={handleContentKeyDown}
+                  role="combobox"
+                  aria-expanded={candidates.length > 0}
+                  aria-controls={listboxId}
+                  aria-autocomplete="list"
+                  aria-activedescendant={
+                    candidates.length > 0 ? `${listboxId}-${mentionIndex}` : undefined
+                  }
                 />
+                {!isPreview && candidates.length > 0 ? (
+                  <MentionPicker
+                    candidates={candidates}
+                    activeIndex={mentionIndex}
+                    listboxId={listboxId}
+                    onPick={insertMention}
+                  />
+                ) : null}
                 {isPreview ? (
                   <div
                     aria-label="Aperçu du contenu"

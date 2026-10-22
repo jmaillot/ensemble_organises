@@ -312,3 +312,102 @@ export function noteExcerpt(content: string, maxLength = 140): string {
   const clean = notePlainText(content);
   return clean.length <= maxLength ? clean : `${clean.slice(0, maxLength - 1).trimEnd()}…`;
 }
+
+/**
+ * LES MENTIONS : `@` pour un membre du foyer, `$` pour une autre note.
+ *
+ * La référence : « L'arobase appelle un membre du foyer, le dollar renvoie
+ * vers une autre note. De quoi relier ce qui va ensemble sans tout
+ * recopier. »
+ *
+ * La mention est du TEXTE dans la note, pas une table à côté : elle
+ * survit à l'export, elle se cherche, et elle ne demande pas une migration.
+ * Une mention de note est un lien Markdown vers le lien profond de la note
+ * — donc cliquable dans l'aperçu, et le lien profond sert les deux.
+ */
+export type MentionKind = 'membre' | 'note';
+
+export interface MentionContext {
+  kind: MentionKind;
+  /** Ce qui est tapé après le déclencheur. */
+  query: string;
+  /** Position du déclencheur dans le texte. */
+  start: number;
+  /** Position du curseur (la fin de la frappe). */
+  end: number;
+}
+
+/**
+ * La mention demandée au curseur, s'il y en a une.
+ *
+ * Le déclencheur doit OUVRIR un mot : « e-mail@ » n'est pas une mention,
+ * et « a@b.fr » non plus. La frappe s'arrête à l'espace : « @Ca » propose
+ * Camille, « @Camille Ma » ne propose plus rien — on ne cherche pas un
+ * nom complet à la main, on le choisit dans la liste.
+ */
+export function mentionAt(text: string, cursor: number): MentionContext | null {
+  if (cursor <= 0 || cursor > text.length) return null;
+  const before = text.slice(0, cursor);
+  const found = /(?:^|\s)([@$])([\p{L}\p{N}'’-]*)$/u.exec(before);
+  if (!found) return null;
+  const query = found[2];
+  return {
+    kind: found[1] === '@' ? 'membre' : 'note',
+    query,
+    start: cursor - query.length - 1,
+    end: cursor,
+  };
+}
+
+export interface MentionCandidate {
+  id: string;
+  /** Le libellé inséré et affiché. */
+  label: string;
+  /** Le texte mis dans la note (un lien Markdown pour une note). */
+  text: string;
+  /** Le genre de cible, pour l'icône. */
+  kind: MentionKind;
+}
+
+/** Le texte d'une mention de note : un lien Markdown vers son lien profond. */
+export function noteMentionText(id: string, title: string): string {
+  // Un titre qui contient un crochet casserait le lien : on l'enlève.
+  const label = title.replace(/[\[\]]/g, '').trim();
+  return `[${label}](/notes?ouvrir=${encodeURIComponent(id)})`;
+}
+
+/**
+ * Les candidats d'une mention : les membres pour `@`, les autres notes pour
+ * `$`. La note en cours de modification n'est jamais proposée — se mentionner
+ * soi-même n'aide à rien.
+ */
+export function mentionCandidates(
+  kind: MentionKind,
+  query: string,
+  members: { id: string; display_name: string }[],
+  notes: { id: string; title: string }[],
+  currentNoteId: string | null,
+): MentionCandidate[] {
+  const needle = query.trim().toLowerCase();
+  if (kind === 'membre') {
+    return members
+      .filter((member) => needle === '' || member.display_name.toLowerCase().includes(needle))
+      .slice(0, 6)
+      .map((member) => ({
+        id: member.id,
+        label: member.display_name,
+        text: `@${member.display_name}`,
+        kind,
+      }));
+  }
+  return notes
+    .filter((note) => note.id !== currentNoteId)
+    .filter((note) => needle === '' || note.title.toLowerCase().includes(needle))
+    .slice(0, 6)
+    .map((note) => ({
+      id: note.id,
+      label: note.title,
+      text: noteMentionText(note.id, note.title),
+      kind,
+    }));
+}
