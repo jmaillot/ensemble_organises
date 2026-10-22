@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyPlaceHit,
   deletePlacePhoto,
   isPlacePhotoPath,
   placePhotoPathOf,
   resolvePlacePhotoUrl,
+  searchPlacesOnline,
   shouldRemovePreviousPlacePhoto,
   toEditPlacePayload,
   toPlacePayload,
@@ -186,5 +188,50 @@ describe('shouldRemovePreviousPlacePhoto — décision de retrait (WR-05)', () =
   it('intégration : une URL signée ne déclenche aucun nettoyage bucket', async () => {
     await deletePlacePhoto(signed);
     expect(removeFileMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('recherche d adresse en ligne', () => {
+  const hit = {
+    name: 'Le Café du Matin',
+    street: '12 rue des Tilleuls',
+    postalCode: '69006',
+    city: 'Lyon',
+    label: 'Le Café du Matin, 12 rue des Tilleuls, 69006 Lyon, France',
+  };
+
+  it('démonstration : le manque de backend se dit, sans essayer de chercher', async () => {
+    supabaseState.configured = false;
+    await expect(searchPlacesOnline('lyon')).rejects.toThrow(/démonstration, remplissez/);
+  });
+
+  it('requête trop courte : aucune requête réseau n’est même lancée', async () => {
+    // La garde de longueur passe AVANT la consultation du client : même en
+    // mode configuré, « ly » ne part pas.
+    supabaseState.configured = true;
+    const hits = await searchPlacesOnline('ly');
+    expect(hits).toEqual([]);
+  });
+
+  it('application d un résultat : adresse remplie, nom seulement s il est vide', () => {
+    // Nom vide : le hit le propose.
+    expect(applyPlaceHit(hit, { name: '' })).toEqual({
+      name: 'Le Café du Matin',
+      street: '12 rue des Tilleuls',
+      postalCode: '69006',
+      city: 'Lyon',
+    });
+    // Nom déjà tapé : ce que l'utilisateur a écrit n'est jamais écrasé.
+    expect(applyPlaceHit(hit, { name: 'Mon café' })).toEqual({
+      street: '12 rue des Tilleuls',
+      postalCode: '69006',
+      city: 'Lyon',
+    });
+  });
+
+  it('application d un résultat incomplet : les champs manquants reviennent à vide', () => {
+    expect(
+      applyPlaceHit({ name: 'Un parc', street: null, postalCode: null, city: null, label: 'Un parc' }, { name: '' }),
+    ).toEqual({ name: 'Un parc', street: '', postalCode: '', city: '' });
   });
 });

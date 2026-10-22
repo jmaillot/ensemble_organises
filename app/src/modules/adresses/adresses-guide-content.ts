@@ -21,6 +21,11 @@ export const ADRESSES_GUIDE_SECTIONS: GuideSection[] = [
         text: "La recherche porte sur le nom, la ville et l’adresse. Elle se combine avec un filtre par type de lieu — restaurant, café, parc, musée… — et une note minimale, de une à cinq étoiles.",
       },
       {
+        icon: 'pin',
+        title: 'L’adresse se cherche en ligne',
+        text: "En tapant une adresse dans la fiche, OpenStreetMap propose des correspondances : en choisir une remplit la rue, le code postal et la ville. Ce que vous avez déjà écrit n’est jamais écrasé — le nom du lieu n’est repris que s’il est vide, et tout reste modifiable à la main.",
+      },
+      {
         icon: 'grid',
         title: 'Grille ou par ville',
         text: "La vue se bascule d’un bouton : la grille montre les fiches avec leur photo, la vue par ville regroupe les lieux sous le nom de leur ville. Un lieu sans ville se range sous « Sans ville ».",
@@ -69,5 +74,10 @@ export const ADRESSES_GUIDE_QUESTIONS: GuideQuestion[] = [
     question: 'Peut-on changer la note d’un lieu ?',
     answer:
       "Oui : le crayon sur la fiche la rouvre en édition, note comprise. Le marqueur « Déjà visité » se change, lui, d’un simple interrupteur sur la carte.",
+  },
+  {
+    question: 'D’où viennent les adresses proposées en ligne ?',
+    answer:
+      "D’OpenStreetMap, via un relais qui ne transmet que la requête, borne le rythme et met en cache une heure. Le nom du lieu n’est repris que si le champ est vide : ce que vous avez déjà écrit n’est jamais remplacé.",
   },
 ];

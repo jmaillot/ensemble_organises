@@ -1,4 +1,5 @@
 import { depositHouseholdFile, householdMediaPathOf, isHouseholdMediaPath, removeHouseholdFile, replacedMediaPath, resolveHouseholdMediaUrl, storedValueOf } from '@/lib/storage';
+import { isSupabaseConfigured, supabase, supabaseFunctionsBase } from '@/lib/supabase/client';
 import type { PlaceRow } from '@/types';
 import type { Place, PlaceInput } from './types';
 
@@ -147,4 +148,90 @@ export async function uploadPlacePhoto(householdId: string, file: File): Promise
 export async function deletePlacePhoto(stored: string | null): Promise<void> {
   const path = placePhotoPathOf(stored);
   if (path) await removeHouseholdFile(path).catch(() => undefined);
+}
+
+/** Un lieu suggéré par la recherche en ligne, prêt à remplir le formulaire. */
+export interface PlaceSearchHit {
+  name: string;
+  street: string | null;
+  postalCode: string | null;
+  city: string | null;
+  /** Ligne complète lisible, telle que Nominatim la présente. */
+  label: string;
+}
+
+/**
+ * Recherche d'adresse en ligne, via le proxy Edge `place-search` (Nominatim).
+ *
+ * PAS de repli direct navigateur, à la différence de la recherche produit
+ * (`searchOffCatalog`) : la politique d'usage de Nominatim exige un
+ * User-Agent identifiant l'application, qu'un navigateur ne peut pas poser —
+ * le repli contournerait la règle au lieu de l'énoncer. Le proxy est le
+ * seul chemin ; son indisponibilité se dit (« indisponible pour le moment »),
+ * la saisie à la main reste toujours possible.
+ */
+export async function searchPlacesOnline(query: string, limit = 5): Promise<PlaceSearchHit[]> {
+  const terms = query.trim();
+  // Une requête trop courte ne vaut même pas un coup d'œil à la configuration.
+  if (terms.length < 3) return [];
+  if (!isSupabaseConfigured || !supabaseFunctionsBase || !supabase) {
+    throw new Error('La recherche en ligne demande un compte connecté : en démonstration, remplissez l’adresse à la main.');
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const { data: authData } = await supabase.auth.getSession();
+    const response = await fetch(`${supabaseFunctionsBase}/place-search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        ...(authData.session?.access_token ? { authorization: `Bearer ${authData.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ q: terms, limit }),
+      signal: controller.signal,
+    });
+    if (response.status === 401) {
+      // Session absente/expirée : withSupabase répond sans champ `error`.
+      throw new Error('Session expirée : reconnectez-vous puis réessayez.');
+    }
+    if (response.status === 400 || response.status === 429) {
+      const detail = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(detail?.error ?? 'Recherche impossible.');
+    }
+    if (!response.ok) {
+      throw new Error('La recherche d’adresse est indisponible pour le moment.');
+    }
+    const payload = (await response.json().catch(() => null)) as { hits?: unknown } | null;
+    if (!payload || !Array.isArray(payload.hits)) {
+      throw new Error('La recherche d’adresse est indisponible pour le moment.');
+    }
+    return (payload.hits as PlaceSearchHit[]).filter((hit) => hit && typeof hit.label === 'string' && hit.label.length > 0);
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'AbortError' || error instanceof TypeError)) {
+      throw new Error('La recherche d’adresse est indisponible pour le moment.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Application d'un hit au formulaire : la rue, le code postal et la ville
+ * sont remplis ; le nom du lieu ne l'est que s'il est vide — ce que
+ * l'utilisateur a déjà tapé n'est jamais écrasé. Décision pure, extraite du
+ * dialogue pour être prouvable sans rendu.
+ */
+export function applyPlaceHit(
+  hit: PlaceSearchHit,
+  current: { name: string },
+): { name?: string; street: string; postalCode: string; city: string } {
+  const name = current.name.trim() === '' && hit.name ? hit.name : undefined;
+  return {
+    ...(name !== undefined ? { name } : {}),
+    street: hit.street ?? '',
+    postalCode: hit.postalCode ?? '',
+    city: hit.city ?? '',
+  };
 }
