@@ -28,7 +28,7 @@ begin
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('invitations', ARRAY['id', 'household_id', 'email', 'phone', 'role', 'status', 'created_at']::text[]),
           ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at', 'trip_id']::text[]),
-          ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'product_id', 'created_at']::text[]),
+          ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'product_id', 'position', 'created_at']::text[]),
           ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'category_id', 'calendar_id', 'created_by', 'created_at']::text[]),
           ('event_categories', ARRAY['id', 'household_id', 'name', 'color', 'icon', 'is_default', 'created_by', 'created_at']::text[]),
           ('event_calendars', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'color', 'created_at', 'updated_at']::text[]),

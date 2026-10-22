@@ -319,6 +319,11 @@ export interface ShoppingItem {
   rayon: Rayon;
   checked: boolean;
   addedBy: string | null;
+  /**
+   * Rang manuel de l'article dans sa liste (0 = premier) — `position` (0139).
+   * C'est l'ordre du foyer : celui du magasin, pas celui de l'ajout.
+   */
+  position: number;
   createdAt: string;
 }
 
@@ -329,8 +334,14 @@ export interface ShoppingListView extends ShoppingList {
   pendingCount: number;
 }
 
-/** Mode de regroupement proposé par le sélecteur du panneau principal. */
-export type Grouping = 'rayon' | 'ajout';
+/**
+ * Mode de regroupement proposé par le sélecteur du panneau principal.
+ *
+ * `rayon` : la liste est rangée par rayon, et l'ordre du foyer se lit À
+ * L'INTÉRIEUR de chaque rayon. `ordre` : la liste est à plat, dans l'ordre
+ * du foyer — c'est la vue où l'on réordonne.
+ */
+export type Grouping = 'rayon' | 'ordre';
 
 export interface ItemSection {
   key: string;
@@ -362,6 +373,8 @@ export interface ShoppingItemInput {
   addedBy: string | null;
   /** Produit du foyer d'origine (0071) : re-scan +1 via resolveScannedProduct. */
   productId?: string | null;
+  /** Rang du foyer dans la liste (0139) : la fin de la liste pour un ajout. */
+  position?: number;
 }
 
 /** Référence OFF jointe à un ajout manuel : même forme que `OffProduct`. */
@@ -404,6 +417,7 @@ export const toShoppingItem = (row: ShoppingListItemRow): ShoppingItem => ({
   rayon: normalizeRayon(row.category),
   checked: Boolean(row.checked),
   addedBy: row.added_by,
+  position: row.position ?? 0,
   createdAt: row.created_at ?? '',
 });
 
@@ -461,14 +475,21 @@ export function toShoppingPrintModel(list: ShoppingListView, householdName: stri
 
 /**
  * Découpe les articles d'une liste en sections visuelles : une section par
- * rayon (vue par défaut) ou une section unique dans l'ordre d'ajout.
+ * rayon (vue par défaut) ou une section unique dans l'ordre du foyer.
+ *
+ * L'ordre du FOYER (`position`, 0139) passe devant tout : c'est lui que le
+ * foyer a posé, et la date d'ajout ne dit plus rien d'utile. Le regroupement
+ * par rayon ne fait qu'en SORTIR les articles, sans toucher à leur rang.
  */
 export function sectionsForList(items: ShoppingItem[], grouping: Grouping): ItemSection[] {
   if (items.length === 0) return [];
-  if (grouping === 'ajout') return [{ key: 'ajout', title: '', items: [...items] }];
+  const ranges = [...items].sort(
+    (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  if (grouping === 'ordre') return [{ key: 'ordre', title: '', items: ranges }];
 
   const buckets = new Map<Rayon, ShoppingItem[]>();
-  for (const item of items) {
+  for (const item of ranges) {
     const bucket = buckets.get(item.rayon);
     if (bucket) bucket.push(item);
     else buckets.set(item.rayon, [item]);

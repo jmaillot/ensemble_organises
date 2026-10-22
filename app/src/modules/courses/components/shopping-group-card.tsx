@@ -1,16 +1,14 @@
 import { useState } from 'react';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { cn } from '@/lib/utils';
 import { CountBadge } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/primitives';
 import {
   guessRayon,
-  itemStateLabel,
   matchCatalogue,
   normalizeSearchText,
-  quantityLabel,
   sectionsForList,
   RAYONS,
   type Grouping,
@@ -18,6 +16,7 @@ import {
   type ShoppingItem,
   type ShoppingListView,
 } from '../types';
+import { ShoppingItemRow } from './shopping-item-row';
 import { productPhotoUrl } from '../products-api';
 import type { ProductRow } from '@/types';
 
@@ -52,6 +51,12 @@ export interface ShoppingGroupCardProps {
   /** Photos affichables du catalogue (chemins re-signés à la lecture, D-01). */
   photoUrls: Record<string, string>;
   disabled?: boolean;
+  /**
+   * Rôle `enfant` : la liste se lit, elle ne se réordonne pas. Le serveur
+   * refuserait l'écriture de toute façon — mais une poignée qui ne peut pas
+   * faire son geste ne doit pas s'afficher.
+   */
+  readOnly?: boolean;
   onToggle: (item: ShoppingItem) => void;
   onQuickAdd: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => void;
   onQuickAddProduct: (listId: string, productId: string) => void;
@@ -73,6 +78,7 @@ export function ShoppingGroupCard({
   catalogue,
   photoUrls,
   disabled = false,
+  readOnly = false,
   onToggle,
   onQuickAdd,
   onQuickAddProduct,
@@ -384,57 +390,23 @@ export function ShoppingGroupCard({
                 <h4 className="m-0 font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{section.title}</h4>
               </div>
             ) : null}
-            <ul className="m-0 grid list-none gap-0.5 p-0">
-              {section.items.map((item) => (
-                <li
-                  key={item.id}
-                  className={cn(
-                    'group flex min-h-[56px] items-center gap-2.5 rounded-[14px] px-2 transition-colors hover:bg-accent-faint',
-                    item.checked && 'done',
-                  )}
-                >
-                  <Checkbox
-                    checked={item.checked}
-                    disabled={disabled}
-                    onCheckedChange={() => onToggle(item)}
-                    aria-label={`${item.checked ? 'Rouvrir' : 'Terminer'} ${item.name}`}
-                    className="size-6 rounded-[7px]"
+            {/* Le geste se fait À L'INTÉRIEUR du groupe : dans la vue « par
+                rayon », un article reste dans son rayon ; dans la vue « l'ordre
+                du foyer », la liste est à plat. */}
+            <SortableContext items={section.items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+              <ul className="m-0 grid list-none gap-0.5 p-0">
+                {section.items.map((item) => (
+                  <ShoppingItemRow
+                    key={item.id}
+                    item={item}
+                    readOnly={readOnly}
+                    onToggle={onToggle}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
                   />
-                  <span className={cn('min-w-0 flex-1 text-[14px] font-medium', item.checked && 'text-muted line-through')}>
-                    {item.name}
-                  </span>
-                  <small className="truncate text-[11px] text-muted max-[650px]:max-w-[96px]">
-                    {quantityLabel(item) ? `${quantityLabel(item)} · ${item.rayon}` : item.rayon}
-                  </small>
-                  <span
-                    className={cn(
-                      'text-[10px] font-semibold whitespace-nowrap max-[650px]:hidden',
-                      item.checked ? 'text-accent-strong' : 'text-muted',
-                    )}
-                  >
-                    {itemStateLabel(item.checked)}
-                  </span>
-                  <span className="flex items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover:opacity-100 group-focus-within:opacity-100 max-[650px]:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      icon="edit"
-                      className="size-8 min-h-8 hover:bg-accent-faint hover:text-fg"
-                      aria-label={`Modifier ${item.name}`}
-                      onClick={() => onEdit(item)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      icon="trash"
-                      className="size-8 min-h-8 hover:bg-coral-soft hover:text-coral"
-                      aria-label={`Supprimer ${item.name}`}
-                      onClick={() => onDelete(item)}
-                    />
-                  </span>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </ul>
+            </SortableContext>
           </div>
         ))
       )}

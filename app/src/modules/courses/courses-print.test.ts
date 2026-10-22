@@ -10,6 +10,7 @@ const item = (over: Partial<ShoppingItem> & { name: string }): ShoppingItem => (
   rayon: 'Divers',
   checked: false,
   addedBy: null,
+  position: 0,
   createdAt: '2026-10-21T09:00:00.000Z',
   ...over,
 });

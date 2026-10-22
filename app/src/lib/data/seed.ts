@@ -193,11 +193,11 @@ export const demoShoppingLists: ShoppingListRow[] = [
 ];
 
 export const demoShoppingItems: ShoppingListItemRow[] = [
-  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'item-2', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fruits', quantity: 1, unit: 'sachet', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, created_at: now() },
-  { id: 'item-3', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Lait d’agne', quantity: 3, unit: 'briques', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.thomas, product_id: null, created_at: now() },
-  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'item-5', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Savon liquide', quantity: 1, unit: 'flacon', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, created_at: now() },
+  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'item-2', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fruits', quantity: 1, unit: 'sachet', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
+  { id: 'item-3', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Lait d’agne', quantity: 3, unit: 'briques', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.thomas, product_id: null, position: 2, created_at: now() },
+  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'item-5', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Savon liquide', quantity: 1, unit: 'flacon', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
 ];
 
 export const demoEvents: EventRow[] = [
@@ -1130,8 +1130,8 @@ export const demoTripShoppingLists: ShoppingListRow[] = [
 ];
 
 export const demoTripShoppingItems: ShoppingListItemRow[] = [
-  { id: 'trip-item-1', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème solaire', quantity: 1, unit: 'tube', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'trip-item-2', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Guide de Lisbonne', quantity: 1, unit: 'exemplaire', category: 'Loisirs', checked: true, added_by: DEMO_MEMBERS.thomas, product_id: null, created_at: now() },
+  { id: 'trip-item-1', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème solaire', quantity: 1, unit: 'tube', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'trip-item-2', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Guide de Lisbonne', quantity: 1, unit: 'exemplaire', category: 'Loisirs', checked: true, added_by: DEMO_MEMBERS.thomas, product_id: null, position: 1, created_at: now() },
 ];
 
 export const demoTripNotes: NoteRow[] = [

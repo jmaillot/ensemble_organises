@@ -165,6 +165,37 @@ test.describe('Parcours des modules', () => {
     }
   });
 
+  test('un article se réordonne à la poignée', async ({ page }) => {
+    await openDemoSession(page);
+    await page.goto('/courses');
+
+    await page.getByLabel('Regroupement').selectOption('ordre');
+    const liste = page.getByRole('region', { name: 'Fresque' });
+    await expect(liste.getByRole('button', { name: 'Réordonner : Yaourts' })).toBeVisible();
+
+    // Le geste se fait au clavier : Espace saisit l'article, la flèche le
+    // descend d'un cran, Espace le dépose. On attend l'ANNONCE de chaque
+    // étape : le capteur clavier n'écoute qu'au tour de boucle suivant, et
+    // une durée fixe serait une course.
+    const poignee = liste.getByRole('button', { name: 'Réordonner : Yaourts' });
+    await poignee.focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByText(/Position de Yaourts atteinte/)).toBeAttached();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByText(/Position de Fruits atteinte/)).toBeAttached();
+    await page.keyboard.press('Space');
+    await expect(page.getByText(/déposée à la place de Fruits/)).toBeAttached();
+
+    // Yaourts a quitté la première place — l'ordre est écrit, pas seulement
+    // affiché.
+    await expect
+      .poll(async () => {
+        const noms = await liste.getByRole('listitem').allInnerTexts();
+        return noms.findIndex((texte) => texte.includes('Yaourts'));
+      }, { timeout: 8000 })
+      .toBe(1);
+  });
+
   test('le mode d’emploi des courses s’ouvre depuis l’espace', async ({ page }) => {
     await openDemoSession(page);
     await page.goto('/courses');

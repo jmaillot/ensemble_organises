@@ -132,6 +132,8 @@ export interface ShoppingListItemRow {
   added_by: Uuid | null;
   /** Produit du foyer d'origine (0071) : NULL si saisi a la main ou produit supprime. */
   product_id: Uuid | null;
+  /** Rang manuel de l'article dans sa liste (0 = premier) — 0139. */
+  position: number;
   created_at: IsoDateTime;
 }
 

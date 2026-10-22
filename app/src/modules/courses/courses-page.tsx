@@ -1,4 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +22,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { useHouseholdStore, useMemberName } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore, useMemberName } from '@/stores/household-store';
 import { formatMediumDate, formatWeekday, pluralize, relativeDayLabel, toLocalDate } from '@/lib/utils';
 import { usePrintSheet } from '@/hooks/use-print-sheet';
 import { useCourses } from './hooks/use-courses';
@@ -22,7 +32,14 @@ import { ProductSheet } from './components/product-sheet';
 import { ShoppingGroupCard } from './components/shopping-group-card';
 import { fetchOffResult, isQueryableEan, type OffProduct } from './off-client';
 import { findProductByEan, offProductFromRow } from './products-api';
-import { toShoppingPrintModel, type Grouping, type ItemFormValues, type ShoppingItem, type ShoppingListView } from './types';
+import {
+  sectionsForList,
+  toShoppingPrintModel,
+  type Grouping,
+  type ItemFormValues,
+  type ShoppingItem,
+  type ShoppingListView,
+} from './types';
 import './components/courses-export.css';
 
 const listSchema = z.object({
@@ -56,6 +73,7 @@ export default function CoursesPage() {
     addItem,
     addItemToList,
     addCatalogProductToList,
+    reorder,
     addList,
     removeItem,
     removeList,
@@ -65,6 +83,10 @@ export default function CoursesPage() {
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
+  // Rôle `enfant` : il lit la liste, il ne la réordonne pas. Le serveur
+  // refuserait l'écriture — mais une poignée qui ne peut pas faire son geste
+  // ne doit pas s'afficher.
+  const isChild = useCurrentMember()?.role === 'enfant';
   const [itemDialog, setItemDialog] = useState<{ open: boolean }>({ open: false });
   const [listDialogOpen, setListDialogOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
@@ -188,6 +210,65 @@ export default function CoursesPage() {
    * les deux ne puissent pas diverger.
    */
   const visibleList = lists.find((list) => list.id === activeListId) ?? lists[0] ?? null;
+
+  const sensors = useSensors(
+    // Un simple clic ne doit pas démarrer un déplacement.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Les annonces du glisser-déposer citent le NOM de l'article, pas son
+  // identifiant : c'est ce que le lecteur d'écran doit entendre.
+  const itemNames = useRef<Map<string, string>>(new Map());
+  itemNames.current = new Map((visibleList?.items ?? []).map((item) => [item.id, item.name]));
+  const itemNameOf = (id: string | number) => itemNames.current.get(String(id)) ?? String(id);
+
+  const announcements = {
+    onDragStart: ({ active }: { active: { id: string | number } }) => `${itemNameOf(active.id)} saisie.`,
+    onDragOver: ({ over }: { over: { id: string | number } | null }) =>
+      over ? `Position de ${itemNameOf(over.id)} atteinte.` : 'Position hors liste.',
+    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) => {
+      if (!over) return 'Déplacement annulé.';
+      return `${itemNameOf(active.id)} déposée à la place de ${itemNameOf(over.id)}.`;
+    },
+    onDragCancel: () => 'Déplacement annulé.',
+  };
+
+  /**
+   * Dépôt d'un article.
+   *
+   * Le geste se fait À L'INTÉRIEUR d'un groupe : dans la vue « par rayon »,
+   * un article reste dans son rayon (le rayon est une propriété de
+   * l'article, pas une place dans la liste) ; dans la vue « l'ordre du
+   * foyer », la liste est à plat et le dépôt porte sur toute la liste.
+   *
+   * Le rang écrit est donc le nouvel ordre du GROUPE déplacé : les articles
+   * déplacés occupent les places de ceux qu'ils remplacent, et les autres ne
+   * bougent pas. C'est ce qui fait qu'un réordonnancement dans un rayon ne
+   * détruit pas l'ordre du foyer pour les autres rayons.
+   */
+  const handleItemDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!visibleList || !over || active.id === over.id) return;
+    const sections = sectionsForList(visibleList.items, grouping);
+    const section = sections.find((entry) => entry.items.some((item) => item.id === String(active.id)));
+    if (!section) return;
+    const ids = section.items.map((item) => item.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    void reorder(visibleList.id, next)
+      .then(() => toast('Ordre de la liste mis à jour.'))
+      .catch((reorderError: unknown) =>
+        toast(
+          reorderError instanceof Error ? reorderError.message : 'L’ordre n’a pas pu être enregistré.',
+          'error',
+        ),
+      );
+  };
+
   const printModel = visibleList ? toShoppingPrintModel(visibleList, householdName ?? 'Foyer') : null;
   const { printing, print } = usePrintSheet();
 
@@ -252,11 +333,11 @@ export default function CoursesPage() {
               <Select
                 id="courses-grouping"
                 value={grouping}
-                onChange={(event) => setGrouping(event.target.value === 'ajout' ? 'ajout' : 'rayon')}
+                onChange={(event) => setGrouping(event.target.value === 'ordre' ? 'ordre' : 'rayon')}
                 className="min-w-[170px] max-[650px]:min-w-0 max-[650px]:flex-1"
               >
                 <option value="rayon">Par rayon</option>
-                <option value="ajout">Par ordre d’ajout</option>
+                <option value="ordre">L’ordre du foyer</option>
               </Select>
             </div>
           }
@@ -304,22 +385,30 @@ export default function CoursesPage() {
               ) : null}
               {visibleList ? (
                 <div className="grid grid-cols-1 gap-[17px]">
-                  <ShoppingGroupCard
-                    key={visibleList.id}
-                    list={visibleList}
-                    grouping={grouping}
-                    suggestions={suggestionsFor(visibleList.id)}
-                    catalogue={products}
-                    photoUrls={productPhotoUrls}
-                    disabled={isMutating}
-                    onToggle={handleToggle}
-                    onQuickAdd={handleQuickAdd}
-                    onQuickAddProduct={handleQuickAddProduct}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    onDelete={setPendingItem}
-                    onEdit={setEditingItem}
-                    onDeleteList={setPendingList}
-                  />
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    accessibility={{ announcements }}
+                    onDragEnd={handleItemDragEnd}
+                  >
+                    <ShoppingGroupCard
+                      key={visibleList.id}
+                      list={visibleList}
+                      grouping={grouping}
+                      suggestions={suggestionsFor(visibleList.id)}
+                      catalogue={products}
+                      photoUrls={productPhotoUrls}
+                      disabled={isMutating}
+                      readOnly={isChild}
+                      onToggle={handleToggle}
+                      onQuickAdd={handleQuickAdd}
+                      onQuickAddProduct={handleQuickAddProduct}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onDelete={setPendingItem}
+                      onEdit={setEditingItem}
+                      onDeleteList={setPendingList}
+                    />
+                  </DndContext>
                 </div>
               ) : null}
             </>

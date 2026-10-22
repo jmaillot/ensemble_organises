@@ -36,7 +36,12 @@ export const COURSES_GUIDE_SECTIONS: GuideSection[] = [
       {
         icon: 'grid',
         title: 'Regroupement par rayon',
-        text: "Un sélecteur range la liste par rayon, ou dans l'ordre d'ajout. Vous voyez d'un coup d'œil ce qu'il reste à prendre au frais ou en épicerie.",
+        text: "Un sélecteur range la liste par rayon, ou dans l’ordre du foyer. Dans la vue par rayon, l’ordre du foyer se lit à l’intérieur de chaque rayon : rien n’est perdu.",
+      },
+      {
+        icon: 'drag',
+        title: 'L’ordre du foyer',
+        text: "Saisissez la poignée d’un article et déplacez-le : la liste se range dans l’ordre de votre magasin. Le geste marche aussi au clavier, et l’ordre est partagé avec le foyer.",
       },
       {
         icon: 'receipt',
@@ -130,6 +135,16 @@ export const COURSES_GUIDE_QUESTIONS: GuideQuestion[] = [
     question: 'Un article déjà dans la liste peut-il être ajouté deux fois ?',
     answer:
       "Non. L’ajout d’un article déjà présent propose de modifier sa quantité, et la ligne reste unique.",
+  },
+  {
+    question: 'Comment réordonner ma liste ?',
+    answer:
+      "Passez en vue « L’ordre du foyer », saisissez la poignée d’un article et déplacez-le. Au clavier : Espace saisit l’article, les flèches le déplacent, Espace le dépose. L’ordre est enregistré et partagé avec le foyer.",
+  },
+  {
+    question: 'Un article reste-t-il dans son rayon si je le déplace ?',
+    answer:
+      "Oui : le rayon est une propriété de l’article, pas une place dans la liste. Dans la vue par rayon, un article se déplace à l’intérieur de son rayon ; dans la vue « L’ordre du foyer », il se range librement.",
   },
   {
     question: 'Comment modifier le nom, la quantité ou le rayon d’un article ?',

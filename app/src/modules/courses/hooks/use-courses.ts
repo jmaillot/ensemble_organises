@@ -14,6 +14,7 @@ import {
   deleteShoppingList,
   renameShoppingList,
   updateShoppingItem,
+  updateShoppingItemPositions,
   SHOPPING_ITEMS_TABLE,
   SHOPPING_LISTS_TABLE,
 } from '../api';
@@ -28,6 +29,7 @@ import {
   type ScanResolution,
 } from '../products-api';
 import { isQueryableEan } from '../off-client';
+import { computeManualRanks } from '@/lib/manual-order';
 import {
   NEW_LIST_OPTION,
   guessRayon,
@@ -59,6 +61,11 @@ export interface UseCoursesResult {
   toggleItem: (item: ShoppingItem) => Promise<void>;
   addItem: (values: ItemFormValues) => Promise<void>;
   addItemToList: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => Promise<void>;
+  /**
+   * Réordonne les articles d'une liste (0139). `orderedIds` est le nouvel
+   * ordre des articles DÉPLACÉS par le geste ; les autres gardent leur place.
+   */
+  reorder: (listId: string, orderedIds: string[]) => Promise<void>;
   addCatalogProductToList: (listId: string, productId: string) => Promise<void>;
   /** Re-scan d'un EAN connu : produit Dexie → item (+1 si déjà présent, D-04). */
   addScannedToList: (listId: string, ean: string, addedBy?: string | null) => Promise<ScanResolution>;
@@ -152,13 +159,27 @@ export function useCourses(): UseCoursesResult {
       .map((row) => toShoppingList(row))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'fr'))
       .map((list) => {
+        // Le rang du foyer (0139) passe devant la date d'ajout : l'ordre de
+        // la liste est celui que le foyer a posé, pas celui des créations.
         const items = (itemsByList.get(list.id) ?? []).sort(
-          (a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'fr'),
+          (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'fr'),
         );
         const checked = items.filter((item) => item.checked).length;
         return { ...list, items, checkedCount: checked, pendingCount: items.length - checked };
       });
   }, [foyerItems, foyerLists]);
+
+  /**
+   * Rang du prochain article d'une liste : la FIN de la liste, pour qu'un
+   * ajout ne passe pas devant ce qui est déjà là (0139).
+   */
+  const nextPosition = useCallback(
+    (listId: string) => {
+      const items = lists.find((list) => list.id === listId)?.items ?? [];
+      return items.reduce((max, item) => Math.max(max, item.position + 1), 0);
+    },
+    [lists],
+  );
 
   const itemCount = foyerItems.length;
   const checkedCount = foyerItems.filter((row) => row.checked).length;
@@ -289,6 +310,7 @@ export function useCourses(): UseCoursesResult {
           unit: values.unit.trim() || null,
           rayon: normalizeRayon(values.rayon),
           addedBy: currentMemberId || null,
+          position: nextPosition(listId),
         });
       }
       await invalidate();
@@ -315,6 +337,7 @@ export function useCourses(): UseCoursesResult {
         unit: null,
         rayon: options?.rayon ? normalizeRayon(options.rayon) : (known ? normalizeRayon(known.rayon) : guessRayon(trimmed)),
         addedBy: currentMemberId || null,
+        position: nextPosition(listId),
       });
       await invalidate();
     },
@@ -446,6 +469,28 @@ export function useCourses(): UseCoursesResult {
 
   const products = useMemo(() => [...productResource.rows].sort((a, b) => a.name.localeCompare(b.name, 'fr')), [productResource.rows]);
 
+  /**
+   * Réordonne les articles d'une liste (0139).
+   *
+   * Seuls les rangs CHANGÉS sont écrits. Le calcul est celui de
+   * `computeManualRanks` : les articles déplacés prennent les places de
+   * ceux qu'ils remplacent, et les autres ne bougent pas.
+   */
+  const reorder = useCallback(
+    async (listId: string, orderedIds: string[]) => {
+      const items = lists.find((list) => list.id === listId)?.items ?? [];
+      if (items.length === 0) return;
+      const ranks = computeManualRanks(items, orderedIds, (item) => item.position);
+      const changed = Object.fromEntries(
+        Object.entries(ranks).filter(([id, rank]) => items.find((item) => item.id === id)?.position !== rank),
+      );
+      if (Object.keys(changed).length === 0) return;
+      await updateShoppingItemPositions(changed);
+      await invalidate();
+    },
+    [invalidate, lists],
+  );
+
   return {
     lists,
     itemCount,
@@ -463,6 +508,7 @@ export function useCourses(): UseCoursesResult {
     toggleItem,
     addItem,
     addItemToList,
+    reorder,
     addScannedToList,
     addCatalogProductToList,
     addList,
