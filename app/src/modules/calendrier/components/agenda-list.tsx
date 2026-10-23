@@ -125,7 +125,7 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
                     type="button"
                     onClick={() => onDelete(item.event)}
                     aria-label={`Supprimer ${item.event.title}`}
-                    className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                    className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text"
                   >
                     <Icon name="trash" size="sm" />
                   </button>

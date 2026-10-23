@@ -208,7 +208,7 @@ export default function AnniversairesPage() {
                               type="button"
                               onClick={() => setPendingDelete(birthday)}
                               aria-label={`Supprimer l’anniversaire de ${birthday.name}`}
-                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                              className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text"
                             >
                               <Icon name="trash" size="sm" />
                             </button>

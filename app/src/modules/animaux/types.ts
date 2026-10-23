@@ -156,7 +156,7 @@ export function reminderState(nextDueDate: string | null): ReminderState {
 
 export const REMINDER_ALERTS: Record<Exclude<ReminderState, 'none' | 'later'>, { label: string; className: string }> = {
   soon: { label: 'Rappel approche', className: 'bg-amber-soft text-[oklch(52%_0.11_78)]' },
-  overdue: { label: 'Rappel en retard', className: 'bg-coral-soft text-coral' },
+  overdue: { label: 'Rappel en retard', className: 'bg-coral-soft text-coral-text' },
 };
 
 export function reminderAlert(kind: PetRecordType, nextDueDate: string | null) {

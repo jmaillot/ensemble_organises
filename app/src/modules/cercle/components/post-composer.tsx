@@ -136,7 +136,7 @@ export function PostComposer({ onPublish, focusSignal = 0, disabled }: PostCompo
               <button
                 type="button"
                 onClick={discardImage}
-                className="grid size-8 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                className="grid size-8 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                 aria-label="Retirer la photo"
               >
                 <Icon name="close" size="sm" />

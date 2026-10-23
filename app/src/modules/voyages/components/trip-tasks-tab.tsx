@@ -313,7 +313,7 @@ export function TripTasksTab({ tripId, householdId, members, currentMemberId, re
                         type="button"
                         onClick={() => setPendingDelete(task)}
                         aria-label={`Supprimer ${task.name}`}
-                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                       >
                         <Icon name="trash" size="sm" />
                       </button>

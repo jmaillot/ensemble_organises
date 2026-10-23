@@ -250,7 +250,7 @@ export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCre
               );
             })}
             {errors.participantIds?.message ? (
-              <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+              <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
                 {errors.participantIds.message}
               </p>
             ) : null}

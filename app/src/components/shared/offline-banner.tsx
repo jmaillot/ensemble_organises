@@ -24,7 +24,7 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="sticky top-0 z-50 border-b border-coral/30 bg-coral-soft/70 px-4 py-2.5 text-center text-[12px] font-semibold text-coral"
+      className="sticky top-0 z-50 border-b border-coral/30 bg-coral-soft/70 px-4 py-2.5 text-center text-[12px] font-semibold text-coral-text"
     >
       <p className="m-0">
         Vous êtes hors ligne : l’application ne peut pas lire les données du foyer pour le moment. Une zone vide

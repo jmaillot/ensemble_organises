@@ -167,7 +167,7 @@ export function ShoppingGroupCard({
           variant="ghost"
           size="icon"
           icon="trash"
-          className="size-8 min-h-8 text-muted hover:bg-coral-soft hover:text-coral"
+          className="size-8 min-h-8 text-muted hover:bg-coral-soft hover:text-coral-text"
           aria-label={`Supprimer la liste ${list.name}`}
           onClick={() => onDeleteList(list)}
         />

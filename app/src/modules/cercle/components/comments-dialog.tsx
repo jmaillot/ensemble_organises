@@ -182,7 +182,7 @@ export function CommentsDialog({
                         type="button"
                         onClick={() => setPendingDelete(comment)}
                         aria-label="Supprimer ce commentaire"
-                        className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                        className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                       >
                         <Icon name="trash" size="sm" />
                       </button>

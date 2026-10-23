@@ -112,7 +112,7 @@ export function LinkedAccountsPanel() {
         abandonnez le doublon : Supabase ne fusionne jamais deux utilisateurs tout seul.
       </p>
       {error ? (
-        <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+        <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
           {error}
         </p>
       ) : null}

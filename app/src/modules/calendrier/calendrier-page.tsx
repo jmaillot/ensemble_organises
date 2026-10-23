@@ -459,7 +459,7 @@ export default function CalendrierPage() {
                   ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} seront déplacés vers Commun`
                   : 'Supprimer ce calendrier perso'
               }
-              className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral"
+              className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral-text"
             >
               Supprimer « {ownPerso.name} »
             </button>

@@ -40,7 +40,7 @@ export function ConfirmDialog({
             'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-40px)] w-[calc(100vw-40px)] max-w-[440px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[22px] bg-surface p-6 shadow-[var(--shadow-lg)]',
           )}
         >
-          <div className="mb-4 grid size-12 place-items-center rounded-[16px] bg-coral-soft text-coral">
+          <div className="mb-4 grid size-12 place-items-center rounded-[16px] bg-coral-soft text-coral-text">
             <Icon name="trash" size="lg" />
           </div>
           <AlertDialogPrimitive.Title className="mb-2 font-display text-xl tracking-[-0.035em]">

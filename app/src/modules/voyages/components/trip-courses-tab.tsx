@@ -207,7 +207,7 @@ export function TripCoursesTab({ tripId, householdId, currentMemberId, readOnly 
                     type="button"
                     onClick={() => setPendingDeleteList(list.id)}
                     aria-label={`Supprimer la liste ${list.name}`}
-                    className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                    className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                   >
                     <Icon name="trash" size="sm" />
                   </button>
@@ -235,7 +235,7 @@ export function TripCoursesTab({ tripId, householdId, currentMemberId, readOnly 
                           type="button"
                           onClick={() => removeItem(item)}
                           aria-label={`Supprimer ${item.name}`}
-                          className="grid size-11 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                          className="grid size-11 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                         >
                           <Icon name="trash" size="sm" />
                         </button>

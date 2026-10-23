@@ -120,7 +120,7 @@ export function InvitationsPanel() {
           </Field>
         </div>
         {error ? (
-          <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+          <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
             {error}
           </p>
         ) : null}

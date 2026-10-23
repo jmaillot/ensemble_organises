@@ -279,7 +279,7 @@ export default function AnimauxPage() {
                   <Button
                     variant="ghost"
                     icon="trash"
-                    className="text-muted hover:bg-coral-soft hover:text-coral"
+                    className="text-muted hover:bg-coral-soft hover:text-coral-text"
                     onClick={() => setPendingPetDeletion(pet)}
                   >
                     Supprimer la fiche

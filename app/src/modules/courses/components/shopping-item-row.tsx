@@ -87,7 +87,7 @@ export function ShoppingItemRow({ item, readOnly = false, onToggle, onEdit, onDe
             variant="ghost"
             size="icon"
             icon="trash"
-            className="size-8 min-h-8 hover:bg-coral-soft hover:text-coral"
+            className="size-8 min-h-8 hover:bg-coral-soft hover:text-coral-text"
             aria-label={`Supprimer ${item.name}`}
             onClick={() => onDelete(item)}
           />

@@ -174,7 +174,7 @@ function PostCardComponent({
                 onRequestDelete();
               }}
               aria-label={`Supprimer la publication de ${authorName}`}
-              className="text-muted hover:bg-coral-soft hover:text-coral"
+              className="text-muted hover:bg-coral-soft hover:text-coral-text"
             >
               <span className="sr-only">Supprimer</span>
             </Button>
@@ -332,7 +332,7 @@ function PostCardComponent({
                             setPendingDeleteComment(comment);
                           }}
                           aria-label="Supprimer ce commentaire"
-                          className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                          className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                         >
                           <Icon name="trash" size="sm" />
                         </button>
@@ -393,7 +393,7 @@ function PostCardComponent({
           </form>
         ) : null}
         {replyOverCap || replyError ? (
-          <small role={replyError ? 'alert' : undefined} className="mb-[13px] block text-[10px] text-coral">
+          <small role={replyError ? 'alert' : undefined} className="mb-[13px] block text-[10px] text-coral-text">
             {replyError ?? `Le commentaire est limité à ${COMMENT_CONTENT_MAX} caractères.`}
           </small>
         ) : null}
@@ -409,7 +409,7 @@ function PostCardComponent({
             aria-label={post.liked ? 'Retirer ma réaction' : 'Réagir à cette publication'}
             className={cn(
               'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[11.5px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:text-coral hover:bg-coral-soft',
-              post.liked && 'border-coral/40 bg-coral-soft text-coral',
+              post.liked && 'border-coral/40 bg-coral-soft text-coral-text',
             )}
           >
             <Icon name="heart" size="sm" />

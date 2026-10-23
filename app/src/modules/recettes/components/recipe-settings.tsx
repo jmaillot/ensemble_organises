@@ -102,7 +102,7 @@ export function RecipeSettings({ householdId, categories, tags, recipeCounts, is
                           type="button"
                           onClick={() => setPendingDeleteCategory(category)}
                           aria-label={`Supprimer la catégorie ${category.name}`}
-                          className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                          className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                         >
                           <Icon name="trash" size="sm" />
                         </button>
@@ -202,7 +202,7 @@ export function RecipeSettings({ householdId, categories, tags, recipeCounts, is
                       type="button"
                       onClick={() => setPendingDeleteTag(tag)}
                       aria-label={`Supprimer l’étiquette ${tag.name}`}
-                      className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                      className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                     >
                       <Icon name="trash" size="sm" />
                     </button>

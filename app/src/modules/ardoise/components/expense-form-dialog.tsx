@@ -297,7 +297,7 @@ export function ExpenseFormDialog({
               ))}
             </div>
             {errors.participants?.message ? (
-              <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+              <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
                 {errors.participants.message}
               </p>
             ) : null}
@@ -342,7 +342,7 @@ export function ExpenseFormDialog({
                     La somme des parts doit égaler le montant de la dépense (au centime près).
                   </p>
                   {typeof errors.customShares?.message === 'string' ? (
-                    <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+                    <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
                       {errors.customShares.message}
                     </p>
                   ) : null}
