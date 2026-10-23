@@ -19,6 +19,7 @@ import { VOYAGES_GUIDE_QUESTIONS, VOYAGES_GUIDE_SECTIONS } from './voyages/voyag
 import { MESSAGES_GUIDE_QUESTIONS, MESSAGES_GUIDE_SECTIONS } from './messages/messages-guide-content';
 import { FRIGO_GUIDE_QUESTIONS, FRIGO_GUIDE_SECTIONS } from './frigo/frigo-guide-content';
 import { MENU_GUIDE_QUESTIONS, MENU_GUIDE_SECTIONS } from './menu/menu-guide-content';
+import { DOCUMENTS_GUIDE_QUESTIONS, DOCUMENTS_GUIDE_SECTIONS } from './documents/documents-guide-content';
 import type { GuideQuestion, GuideSection } from '@/components/shared/module-guide';
 
 /**
@@ -73,13 +74,16 @@ const GUIDES: Guide[] = [
   { module: 'messages', sections: MESSAGES_GUIDE_SECTIONS, questions: MESSAGES_GUIDE_QUESTIONS },
   { module: 'frigo', sections: FRIGO_GUIDE_SECTIONS, questions: FRIGO_GUIDE_QUESTIONS },
   { module: 'menu', sections: MENU_GUIDE_SECTIONS, questions: MENU_GUIDE_QUESTIONS },
+  { module: 'documents', sections: DOCUMENTS_GUIDE_SECTIONS, questions: DOCUMENTS_GUIDE_QUESTIONS },
 ];
 
 describe('les modes d’emploi des espaces', () => {
   it('couvre tous les espaces du foyer', () => {
-    // Vingt espaces : l'accueil et les dix-neuf du catalogue. Un module
-    // sans mode d'emploi serait un trou, pas un détail.
-    expect(GUIDES).toHaveLength(20);
+    // Vingt-et-un : l'accueil et les vingt du catalogue, documents compris —
+    // son mode d'emploi manquait depuis la vague 3.2 (retour du 23 octobre
+    // 2026 : le bouton ⓘ pointait vers une page qui n'existait pas). Un
+    // module sans mode d'emploi serait un trou, pas un détail.
+    expect(GUIDES).toHaveLength(21);
     expect(new Set(GUIDES.map((guide) => guide.module)).size).toBe(GUIDES.length);
   });
 

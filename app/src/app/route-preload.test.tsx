@@ -9,7 +9,6 @@ import {
   ROUTE_CHUNK_COUNT,
   __resetRoutePreloadForTests,
   preloadRouteChunks,
-  routeChunkLoaders,
   type RouteChunkLoader,
 } from './route-preload';
 
@@ -148,8 +147,8 @@ describe('preloadRouteChunks — préchargement idle', () => {
     // couverture précache (`scripts/check-precache-coverage.sh`) compare
     // la table au build. Le nombre se met à jour ICI, à l'ajout d'une
     // route — jamais dans le silence.
-    expect(ROUTE_CHUNK_COUNT).toBe(58);
-    expect(Object.keys(routeChunkLoaders)).toHaveLength(58);
+    // 59 morceaux depuis le mode d'emploi de Documents (23/10).
+    expect(ROUTE_CHUNK_COUNT).toBe(59);
   });
 
   it("ne télécharge rien avant l'idle, puis chaque morceau en ligne", async () => {

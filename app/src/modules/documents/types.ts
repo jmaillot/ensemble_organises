@@ -103,7 +103,7 @@ export const documentExpiryLabels: Record<DocumentExpiryState, string> = {
 /** Classes d'affichage des pastilles d'expiration, même vocabulaire que le frigo. */
 export const documentExpiryToneClass: Record<DocumentExpiryState, string> = {
   expired: 'bg-coral text-surface',
-  soon: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
+  soon: 'bg-amber-soft text-amber-strong',
   ok: 'bg-accent-soft text-accent-strong',
   none: 'bg-bg text-muted',
 };
