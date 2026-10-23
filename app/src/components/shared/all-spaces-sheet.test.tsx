@@ -24,9 +24,10 @@ describe('AllSpacesSheet', () => {
     renderSheet();
 
     const links = screen.getAllByRole('link', { name: /^Ouvrir / });
-    // Maison + dix-neuf modules du catalogue (frigo et menu, vague 3.1) :
-    // la feuille ne doit jamais en lister moins que le tiroir.
-    expect(links.length).toBe(20);
+    // Maison + vingt modules du catalogue (frigo, menu, vague 3.1 ;
+    // documents, vague 3.2) : la feuille ne doit jamais en lister moins
+    // que le tiroir.
+    expect(links.length).toBe(21);
     expect(screen.getByRole('dialog', { name: 'Tous les espaces' })).toBeInTheDocument();
   });
 

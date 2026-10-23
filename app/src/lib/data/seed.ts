@@ -1492,6 +1492,21 @@ export const demoWidgets: DashboardWidgetRow[] = [
   },
 ];
 
+/** Dossiers du module Documents (démo). */
+export const demoDocumentFolders = [
+  { id: 'docfolder-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Assurance', color: 'sage', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'docfolder-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Santé', color: 'blush', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'docfolder-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Maison', color: 'butter', created_by: DEMO_MEMBERS.thomas, created_at: now() },
+];
+
+/** Documents du module Documents (démo) : deux dossiers, un papier à la racine. */
+export const demoDocuments = [
+  { id: 'doc-1', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-1', name: 'Attestation habitation', mime: 'application/pdf', size: 320484, storage_path: 'demo/documents/attestation-habitation.pdf', expires_on: day(200), notes: 'Renouveler à la fin du bail.', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'doc-2', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-1', name: 'Carte grise voiture', mime: 'image/jpeg', size: 124800, storage_path: 'demo/documents/carte-grise.jpg', expires_on: null, notes: null, created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'doc-3', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-2', name: 'Ordonnance lunettes', mime: 'image/jpeg', size: 145200, storage_path: 'demo/documents/ordonnance-lunettes.jpg', expires_on: day(15), notes: 'Valable jusqu’à la mi-mois.', created_by: DEMO_MEMBERS.lina, created_at: now() },
+  { id: 'doc-4', household_id: DEMO_HOUSEHOLD_ID, folder_id: null, name: 'Notice lave-linge', mime: 'application/pdf', size: 1452030, storage_path: 'demo/documents/notice-lave-linge.pdf', expires_on: null, notes: 'Mise en série C-384.', created_by: DEMO_MEMBERS.camille, created_at: now() },
+];
+
 /** Clé de la copie locale (`table` dans `src/lib/data/local-adapter.ts`). */
 const seedTables: Record<string, Row[]> = {
   profiles: [demoProfile as unknown as Row],
@@ -1513,6 +1528,8 @@ const seedTables: Record<string, Row[]> = {
   household_members: demoMembers as unknown as Row[],
   pantry_items: demoPantryItems as unknown as Row[],
   meal_entries: demoMealEntries as unknown as Row[],
+  document_folders: demoDocumentFolders as unknown as Row[],
+  documents: demoDocuments as unknown as Row[],
   shopping_lists: [...demoShoppingLists, ...demoTripShoppingLists] as unknown as Row[],
   shopping_list_items: [...demoShoppingItems, ...demoTripShoppingItems] as unknown as Row[],
   products: demoProducts as unknown as Row[],

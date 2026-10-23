@@ -93,8 +93,9 @@ describe('Accueil — rendu', () => {
     expect(within(grid).getByRole('button', { name: /Ardoise/ })).toBeInTheDocument();
     expect(within(grid).getByRole('button', { name: /Fidélité/ })).toBeInTheDocument();
     expect(within(grid).getByRole('button', { name: /Contacts/ })).toBeInTheDocument();
-    // Dix-neuf tuiles : frigo et menu (vague 3.1) portent la grille à 19.
-    expect(within(grid).getAllByRole('button')).toHaveLength(19);
+    // Vingt tuiles : frigo, menu (vague 3.1) et documents (vague 3.2)
+    // portent la grille à 20.
+    expect(within(grid).getAllByRole('button')).toHaveLength(20);
   });
 
   it('ouvre le mode personnalisation et permet de masquer un widget', async () => {
@@ -249,10 +250,10 @@ describe('Accueil — rendu', () => {
       useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
     });
 
-    // Quatorze tuiles : les 5 modules hors périmètre ont disparu, les autres
+    // Quinze tuiles : les 5 modules hors périmètre ont disparu, les autres
     // restent byte-identiques.
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
-    expect(within(grid).getAllByRole('button')).toHaveLength(14);
+    expect(within(grid).getAllByRole('button')).toHaveLength(15);
     for (const name of ['Ardoise', 'Cadeaux', 'Fidélité', 'Prestataires', 'Animaux']) {
       expect(within(grid).queryByRole('button', { name: new RegExp(name) })).not.toBeInTheDocument();
     }

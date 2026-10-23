@@ -94,8 +94,8 @@ describe('AppShell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     // L'en-tête porte le nom de l'application, pas un « Menu » générique.
     expect(within(dialog).getByText('Ensemble & Organisés')).toBeInTheDocument();
-    // Maison + dix-neuf modules, chacun joignable en un tap.
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(20);
+    // Maison + vingt modules, chacun joignable en un tap.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(21);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Courses' })).toBeInTheDocument();
   });
 
@@ -174,7 +174,7 @@ describe('AppShell — catalogue des espaces', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(20);
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(21);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Anniversaires' })).toBeInTheDocument();
   });
 
@@ -282,8 +282,8 @@ describe('AppShell — périmètre enfant', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    // Maison + quatorze espaces : 15 liens, aucun hollow, aucun masqué en CSS.
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(15);
+    // Maison + quinze espaces : 16 liens, aucun hollow, aucun masqué en CSS.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(16);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Maison' })).toBeInTheDocument();
     for (const label of ['Ardoise', 'Cadeaux', 'Animaux', 'Prestataires', 'Fidélité']) {
       expect(within(dialog).queryByRole('link', { name: `Ouvrir ${label}` })).not.toBeInTheDocument();

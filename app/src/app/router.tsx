@@ -537,6 +537,12 @@ export function AppRoutes() {
             }
         />
         <Route
+          path="/documents"
+          element={
+            <LazyRoute load={routeChunkLoaders.documents} />
+          }
+        />
+        <Route
           path="/menu"
           element={
             <LazyRoute load={routeChunkLoaders.menu} />

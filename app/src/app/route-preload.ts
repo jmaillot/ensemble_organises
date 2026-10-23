@@ -55,6 +55,7 @@ export const routeChunkLoaders = {
   contactsGuide: () => import('@/modules/contacts/contacts-guide-page'),
   frigo: () => import('@/modules/frigo/frigo-page'),
   frigoGuide: () => import('@/modules/frigo/frigo-guide-page'),
+  documents: () => import('@/modules/documents/documents-page'),
   menu: () => import('@/modules/menu/menu-page'),
   menuGuide: () => import('@/modules/menu/menu-guide-page'),
   animaux: () => import('@/modules/animaux/animaux-page'),

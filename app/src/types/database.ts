@@ -841,3 +841,32 @@ export interface DashboardWidgetRow {
   height: number;
   settings: Record<string, unknown> | null;
 }
+
+/** Dossier coloré du module Documents (migration 0143). */
+export interface DocumentFolderRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  /** Teinte de la pastille : palette fermée vérifiée par la base. */
+  color: 'sage' | 'blush' | 'butter' | 'sky' | 'lilac' | 'sand';
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
+/** Document du foyer : toujours un fichier (photo ou PDF), jamais un texte. */
+export interface DocumentRow {
+  id: Uuid;
+  household_id: Uuid;
+  folder_id: string | null;
+  name: string;
+  /** Type déclaré : images et PDF uniquement (contrainte 0143). */
+  mime: string;
+  /** Taille du fichier en octets, toujours positive. */
+  size: number;
+  /** Chemin du bucket privé `household-media`, jamais une URL signée. */
+  storage_path: string;
+  expires_on: IsoDate | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
