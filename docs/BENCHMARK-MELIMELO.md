@@ -10,6 +10,23 @@
 > **recherche d'adresse en ligne** (Edge Function `place-search` sur
 > Nominatim, préremplissage du formulaire de lieu). Restent les lots 3
 > (nouveaux modules) et 4 (modèle économique).
+>
+> **Re-vérification du site melimelo.co le 23 octobre 2026** : la page
+> d'accueil liste toujours les mêmes 26 modules (la table §4 reste juste),
+> mais les **notes de version** (`/releases`) révèlent un **27e module absent
+> de l'analyse : Entourage** (v4.1.0, 15 octobre 2026) — il relie le foyer à
+> ceux de ses proches : invitation d'un foyer par code ou lien, partage d'une
+> recette, d'une adresse ou d'un prestataire que le proche ajoute chez lui en
+> un toucher, fil des partages reçus (signalé sur l'accueil et par
+> notification), messages inter-foyers, lien public de recette avec aperçu
+> dans les messageries. Aucune page publique `/entourage` n'existe encore et
+> la page d'accueil ne le compte pas dans ses 26 : le module n'est visible
+> que par les notes de version et dans l'application. La même v4.1.0 élargit
+> aussi Budget (« reste pour vivre », pots, import OFX/CSV/Excel,
+> ventilation, mode Expert), Bien-être (journal alimentaire, calories,
+> nutriments, sport, poids) et Bébé (sommeil, couches, minuteurs) — trois
+> modules que le benchmark classait « absent » et dont le périmètre réel de
+> référence est désormais plus large que ce qui était décrit ici.
 
 ## 0. Réponse courte
 
