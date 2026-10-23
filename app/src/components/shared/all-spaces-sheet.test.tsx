@@ -5,11 +5,13 @@ import { MemoryRouter } from 'react-router';
 import { AllSpacesSheet } from './all-spaces-sheet';
 
 /**
- * La feuille « Tous les espaces » est le pendant du tiroir : mêmes entrées
- * visibles (rôle enfant + menu des applications 0140), geste différent — le
- * « Plus » de la barre basse l'ouvre, le hamburger reste réservé aux
- * réglages. L'invariant de couverture (chaque espace + la maison) est posé
- * ici comme il l'est sur le tiroir.
+ * La feuille « Tous les espaces » est le « Plus » de la barre basse. Depuis
+ * le pass adapt du 23 octobre 2026, elle expose les espaces HORS barre basse
+ * (benchmark §2.6 : « “Plus” ouvre une feuille avec les autres espaces ») en
+ * tuiles pastel — la barre basse sert déjà Maison, Courses, Agenda et Tâches
+ * d'un tap ; les répéter ici re-mettait deux fois la même destination sous
+ * le pouce. La visibilité suit les mêmes règles que le tiroir (rôle enfant,
+ * menu des applications 0140).
  */
 function renderSheet(open = true, onOpenChange = () => {}) {
   return render(
@@ -20,14 +22,18 @@ function renderSheet(open = true, onOpenChange = () => {}) {
 }
 
 describe('AllSpacesSheet', () => {
-  it('expose chaque espace du catalogue plus la maison, en liens nommés', () => {
+  it('expose les espaces hors barre basse, en tuiles nommées, sans doublon', () => {
     renderSheet();
 
     const links = screen.getAllByRole('link', { name: /^Ouvrir / });
-    // Maison + vingt modules du catalogue (frigo, menu, vague 3.1 ;
-    // documents, vague 3.2) : la feuille ne doit jamais en lister moins
-    // que le tiroir.
-    expect(links.length).toBe(21);
+    // Vingt modules du catalogue (frigo, menu, vague 3.1 ; documents,
+    // vague 3.2) MINUS les quatre que la barre basse sert déjà (Maison,
+    // Courses, Agenda, Tâches) : 20 − 3 modules + 0 (la maison n'est pas
+    // un module du catalogue) = 17.
+    expect(links.length).toBe(17);
+    for (const absent of ['Ouvrir Maison', 'Ouvrir Courses', 'Ouvrir Tâches']) {
+      expect(screen.queryByRole('link', { name: absent })).not.toBeInTheDocument();
+    }
     expect(screen.getByRole('dialog', { name: 'Tous les espaces' })).toBeInTheDocument();
   });
 
@@ -36,7 +42,7 @@ describe('AllSpacesSheet', () => {
     renderSheet(true, onOpenChange);
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('link', { name: 'Ouvrir Courses' }));
+    await user.click(screen.getByRole('link', { name: 'Ouvrir Notes' }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

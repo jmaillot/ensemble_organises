@@ -87,15 +87,16 @@ describe('Accueil — rendu', () => {
 
   it('propose les dix-neuf espaces du foyer dans la grille', async () => {
     renderWithProviders(<DashboardPage />);
-    expect(await screen.findByRole('button', { name: /Courses/ })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Courses/ })).toBeInTheDocument();
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
-    expect(within(grid).getByRole('button', { name: /Courses/ })).toBeInTheDocument();
-    expect(within(grid).getByRole('button', { name: /Ardoise/ })).toBeInTheDocument();
-    expect(within(grid).getByRole('button', { name: /Fidélité/ })).toBeInTheDocument();
-    expect(within(grid).getByRole('button', { name: /Contacts/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Courses/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Ardoise/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Fidélité/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Contacts/ })).toBeInTheDocument();
     // Vingt tuiles : frigo, menu (vague 3.1) et documents (vague 3.2)
-    // portent la grille à 20.
-    expect(within(grid).getAllByRole('button')).toHaveLength(20);
+    // portent la grille à 20. Tuiles pastel depuis le 23/10 : chaque espace
+    // est un lien vers sa page.
+    expect(within(grid).getAllByRole('link')).toHaveLength(20);
   });
 
   it('ouvre le mode personnalisation et permet de masquer un widget', async () => {
@@ -251,14 +252,14 @@ describe('Accueil — rendu', () => {
     });
 
     // Quinze tuiles : les 5 modules hors périmètre ont disparu, les autres
-    // restent byte-identiques.
+    // restent byte-identiques. Tuiles-liens depuis le 23/10 (pass adapt).
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
-    expect(within(grid).getAllByRole('button')).toHaveLength(15);
+    expect(within(grid).getAllByRole('link')).toHaveLength(15);
     for (const name of ['Ardoise', 'Cadeaux', 'Fidélité', 'Prestataires', 'Animaux']) {
-      expect(within(grid).queryByRole('button', { name: new RegExp(name) })).not.toBeInTheDocument();
+      expect(within(grid).queryByRole('link', { name: new RegExp(name) })).not.toBeInTheDocument();
     }
-    expect(within(grid).getByRole('button', { name: /Courses/ })).toBeInTheDocument();
-    expect(within(grid).getByRole('button', { name: /Contacts/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Courses/ })).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: /Contacts/ })).toBeInTheDocument();
     // La colonne latérale qui lit les dépenses disparaît avec elles : aucun
     // total ni aucune ligne d'activité ne fuite vers l'enfant.
     expect(screen.queryByText(/dépenses du foyer/)).not.toBeInTheDocument();

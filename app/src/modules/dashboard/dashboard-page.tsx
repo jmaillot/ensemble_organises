@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
-import { ModuleTile } from '@/components/shared/module-tile';
+import { AppTile } from '@/components/shared/app-tile';
 import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { filterModuleEntries, modules } from '@/lib/modules';
@@ -279,7 +279,7 @@ export default function DashboardPage() {
               {visibleTiles
                 .map((entry) => (
                   <li key={entry.key} className="min-w-0">
-                    <ModuleTile entry={entry} />
+                    <AppTile label={entry.label} tint={entry.tint} emoji={entry.emoji} to={`/${entry.key}`} />
                   </li>
                 ))}
             </ul>

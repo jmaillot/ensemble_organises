@@ -249,7 +249,6 @@ export function RoutinesWidget({
 
 export function BoardSummaryCard({ total, monthLabel, balances }: { total: number; monthLabel: string; balances: { memberId: string; displayName: string; amount: number }[] }) {
   const positives = balances.filter((entry) => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
-  const totalAbs = balances.reduce((sum, entry) => sum + Math.abs(entry.amount), 0) || 1;
   const segments = balances.slice(0, 3).map((entry) => Math.abs(entry.amount));
   const scale = segments.reduce((sum, value) => sum + value, 0) || 1;
   return (

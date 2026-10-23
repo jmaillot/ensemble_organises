@@ -1,23 +1,6 @@
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { catalogueModules, filterModuleEntries, filterModuleKeys, isModuleDisabled, modules, navModules } from './modules';
 
-/**
- * Vitest ne garantit pas le répertoire courant du runner : on remonte depuis
- * celui-ci jusqu'à trouver le dossier `public/assets` de l'application.
- */
-function findAssetsDir(): string | null {
-  let directory = process.cwd();
-  for (let depth = 0; depth < 6; depth += 1) {
-    const candidate = resolve(directory, 'public/assets');
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(directory);
-    if (parent === directory) break;
-    directory = parent;
-  }
-  return null;
-}
 
 /**
  * Le catalogue est la seule garantie qu'aucune catégorie n'est inatteignable.
@@ -39,13 +22,15 @@ describe('Catalogue des espaces', () => {
     }
   });
 
-  it('associe à chaque espace une photo présente dans les assets', () => {
-    const assetsDir = findAssetsDir();
-    expect(assetsDir, 'public/assets est introuvable depuis la racine du test').not.toBeNull();
+  it('associe à chaque espace un pastel et un emoji de tuile valides', () => {
+    // Les tuiles sont passées au pastel Melimelo le 23 octobre 2026 (demande
+    // explicite : « les tuiles du site melimelo à la place des miennes ») —
+    // le garde vérifie le contrat qui remplace la photo : un aplat de la
+    // liste fermée des six pastels, et un emoji non vide par espace.
+    const TINTS = new Set(['sage', 'blush', 'butter', 'sky', 'lilac', 'sand']);
     for (const entry of catalogueModules) {
-      expect(existsSync(resolve(assetsDir!, entry.image)), `${entry.key} pointe vers une photo absente : ${entry.image}`).toBe(
-        true,
-      );
+      expect(TINTS.has(entry.tint), `${entry.key} porte un pastel inconnu : ${entry.tint}`).toBe(true);
+      expect(entry.emoji.trim().length, `${entry.key} n'a pas d'objet (emoji) sur sa tuile`).toBeGreaterThan(0);
     }
   });
 
