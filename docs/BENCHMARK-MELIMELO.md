@@ -27,6 +27,13 @@
 > nutriments, sport, poids) et Bébé (sommeil, couches, minuteurs) — trois
 > modules que le benchmark classait « absent » et dont le périmètre réel de
 > référence est désormais plus large que ce qui était décrit ici.
+>
+> **Décision produit du 23 octobre 2026 : quatre modules exclus du
+> périmètre, définitivement et sans appel — Entourage, Bébé, Budget,
+> Bien-être.** Ils ne seront ni portés, ni planifiés, ni reproposés ; une
+> future re-vérification du site ne doit pas les remonter comme manquants.
+> Le lot 3 (nouveaux modules) s'en tient à ce que le benchmark §6 liste
+> hors ces quatre-là.
 
 ## 0. Réponse courte
 
