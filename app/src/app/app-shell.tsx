@@ -6,15 +6,13 @@ import {
   modulePath,
   filterModuleKeys,
   isModuleDisabled,
-  navLabelOf,
-  navModules,
+  modules,
   type ModuleKey,
 } from '@/lib/modules';
 import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
-import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
 import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
 import { AllSpacesSheet } from '@/components/shared/all-spaces-sheet';
@@ -33,6 +31,17 @@ import { syncRotatedPushSubscription } from '@/modules/parametres/lib/push';
 import type { TaskRow } from '@/types';
 
 const homeIcon: IconName = 'home';
+
+/**
+ * Traitement d'un lien de navigation de la barre latérale : la pilule
+ * active pleine, l'inactive bordée — la même forme sur TOUTE la liste,
+ * désormais unique.
+ */
+const navItemClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    'flex min-h-11 w-full items-center gap-3 rounded-full px-3.5 text-left text-[13.5px] text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
+    isActive && 'bg-accent font-[650] text-surface hover:bg-accent-strong hover:text-surface',
+  );
 
 /**
  * Libellé du raccourci, selon la plateforme. `platform` n'est pas normalisé
@@ -179,7 +188,7 @@ export function AppShell() {
   // propre libellé de navigation.
   const fallbackLabels: Partial<Record<string, string>> = { parametres: 'Paramètres' };
   const currentLabel = fallbackLabels[currentKey]
-    ?? (currentKey === 'accueil' ? 'Maison' : moduleMap[currentKey] ? navLabelOf(moduleMap[currentKey]) : 'Maison');
+    ?? (currentKey === 'accueil' ? 'Maison' : moduleMap[currentKey] ? moduleMap[currentKey].label : 'Maison');
   const isAdmin = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'admin');
   // Rôle `enfant` (phase 14, D-05) : les accès rapides épinglés suivent le
   // même masquage que le catalogue (aucun des 5 n'y figure aujourd'hui, mais
@@ -188,7 +197,11 @@ export function AppShell() {
   // la navigation — présentation seulement, la RLS reste la frontière.
   const isChild = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'enfant');
   const disabledModules = useDisabledModules();
-  const visibleNavModules = filterModuleKeys(navModules, { isChild, disabledModules });
+  // Une seule liste (retour du 23 octobre : « le menu de navigation sur pc
+  // soit unique ») : Maison puis TOUS les espaces du catalogue, dans l'ordre
+  // du catalogue, sans second groupe « Tous les espaces » qui répétait
+  // Calendrier, Tâches et Cercle et doublait les états actifs.
+  const visibleNavModules = filterModuleKeys(modules.map((entry) => entry.key), { isChild, disabledModules });
 
   return (
     <div className="flex min-h-screen">
@@ -210,11 +223,10 @@ export function AppShell() {
           </div>
         </div>
 
-        {/* Zone de défilement : seize catégories ne tiennent pas dans la hauteur
-            d'un écran. `w-full` parce que la barre latérale centre ses enfants
-            sous 920 px, où les libellés disparaissent. */}
+        {/* Zone de défilement : vingt catégories ne tiennent pas dans la
+            hauteur d'un écran. `w-full` parce que la barre latérale centre
+            ses enfants sous 920 px, où les libellés disparaissent. */}
         <div className="min-h-0 w-full flex-1 overflow-y-auto pb-1 scrollbar-slim">
-          <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Navigation</p>
           <nav aria-label="Navigation principale">
             <ul className="grid list-none gap-1 p-0">
               <li>
@@ -229,7 +241,7 @@ export function AppShell() {
                   <li key={key}>
                     <NavLink to={modulePath(key)} className={navItemClass}>
                       <Icon name={entry.icon} />
-                      <span className="max-[920px]:sr-only">{navLabelOf(entry)}</span>
+                      <span className="max-[920px]:sr-only">{entry.label}</span>
                       {key === 'taches' && openTaskCount !== null && openTaskCount > 0 ? (
                         <span className="ml-auto text-xs text-muted max-[920px]:hidden" aria-label={`${openTaskCount} tâches ouvertes`}>
                           {openTaskCount}
@@ -246,7 +258,6 @@ export function AppShell() {
               })}
             </ul>
           </nav>
-          <ModuleCatalogueNav />
         </div>
 
         {/* `w-full` : la barre centre ses enfants sous 920 px, et un conteneur

@@ -135,43 +135,31 @@ describe('AppShell', () => {
  * rail pouvaient être actives simultanément.
  */
 describe('AppShell — catalogue des espaces', () => {
-  it('expose un bouton pour chaque catégorie hors accès rapides, sans doublon', () => {
+  it('expose UNE liste unique : Maison puis les vingt espaces, sans doublon', () => {
     renderShell('/accueil');
-    const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
-    const links = within(grid).getAllByRole('link');
-    const catalogue = catalogueModules.filter((entry) => !['calendrier', 'taches', 'cercle'].includes(entry.key));
-    expect(links).toHaveLength(catalogue.length);
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(catalogue.map((entry) => `/${entry.key}`));
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    const links = within(nav).getAllByRole('link');
+    // Un seul menu (retour du 23 octobre : « le menu de navigation sur pc
+    // soit unique ») : Maison + les vingt modules du catalogue, dans
+    // l'ordre du catalogue. Le second groupe « Tous les espaces » et son
+    // repli sont partis — ils répétaient Calendrier, Tâches et Cercle.
+    expect(links).toHaveLength(catalogueModules.length + 1);
+    const hrefs = links.map((link) => link.getAttribute('href'));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs.slice(1)).toEqual(catalogueModules.map((entry) => `/${entry.key}`));
+    expect(hrefs[0]).toBe('/accueil');
+    // Plus aucun bouton de repli : la liste ne se masque pas.
+    expect(within(nav).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('départage les catégories qui n’ont pas d’accès rapide épinglé', () => {
+  it('affiche chaque espace une seule fois dans la barre latérale', () => {
     renderShell('/accueil');
-    const quick = within(screen.getByRole('navigation', { name: 'Navigation principale' }));
-    // Accueil n'appartient pas au catalogue : il reste le premier accès rapide.
-    expect(quick.getByRole('link', { name: /Maison/ })).toBeInTheDocument();
-    for (const key of ['courses', 'anniversaires', 'animaux', 'fidelite', 'messages'] as const) {
-      const entry = catalogueModules.find((module) => module.key === key)!;
-      expect(quick.queryByRole('link', { name: entry.label })).not.toBeInTheDocument();
-      expect(screen.getAllByRole('link', { name: entry.label }).length).toBeGreaterThan(0);
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    // Le doublon le plus visible était « Calendrier » : une entrée par
+    // groupe. Chaque libellé ne peut plus y paraître deux fois.
+    for (const label of ['Calendrier', 'Tâches', 'Cercle', 'Courses']) {
+      expect(within(nav).getAllByRole('link', { name: new RegExp(label) }).length).toBeLessThanOrEqual(1);
     }
-  });
-
-  it('replie et déplie la section du catalogue', async () => {
-    const user = userEvent.setup();
-    renderShell('/accueil');
-    const toggle = screen.getByRole('button', { name: /Tous les espaces/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle.getAttribute('aria-controls')).toBeTruthy();
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Repliée, la section ne doit plus exposer un seul lien à l'axe de
-    // tabulation ni au lecteur d'écran.
-    expect(screen.queryByRole('list', { name: 'Espaces du foyer' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Courses' })).not.toBeInTheDocument();
-
-    await user.click(toggle);
-    expect(screen.getByRole('link', { name: 'Courses' })).toBeInTheDocument();
   });
 
   it('ouvre le tiroir en tuiles depuis le hamburger', async () => {
@@ -267,23 +255,22 @@ describe('AppShell — périmètre enfant', () => {
     });
   }
 
-  it('retire les 5 modules du catalogue pour un enfant', () => {
+  it('retire les 5 modules de la navigation unique pour un enfant', () => {
     renderShellAsChild('/accueil');
-    const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
-    const links = within(grid).getAllByRole('link');
-    // Catalogue SANS les accès rapides (critique UI 2026-10-23), PUIS sans les
-    // modules hors périmètre enfant — les deux filtres se composent.
-    const expected = catalogueModules
-      .filter((entry) => !['calendrier', 'taches', 'cercle'].includes(entry.key))
-      .filter((entry) => !isChildHiddenModule(entry.key));
-    expect(links).toHaveLength(expected.length);
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(expected.map((entry) => `/${entry.key}`));
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    const links = within(nav).getAllByRole('link');
+    // Liste unique : Maison + les vingt modules, MINUS les 5 hors périmètre
+    // enfant — le masquage D-05 s'applique à la liste entière.
+    const expected = catalogueModules.filter((entry) => !isChildHiddenModule(entry.key));
+    expect(links).toHaveLength(expected.length + 1);
+    expect(links[0].getAttribute('href')).toBe('/accueil');
+    expect(links.slice(1).map((link) => link.getAttribute('href'))).toEqual(expected.map((entry) => `/${entry.key}`));
     for (const label of hiddenLabels) {
-      expect(within(grid).queryByRole('link', { name: label })).not.toBeInTheDocument();
+      expect(within(nav).queryByRole('link', { name: label })).not.toBeInTheDocument();
     }
     // Les espaces autorisés restent joignables, sans entrée focusable cachée.
-    expect(within(grid).getByRole('link', { name: 'Courses' })).toBeInTheDocument();
-    expect(within(grid).getByRole('link', { name: 'Contacts' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Courses' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Contacts' })).toBeInTheDocument();
   });
 
   it('retire les 5 modules du tiroir mobile pour un enfant', async () => {
