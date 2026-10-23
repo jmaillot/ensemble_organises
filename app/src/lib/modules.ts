@@ -38,7 +38,13 @@ export interface ModuleEntry {
   icon: import('@/components/shared/icon').IconName;
   /** Libellé court pour la navigation mobile. */
   short: string;
-  /** Libellé dans la barre latérale (« À faire » pour les tâches, comme dans l'export). */
+  /**
+   * Libellé dans la barre latérale. Était « À faire » pour les tâches —
+   * deux noms pour une même page (catalogue « Tâches », page « Tâches »,
+   * rail « À faire ») : le lecteur devait désambiguïser, et le rail
+   * surlignait DEUX entrées actives d'un coup (critique UI 2026-10-23).
+   * Un seul nom partout : celui du module.
+   */
   navLabel?: string;
   /** Présent dans la grille de l'accueil. */
   tile: boolean;
@@ -54,7 +60,7 @@ export const modules: ModuleEntry[] = [
   { key: 'courses', label: 'Courses', detail: 'Listes partagées', kicker: 'À faire ensemble', image: 'courses.jpg', icon: 'receipt', short: 'Courses', tile: true, nav: false },
   { key: 'calendrier', label: 'Calendrier', detail: 'Événements & rappels', kicker: 'Le temps du foyer', image: 'calendrier.jpg', icon: 'calendar', short: 'Agenda', navLabel: 'Calendrier', tile: true, nav: true },
   { key: 'notes', label: 'Notes', detail: 'Mémoires & idées', kicker: 'À garder près de soi', image: 'calendrier.jpg', icon: 'edit', short: 'Notes', tile: true, nav: false },
-  { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', image: 'taches.jpg', icon: 'checkCircle', short: 'À faire', navLabel: 'À faire', tile: true, nav: true },
+  { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', image: 'taches.jpg', icon: 'checkCircle', short: 'Tâches', tile: true, nav: true },
   { key: 'routines', label: 'Routines', detail: 'Habitudes du foyer', kicker: 'Le rythme juste', image: 'routines.jpg', icon: 'wand', short: 'Routines', tile: true, nav: false },
   { key: 'ardoise', label: 'Ardoise', detail: 'Dépenses & partage', kicker: 'Transparent par nature', image: 'ardoise.jpg', icon: 'wallet', short: 'Ardoise', tile: true, nav: false },
   { key: 'recettes', label: 'Recettes', detail: 'Carnet de cuisine', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },

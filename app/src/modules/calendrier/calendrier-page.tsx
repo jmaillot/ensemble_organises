@@ -333,7 +333,11 @@ export default function CalendrierPage() {
                 <span className="max-[650px]:hidden">Ajouter un événement</span>
                 <span className="min-[651px]:hidden">Nouvel événement</span>
               </Button>
+              {/* Un seul bouton plein par en-tête (critique UI 2026-10-23) :
+                  deux primaires se disputaient le même regard. Le secondaire
+                  garde son accès direct — il mène à un autre module. */}
               <Button
+                variant="secondary"
                 icon="plus"
                 onClick={() => navigate('/taches', { state: { dueDate: selected } })}
               >

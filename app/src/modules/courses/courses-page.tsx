@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogActions } from '@/components/ui/dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { HeaderMenu } from '@/components/ui/header-menu';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -285,26 +286,24 @@ export default function CoursesPage() {
       infoTo="/courses/aide"
       actions={
         <>
-          <Button variant="secondary" icon="scan" disabled={isLoading} onClick={() => setScanOpen(true)}>
-            Scanner
-          </Button>
-          <Button variant="secondary" icon="grid" onClick={() => navigate('/courses/catalogue')}>
-            Catalogue
-          </Button>
-          <Button
-            variant="secondary"
-            icon="download"
-            disabled={!printModel}
-            onClick={print}
-          >
-            Imprimer
-          </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
             Nouvelle liste
           </Button>
           <Button icon="plus" disabled={isLoading} onClick={() => setItemDialog({ open: true })}>
             Ajouter un article
           </Button>
+          {/* Un seul bouton plein par en-tête (critique UI 2026-10-23) :
+              Scanner, Catalogue et Imprimer descendent dans le menu « ⋯ ».
+              « Imprimer » est retiré plutôt que grisé quand il n'y a rien à
+              imprimer — un contrôle désactivé sans raison lisible est du
+              bruit, pas une garde. */}
+          <HeaderMenu
+            items={[
+              { label: 'Scanner un article', icon: 'scan', onSelect: () => setScanOpen(true), disabled: isLoading },
+              { label: 'Catalogue du foyer', icon: 'grid', onSelect: () => navigate('/courses/catalogue') },
+              ...(printModel ? [{ label: 'Imprimer la liste', icon: 'download' as const, onSelect: print }] : []),
+            ]}
+          />
         </>
       }
     >

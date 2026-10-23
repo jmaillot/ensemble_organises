@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { NavLink } from 'react-router';
 import { cn } from '@/lib/utils';
-import { catalogueModules, filterModuleEntries, modulePath } from '@/lib/modules';
+import { catalogueModules, filterModuleEntries, modulePath, navModules } from '@/lib/modules';
 import { useCurrentMember, useDisabledModules } from '@/stores/household-store';
 import { Icon } from './icon';
 
@@ -30,7 +30,15 @@ export function ModuleCatalogueNav({ className }: { className?: string }) {
   // des applications (0140) : les espaces éteints par le foyer sortent aussi.
   const isChild = useCurrentMember()?.role === 'enfant';
   const disabledModules = useDisabledModules();
-  const visibleModules = filterModuleEntries(catalogueModules, { isChild, disabledModules });
+  // Les accès rapides du rail (« Navigation ») ne se répètent pas ici :
+  // « Calendrier » apparaissait deux fois dans la même barre, et la tabulation
+  // annonçait deux fois la même destination (critique UI 2026-10-23, P1).
+  // La section reste le catalogue des espaces ABSENTS du rail — chaque module
+  // demeure référencé quelque part, c'est le contrat de `catalogueModules`.
+  const quickAccess = new Set(navModules);
+  const visibleModules = filterModuleEntries(catalogueModules, { isChild, disabledModules }).filter(
+    (entry) => !quickAccess.has(entry.key),
+  );
 
   return (
     <div className={cn('mt-6', className)}>

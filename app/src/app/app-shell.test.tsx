@@ -64,7 +64,7 @@ describe('AppShell', () => {
     renderShell('/accueil');
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
     expect(within(nav).getByRole('link', { name: /Maison/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /À faire/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Tâches/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Calendrier/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Cercle/ })).toBeInTheDocument();
     expect(screen.getAllByText('Foyer Martin').length).toBeGreaterThan(0);
@@ -73,8 +73,10 @@ describe('AppShell', () => {
   it('propose un fil d’Ariane cohérent avec la route courante', () => {
     renderShell('/taches');
     const breadcrumb = screen.getByRole('navigation', { name: 'Fil d’Ariane' });
-    // Libellé de navigation de l'export : « À faire » pour le module tâches.
-    expect(within(breadcrumb).getByText('À faire')).toBeInTheDocument();
+    // Un seul nom pour le module tâches (critique UI 2026-10-23) : le rail
+    // disait « À faire », la page et le catalogue « Tâches » — le fil
+    // d'Ariane suit désormais le nom du module.
+    expect(within(breadcrumb).getByText('Tâches')).toBeInTheDocument();
   });
 
   it('nomme le module, pas la page, sur une sous-route', () => {
@@ -127,15 +129,19 @@ describe('AppShell', () => {
 /**
  * Régression : la barre latérale n'épinglait que quatre entrées, et les douze
  * autres catégories n'avaient aucun bouton de navigation. Le catalogue est la
- * garantie qu'aucun espace du foyer ne devienne inatteignable.
+ * garantie qu'aucun espace du foyer ne devienne inatteignable. Depuis la
+ * critique UI 2026-10-23, il n'expose que les espaces ABSENTS des accès
+ * rapides : Calendrier et Tâches y figuraient deux fois, et deux entrées du
+ * rail pouvaient être actives simultanément.
  */
 describe('AppShell — catalogue des espaces', () => {
-  it('expose un bouton pour chacune des dix-sept catégories', () => {
+  it('expose un bouton pour chaque catégorie hors accès rapides, sans doublon', () => {
     renderShell('/accueil');
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
     const links = within(grid).getAllByRole('link');
-    expect(links).toHaveLength(catalogueModules.length);
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(catalogueModules.map((entry) => `/${entry.key}`));
+    const catalogue = catalogueModules.filter((entry) => !['calendrier', 'taches', 'cercle'].includes(entry.key));
+    expect(links).toHaveLength(catalogue.length);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(catalogue.map((entry) => `/${entry.key}`));
   });
 
   it('départage les catégories qui n’ont pas d’accès rapide épinglé', () => {
@@ -210,8 +216,8 @@ describe('AppShell — catalogue des espaces', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog');
-    await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'a faire');
-    expect(within(dialog).getByRole('link', { name: 'Ouvrir À faire' })).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'taches');
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir Tâches' })).toBeInTheDocument();
   });
 
   it('affiche une popup quand le service worker relaie un push (app ouverte)', async () => {
@@ -265,7 +271,11 @@ describe('AppShell — périmètre enfant', () => {
     renderShellAsChild('/accueil');
     const grid = screen.getByRole('list', { name: 'Espaces du foyer' });
     const links = within(grid).getAllByRole('link');
-    const expected = catalogueModules.filter((entry) => !isChildHiddenModule(entry.key));
+    // Catalogue SANS les accès rapides (critique UI 2026-10-23), PUIS sans les
+    // modules hors périmètre enfant — les deux filtres se composent.
+    const expected = catalogueModules
+      .filter((entry) => !['calendrier', 'taches', 'cercle'].includes(entry.key))
+      .filter((entry) => !isChildHiddenModule(entry.key));
     expect(links).toHaveLength(expected.length);
     expect(links.map((link) => link.getAttribute('href'))).toEqual(expected.map((entry) => `/${entry.key}`));
     for (const label of hiddenLabels) {
