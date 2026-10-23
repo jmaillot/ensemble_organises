@@ -16,7 +16,7 @@ const chipVisual: Record<AgendaItem['kind'], { className: string }> = {
   tache: { className: 'bg-lilac text-[oklch(42%_0.12_300)]' },
   anniversaire: { className: 'bg-blush text-[oklch(42%_0.13_20)]' },
   ferie: { className: 'bg-amber-soft text-[oklch(45%_0.11_78)]' },
-  vacances: { className: 'bg-sky text-[#1f4e79]' },
+  vacances: { className: 'bg-sky text-sky-strong' },
 };
 
 export interface AgendaListProps {

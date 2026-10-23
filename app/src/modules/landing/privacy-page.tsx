@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 const EFFECTIVE_DATE = '13 octobre 2026';
 const CONTACT_EMAIL = 'jeremymaillot@gmail.com';
@@ -26,9 +27,9 @@ export default function PrivacyPage() {
 
       <div className="grid gap-7 text-[14px] leading-relaxed">
         <section aria-labelledby="prive-qui">
-          <h2 id="prive-qui" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-qui" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             1. Qui sommes-nous ?
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             <strong>Ensemble &amp; Organisés</strong> (« l’application ») est un espace familial permettant de gérer
             ensemble tâches, courses, calendrier, budget partagé et souvenirs. Elle est éditée par{' '}
@@ -42,9 +43,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-donnees">
-          <h2 id="prive-donnees" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-donnees" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             2. Données collectées
-          </h2>
+          </SectionHeading>
           <p className="mt-0 mb-2">
             <strong>Données de compte.</strong> Lorsque vous choisissez « Continuer avec Google », l’application
             demande uniquement les trois autorisations d’identification suivantes, et aucune autre :
@@ -87,9 +88,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-finalites">
-          <h2 id="prive-finalites" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-finalites" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             3. Finalités et bases légales
-          </h2>
+          </SectionHeading>
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
@@ -132,9 +133,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-google">
-          <h2 id="prive-google" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-google" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             4. Utilisation des données Google
-          </h2>
+          </SectionHeading>
           <p className="mt-0 mb-2">
             L’utilisation des informations reçues des API Google respecte la Politique relative aux données
             utilisateur des services d’API Google, y compris les exigences d’utilisation limitée (Limited Use).
@@ -154,9 +155,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-hebergement">
-          <h2 id="prive-hebergement" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-hebergement" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             5. Hébergement et destinataires
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             Les données sont hébergées par nos soins sur une instance Supabase auto-hébergée, exécutée sur
             l’infrastructure d’Oracle Cloud Infrastructure (OCI), dans une région située en France. Oracle intervient
@@ -174,9 +175,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-duree">
-          <h2 id="prive-duree" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-duree" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             6. Durée de conservation et suppression
-          </h2>
+          </SectionHeading>
           <p className="mt-0 mb-2">
             Les données de votre compte et de votre foyer sont conservées tant que votre compte est actif.
           </p>
@@ -199,9 +200,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-securite">
-          <h2 id="prive-securite" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-securite" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             7. Sécurité
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             Les échanges sont chiffrés (HTTPS). L’accès aux données est protégé par authentification et par des règles
             d’accès qui limitent chaque utilisateur aux données de son foyer. Les sauvegardes sont chiffrées, accès
@@ -210,9 +211,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-cookies">
-          <h2 id="prive-cookies" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-cookies" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             8. Cookies et stockage local
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             L’application utilise uniquement des mécanismes strictement nécessaires : session de connexion et stockage
             local du navigateur (cache de l’application installable, jeu de démonstration local). Ils ne nécessitent
@@ -221,9 +222,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-droits">
-          <h2 id="prive-droits" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-droits" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             9. Vos droits
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             Conformément au RGPD, vous disposez des droits d’accès, de rectification, d’effacement, de limitation,
             d’opposition et de portabilité de vos données. Pour les exercer, écrivez à{' '}
@@ -240,9 +241,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-enfants">
-          <h2 id="prive-enfants" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-enfants" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             10. Enfants
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             L’application est destinée à un usage familial. Elle n’est pas destinée aux enfants de moins de 15 ans
             sans l’accord d’un parent ou tuteur légal, qui reste responsable des informations ajoutées au foyer. Nous
@@ -251,9 +252,9 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="prive-evolutions">
-          <h2 id="prive-evolutions" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
+          <SectionHeading id="prive-evolutions" className="mb-2 font-display text-[19px] tracking-[-0.02em]">
             11. Modifications
-          </h2>
+          </SectionHeading>
           <p className="m-0">
             Cette politique peut évoluer. La date de dernière mise à jour figure en haut de cette page ; en cas de
             changement important, nous vous en informerons dans l’application.

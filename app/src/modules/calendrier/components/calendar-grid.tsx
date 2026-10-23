@@ -210,7 +210,7 @@ export function CalendarGrid({
                       ) : null}
                       {marker.hasBirthday ? <span className="size-[5px] rounded-full bg-accent" /> : null}
                       {marker.hasHoliday ? <span className="size-[5px] rounded-full bg-amber" /> : null}
-                      {marker.hasVacation ? <span className="size-[5px] rounded-full bg-[#1f4e79]" /> : null}
+                      {marker.hasVacation ? <span className="size-[5px] rounded-full bg-sky-strong" /> : null}
                     </span>
                   ) : null}
                 </button>
@@ -234,7 +234,7 @@ export function CalendarGrid({
           Jour férié
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-[6px] rounded-full bg-[#1f4e79]" />
+          <span aria-hidden="true" className="size-[6px] rounded-full bg-sky-strong" />
           Vacances
         </span>
         <span className="flex items-center gap-1.5">

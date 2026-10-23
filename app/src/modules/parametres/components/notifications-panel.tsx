@@ -219,7 +219,7 @@ export function NotificationsPanel() {
         ) : null}
 
         {server.loaded && !server.pushConfigured && !isLocalMode ? (
-          <p className="mb-4 mt-0 rounded-[10px] bg-amber-soft px-3 py-2 text-[11px] text-[oklch(52%_0.11_78)]">
+          <p className="mb-4 mt-0 rounded-[10px] bg-amber-soft px-3 py-2 text-[11px] text-amber-strong">
             Le serveur n’a pas de clé VAPID configurée. Générez-la avec <code>sh scripts/generate-vapid-keys.sh</code>, puis
             redémarrez le service des fonctions.
           </p>
@@ -327,7 +327,7 @@ export function NotificationsPanel() {
         </div>
 
         {hasDevice && localEndpoint !== null && !devices.some((device) => device.endpoint === localEndpoint) ? (
-          <p className="mb-4 mt-0 rounded-[10px] bg-amber-soft px-3 py-2 text-[11px] text-[oklch(52%_0.11_78)]">
+          <p className="mb-4 mt-0 rounded-[10px] bg-amber-soft px-3 py-2 text-[11px] text-amber-strong">
             Cet appareil n’est pas enregistré : le serveur notifie peut-être un ancien abonnement. Appuyez sur «
             Synchroniser cet appareil » depuis CE téléphone.
           </p>

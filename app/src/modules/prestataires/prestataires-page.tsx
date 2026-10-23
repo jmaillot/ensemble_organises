@@ -187,7 +187,7 @@ export default function PrestatairesPage() {
               className="panel-surface group rounded-[22px] p-4 transition-shadow duration-[var(--duration-quick)] hover:shadow-md min-[651px]:p-[22px]"
             >
               <div className="flex items-start gap-3">
-                <div className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-sage text-[#2f5d50]">
+                <div className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-sage text-sage-strong">
                   <Icon name={provider.typeIcon} size="sm" />
                 </div>
                 <div className="min-w-0 flex-1">

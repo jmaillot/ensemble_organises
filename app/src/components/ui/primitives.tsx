@@ -81,7 +81,7 @@ export function Badge({ className, tone = 'accent', ...rest }: React.HTMLAttribu
   const tones = {
     accent: 'bg-accent-soft text-accent-strong',
     coral: 'bg-coral-soft text-coral',
-    amber: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
+    amber: 'bg-amber-soft text-amber-strong',
     muted: 'bg-bg text-muted',
   } as const;
   return (
