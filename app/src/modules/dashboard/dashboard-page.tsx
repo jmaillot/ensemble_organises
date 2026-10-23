@@ -155,11 +155,16 @@ export default function DashboardPage() {
                 : `${openTasks.length} tâche${openTasks.length > 1 ? 's' : ''} en attente.`}
           </h2>
           {dashboard.todayItems.length === 0 ? (
+            // La phrase « Les courses sont presque prêtes » était posée en dur :
+            // elle affirmait un état des listes que ce résumé ne lit pas — sur un
+            // foyer vide, elle mentait dès la première ouverture (critique UI
+            // 2026-10-23, P1 ; même règle que AGENTS.md §2.7 I : une absence
+            // affirmée est une affirmation). Le résumé ne dit plus que ce qu'il
+            // lit vraiment : les échéances et le prochain rendez-vous.
             <p className="m-0 text-[13px] text-ink-soft">
               {nextEvent
                 ? `Prochain rendez-vous : ${nextEvent.title}, ${formatNextEventWhen(nextEvent)}.`
-                : 'Aucune échéance aujourd’hui : la journée est à vous.'}{' '}
-              Les courses, elles, sont presque prêtes.
+                : 'Aucune échéance aujourd’hui : la journée est à vous.'}
             </p>
           ) : (
             <div className={cn('grid gap-4', todayGroups.length > 1 && 'min-[650px]:grid-cols-2')}>

@@ -312,9 +312,13 @@ export default function CoursesPage() {
         {`${lists.length} listes, ${itemCount} articles, dont ${checkedCount} dans le panier.`}
       </p>
 
+      {/* Pas de statistique « Listes » : la carte sapin du rail la porte déjà
+          (critique UI 2026-10-23 — le zéro y était débattu deux fois). Sous
+          650 px, la rangée entière s'efface : le foyer au magasin veut sa
+          liste, pas ses compteurs (la Fab porte l'action principale). */}
       <MetricRow
+        className="max-[650px]:hidden"
         items={[
-          { label: 'Listes', value: lists.length, caption: lists.length > 1 ? 'listes actives' : 'liste active' },
           { label: 'Articles', value: itemCount, caption: 'à acheter au total' },
           { label: 'Dans le panier', value: checkedCount, caption: 'articles cochés' },
           {
