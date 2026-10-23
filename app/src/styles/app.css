@@ -235,6 +235,18 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Carte héro : le seul aplat à dégradé du système (§2.3 du benchmark —
+   « Les dégradés verts sont réservés aux cartes héro »). Dégradé dérivé
+   des jetons sapin, jamais de valeurs hexadécimales locales. */
+@utility hero-surface {
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklch, var(--color-accent) 82%, var(--color-accent-deep)) 0%,
+    var(--color-accent) 52%,
+    var(--color-accent-strong) 100%
+  );
+}
+
 @utility safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
