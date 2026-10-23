@@ -99,7 +99,7 @@ export function PetRecordsTimeline({ records, busyId, onEdit, onDelete }: PetRec
                   variant="ghost"
                   size="icon"
                   icon="trash"
-                  className="size-[31px] text-muted hover:bg-coral-soft hover:text-coral"
+                  className="size-[31px] text-muted hover:bg-coral-soft hover:text-coral-text"
                   aria-label={`Supprimer le suivi ${record.name}`}
                   onClick={() => setPending(record)}
                 />

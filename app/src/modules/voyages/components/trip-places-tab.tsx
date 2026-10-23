@@ -263,7 +263,7 @@ export function TripPlacesTab({ tripId, householdId, readOnly = false }: TripPla
                         type="button"
                         onClick={() => setPendingDelete(place)}
                         aria-label={`Supprimer ${place.name}`}
-                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                       >
                         <Icon name="trash" size="sm" />
                       </button>

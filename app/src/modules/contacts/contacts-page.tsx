@@ -202,7 +202,7 @@ export default function ContactsPage() {
                           type="button"
                           onClick={() => setPendingDelete(contact)}
                           aria-label={`Supprimer la fiche de ${contact.name}`}
-                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-coral hover:bg-coral-soft hover:text-coral-text"
                         >
                           <Icon name="trash" size="sm" />
                         </button>

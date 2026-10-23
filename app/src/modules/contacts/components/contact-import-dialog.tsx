@@ -236,7 +236,7 @@ export function ContactImportDialog({
                       )}
                       {row.duplicateOf !== null ? (
                         <span
-                          className="shrink-0 rounded-full bg-coral-soft px-2 py-0.5 text-[10px] font-extrabold text-coral"
+                          className="shrink-0 rounded-full bg-coral-soft px-2 py-0.5 text-[10px] font-extrabold text-coral-text"
                           title={`Fiche proche existante : ${row.duplicateOf}`}
                         >
                           doublon ?

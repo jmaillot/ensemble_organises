@@ -60,7 +60,7 @@ export function Field({ label, hint, error, optional, className, children }: Fie
           </p>
         ) : null}
         {error ? (
-          <p id={errorId} role="alert" className="text-[11px] font-semibold text-coral">
+          <p id={errorId} role="alert" className="text-[11px] font-semibold text-coral-text">
             {error}
           </p>
         ) : null}

@@ -359,7 +359,7 @@ export default function NotesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral"
+                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral-text"
                               aria-label={`Supprimer ${note.title}`}
                               onClick={() => setPendingDelete(note)}
                             >

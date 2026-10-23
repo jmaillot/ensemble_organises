@@ -113,7 +113,7 @@ export function RoutineHistory({
                       type="button"
                       onClick={() => onDeleteOccurrence(entry)}
                       aria-label={`Supprimer l’occurrence de ${entry.routineName} du ${formatMediumDate(entry.date)}`}
-                      className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-[color,background,border-color] duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                      className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-[color,background,border-color] duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text"
                     >
                       <Icon name="trash" size="sm" />
                     </button>

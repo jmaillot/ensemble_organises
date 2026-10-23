@@ -12,7 +12,7 @@ const buttonVariants = cva(
         primary: 'bg-accent text-surface shadow-[0_1px_2px_rgb(32_65_61/0.18)] hover:bg-accent-strong',
         secondary: 'border border-border bg-surface text-fg hover:border-accent hover:bg-accent-faint',
         quiet: 'bg-transparent px-2 text-accent-strong hover:bg-accent-soft',
-        danger: 'bg-coral-soft text-coral hover:bg-coral-strong',
+        danger: 'bg-coral-soft text-coral-text hover:bg-coral-strong',
         ghost: 'bg-transparent text-muted hover:bg-accent-faint hover:text-fg',
       },
       size: {

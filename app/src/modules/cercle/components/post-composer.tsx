@@ -91,6 +91,7 @@ export function PostComposer({ onPublish, focusSignal = 0, disabled }: PostCompo
       <form onSubmit={onSubmit} className="grid gap-4" noValidate>
         <Field
           label="Votre commentaire"
+          optional
           error={errors.text?.message}
           hint={`Les publications sont visibles par tout le foyer. ${text.trim().length} / ${POST_TEXT_MAX} caractères.`}
         >
@@ -136,7 +137,7 @@ export function PostComposer({ onPublish, focusSignal = 0, disabled }: PostCompo
               <button
                 type="button"
                 onClick={discardImage}
-                className="grid size-8 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                className="grid size-8 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                 aria-label="Retirer la photo"
               >
                 <Icon name="close" size="sm" />

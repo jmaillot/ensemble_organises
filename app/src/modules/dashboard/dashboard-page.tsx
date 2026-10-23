@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
-import { ModuleTile } from '@/components/shared/module-tile';
+import { AppTile } from '@/components/shared/app-tile';
 import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
 import { filterModuleEntries, modules } from '@/lib/modules';
@@ -143,23 +143,44 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <section className="pulse-banner relative mb-[31px] flex items-center justify-between gap-[26px] overflow-hidden rounded-[22px] border border-accent/25 bg-accent-soft p-[22px] max-[650px]:block max-[650px]:p-[18px]">
+      {/* Le héro de l'accueil est la seule surface pleine sapin de la page
+          (hero-surface, réservé aux cartes héro) : c'est le geste d'ouverture
+          de melimelo — l'écran s'ouvre sur l'encre profonde — et il était
+          resté au benchmark (critique UI 2026-10-23). L'accent de titre
+          reprend sa grammaire : une finale en Fraunces italique beurre. */}
+      <section className="hero-surface pulse-banner relative mb-[31px] flex items-center justify-between gap-[26px] overflow-hidden rounded-[22px] p-[22px] text-surface max-[650px]:block max-[650px]:p-[18px]">
         <span aria-hidden="true" className="pulse-ring" />
         <div className="relative z-1">
-          <p className="eyebrow mb-1.5">Le point du jour</p>
+          <p className="eyebrow mb-1.5 text-on-dark">Le point du jour</p>
           <h2 className="mb-1.5 text-xl tracking-[-0.02em]">
-            {openTasks.length === 0
-              ? 'Le foyer est à jour, profitez-en.'
-              : dashboard.todayItems.length > 0
-                ? `${dashboard.todayItems.length} point${dashboard.todayItems.length > 1 ? 's' : ''} à garder en tête.`
-                : `${openTasks.length} tâche${openTasks.length > 1 ? 's' : ''} en attente.`}
+            {openTasks.length === 0 ? (
+              <>
+                Le foyer est à jour,{' '}
+                <em className="font-display font-medium italic text-butter">profitez-en.</em>
+              </>
+            ) : dashboard.todayItems.length > 0 ? (
+              <>
+                {dashboard.todayItems.length} point{dashboard.todayItems.length > 1 ? 's' : ''},{' '}
+                <em className="font-display font-medium italic text-butter">à garder en tête.</em>
+              </>
+            ) : (
+              <>
+                {openTasks.length} tâche{openTasks.length > 1 ? 's' : ''}{' '}
+                <em className="font-display font-medium italic text-butter">en attente.</em>
+              </>
+            )}
           </h2>
           {dashboard.todayItems.length === 0 ? (
-            <p className="m-0 text-[13px] text-ink-soft">
+            // La phrase « Les courses sont presque prêtes » était posée en dur :
+            // elle affirmait un état des listes que ce résumé ne lit pas — sur un
+            // foyer vide, elle mentait dès la première ouverture (critique UI
+            // 2026-10-23, P1 ; même règle que AGENTS.md §2.7 I : une absence
+            // affirmée est une affirmation). Le résumé ne dit plus que ce qu'il
+            // lit vraiment : les échéances et le prochain rendez-vous.
+            <p className="m-0 text-[13px] text-on-dark">
               {nextEvent
                 ? `Prochain rendez-vous : ${nextEvent.title}, ${formatNextEventWhen(nextEvent)}.`
-                : 'Aucune échéance aujourd’hui : la journée est à vous.'}{' '}
-              Les courses, elles, sont presque prêtes.
+                : 'Aucune échéance aujourd’hui : la journée est à vous.'}
             </p>
           ) : (
             <div className={cn('grid gap-4', todayGroups.length > 1 && 'min-[650px]:grid-cols-2')}>
@@ -169,8 +190,8 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-        <div className="relative z-1 mt-0 min-w-[132px] border-l-0 border-t border-accent/25 pt-3.5 pl-0 min-[650px]:mt-0 min-[650px]:border-t-0 min-[650px]:border-l min-[650px]:pt-0 min-[650px]:pl-5">
-          <span className="block text-[11px] text-muted">Prochain rendez-vous</span>
+        <div className="relative z-1 mt-0 min-w-[132px] border-l-0 border-t border-white/25 pt-3.5 pl-0 min-[650px]:mt-0 min-[650px]:border-t-0 min-[650px]:border-l min-[650px]:pt-0 min-[650px]:pl-5">
+          <span className="block text-[11px] text-on-dark">Prochain rendez-vous</span>
           <strong className="my-0.5 block font-display text-[25px] tracking-[-0.04em]">
             {nextEvent
               ? nextEvent.all_day
@@ -178,7 +199,7 @@ export default function DashboardPage() {
                 : eventWallTime(nextEvent.start_at)
               : '—'}
           </strong>
-          <small className="text-[11px] text-muted">
+          <small className="text-[11px] text-on-dark">
             {nextEvent ? `${nextEvent.title}${nextEventDay ? ` · ${nextEventDay}` : ''}` : 'Rien de planifié'}
           </small>
         </div>
@@ -199,7 +220,12 @@ export default function DashboardPage() {
         <div className="min-w-0">
           <SectionHeading
             title="Les essentiels du jour"
-            description="Glissez les poignées pour réorganiser (appui long sur mobile)."
+            /* L'instruction de glisser ne se lit pas sur une grille à peine
+               peuplée : elle décrit un geste qu'on n'a pas encore de raison de
+               faire (critique UI 2026-10-23, persona Marie). */
+            description={
+              dashboard.placements.length > 1 ? 'Glissez les poignées pour réorganiser (appui long sur mobile).' : undefined
+            }
             action={<CountBadge value={dashboard.placements.length} label="widgets affichés" />}
           />
 
@@ -253,7 +279,13 @@ export default function DashboardPage() {
               {visibleTiles
                 .map((entry) => (
                   <li key={entry.key} className="min-w-0">
-                    <ModuleTile entry={entry} />
+                    <AppTile
+                      label={entry.label}
+                      tint={entry.tint}
+                      emoji={entry.emoji}
+                      to={`/${entry.key}`}
+                      counter={dashboard.tileCounters[entry.key]}
+                    />
                   </li>
                 ))}
             </ul>
@@ -363,19 +395,23 @@ function TodayGroup({ title, listLabel, items }: { title: string; listLabel: str
   const extra = items.length - visible.length;
   return (
     <div className="min-w-0">
-      <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{title}</h3>
+      {/* Toutes les teintes sont « sur sapin » : le groupe ne vit que dans la
+          carte héro du point du jour — les jetons d'encre (muted, ink-soft,
+          fg) y étaient quasi invisibles, encre sombre sur fond sombre
+          (retour du 23 octobre). on-dark mesure 5,59:1, surface 11,1:1. */}
+      <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-on-dark uppercase">{title}</h3>
       <ul className="m-0 grid min-w-0 list-none grid-cols-[minmax(0,1fr)] gap-1.5 p-0" aria-label={listLabel}>
         {visible.map((item) => (
-          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-ink-soft">
-            <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
+          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-on-dark">
+            <span className="shrink-0 font-extrabold text-surface tabular-nums">{item.time ?? '•'}</span>
             <span className="line-clamp-2 min-w-0 min-[651px]:line-clamp-1">
-              <strong className="font-semibold text-fg">{item.title}</strong>
+              <strong className="font-semibold text-surface">{item.title}</strong>
               {item.detail ? <span> · {item.detail}</span> : null}
             </span>
           </li>
         ))}
         {extra > 0 ? (
-          <li className="text-[12px] text-muted">…et {extra} autre{extra > 1 ? 's' : ''}.</li>
+          <li className="text-[12px] text-on-dark">…et {extra} autre{extra > 1 ? 's' : ''}.</li>
         ) : null}
       </ul>
     </div>

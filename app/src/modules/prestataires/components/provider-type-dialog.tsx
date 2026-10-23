@@ -143,7 +143,7 @@ export function ProviderTypeDialog({
                     variant="ghost"
                     size="icon"
                     icon="trash"
-                    className="size-[34px] text-muted hover:bg-coral-soft hover:text-coral"
+                    className="size-[34px] text-muted hover:bg-coral-soft hover:text-coral-text"
                     aria-label={`Supprimer le type ${type.name}`}
                     onClick={() => setPending(type)}
                   />

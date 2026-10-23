@@ -3,6 +3,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogActions } from '@/components/ui/dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
+import { HeaderMenu } from '@/components/ui/header-menu';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
@@ -221,6 +223,11 @@ export default function CoursesPage() {
   const sensors = useSensors(
     // Un simple clic ne doit pas démarrer un déplacement.
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Tactile : appui long, comme sur la grille de l'accueil. Un PointerSensor
+    // à 6 px capturait un toucher qui glisse : la page scrollait sous le
+    // doigt PUIS le drag partait — le geste natif et le geste applicatif se
+    // disputaient le même toucher (critique UI 2026-10-23, P2).
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -285,26 +292,24 @@ export default function CoursesPage() {
       infoTo="/courses/aide"
       actions={
         <>
-          <Button variant="secondary" icon="scan" disabled={isLoading} onClick={() => setScanOpen(true)}>
-            Scanner
-          </Button>
-          <Button variant="secondary" icon="grid" onClick={() => navigate('/courses/catalogue')}>
-            Catalogue
-          </Button>
-          <Button
-            variant="secondary"
-            icon="download"
-            disabled={!printModel}
-            onClick={print}
-          >
-            Imprimer
-          </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
             Nouvelle liste
           </Button>
           <Button icon="plus" disabled={isLoading} onClick={() => setItemDialog({ open: true })}>
             Ajouter un article
           </Button>
+          {/* Un seul bouton plein par en-tête (critique UI 2026-10-23) :
+              Scanner, Catalogue et Imprimer descendent dans le menu « ⋯ ».
+              « Imprimer » est retiré plutôt que grisé quand il n'y a rien à
+              imprimer — un contrôle désactivé sans raison lisible est du
+              bruit, pas une garde. */}
+          <HeaderMenu
+            items={[
+              { label: 'Scanner un article', icon: 'scan', onSelect: () => setScanOpen(true), disabled: isLoading },
+              { label: 'Catalogue du foyer', icon: 'grid', onSelect: () => navigate('/courses/catalogue') },
+              ...(printModel ? [{ label: 'Imprimer la liste', icon: 'download' as const, onSelect: print }] : []),
+            ]}
+          />
         </>
       }
     >
@@ -312,9 +317,13 @@ export default function CoursesPage() {
         {`${lists.length} listes, ${itemCount} articles, dont ${checkedCount} dans le panier.`}
       </p>
 
+      {/* Pas de statistique « Listes » : la carte sapin du rail la porte déjà
+          (critique UI 2026-10-23 — le zéro y était débattu deux fois). Sous
+          650 px, la rangée entière s'efface : le foyer au magasin veut sa
+          liste, pas ses compteurs (la Fab porte l'action principale). */}
       <MetricRow
+        className="max-[650px]:hidden"
         items={[
-          { label: 'Listes', value: lists.length, caption: lists.length > 1 ? 'listes actives' : 'liste active' },
           { label: 'Articles', value: itemCount, caption: 'à acheter au total' },
           { label: 'Dans le panier', value: checkedCount, caption: 'articles cochés' },
           {

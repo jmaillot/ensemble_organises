@@ -289,7 +289,7 @@ export default function PrestatairesPage() {
                   variant="ghost"
                   size="sm"
                   icon="trash"
-                  className="text-muted hover:bg-coral-soft hover:text-coral"
+                  className="text-muted hover:bg-coral-soft hover:text-coral-text"
                   onClick={() => setPendingDeletion(provider)}
                 >
                   Supprimer

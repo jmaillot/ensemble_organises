@@ -265,7 +265,10 @@ describe('Module Courses', () => {
       { route: '/courses' },
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Catalogue' }));
+    // « Catalogue » vit dans le menu « ⋯ » de l'en-tête (critique UI
+    // 2026-10-23 : un seul bouton plein, actions de deuxième rang regroupées).
+    await user.click(await screen.findByRole('button', { name: 'Plus d’actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Catalogue du foyer' }));
     expect(await screen.findByRole('heading', { name: 'Catalogue des produits scannés' })).toBeInTheDocument();
   });
 
@@ -349,7 +352,10 @@ describe('Module Courses', () => {
         expect(within(listRegion('Maison')).queryByText('Hygiène & Beauté')).not.toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole('button', { name: 'Imprimer' }));
+      // « Imprimer » vit dans le menu « ⋯ » de l'en-tête, et n'y figure que
+      // quand il y a quelque chose à imprimer (retiré, pas grisé).
+      await user.click(screen.getByRole('button', { name: 'Plus d’actions' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Imprimer la liste' }));
 
       expect(print).toHaveBeenCalledTimes(1);
       const sheet = document.querySelector('.courses-print');

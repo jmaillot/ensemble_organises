@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
 import { seedOnlineStatus } from '@/lib/online-status';
 import '@fontsource-variable/fraunces';
+// L'italique est le geste typographique signature de melimelo (la seconde
+// ligne du héro) — il était resté au paquet, jamais embarqué (critique UI
+// 2026-10-23). Même famille variable, style italic : aucun nom de police
+// nouveau dans les jetons.
+import '@fontsource-variable/fraunces/wght-italic.css';
 import '@fontsource-variable/inter-tight';
 import '@/styles/app.css';
 

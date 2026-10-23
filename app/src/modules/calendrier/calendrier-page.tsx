@@ -333,7 +333,11 @@ export default function CalendrierPage() {
                 <span className="max-[650px]:hidden">Ajouter un événement</span>
                 <span className="min-[651px]:hidden">Nouvel événement</span>
               </Button>
+              {/* Un seul bouton plein par en-tête (critique UI 2026-10-23) :
+                  deux primaires se disputaient le même regard. Le secondaire
+                  garde son accès direct — il mène à un autre module. */}
               <Button
+                variant="secondary"
                 icon="plus"
                 onClick={() => navigate('/taches', { state: { dueDate: selected } })}
               >
@@ -459,7 +463,7 @@ export default function CalendrierPage() {
                   ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} seront déplacés vers Commun`
                   : 'Supprimer ce calendrier perso'
               }
-              className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral"
+              className="shrink-0 rounded-full border border-coral/30 bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:border-coral hover:bg-coral-soft hover:text-coral-text"
             >
               Supprimer « {ownPerso.name} »
             </button>

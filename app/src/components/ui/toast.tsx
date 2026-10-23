@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             aria-live="polite"
             className={cn(
               'pointer-events-auto flex items-center gap-2.5 rounded-[12px] px-4 py-3 text-xs text-surface shadow-[var(--shadow-md)]',
-              item.tone === 'error' ? 'bg-coral' : 'bg-fg',
+              item.tone === 'error' ? 'bg-coral-text' : 'bg-fg',
             )}
           >
             <Icon name={toneIcon[item.tone]} size="sm" />

@@ -118,7 +118,7 @@ export function ProfileForm() {
               {(props) => <Input type="email" readOnly value={profileQuery.data?.email ?? ''} {...props} />}
             </Field>
             {error ? (
-              <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+              <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
                 {error}
               </p>
             ) : null}

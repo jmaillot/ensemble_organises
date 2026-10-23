@@ -356,7 +356,7 @@ function StepRow(props: StepRowProps) {
                 type="button"
                 onClick={props.onRemovePhoto}
                 aria-label={`Retirer la photo de l’étape ${number}`}
-                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+                className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral-text"
               >
                 <Icon name="close" size="sm" />
               </button>
@@ -365,7 +365,7 @@ function StepRow(props: StepRowProps) {
               type="button"
               onClick={props.onDelete}
               aria-label={`Supprimer l’étape ${number}`}
-              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+              className="grid size-11 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral-text"
             >
               <Icon name="trash" size="sm" />
             </button>

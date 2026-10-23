@@ -296,7 +296,7 @@ export function RoutineFormDialog({
                     })}
                   </div>
                   {errors.weeklyDays?.message ? (
-                    <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+                    <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
                       {errors.weeklyDays.message as string}
                     </p>
                   ) : null}
@@ -491,7 +491,7 @@ export function RoutineFormDialog({
                       {...register(`reminders.${index}` as const)}
                     />
                     {errors.reminders?.[index]?.message ? (
-                      <p role="alert" className="m-0 mt-1 text-[11px] font-semibold text-coral">
+                      <p role="alert" className="m-0 mt-1 text-[11px] font-semibold text-coral-text">
                         {errors.reminders[index]?.message}
                       </p>
                     ) : null}

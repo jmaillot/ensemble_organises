@@ -18,6 +18,12 @@
   --color-accent-soft: #dfeae5;
   --color-accent-faint: #eef3f0;
   --color-coral: #d95f5c;
+  /* Texte sombre posé sur un aplat --color-coral-soft (Badge erreur,
+     PriorityTag « haute ») et fond de tonneau d'erreur sous texte clair :
+     #d95f5c sur coral-soft = 2,97:1, sous les 4,5:1 exigés d'un texte de
+     10-11 px (critique UI 2026-10-23). Mesuré : 4,81:1 sur coral-soft,
+     5,91:1 sous blanc. */
+  --color-coral-text: oklch(52% 0.14 25);
   --color-coral-strong: #f7c3bf;
   --color-coral-soft: #f8e3e1;
   --color-amber: #b9822f;
@@ -208,7 +214,10 @@
   top: -145px;
   width: 210px;
   height: 210px;
-  border: 1px solid color-mix(in oklch, var(--color-accent) 18%, transparent);
+  /* LeAnneau vit sur la carte héro sapin de l'accueil : une teinte claire,
+     comme coupon-ring — le mix sapin d'origine était invisible sur son
+     propre fond. */
+  border: 1px solid oklch(100% 0 0 / 0.18);
   border-radius: 9999px;
   pointer-events: none;
 }

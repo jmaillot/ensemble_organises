@@ -1,21 +1,32 @@
 import { useEffect } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { NavLink, useLocation } from 'react-router';
-import { cn } from '@/lib/utils';
-import { Icon } from './icon';
-import { useVisibleDrawerEntries } from './mobile-drawer';
+import { useLocation } from 'react-router';
+import { AppTile } from './app-tile';
+import { moduleMap, type ModuleKey } from '@/lib/modules';
+import { useVisibleDrawerEntries, type DrawerEntry } from './mobile-drawer';
+
+/**
+ * Les espaces que la barre basse sert déjà d'un tap (benchmark §2.6 :
+ * « “Plus” ouvre une feuille avec les 13 autres espaces »). La feuille ne
+ * les répète pas : ses entrées sont les espaces du tiroir MINUS ces quatre-là.
+ */
+export const BOTTOM_NAV_KEYS = ['accueil', 'courses', 'calendrier', 'taches'] as const;
 
 /**
  * Feuille « Tous les espaces » (≤650px) : le « Plus » de la barre basse
- * ouvre ici la liste complète, en feuille de bas de page — le tiroir
- * hamburger reste réservé aux réglages (benchmark §9.2, décision 2).
+ * ouvre ici la grille de tuiles pastel des espaces hors barre basse — la
+ * grille « Mes applications » de melimelo, 3 colonnes sur mobile (benchmark
+ * §2.4-3), à la place de la liste textuelle (demande du 23 octobre 2026).
  * Radix fournit l'overlay, Échap et le piège de focus ; la visibilité des
- * espaces suit exactement les mêmes règles que le tiroir (rôle enfant,
- * menu des applications 0140) — une seule liste, jamais deux vérités.
+ * espaces suit exactement les mêmes règles que le tiroir (rôle enfant, menu
+ * des applications 0140) — une seule liste, jamais deux vérités.
  */
 export function AllSpacesSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { pathname } = useLocation();
   const entries = useVisibleDrawerEntries();
+  const extraEntries: DrawerEntry[] = entries.filter(
+    (entry) => !(BOTTOM_NAV_KEYS as readonly string[]).includes(entry.key),
+  );
 
   // Une navigation referme la feuille (filet de sécurité en plus du onClick).
   useEffect(() => {
@@ -47,25 +58,21 @@ export function AllSpacesSheet({ open, onOpenChange }: { open: boolean; onOpenCh
           <DialogPrimitive.Description className="sr-only">
             Choisissez un espace pour y naviguer, ou refermez la feuille.
           </DialogPrimitive.Description>
-          <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-3">
-            <ul className="m-0 grid list-none gap-1 p-0 pb-2">
-              {entries.map((entry) => (
-                <li key={entry.key}>
-                  <NavLink
+          <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-4">
+            <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0 pb-2">
+              {extraEntries.map((entry) => (
+                <li key={entry.key} className="min-w-0">
+                  <AppTile
+                    label={entry.label}
+                    // Le filtre au-dessus a déjà retiré « accueil » : la clé
+                    // restante nomme toujours un module du catalogue.
+                    tint={moduleMap[entry.key as ModuleKey].tint}
+                    emoji={moduleMap[entry.key as ModuleKey].emoji}
                     to={entry.to}
                     onClick={() => onOpenChange(false)}
-                    aria-label={`Ouvrir ${entry.label}`}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex min-h-11 items-center gap-2.5 rounded-[12px] px-2.5 text-[13px] font-semibold text-fg transition-colors hover:bg-accent-faint',
-                        isActive && 'bg-accent-soft text-accent-strong',
-                      )
-                    }
-                  >
-                    <Icon name={entry.icon} size="sm" />
-                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                    <Icon name="chevronRight" size="sm" className="text-muted" />
-                  </NavLink>
+                    active={pathname === entry.to}
+                    className="min-h-[92px] p-3"
+                  />
                 </li>
               ))}
             </ul>

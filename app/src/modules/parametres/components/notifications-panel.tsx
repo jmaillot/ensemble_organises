@@ -198,7 +198,7 @@ export function NotificationsPanel() {
         action={
           <span
             className={`inline-flex min-h-6 items-center rounded-full px-2 text-[11px] font-extrabold ${
-              permission === 'autorise' ? 'bg-accent-soft text-accent-strong' : permission === 'refuse' ? 'bg-coral-soft text-coral' : 'bg-bg text-muted'
+              permission === 'autorise' ? 'bg-accent-soft text-accent-strong' : permission === 'refuse' ? 'bg-coral-soft text-coral-text' : 'bg-bg text-muted'
             }`}
           >
             {pushPermissionLabels[permission]}
@@ -215,7 +215,7 @@ export function NotificationsPanel() {
         ) : null}
 
         {server.error ? (
-          <p className="mb-4 mt-0 rounded-[10px] bg-coral-soft px-3 py-2 text-[11px] text-coral">{server.error}</p>
+          <p className="mb-4 mt-0 rounded-[10px] bg-coral-soft px-3 py-2 text-[11px] text-coral-text">{server.error}</p>
         ) : null}
 
         {server.loaded && !server.pushConfigured && !isLocalMode ? (
@@ -417,7 +417,7 @@ export function NotificationsPanel() {
                             type="button"
                             onClick={() => setDeleting(device)}
                             aria-label={`Supprimer ${label}`}
-                            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral"
+                            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors hover:bg-coral-soft hover:text-coral-text"
                           >
                             <Icon name="trash" size="sm" />
                           </button>

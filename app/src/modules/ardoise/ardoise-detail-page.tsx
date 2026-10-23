@@ -376,7 +376,7 @@ export default function ArdoiseDetailPage() {
                         type="button"
                         onClick={() => openEditor(expense)}
                         aria-label={`Modifier ${expense.title}`}
-                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-accent hover:bg-accent-faint hover:text-fg focus-visible:opacity-100 max-[650px]:opacity-100"
+                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-accent hover:bg-accent-faint hover:text-fg focus-visible:opacity-100 max-[650px]:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <Icon name="edit" size="sm" />
                       </button>
@@ -384,7 +384,7 @@ export default function ArdoiseDetailPage() {
                         type="button"
                         onClick={() => setPendingDeletion(expense)}
                         aria-label={`Supprimer ${expense.title}`}
-                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-coral hover:bg-coral-soft hover:text-coral focus-visible:opacity-100 max-[650px]:opacity-100"
+                        className="grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted opacity-0 transition-[color,background,border-color,opacity] duration-[var(--duration-quick)] group-hover:opacity-100 hover:border-coral hover:bg-coral-soft hover:text-coral-text focus-visible:opacity-100 max-[650px]:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <Icon name="trash" size="sm" />
                       </button>

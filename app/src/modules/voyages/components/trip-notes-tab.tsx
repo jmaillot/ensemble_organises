@@ -256,7 +256,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
                         type="button"
                         onClick={() => setPendingDelete(note)}
                         aria-label={`Supprimer ${note.title}`}
-                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                        className="grid size-11 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                       >
                         <Icon name="trash" size="sm" />
                       </button>
@@ -288,7 +288,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
                                 removePhoto(attachment);
                               }}
                               aria-label={`Retirer la photo de ${note.title}`}
-                              className="grid size-11 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral"
+                              className="grid size-11 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-coral-soft hover:text-coral-text"
                             >
                               <Icon name="trash" size="sm" />
                             </button>

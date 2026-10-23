@@ -64,7 +64,7 @@ export const loyaltyBrandColors: ReadonlyArray<{ value: LoyaltyBrandColor; label
 /** Fond et texte de la pastille `loyalty-icon` selon la couleur de marque. */
 export const loyaltyIconTone: Record<LoyaltyBrandColor, string> = {
   accent: 'bg-accent-soft text-accent-strong',
-  coral: 'bg-coral-soft text-coral',
+  coral: 'bg-coral-soft text-coral-text',
   amber: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
   ink: 'bg-bg text-fg',
 };

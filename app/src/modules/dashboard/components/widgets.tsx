@@ -249,7 +249,6 @@ export function RoutinesWidget({
 
 export function BoardSummaryCard({ total, monthLabel, balances }: { total: number; monthLabel: string; balances: { memberId: string; displayName: string; amount: number }[] }) {
   const positives = balances.filter((entry) => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
-  const totalAbs = balances.reduce((sum, entry) => sum + Math.abs(entry.amount), 0) || 1;
   const segments = balances.slice(0, 3).map((entry) => Math.abs(entry.amount));
   const scale = segments.reduce((sum, value) => sum + value, 0) || 1;
   return (
@@ -285,8 +284,15 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
           </strong>
         </div>
       ))}
+      {/* « X € en jeu » additionnait la moitié des soldes absolus — un nombre
+          qui ne voulait rien dire dès trois membres, et que nul ne pouvait
+          décoder (critique UI 2026-10-23). La phrase dit ce que la jauge
+          annonce déjà : ce qui reste à rembourser ; omise quand il n'y a plus
+          rien. */}
       <p className="mt-2.5 text-[11px] text-muted">
-        Réparties automatiquement. Détail dans <strong className="font-semibold text-fg">l'Ardoise</strong> ({Math.round((totalAbs / 2) * 100) / 100} € en jeu).
+        Réparties automatiquement. Détail dans{' '}
+        <strong className="font-semibold text-fg">l'Ardoise</strong>
+        {positives > 0 ? <> — {formatEuro(positives)} à rembourser entre membres.</> : '.'}
       </p>
     </section>
   );

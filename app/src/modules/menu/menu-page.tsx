@@ -321,7 +321,7 @@ function MealCard({
           type="button"
           onClick={onRemove}
           aria-label={`Retirer ${label} du menu`}
-          className="grid size-7 shrink-0 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+          className="grid size-7 shrink-0 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
         >
           <Icon name="close" size="sm" />
         </button>

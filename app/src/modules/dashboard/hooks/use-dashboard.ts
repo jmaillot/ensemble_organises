@@ -7,8 +7,10 @@ import { useSessionUser } from '@/hooks/use-auth';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { useFrenchHolidays } from '@/hooks/use-french-holidays';
 import { useRoutines } from '@/modules/routines/hooks/use-routines';
+import { SHOPPING_ITEMS_TABLE } from '@/modules/courses/api';
 import { todayIso, daysBetween, eventWallDate, eventWallTime } from '@/lib/utils';
-import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, TaskRow } from '@/types';
+import type { ModuleKey } from '@/lib/modules';
+import type { BirthdayRow, DashboardWidgetRow, EventRow, ExpenseParticipantRow, ExpenseRow, HouseholdMemberRow, PostRow, ProfileRow, ShoppingListItemRow, TaskRow } from '@/types';
 import {
   layoutWidgets,
   nextUpcomingEvent,
@@ -52,6 +54,15 @@ export interface DashboardData {
   };
   nextEvent: ReturnType<typeof nextUpcomingEvent>;
   nextShopping: { title: string; iso: string; relative: string } | null;
+  /**
+   * Compteur des tuiles « Mes applications » (le pastille bas-gauche du
+   * vrai site melimelo). Dérivé EXCLUSIVEMENT des lectures déjà faites
+   * pour les widgets — la seule lecture ajoutée est `shopping_list_items`,
+   * la même table et la même clé que le module Courses, donc zéro requête
+   * doublon. Absent = pas de compteur sur la tuile ; jamais un zéro
+   * décoratif (règle du mur de zéros).
+   */
+  tileCounters: Partial<Record<ModuleKey, { value: number; label: string }>>;
 }
 
 export interface TodayItem {
@@ -95,6 +106,10 @@ export function useDashboard(): DashboardData {
   const birthdays = useResource<BirthdayRow>('birthdays');
   const expenses = useResource<ExpenseRow>('expenses');
   const posts = useResource<PostRow>('posts');
+  // Compteur de la tuile Courses : même table, même clé que le module —
+  // la lecture du tableau de bord et celle de la page Courses partagent
+  // leur cache, aucune ne se répète.
+  const shoppingItems = useResource<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE);
   const widgets = useResource<{ widget_type: string; position_x: number; position_y: number; width: number; member_id: string }>(
     'dashboard_widgets',
     { filter: { member_id: currentMember?.id ?? '__none__' } },
@@ -286,6 +301,27 @@ export function useDashboard(): DashboardData {
 
   const nextEvent = useMemo(() => nextUpcomingEvent(events.rows), [events.rows]);
 
+  // Compteurs des tuiles : dérivés des lectures ci-dessus, jamais un zéro
+  // décoratif — un compteur absent vaut mieux qu'une pastille « 0 » qui
+  // ressemble à un dysfonctionnement (règle du mur de zéros). Les tâches
+  // propres à un voyage sont exclues, comme partout ailleurs (15-01).
+  const tileCounters = useMemo<Partial<Record<ModuleKey, { value: number; label: string }>>>(() => {
+    const monthNow = new Date().toISOString().slice(0, 7);
+    const counters: Partial<Record<ModuleKey, { value: number; label: string }>> = {};
+    const pendingShopping = shoppingItems.rows.filter((item) => !item.checked).length;
+    if (pendingShopping > 0) counters.courses = { value: pendingShopping, label: 'articles à acheter' };
+    if (openTasks.length > 0) counters.taches = { value: openTasks.length, label: 'tâches ouvertes' };
+    const upcomingEvents = events.rows.filter((event) => eventWallDate(event.start_at) >= todayIso()).length;
+    if (upcomingEvents > 0) counters.calendrier = { value: upcomingEvents, label: 'événements à venir' };
+    const routinesLeft = routineProgress.total - routineProgress.done;
+    if (routinesLeft > 0) counters.routines = { value: routinesLeft, label: 'routines à faire aujourd’hui' };
+    if (birthdays.rows.length > 0) counters.anniversaires = { value: birthdays.rows.length, label: 'anniversaires suivis' };
+    const monthExpenses = expenses.rows.filter((expense) => expense.expense_date?.slice(0, 7) === monthNow).length;
+    if (monthExpenses > 0) counters.ardoise = { value: monthExpenses, label: 'dépenses ce mois-ci' };
+    if (posts.rows.length > 0) counters.cercle = { value: posts.rows.length, label: 'publications du foyer' };
+    return counters;
+  }, [birthdays.rows, events.rows, expenses.rows, openTasks.length, posts.rows, routineProgress.done, routineProgress.total, shoppingItems.rows]);
+
   const nextShopping = useMemo(() => {
     const event = events.rows
       .filter((row) => /cours/i.test(row.title))
@@ -324,6 +360,7 @@ export function useDashboard(): DashboardData {
     board,
     nextEvent,
     nextShopping,
+    tileCounters,
   };
 }
 

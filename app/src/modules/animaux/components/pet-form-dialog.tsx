@@ -228,7 +228,7 @@ export function PetFormDialog({ open, onOpenChange, pet, summary, saving = false
                       <button
                         type="button"
                         onClick={discardPhoto}
-                        className="inline-flex min-h-9 items-center px-1 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral"
+                        className="inline-flex min-h-9 items-center px-1 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:text-coral-text"
                       >
                         Retirer
                       </button>

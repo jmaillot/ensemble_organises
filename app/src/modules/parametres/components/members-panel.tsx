@@ -100,7 +100,7 @@ export function MembersPanel() {
                     variant="ghost"
                     size="sm"
                     icon="trash"
-                    className="hover:bg-coral-soft hover:text-coral"
+                    className="hover:bg-coral-soft hover:text-coral-text"
                     disabled={isSelf}
                     aria-label={`Retirer ${member.display_name} du foyer`}
                     onClick={() => setPendingRemoval(member.id)}

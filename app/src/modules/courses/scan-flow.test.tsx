@@ -71,7 +71,9 @@ describe('ScanDialog sur la page Courses', () => {
     renderWithProviders(<CoursesPage />);
 
     await screen.findByRole('region', { name: 'Fresque' });
-    await user.click(screen.getByRole('button', { name: /scanner/i }));
+    // « Scanner » vit dans le menu « ⋯ » de l'en-tête (critique UI 2026-10-23).
+    await user.click(screen.getByRole('button', { name: 'Plus d’actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Scanner un article' }));
 
     expect(await screen.findByLabelText('Aperçu de la caméra')).toBeInTheDocument();
   });
@@ -81,7 +83,9 @@ describe('ScanDialog sur la page Courses', () => {
     renderWithProviders(<CoursesPage />);
 
     await screen.findByRole('region', { name: 'Fresque' });
-    await user.click(screen.getByRole('button', { name: /scanner/i }));
+    // « Scanner » vit dans le menu « ⋯ » de l'en-tête (critique UI 2026-10-23).
+    await user.click(screen.getByRole('button', { name: 'Plus d’actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Scanner un article' }));
 
     expect(await screen.findByLabelText('Aperçu de la caméra')).toBeInTheDocument();
     // Message du hook et aide du champ : les deux portent le repli manuel.
@@ -191,7 +195,9 @@ describe('fiche produit 1-tap', () => {
     renderWithProviders(<CoursesPage />);
 
     await screen.findByRole('region', { name: 'Fresque' });
-    await user.click(screen.getByRole('button', { name: /scanner/i }));
+    // « Scanner » vit dans le menu « ⋯ » de l'en-tête (critique UI 2026-10-23).
+    await user.click(screen.getByRole('button', { name: 'Plus d’actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Scanner un article' }));
     await user.type(screen.getByLabelText(/code-barres/i), KNOWN_EAN);
     await user.click(screen.getByRole('button', { name: 'Utiliser ce code' }));
 

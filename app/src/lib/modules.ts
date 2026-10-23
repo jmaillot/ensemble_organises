@@ -27,6 +27,13 @@ export type ModuleKey =
   | 'documents'
   | 'parametres';
 
+/**
+ * Aplat pastel d'une tuile (benchmark Melimelo §2.4-3 : « chaque module a une
+ * couleur de fond et un objet »). Les six pastels sont les jetons existants —
+ * aucun nouveau token ; l'encre sapin sur chacun d'eux mesure ≥ 7:1.
+ */
+export type ModuleTint = 'sage' | 'blush' | 'butter' | 'sky' | 'lilac' | 'sand';
+
 export interface ModuleEntry {
   key: ModuleKey;
   label: string;
@@ -34,11 +41,20 @@ export interface ModuleEntry {
   detail: string;
   /** Sur-titre de l'en-tête. */
   kicker: string;
-  image: string;
+  /** Aplat pastel de la tuile (accueil, tiroir mobile, feuille « Plus »). */
+  tint: ModuleTint;
+  /** L'« objet » de la tuile : l'emoji tient lieu d'illustration Melimelo. */
+  emoji: string;
   icon: import('@/components/shared/icon').IconName;
   /** Libellé court pour la navigation mobile. */
   short: string;
-  /** Libellé dans la barre latérale (« À faire » pour les tâches, comme dans l'export). */
+  /**
+   * Libellé dans la barre latérale. Était « À faire » pour les tâches —
+   * deux noms pour une même page (catalogue « Tâches », page « Tâches »,
+   * rail « À faire ») : le lecteur devait désambiguïser, et le rail
+   * surlignait DEUX entrées actives d'un coup (critique UI 2026-10-23).
+   * Un seul nom partout : celui du module.
+   */
   navLabel?: string;
   /** Présent dans la grille de l'accueil. */
   tile: boolean;
@@ -51,26 +67,26 @@ export interface ModuleEntry {
 }
 
 export const modules: ModuleEntry[] = [
-  { key: 'courses', label: 'Courses', detail: 'Listes partagées', kicker: 'À faire ensemble', image: 'courses.jpg', icon: 'receipt', short: 'Courses', tile: true, nav: false },
-  { key: 'calendrier', label: 'Calendrier', detail: 'Événements & rappels', kicker: 'Le temps du foyer', image: 'calendrier.jpg', icon: 'calendar', short: 'Agenda', navLabel: 'Calendrier', tile: true, nav: true },
-  { key: 'notes', label: 'Notes', detail: 'Mémoires & idées', kicker: 'À garder près de soi', image: 'calendrier.jpg', icon: 'edit', short: 'Notes', tile: true, nav: false },
-  { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', image: 'taches.jpg', icon: 'checkCircle', short: 'À faire', navLabel: 'À faire', tile: true, nav: true },
-  { key: 'routines', label: 'Routines', detail: 'Habitudes du foyer', kicker: 'Le rythme juste', image: 'routines.jpg', icon: 'wand', short: 'Routines', tile: true, nav: false },
-  { key: 'ardoise', label: 'Ardoise', detail: 'Dépenses & partage', kicker: 'Transparent par nature', image: 'ardoise.jpg', icon: 'wallet', short: 'Ardoise', tile: true, nav: false },
-  { key: 'recettes', label: 'Recettes', detail: 'Carnet de cuisine', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
-  { key: 'cadeaux', label: 'Cadeaux', detail: 'Idées à offrir', kicker: 'Pour dire merci', image: 'cadeaux.jpg', icon: 'gift', short: 'Cadeaux', tile: true, nav: false },
-  { key: 'anniversaires', label: 'Anniversaires', detail: 'Ne rien oublier', kicker: 'Les petits moments', image: 'calendrier.jpg', icon: 'heart', short: 'Anniversaires', tile: true, nav: false },
-  { key: 'contacts', label: 'Contacts', detail: 'Famille & proches', kicker: 'Les visages du foyer', image: 'cercle.jpg', icon: 'people', short: 'Contacts', tile: true, nav: false },
-  { key: 'animaux', label: 'Animaux', detail: 'Santé & historique', kicker: 'Toute la famille', image: 'animaux.jpg', icon: 'heart', short: 'Animaux', tile: true, nav: false },
-  { key: 'prestataires', label: 'Prestataires', detail: 'Appels & contacts', kicker: 'Le bon relais', image: 'cercle.jpg', icon: 'settings', short: 'Prestataires', tile: true, nav: false },
-  { key: 'fidelite', label: 'Fidélité', detail: 'Cartes & codes', kicker: 'Toujours sous la main', image: 'adresses.jpg', icon: 'wallet', short: 'Fidélité', tile: true, nav: false },
-  { key: 'adresses', label: 'Adresses', detail: 'Lieux à retrouver', kicker: 'Explorer & sauvegarder', image: 'adresses.jpg', icon: 'pin', short: 'Adresses', tile: true, nav: false },
-  { key: 'cercle', label: 'Cercle', detail: 'Photos & réactions', kicker: 'Le fil du foyer', image: 'cercle.jpg', icon: 'people', short: 'Cercle', tile: true, nav: true },
-  { key: 'voyages', label: 'Voyages', detail: 'Projets à préparer', kicker: 'Partir ensemble', image: 'voyages.jpg', icon: 'map', short: 'Voyages', tile: true, nav: false },
-  { key: 'messages', label: 'Messages', detail: 'Échanges privés', kicker: 'Se retrouver', image: 'cercle.jpg', icon: 'message', short: 'Messages', tile: true, nav: false },
-  { key: 'frigo', label: 'Frigo', detail: 'Stocks & péremptions', kicker: 'Rien ne se perd', image: 'courses.jpg', icon: 'archive', short: 'Frigo', tile: true, nav: false },
-  { key: 'menu', label: 'Menu', detail: 'Repas de la semaine', kicker: 'La semaine à table', image: 'courses.jpg', icon: 'calendar', short: 'Menu', tile: true, nav: false },
-  { key: 'documents', label: 'Documents', detail: 'La boîte à papiers du foyer', kicker: 'Tout à portée de main', image: 'taches.jpg', icon: 'receipt', short: 'Documents', tile: true, nav: false },
+  { key: 'courses', label: 'Courses', detail: 'Listes partagées', kicker: 'À faire ensemble', tint: 'sage', emoji: '🛒', icon: 'receipt', short: 'Courses', tile: true, nav: false },
+  { key: 'calendrier', label: 'Calendrier', detail: 'Événements & rappels', kicker: 'Le temps du foyer', tint: 'sky', emoji: '📅', icon: 'calendar', short: 'Agenda', navLabel: 'Calendrier', tile: true, nav: true },
+  { key: 'notes', label: 'Notes', detail: 'Mémoires & idées', kicker: 'À garder près de soi', tint: 'butter', emoji: '📝', icon: 'edit', short: 'Notes', tile: true, nav: false },
+  { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', tint: 'blush', emoji: '✅', icon: 'checkCircle', short: 'Tâches', tile: true, nav: true },
+  { key: 'routines', label: 'Routines', detail: 'Habitudes du foyer', kicker: 'Le rythme juste', tint: 'lilac', emoji: '🔁', icon: 'wand', short: 'Routines', tile: true, nav: false },
+  { key: 'ardoise', label: 'Ardoise', detail: 'Dépenses & partage', kicker: 'Transparent par nature', tint: 'sand', emoji: '💶', icon: 'wallet', short: 'Ardoise', tile: true, nav: false },
+  { key: 'recettes', label: 'Recettes', detail: 'Carnet de cuisine', kicker: 'La cuisine du foyer', tint: 'butter', emoji: '🍳', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
+  { key: 'cadeaux', label: 'Cadeaux', detail: 'Idées à offrir', kicker: 'Pour dire merci', tint: 'blush', emoji: '🎁', icon: 'gift', short: 'Cadeaux', tile: true, nav: false },
+  { key: 'anniversaires', label: 'Anniversaires', detail: 'Ne rien oublier', kicker: 'Les petits moments', tint: 'sky', emoji: '🎂', icon: 'heart', short: 'Anniversaires', tile: true, nav: false },
+  { key: 'contacts', label: 'Contacts', detail: 'Famille & proches', kicker: 'Les visages du foyer', tint: 'sage', emoji: '👥', icon: 'people', short: 'Contacts', tile: true, nav: false },
+  { key: 'animaux', label: 'Animaux', detail: 'Santé & historique', kicker: 'Toute la famille', tint: 'butter', emoji: '🐾', icon: 'heart', short: 'Animaux', tile: true, nav: false },
+  { key: 'prestataires', label: 'Prestataires', detail: 'Appels & contacts', kicker: 'Le bon relais', tint: 'sand', emoji: '🔧', icon: 'settings', short: 'Prestataires', tile: true, nav: false },
+  { key: 'fidelite', label: 'Fidélité', detail: 'Cartes & codes', kicker: 'Toujours sous la main', tint: 'lilac', emoji: '🎫', icon: 'wallet', short: 'Fidélité', tile: true, nav: false },
+  { key: 'adresses', label: 'Adresses', detail: 'Lieux à retrouver', kicker: 'Explorer & sauvegarder', tint: 'sky', emoji: '📍', icon: 'pin', short: 'Adresses', tile: true, nav: false },
+  { key: 'cercle', label: 'Cercle', detail: 'Photos & réactions', kicker: 'Le fil du foyer', tint: 'blush', emoji: '📸', icon: 'people', short: 'Cercle', tile: true, nav: true },
+  { key: 'voyages', label: 'Voyages', detail: 'Projets à préparer', kicker: 'Partir ensemble', tint: 'sage', emoji: '✈️', icon: 'map', short: 'Voyages', tile: true, nav: false },
+  { key: 'messages', label: 'Messages', detail: 'Échanges privés', kicker: 'Se retrouver', tint: 'lilac', emoji: '💬', icon: 'message', short: 'Messages', tile: true, nav: false },
+  { key: 'frigo', label: 'Frigo', detail: 'Stocks & péremptions', kicker: 'Rien ne se perd', tint: 'sky', emoji: '🧊', icon: 'archive', short: 'Frigo', tile: true, nav: false },
+  { key: 'menu', label: 'Menu', detail: 'Repas de la semaine', kicker: 'La semaine à table', tint: 'butter', emoji: '🍽️', icon: 'calendar', short: 'Menu', tile: true, nav: false },
+  { key: 'documents', label: 'Documents', detail: 'La boîte à papiers du foyer', kicker: 'Tout à portée de main', tint: 'sand', emoji: '📁', icon: 'receipt', short: 'Documents', tile: true, nav: false },
 ];
 
 export const moduleMap: Record<ModuleKey, ModuleEntry> = Object.fromEntries(

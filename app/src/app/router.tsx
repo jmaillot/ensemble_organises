@@ -121,7 +121,7 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
             Je certifie avoir 15 ans ou plus.
           </label>
           {saveError ? (
-            <p role="alert" className="m-0 text-[11px] font-semibold text-coral">
+            <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
               {saveError}
             </p>
           ) : null}
@@ -540,6 +540,12 @@ export function AppRoutes() {
           path="/documents"
           element={
             <LazyRoute load={routeChunkLoaders.documents} />
+          }
+        />
+        <Route
+          path="/documents/aide"
+          element={
+            <LazyRoute load={routeChunkLoaders.documentsGuide} />
           }
         />
         <Route

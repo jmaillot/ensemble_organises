@@ -9,11 +9,12 @@ import { useToast } from '@/components/ui/toast';
 import { Icon, type IconName } from './icon';
 import { memberTagClass } from './member-avatar';
 import { Input } from '@/components/ui/input';
+import { AppTile } from './app-tile';
 import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 
 type DrawerKey = ModuleKey | 'accueil';
 
-interface DrawerEntry {
+export interface DrawerEntry {
   key: DrawerKey;
   label: string;
   icon: IconName;
@@ -205,13 +206,25 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
             aria-label="Rechercher un espace"
           />
 
-          {/* Seule la liste défile : le pied (foyer, préférences,
-              déconnexion) reste épinglé en bas du tiroir. */}
+          {/* Le hamburger affiche les tuiles directement (demande du
+              23 octobre 2026) : la grille pastel de melimelo remplace la
+              liste textuelle. Seule la grille défile ; le pied (foyer,
+              préférences, déconnexion) reste épinglé en bas. Deux colonnes :
+              le tiroir fait 320 px, la grille « 3 colonnes » du benchmark
+              vaut pour la feuille pleine largeur. */}
           <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
-            <ul className="m-0 grid list-none gap-1 p-0">
+            <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 pb-1">
               {(filtered ?? visibleEntries).map((entry) => (
-                <li key={entry.key}>
-                  <DrawerLink entry={entry} onNavigate={() => onOpenChange(false)} />
+                <li key={entry.key} className="min-w-0">
+                  <AppTile
+                    label={entry.label}
+                    tint={entry.key === 'accueil' ? 'sage' : moduleMap[entry.key].tint}
+                    emoji={entry.key === 'accueil' ? '🏡' : moduleMap[entry.key].emoji}
+                    to={entry.to}
+                    onClick={() => onOpenChange(false)}
+                    active={pathname === entry.to}
+                    className="min-h-[96px]"
+                  />
                 </li>
               ))}
             </ul>
@@ -265,21 +278,3 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   );
 }
 
-function DrawerLink({ entry, onNavigate }: { entry: DrawerEntry; onNavigate: () => void }) {
-  return (
-    <NavLink
-      to={entry.to}
-      onClick={onNavigate}
-      aria-label={`Ouvrir ${entry.label}`}
-      className={({ isActive }) =>
-        cn(
-          'flex min-h-11 items-center gap-2.5 rounded-[12px] px-2.5 text-[13px] font-semibold text-fg transition-colors hover:bg-accent-faint',
-          isActive && 'bg-accent-soft text-accent-strong',
-        )
-      }
-    >
-      <Icon name={entry.icon} size="sm" />
-      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-    </NavLink>
-  );
-}

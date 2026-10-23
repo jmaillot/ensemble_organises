@@ -59,7 +59,7 @@ export function PetAttachmentsPanel({
         <span className="text-[11px] text-muted">Images et PDF.</span>
       </div>
       {uploadError ? (
-        <p role="alert" className="m-0 mb-3 text-[11px] font-semibold text-coral">
+        <p role="alert" className="m-0 mb-3 text-[11px] font-semibold text-coral-text">
           {uploadError}
         </p>
       ) : null}
@@ -108,7 +108,7 @@ export function PetAttachmentsPanel({
                   variant="ghost"
                   size="icon"
                   icon="trash"
-                  className="size-[31px] shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+                  className="size-[31px] shrink-0 text-muted hover:bg-coral-soft hover:text-coral-text"
                   aria-label={`Supprimer ${attachment.fileName}`}
                   onClick={() => setPending(attachment)}
                 />

@@ -80,7 +80,7 @@ export function TabsContent({ className, ...rest }: React.ComponentProps<typeof 
 export function Badge({ className, tone = 'accent', ...rest }: React.HTMLAttributes<HTMLSpanElement> & { tone?: 'accent' | 'coral' | 'amber' | 'muted' }) {
   const tones = {
     accent: 'bg-accent-soft text-accent-strong',
-    coral: 'bg-coral-soft text-coral',
+    coral: 'bg-coral-soft text-coral-text',
     amber: 'bg-amber-soft text-amber-strong',
     muted: 'bg-bg text-muted',
   } as const;

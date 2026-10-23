@@ -298,7 +298,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         {/* Une lecture partielle est dite : masquer un espace en échec ferait
             croire qu'il ne contient rien. */}
         {failedModules.length > 0 ? (
-          <p className="m-0 border-t border-border px-4 py-2 text-[10.5px] text-coral" role="status">
+          <p className="m-0 border-t border-border px-4 py-2 text-[10.5px] text-coral-text" role="status">
             Non lus : {failedModules.map((key) => moduleMap[key].label).join(', ')}.
           </p>
         ) : null}

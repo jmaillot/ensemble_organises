@@ -142,7 +142,7 @@ function MessageBubble({
               icon="trash"
               onClick={onRequestDelete}
               aria-label="Supprimer ce message"
-              className="size-8 text-coral hover:bg-coral-soft hover:text-coral"
+              className="size-8 text-coral hover:bg-coral-soft hover:text-coral-text"
             />
           ) : null}
         </div>
@@ -281,7 +281,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             onClick={onArchiveConversation}
             aria-label={`Archiver la conversation ${conversation.title} pour tout le foyer`}
             title="Archiver pour tout le foyer (admin)"
-            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral-text"
           />
         ) : null}
         {onArchiveForMe ? (
@@ -316,7 +316,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
             onClick={onDeleteForMe}
             aria-label={`Supprimer la conversation ${conversation.title} pour moi`}
             title="Supprimer pour moi : elle disparaît de ma vue, les autres la gardent"
-            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral"
+            className="size-8 shrink-0 text-muted hover:bg-coral-soft hover:text-coral-text"
           />
         ) : null}
         {!readOnly && onLeaveConversation ? (
@@ -442,7 +442,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         </div>
       ) : null}
       {attachError ? (
-        <p role="alert" className="m-0 border-t border-border px-3 pt-2 text-[11px] font-semibold text-coral">
+        <p role="alert" className="m-0 border-t border-border px-3 pt-2 text-[11px] font-semibold text-coral-text">
           {attachError}
         </p>
       ) : null}

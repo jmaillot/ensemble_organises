@@ -149,6 +149,14 @@ export interface MetricItem {
 }
 
 export function MetricRow({ items, className }: { items: MetricItem[]; className?: string }) {
+  // Le « mur de zéros » (critique UI 2026-10-23, P0) : une rangée de
+  // statistiques dérivées toutes vides ne porte aucune information — l'état
+  // vide du panneau le dit déjà mieux — et elle priment à tort sur les
+  // données vivantes. Le contrat : la rangée ne se rend que si AU MOINS une
+  // valeur est informative ; un comptage nul, « 0 », « — » ou une chaîne
+  // vide n'en est pas une. Sinon elle ne rend rien du tout.
+  const isEmptyValue = (value: string | number) => value === 0 || value === '0' || value === '' || value === '—';
+  if (items.every((item) => isEmptyValue(item.value))) return null;
   return (
     <div className={cn('mb-5 grid grid-cols-4 gap-3 max-[650px]:grid-cols-2', className)}>
       {items.map((item) => (
@@ -202,8 +210,8 @@ export function CountBadge({ value, label }: { value: number | string; label?: s
 
 export function PriorityTag({ priority }: { priority: 'haute' | 'normale' | 'basse' }) {
   const map = {
-    haute: { label: 'Haute', className: 'bg-coral-soft text-coral' },
-    normale: { label: 'Normale', className: 'bg-amber-soft text-[oklch(45%_0.11_78)]' },
+    haute: { label: 'Haute', className: 'bg-coral-soft text-coral-text' },
+    normale: { label: 'Normale', className: 'bg-amber-soft text-amber-strong' },
     basse: { label: 'Basse', className: 'bg-sand text-muted' },
   } as const;
   const entry = map[priority];

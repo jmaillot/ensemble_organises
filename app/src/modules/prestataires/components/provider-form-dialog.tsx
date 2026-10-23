@@ -178,7 +178,7 @@ export function ProviderFormDialog({ open, onOpenChange, provider, types, saving
                         <button
                           type="button"
                           onClick={() => setRemovedIds((current) => [...current, attachment.id])}
-                          className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                          className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                           aria-label={`Retirer ${attachment.fileName}`}
                         >
                           <Icon name="close" size="sm" />
@@ -200,7 +200,7 @@ export function ProviderFormDialog({ open, onOpenChange, provider, types, saving
                         <button
                           type="button"
                           onClick={() => setNewFiles((current) => current.filter((_, i) => i !== index))}
-                          className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                          className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral-text"
                           aria-label={`Retirer ${file.name}`}
                         >
                           <Icon name="close" size="sm" />
