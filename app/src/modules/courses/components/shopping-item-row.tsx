@@ -74,7 +74,7 @@ export function ShoppingItemRow({ item, readOnly = false, onToggle, onEdit, onDe
         {itemStateLabel(item.checked)}
       </span>
       {readOnly ? null : (
-        <span className="flex items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover:opacity-100 group-focus-within:opacity-100 max-[650px]:opacity-100">
+        <span className="flex items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-quick)] group-hover:opacity-100 group-focus-within:opacity-100 max-[650px]:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:opacity-100">
           <Button
             variant="ghost"
             size="icon"

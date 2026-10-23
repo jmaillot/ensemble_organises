@@ -408,7 +408,7 @@ function PostCardComponent({
             aria-pressed={post.liked}
             aria-label={post.liked ? 'Retirer ma réaction' : 'Réagir à cette publication'}
             className={cn(
-              'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[11.5px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:text-coral hover:bg-coral-soft',
+              'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[11.5px] font-bold text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:text-coral-text hover:bg-coral-soft',
               post.liked && 'border-coral/40 bg-coral-soft text-coral-text',
             )}
           >

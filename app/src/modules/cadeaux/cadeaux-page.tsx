@@ -653,7 +653,7 @@ export default function CadeauxPage() {
               {activeList?.isOwned ? (
                 <button
                   type="button"
-                  className={`${cardAction} hover:bg-coral-soft hover:text-coral`}
+                  className={`${cardAction} hover:bg-coral-soft hover:text-coral-text`}
                   aria-label={`Supprimer la liste ${activeList.name}`}
                   onClick={() => setPendingListDeletion(activeList)}
                 >
@@ -767,7 +767,7 @@ export default function CadeauxPage() {
                             </button>
                             <button
                               type="button"
-                              className={`${cardAction} hover:bg-coral-soft hover:text-coral`}
+                              className={`${cardAction} hover:bg-coral-soft hover:text-coral-text`}
                               aria-label={`Supprimer l’idée ${item.name}`}
                               onClick={() => setPendingItemDeletion(item)}
                             >
@@ -948,7 +948,7 @@ export default function CadeauxPage() {
                       </button>
                       <button
                         type="button"
-                        className={`${ideaAction} hover:bg-coral-soft hover:text-coral`}
+                        className={`${ideaAction} hover:bg-coral-soft hover:text-coral-text`}
                         aria-label={`Supprimer l’idée ${idea.name}`}
                         onClick={() => setPendingIdeaDeletion(idea)}
                       >

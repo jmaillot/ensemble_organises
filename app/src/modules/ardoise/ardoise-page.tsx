@@ -126,7 +126,7 @@ export default function ArdoisePage() {
                     type="button"
                     onClick={() => setPendingDeleteId(ardoise.id)}
                     aria-label={`Supprimer ${ardoise.name}`}
-                    className={`relative grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral ${
+                    className={`relative grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text ${
                       coverUrl ? 'border-white/25 text-white/85' : 'border-border/70 bg-surface text-muted'
                     }`}
                   >
