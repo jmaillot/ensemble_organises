@@ -46,7 +46,7 @@ export const MOBILE_DRAWER_GROUPS: Array<{ title: string; keys: DrawerKey[] }> =
  * fait au niveau des groupes pour qu'un regroupement futur n'y réexpose
  * jamais un espace masqué.
  */
-function useVisibleDrawerEntries(): DrawerEntry[] {
+export function useVisibleDrawerEntries(): DrawerEntry[] {
   const isChild = useCurrentMember()?.role === 'enfant';
   const disabledModules = useDisabledModules();
   return useMemo(

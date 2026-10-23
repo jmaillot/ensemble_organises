@@ -447,6 +447,24 @@ test.describe('Mises en page', () => {
     await expect(dialog).toBeHidden();
   });
 
+  test('le « Plus » de la barre basse ouvre la feuille des espaces, pas le tiroir', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'la barre basse n’existe que sous 650 px');
+
+    await openDemoSession(page);
+    await page.getByRole('button', { name: 'Plus' }).click();
+
+    // La feuille dédiée : le tiroir (réglages) reste fermé pendant ce parcours.
+    const sheet = page.getByRole('dialog', { name: 'Tous les espaces' });
+    await expect(sheet).toBeVisible();
+    // Même invariant de couverture que le tiroir : maison + dix-neuf modules.
+    await expect(sheet.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
+    expect(page.getByRole('dialog', { name: 'Menu des espaces du foyer' })).toHaveCount(0);
+
+    await sheet.getByRole('link', { name: 'Ouvrir Courses' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(/\/courses$/);
+  });
+
   test('les pages du parcours foyer démarrent en haut sur mobile', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'le centrage vertical ne gêne que sous 650 px');
 

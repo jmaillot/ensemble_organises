@@ -17,6 +17,7 @@ import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
 import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
+import { AllSpacesSheet } from '@/components/shared/all-spaces-sheet';
 import { ModuleDisabled } from '@/components/shared/module-disabled';
 import { CommandPalette } from '@/components/shared/command-palette';
 import { Button } from '@/components/ui/button';
@@ -83,6 +84,7 @@ export function AppShell() {
     }
   }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [spacesSheetOpen, setSpacesSheetOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const notifications = useNotifications();
@@ -397,7 +399,8 @@ export function AppShell() {
 
       <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
 
-      {isMobileLayout ? <MobileBottomNav onMore={() => setDrawerOpen(true)} /> : null}
+      {isMobileLayout ? <MobileBottomNav onMore={() => setSpacesSheetOpen(true)} /> : null}
+      <AllSpacesSheet open={spacesSheetOpen} onOpenChange={setSpacesSheetOpen} />
     </div>
   );
 }
