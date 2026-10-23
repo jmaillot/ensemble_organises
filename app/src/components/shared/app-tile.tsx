@@ -61,18 +61,21 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
       <strong className="relative z-1 text-[16px] font-bold leading-tight tracking-[-0.01em] text-fg hyphens-auto">
         {label}
       </strong>
-      {/* L'objet de la tuile, qui déborde du bord bas-droit comme
-          l'illustration 3D de melimelo. `select-none` : un double-tac ne
-          doit jamais sélectionner l'emoji. */}
-      <span aria-hidden="true" className="pointer-events-none absolute -right-2 -bottom-2.5 select-none text-[62px] leading-none">
+      {/* L'objet de la tuile, CENTRÉ et entier : rogné dans l'angle, il ne
+          se lisait plus (retour du 23 octobre 2026 — « c'est un peu
+          compliqué de comprendre ce que c'est »). La pastille-compteur le
+          chevauche en bas à gauche, comme le « 21 » de melimelo pose sur
+          son caddie — elle passe devant (`z-1`). `select-none` : un
+          double-tac ne doit jamais sélectionner l'emoji. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 flex select-none items-end justify-center pb-1 text-[58px] leading-none">
         {emoji}
       </span>
-      {/* La pastille-compteur, bas-GAUCHE chez melimelo — jamais un zéro
-          décoratif : elle ne paraît que si la valeur est informative. */}
+      {/* Jamais un zéro décoratif : la pastille ne paraît que si la valeur
+          est informative. */}
       {counter ? (
         <span
           aria-hidden="true"
-          className="absolute bottom-2.5 left-3 grid size-[26px] place-items-center rounded-full bg-[oklch(100%_0_0/0.78)] text-[12px] font-bold text-fg"
+          className="absolute bottom-2.5 left-3 z-1 grid size-[26px] place-items-center rounded-full bg-[oklch(100%_0_0/0.78)] text-[12px] font-bold text-fg"
         >
           {counter.value > 99 ? '99+' : counter.value}
         </span>
