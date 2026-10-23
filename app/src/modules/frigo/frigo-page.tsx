@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
+import { ModuleShell, Panel } from '@/components/shared/module-shell';
+import { HeroCard } from '@/components/ui/hero-card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, LoadingRows } from '@/components/ui/empty-state';
@@ -45,6 +46,15 @@ export default function FrigoPage() {
   // Le rôle `enfant` est en lecture seule côté serveur (phase 14) : la page
   // cache les commandes d'écriture au lieu de laisser la RLS refuser.
   const canWrite = useCurrentMember()?.role !== 'enfant';
+
+  // Les trois métriques du résumé : le compte des bientôt périmés devient la
+  // valeur héro, les deux autres se lisent dans la carte.
+  const expiringSoonCount = pantry.items.filter(
+    (item) => expiryStateOf(item.expiresOn, pantry.today) === 'soon',
+  ).length;
+  const expiredCount = pantry.items.filter(
+    (item) => expiryStateOf(item.expiresOn, pantry.today) === 'expired',
+  ).length;
   const [tab, setTab] = useState<LocationTab>('tous');
   const [query, setQuery] = useState('');
   const [onlyPerishing, setOnlyPerishing] = useState(false);
@@ -111,13 +121,22 @@ export default function FrigoPage() {
         )
       }
     >
-      <MetricRow
-        items={[
-          { label: 'Articles', value: pantry.items.length, caption: 'dans tout le frigo' },
-          { label: 'Bientôt périmé', value: pantry.items.filter((item) => expiryStateOf(item.expiresOn, pantry.today) === 'soon').length, caption: 'à consommer sous 2 jours' },
-          { label: 'Périmés', value: pantry.items.filter((item) => expiryStateOf(item.expiresOn, pantry.today) === 'expired').length, caption: 'à trier' },
-        ]}
-      />
+      <HeroCard
+        kicker="Frigo · Contenu du foyer"
+        value={expiringSoonCount}
+        caption="Bientôt périmé, à consommer sous 2 jours"
+        gauge={pantry.items.length > 0 ? expiringSoonCount / pantry.items.length : 0}
+        gaugeLabel="Part des articles bientôt périmés"
+      >
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-on-dark">
+          <span>
+            <strong className="font-display text-[15px]">{pantry.items.length}</strong> articles dans tout le frigo
+          </span>
+          <span>
+            <strong className="font-display text-[15px]">{expiredCount}</strong> périmés, à trier
+          </span>
+        </div>
+      </HeroCard>
 
       {pantry.isError ? (
         <Panel title="Le frigo" description="Contenu du foyer, par emplacement.">

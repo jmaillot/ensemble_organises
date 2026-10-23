@@ -14,6 +14,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { Fab } from '@/components/ui/fab';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Select } from '@/components/ui/input';
@@ -258,7 +259,7 @@ export default function TachesPage() {
       infoTo="/taches/aide"
       actions={
         canWrite ? (
-          <Button icon="plus" onClick={openCreate}>
+          <Button icon="plus" onClick={openCreate} className="max-[650px]:hidden">
             Ajouter une tâche
           </Button>
         ) : null
@@ -591,6 +592,12 @@ export default function TachesPage() {
             );
         }}
       />
+
+      {/* Le bouton flottant reprend l'action principale du module à portée de
+          pouce sur tactile ; l'en-tête la porte déjà au-delà de 650 px. */}
+      {canWrite ? (
+        <Fab icon="plus" label="Ajouter une tâche" onClick={openCreate} className="min-[651px]:hidden" />
+      ) : null}
     </ModuleShell>
   );
 }

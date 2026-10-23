@@ -41,7 +41,7 @@ export default function LandingPage() {
       </header>
 
       <main id="contenu" className="mx-auto max-w-[1180px] px-5 max-[650px]:px-[15px]">
-        <section className="grid items-center gap-8 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:py-16">
+        <section className="grid items-center gap-8 pb-14 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:pb-20 lg:pt-14">
           <div>
             <p className="eyebrow mb-3">L’espace familial</p>
             <h1 className="mb-3.5 text-[clamp(30px,4.4vw,52px)] leading-[1.02]">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ModuleShell, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { Fab } from '@/components/ui/fab';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, LoadingRows } from '@/components/ui/empty-state';
 import { Icon } from '@/components/shared/icon';
@@ -110,7 +111,7 @@ export default function DocumentsPage() {
             <Button variant="secondary" icon="archive" onClick={() => setFolderDialog({ open: true, folder: null })}>
               Nouveau dossier
             </Button>
-            <Button icon="plus" onClick={openCreate}>
+            <Button icon="plus" onClick={openCreate} className="max-[650px]:hidden">
               Ajouter un document
             </Button>
           </>
@@ -238,6 +239,12 @@ export default function DocumentsPage() {
         confirmLabel="Retirer"
         onConfirm={() => void handleRemove()}
       />
+
+      {/* L'action principale à portée de pouce sur tactile ; l'en-tête la
+          porte déjà au-delà de 650 px, le secondaire reste visible partout. */}
+      {canWrite ? (
+        <Fab icon="plus" label="Ajouter un document" onClick={openCreate} className="min-[651px]:hidden" />
+      ) : null}
     </ModuleShell>
   );
 }

@@ -32,7 +32,9 @@ export function HeroCard({ kicker, value, caption, gauge, gaugeLabel, children, 
   return (
     <section
       className={cn(
-        'hero-surface min-w-0 rounded-[28px] p-[23px] text-surface max-[650px]:rounded-[24px] max-[650px]:p-4',
+        // Marge basse intégrée : un héro n'est jamais collé au panneau qui le
+        // suit. Un consommateur peut l'écraser via `className` (tailwind-merge).
+        'hero-surface min-w-0 rounded-[28px] p-[23px] text-surface mb-[18px] max-[650px]:mb-3 max-[650px]:rounded-[24px] max-[650px]:p-4',
         className,
       )}
     >

@@ -84,7 +84,7 @@ describe('TachesPage', () => {
     renderWithProviders(<TachesPage />, { route: '/taches' });
 
     await findTaskList();
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]);
 
     const dialog = within(await screen.findByRole('dialog'));
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche' }));
@@ -123,7 +123,7 @@ describe('TachesPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<TachesPage />, { route: '/taches' });
     await findTaskList();
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]);
     const dialog = within(await screen.findByRole('dialog'));
     await user.type(dialog.getByLabelText(/Nom de la tâche/), name);
     // `datetime-local` se remplit par un changement de valeur : `type` y écrit
@@ -372,7 +372,7 @@ describe('TachesPage — corbeille réservée à l’administrateur', () => {
 
     expect(taskList().queryByRole('button', { name: TRASH })).not.toBeInTheDocument();
     expect(taskList().getByRole('button', { name: EDIT })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]).toBeInTheDocument();
   });
 });
 

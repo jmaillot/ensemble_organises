@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
+import { ModuleShell, Panel } from '@/components/shared/module-shell';
+import { HeroCard } from '@/components/ui/hero-card';
+import { Fab } from '@/components/ui/fab';
 import { MemberAvatar, memberTagClass } from '@/components/shared/member-avatar';
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
@@ -9,6 +11,7 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { SearchInput } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
+import { useCurrentMember } from '@/stores/household-store';
 import { useCalendarGrid } from '@/hooks/use-calendar';
 import { cn, formatMonthLabel, pad, pluralize, todayIso } from '@/lib/utils';
 import { BirthdayConfetti } from './components/birthday-confetti';
@@ -24,6 +27,7 @@ export default function AnniversairesPage() {
   const toast = useToast();
   const { aggregated, birthdays, isLoading, isError, error, refetch, isMutating, saveBirthday, removeBirthday } =
     useAnniversaires();
+  const canWrite = useCurrentMember()?.role !== 'enfant';
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('liste');
   const [dialog, setDialog] = useState<{ open: boolean; birthday: Birthday | null }>({ open: false, birthday: null });
@@ -56,29 +60,34 @@ export default function AnniversairesPage() {
       module="anniversaires"
       infoTo="/anniversaires/aide"
       actions={
-        <Button icon="plus" onClick={openCreate}>
+        <Button icon="plus" onClick={openCreate} className="max-[650px]:hidden">
           Ajouter un anniversaire
         </Button>
       }
     >
       {isCelebrating ? <BirthdayConfetti /> : null}
 
-      <MetricRow
-        items={[
-          { label: 'Cette année', value: rows.length, caption: 'anniversaires suivis' },
-          {
-            label: 'Le prochain',
-            value: next ? formatDayMonth(next.nextDate) : '—',
-            caption: next ? `${next.name} · ${birthdayCountdown(next).toLowerCase()}` : 'aucun anniversaire',
-          },
-          { label: 'Ce mois', value: thisMonth.length, caption: 'à préparer' },
-          {
-            label: 'Recherche',
-            value: query.trim() === '' ? 'Inactive' : pluralize(filtered.length, 'résultat'),
-            caption: 'liste + calendrier',
-          },
-        ]}
-      />
+      {/* Carte héro : le compte à rebours du prochain anniversaire est la
+          seule information qu'on vient chercher d'abord ; le reste (volume,
+          mois courant) se lit en regard. */}
+      <HeroCard
+        kicker="Anniversaires · Suivi du foyer"
+        value={next ? `${next.daysUntil}` : '—'}
+        caption={
+          next
+            ? `Jours avant l’anniversaire de ${next.name}, le ${formatDayMonth(next.nextDate)}`
+            : 'Aucun anniversaire enregistré — notez-en un pour ne plus l’oublier.'
+        }
+      >
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-on-dark">
+          <span>
+            <strong className="font-display text-[15px]">{rows.length}</strong> anniversaires suivis
+          </span>
+          <span>
+            <strong className="font-display text-[15px]">{thisMonth.length}</strong> à préparer ce mois-ci
+          </span>
+        </div>
+      </HeroCard>
 
       {thisMonth.length > 0 ? (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-[16px] border border-coral/25 bg-coral-soft px-4 py-3.5">
@@ -260,6 +269,12 @@ export default function AnniversairesPage() {
           }
         }}
       />
+
+      {/* L'action principale à portée de pouce sur tactile ; l'en-tête la
+          porte déjà au-delà de 650 px. */}
+      {canWrite ? (
+        <Fab icon="plus" label="Ajouter un anniversaire" onClick={openCreate} className="min-[651px]:hidden" />
+      ) : null}
 
       <ConfirmDialog
         open={pendingDelete !== null}

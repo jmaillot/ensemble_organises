@@ -21,7 +21,6 @@ export function BalanceCard({ total, monthLabel, onAddExpense, onInvite }: Balan
       kicker={`Ardoise\u00a0· ${monthLabel}`}
       value={<span data-testid="balance-total">{formatEuro(total)}</span>}
       caption="Répartis automatiquement, selon les membres choisis pour chaque dépense."
-      className="mb-[18px] max-[650px]:mb-3"
       actions={
         <>
           <Button icon="plus" onClick={onAddExpense} className="bg-surface text-fg hover:bg-[oklch(96%_0.01_240)]">
