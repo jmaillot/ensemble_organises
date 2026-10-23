@@ -1,0 +1,71 @@
+/**
+ * Export imprimable de la période affichée (Lot 2) : `@media print`, sans
+ * dépendance PDF — même parti que `courses-export.css` et `recipe-export.css`.
+ *
+ * À l'impression, tout le contenu du module sauf `.calendar-print` disparaît,
+ * avec le chrome applicatif. Un jour ne se coupe pas en deux pages : un
+ * rendez-vous orphelin en haut de feuille serait pire qu'un blanc en bas.
+ */
+
+.calendar-print {
+  display: none;
+}
+
+@media print {
+  body aside,
+  body header,
+  body nav,
+  body [role='region'],
+  [data-module='calendrier'] > :not(.calendar-print) {
+    display: none !important;
+  }
+
+  [data-module='calendrier'] {
+    max-width: none !important;
+  }
+
+  .calendar-print {
+    display: block !important;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.45;
+  }
+
+  .calendar-print h2 {
+    font-size: 18pt;
+    margin: 0 0 4pt;
+  }
+
+  .calendar-print p {
+    margin: 0 0 12pt;
+  }
+
+  .calendar-print h3 {
+    font-size: 13pt;
+    margin: 14pt 0 4pt;
+  }
+
+  .calendar-print section {
+    break-inside: avoid;
+  }
+
+  .calendar-print ul {
+    margin: 0 0 10pt;
+    padding-left: 16pt;
+  }
+
+  .calendar-print li {
+    margin-bottom: 4pt;
+    break-inside: avoid;
+  }
+
+  .calendar-print .heure {
+    font-weight: 700;
+    margin-right: 6pt;
+  }
+
+  .calendar-print .precision {
+    color: #333;
+    display: block;
+  }
+}

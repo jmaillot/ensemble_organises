@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { catalogueModules, modules, navModules } from './modules';
+import { catalogueModules, filterModuleEntries, filterModuleKeys, isModuleDisabled, modules, navModules } from './modules';
 
 /**
  * Vitest ne garantit pas le répertoire courant du runner : on remonte depuis
@@ -53,5 +53,44 @@ describe('Catalogue des espaces', () => {
     for (const key of navModules) {
       expect(catalogueModules.some((entry) => entry.key === key)).toBe(true);
     }
+  });
+});
+
+/**
+ * Menu des applications (migration 0140) : le masquage est une décision de
+ * présentation, portée par `households.disabled_modules`. Ces invariants
+ * garantissent qu'aucune surface de navigation ne recompose sa propre règle :
+ * une seule définition de « éteint » et de « hors périmètre enfant », composée
+ * partout pareil.
+ */
+describe('Gating des espaces (0140)', () => {
+  it('dit « éteint » seulement pour une clé présente dans la liste du foyer', () => {
+    expect(isModuleDisabled('ardoise', ['ardoise', 'voyages'])).toBe(true);
+    expect(isModuleDisabled('courses', ['ardoise', 'voyages'])).toBe(false);
+    // La liste vide dit « tout activé » : aucun foyer existant ne change de
+    // comportement sans l'avoir choisi.
+    for (const entry of modules) {
+      expect(isModuleDisabled(entry.key, [])).toBe(false);
+    }
+  });
+
+  it('compose masquage enfant et espaces éteints dans un seul filtre', () => {
+    const CHILD_HIDDEN = ['ardoise', 'cadeaux', 'fidelite', 'prestataires', 'animaux'] as const;
+    const disabled = ['recettes'];
+    const isChild = true;
+
+    const keys = filterModuleKeys(modules.map((entry) => entry.key), { isChild, disabledModules: disabled });
+    for (const key of keys) {
+      expect(CHILD_HIDDEN, `${key} réexpose un module masqué à l'enfant`).not.toContain(key);
+      expect(disabled, `${key} réexpose un espace éteint par le foyer`).not.toContain(key);
+    }
+    // `accueil` et `parametres` ne sont jamais gated : on doit toujours
+    // pouvoir rejoindre le tableau de bord et réactiver un espace.
+    expect(keys).toContain('calendrier');
+    expect(keys).not.toContain('parametres');
+
+    const entries = filterModuleEntries(modules, { disabledModules: disabled });
+    expect(entries.some((entry) => entry.key === 'recettes')).toBe(false);
+    expect(entries.length).toBe(modules.length - disabled.length);
   });
 });

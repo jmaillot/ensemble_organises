@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/shared/module-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
+import { AppsPanel } from './components/apps-panel';
 import { HouseholdDeletePanel } from './components/household-delete-panel';
 import { HouseholdForm } from './components/household-form';
 import { InvitationsPanel } from './components/invitations-panel';
@@ -59,7 +60,10 @@ export default function ParametresPage() {
           <NotificationsPanel />
         </TabsContent>
         <TabsContent value="application">
-          <OfflinePanel />
+          <div className="grid gap-[18px]">
+            <AppsPanel />
+            <OfflinePanel />
+          </div>
         </TabsContent>
       </Tabs>
     </section>

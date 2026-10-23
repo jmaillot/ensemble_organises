@@ -77,6 +77,15 @@ describe('AppShell', () => {
     expect(within(breadcrumb).getByText('À faire')).toBeInTheDocument();
   });
 
+  it('nomme le module, pas la page, sur une sous-route', () => {
+    renderShell('/courses/aide');
+    const breadcrumb = screen.getByRole('navigation', { name: 'Fil d’Ariane' });
+    // Le chemin entier était cherché dans le catalogue des espaces : une
+    // sous-route retombait sur « Maison », et le lecteur perdait le module.
+    expect(within(breadcrumb).getByText('Courses')).toBeInTheDocument();
+    expect(within(breadcrumb).queryByText('Maison')).not.toBeInTheDocument();
+  });
+
   it('propose un hamburger qui ouvre le tiroir des espaces', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
@@ -85,8 +94,8 @@ describe('AppShell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     // L'en-tête porte le nom de l'application, pas un « Menu » générique.
     expect(within(dialog).getByText('Ensemble & Organisés')).toBeInTheDocument();
-    // Maison + dix-sept modules, chacun joignable en un tap.
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(18);
+    // Maison + vingt modules, chacun joignable en un tap.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(21);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Courses' })).toBeInTheDocument();
   });
 
@@ -165,7 +174,7 @@ describe('AppShell — catalogue des espaces', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(18);
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(21);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Anniversaires' })).toBeInTheDocument();
   });
 
@@ -273,8 +282,8 @@ describe('AppShell — périmètre enfant', () => {
     await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    // Maison + douze espaces : 13 liens, aucun hollow, aucun masqué en CSS.
-    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(13);
+    // Maison + quinze espaces : 16 liens, aucun hollow, aucun masqué en CSS.
+    expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(16);
     expect(within(dialog).getByRole('link', { name: 'Ouvrir Maison' })).toBeInTheDocument();
     for (const label of ['Ardoise', 'Cadeaux', 'Animaux', 'Prestataires', 'Fidélité']) {
       expect(within(dialog).queryByRole('link', { name: `Ouvrir ${label}` })).not.toBeInTheDocument();

@@ -112,19 +112,32 @@ const CATEGORY_COLORS = ['#E8930C', '#D64545', '#3E7CB1', '#4CAF50', '#7C5CBF', 
 
 export { CATEGORY_COLORS };
 
+/**
+ * Crée une catégorie d'événement. `icon` est facultatif : vide, la catégorie
+ * n'en porte pas et son emoji se déduit du nom à l'affichage. Une icône fournie
+ * est bornée ici comme en base (0138) — le message le dit avant l'aller-retour.
+ */
 export async function createCategory(
   householdId: string,
   createdBy: string | null,
   name: string,
   color: string,
+  icon: string | null = null,
 ): Promise<EventCategoryRow> {
   const trimmed = name.trim();
   if (trimmed.length === 0 || trimmed.length > 40) throw new Error('Nom de catégorie invalide (1 à 40 caractères).');
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error('Couleur de catégorie invalide.');
+  const trimmedIcon = icon?.trim() ?? '';
+  // `char_length` en base compte des signes, pas des unités UTF-16 : une
+  // séquence composée (drapeau, famille en ZWJ) vaut un signe par emoji. On
+  // compte donc les points de code, sinon 17 emoji refuseraient ici ce que la
+  // contrainte accepterait.
+  if ([...trimmedIcon].length > 32) throw new Error('Emoji de catégorie invalide (32 signes au maximum).');
   return data.create<EventCategoryRow>(CATEGORIES, {
     household_id: householdId,
     name: trimmed,
     color,
+    icon: trimmedIcon === '' ? null : trimmedIcon,
     created_by: createdBy,
   });
 }

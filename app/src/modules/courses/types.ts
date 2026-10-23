@@ -1,4 +1,4 @@
-import type { ShoppingListItemRow, ShoppingListRow } from '@/types';
+import type { ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 
 /**
  * Rayons proposés par le module. L'ordre suit le parcours en magasin : il sert
@@ -319,6 +319,11 @@ export interface ShoppingItem {
   rayon: Rayon;
   checked: boolean;
   addedBy: string | null;
+  /**
+   * Rang manuel de l'article dans sa liste (0 = premier) — `position` (0139).
+   * C'est l'ordre du foyer : celui du magasin, pas celui de l'ajout.
+   */
+  position: number;
   createdAt: string;
 }
 
@@ -329,8 +334,14 @@ export interface ShoppingListView extends ShoppingList {
   pendingCount: number;
 }
 
-/** Mode de regroupement proposé par le sélecteur du panneau principal. */
-export type Grouping = 'rayon' | 'ajout';
+/**
+ * Mode de regroupement proposé par le sélecteur du panneau principal.
+ *
+ * `rayon` : la liste est rangée par rayon, et l'ordre du foyer se lit À
+ * L'INTÉRIEUR de chaque rayon. `ordre` : la liste est à plat, dans l'ordre
+ * du foyer — c'est la vue où l'on réordonne.
+ */
+export type Grouping = 'rayon' | 'ordre';
 
 export interface ItemSection {
   key: string;
@@ -362,6 +373,8 @@ export interface ShoppingItemInput {
   addedBy: string | null;
   /** Produit du foyer d'origine (0071) : re-scan +1 via resolveScannedProduct. */
   productId?: string | null;
+  /** Rang du foyer dans la liste (0139) : la fin de la liste pour un ajout. */
+  position?: number;
 }
 
 /** Référence OFF jointe à un ajout manuel : même forme que `OffProduct`. */
@@ -404,6 +417,7 @@ export const toShoppingItem = (row: ShoppingListItemRow): ShoppingItem => ({
   rayon: normalizeRayon(row.category),
   checked: Boolean(row.checked),
   addedBy: row.added_by,
+  position: row.position ?? 0,
   createdAt: row.created_at ?? '',
 });
 
@@ -416,15 +430,108 @@ export function quantityLabel(item: ShoppingItem): string {
 export const itemStateLabel = (checked: boolean) => (checked ? 'dans le panier' : 'à acheter');
 
 /**
+ * Ce que la feuille imprimée doit porter (Lot 2, export Courses).
+ *
+ * Le regroupement est **toujours** par rayon, même quand l'écran affiche
+ * l'ordre d'ajout : le papier sert à parcourir le magasin, pas à retrouver la
+ * chronologie de la saisie. Pas d'horodatage non plus — la date d'impression
+ * est celle du navigateur, et une ligne « imprimée le … » figée au dernier
+ * rendu mentirait sur une page restée ouverte.
+ */
+export interface ShoppingPrintItem {
+  name: string;
+  quantity: string;
+  checked: boolean;
+}
+
+export interface ShoppingPrintSection {
+  key: string;
+  title: string;
+  items: ShoppingPrintItem[];
+}
+
+export interface ShoppingPrintModel {
+  title: string;
+  meta: string;
+  sections: ShoppingPrintSection[];
+}
+
+export function toShoppingPrintModel(list: ShoppingListView, householdName: string): ShoppingPrintModel {
+  const pending = list.items.filter((item) => !item.checked).length;
+  return {
+    title: list.name,
+    meta: `${householdName} · ${pending} à acheter sur ${list.items.length}`,
+    sections: sectionsForList(list.items, 'rayon').map((section) => ({
+      key: section.key,
+      title: section.title,
+      items: section.items.map((item) => ({
+        name: item.name,
+        quantity: quantityLabel(item),
+        checked: item.checked,
+      })),
+    })),
+  };
+}
+
+/** Mode de tri du catalogue des produits. */
+export type CatalogSort = 'nom' | 'frequence';
+
+/**
+ * Trie le catalogue des produits.
+ *
+ * `nom` : l'ordre alphabétique français — le catalogue se feuillette.
+ * `frequence` : le produit le plus souvent dans les listes d'abord — c'est
+ * le plus à ressemer, et le catalogue sert alors de mémoire d'achat.
+ *
+ * La fréquence est le nombre d'articles de vos listes qui pointent ce
+ * produit (`shopping_list_items.product_id`). C'est un COMPTE, pas une
+ * préférence apprise : rien n'est deviné, et un produit jamais mis en liste
+ * tombe à la fin, alphabétiquement.
+ */
+export function sortProducts(
+  products: ProductRow[],
+  usage: Record<string, number>,
+  sort: CatalogSort,
+): ProductRow[] {
+  const copy = [...products];
+  if (sort === 'frequence') {
+    return copy.sort(
+      (a, b) =>
+        (usage[b.id] ?? 0) - (usage[a.id] ?? 0) || a.name.localeCompare(b.name, 'fr'),
+    );
+  }
+  return copy.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+}
+
+/**
  * Découpe les articles d'une liste en sections visuelles : une section par
- * rayon (vue par défaut) ou une section unique dans l'ordre d'ajout.
+ * rayon (vue par défaut) ou une section unique dans l'ordre du foyer.
+ *
+ * L'ordre du FOYER (`position`, 0139) passe devant tout : c'est lui que le
+ * foyer a posé, et la date d'ajout ne dit plus rien d'utile. Le regroupement
+ * par rayon ne fait qu'en SORTIR les articles, sans toucher à leur rang.
  */
 export function sectionsForList(items: ShoppingItem[], grouping: Grouping): ItemSection[] {
   if (items.length === 0) return [];
-  if (grouping === 'ajout') return [{ key: 'ajout', title: '', items: [...items] }];
+  const ranges = [...items].sort(
+    (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  if (grouping === 'ordre') {
+    // Les articles COCHÉS descendent en bas : ce qu'il reste à prendre reste
+    // sous les yeux. Ils gardent pourtant leur RANG — les décocher les rend
+    // à leur place dans l'ordre du foyer, pas à la fin.
+    const aAcheter = ranges.filter((item) => !item.checked);
+    const dansLePanier = ranges.filter((item) => item.checked);
+    // Une section vide ne s'affiche pas : un titre « Dans le panier » sans
+    // rien en dessous ferait une promesse vide.
+    return [
+      { key: 'ordre', title: '', items: aAcheter },
+      ...(dansLePanier.length > 0 ? [{ key: 'panier', title: 'Dans le panier', items: dansLePanier }] : []),
+    ].filter((section) => section.items.length > 0);
+  }
 
   const buckets = new Map<Rayon, ShoppingItem[]>();
-  for (const item of items) {
+  for (const item of ranges) {
     const bucket = buckets.get(item.rayon);
     if (bucket) bucket.push(item);
     else buckets.set(item.rayon, [item]);

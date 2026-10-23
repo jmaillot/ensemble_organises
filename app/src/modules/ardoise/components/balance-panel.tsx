@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { HeroCard } from '@/components/ui/hero-card';
 import { Panel } from '@/components/shared/module-shell';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { formatEuro } from '@/lib/utils';
@@ -13,26 +14,24 @@ export interface BalanceCardProps {
   onInvite: () => void;
 }
 
-/** Carte sombre d'ouverture : le total de l'ardoise et les deux actions clés. */
+/** Carte héro d'ouverture : le total de l'ardoise et les deux actions clés. */
 export function BalanceCard({ total, monthLabel, onAddExpense, onInvite }: BalanceCardProps) {
   return (
-    <div className="mb-[18px] rounded-[22px] bg-fg p-[23px] text-surface max-[650px]:mb-3 max-[650px]:p-4">
-      <p className="eyebrow mb-2 text-on-dark">{`Ardoise\u00a0· ${monthLabel}`}</p>
-      <strong data-testid="balance-total" className="font-display text-[46px] tracking-[-0.06em] max-[650px]:text-[34px]">
-        {formatEuro(total)}
-      </strong>
-      <p className="mt-2 mb-0 text-[12px] text-on-dark max-[650px]:hidden">
-        Répartis automatiquement, selon les membres choisis pour chaque dépense.
-      </p>
-      <div className="mt-5 flex flex-wrap gap-2 max-[650px]:mt-4">
-        <Button icon="plus" onClick={onAddExpense} className="bg-surface text-fg hover:bg-[oklch(96%_0.01_240)]">
-          Ajouter une dépense
-        </Button>
-        <Button variant="secondary" icon="people" onClick={onInvite} className="border-transparent bg-transparent text-surface hover:bg-[oklch(28%_0.025_240)]">
-          Inviter un membre
-        </Button>
-      </div>
-    </div>
+    <HeroCard
+      kicker={`Ardoise\u00a0· ${monthLabel}`}
+      value={<span data-testid="balance-total">{formatEuro(total)}</span>}
+      caption="Répartis automatiquement, selon les membres choisis pour chaque dépense."
+      actions={
+        <>
+          <Button icon="plus" onClick={onAddExpense} className="bg-surface text-fg hover:bg-[oklch(96%_0.01_240)]">
+            Ajouter une dépense
+          </Button>
+          <Button variant="secondary" icon="people" onClick={onInvite} className="border-transparent bg-transparent text-surface hover:bg-[oklch(28%_0.025_240)]">
+            Inviter un membre
+          </Button>
+        </>
+      }
+    />
   );
 }
 
@@ -57,7 +56,7 @@ export function MemberBalances({ balances, source = 'local' }: MemberBalancesPro
             <div
               key={balance.key}
               data-testid={`balance-row-${balance.key}`}
-              className="flex items-center justify-between gap-2 border-t border-border py-[7px] text-xs first-of-type:border-t-0"
+              className="flex items-center justify-between gap-2 rounded-[14px] px-1 py-2.5 text-[13px] transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
             >
               <span className="flex items-center gap-2">
                 <i

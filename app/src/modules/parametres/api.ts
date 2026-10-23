@@ -113,6 +113,18 @@ export async function saveHousehold(
   return data.update<HouseholdRow>('households', householdId, values);
 }
 
+/**
+ * Change les espaces éteints du foyer (menu des applications, migration
+ * 0140). La RLS `households_update` (0007) réserve l'écriture d'une ligne
+ * foyer aux administrateurs : la fonction ne fait que transmettre, jamais
+ * décider. La validité des clés est tenue par la base — la contrainte 0140
+ * refuse une chaîne hors format maison, donc une clé mal écrite ne peut pas
+ * éteindre un module qui n'existe pas.
+ */
+export async function saveDisabledModules(householdId: string, disabledModules: string[]): Promise<HouseholdRow> {
+  return data.update<HouseholdRow>('households', householdId, { disabled_modules: disabledModules });
+}
+
 /** Retire un membre du foyer : action réservée à l'administrateur. */
 export async function removeMember(memberId: string): Promise<void> {
   await data.remove('household_members', memberId);

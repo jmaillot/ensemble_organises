@@ -1398,20 +1398,22 @@ Functions, espace disque, expiration des certificats, résultat de
   rapport à son appel (§6.6).
 
   Reste non validé par un envoi réel, et vérifié uniquement par `0007_push.sql` :
-  * le chemin des anniversaires (`eo-birthday-alerts`, chaque matin) — et il ne
-    peut pas l'être par disparition de ligne, puisqu'un anniversaire n'a rien à
-    consommer (§6.6).
+  * rien — le chemin des anniversaires (`eo-birthday-alerts`, chaque matin à
+    06 h 40) est **validé par un envoi réel** depuis le 27 septembre 2026, par
+    `scripts/test-dispatch-anniversaires.sh` (deux dispatches, `200` et
+    `delivered: 2` les deux fois, `consumed: 0` comme prévu par contrat,
+    revalidation au second appel, nettoyage vérifié par comptage).
 
-  La marche à suivre pour le chemin restant est en §6.6.
-
-* **Ce qui n'a jamais été exercé par un humain** : la chaîne est vérifiée de bout
-  en bout par le code et par `test-dispatch-push.sh`, et le formulaire de tâche
-  expose bien le champ de rappel — `reminderAt` au schéma Zod, saisie en
-  `datetime-local`, `saveTask` appelant `setTaskReminder`, et
-  `removeTask` nettoyant au passage. Ce qui n'a jamais eu lieu, c'est une
-  personne qui crée un rappel dans l'interface, reçoit la notification et clique
-  dessus. Le `notificationclick` du service worker est écrit et relu, jamais
-  exécuté. Un chemin dont chaque maillon est vérifié peut encore ne pas
+* **Ce qui n'a jamais été exercé par un humain, en une part** : la réception et
+  l'**affichage** de la notification sont prouvés sur deux postes réels
+  (Firefox/Linux le 2026-10-19, Android/Chrome installé en PWA le même jour,
+  avec la seconde bannière au renvoi — donc `renotify` compris), après
+  correction de la trame `d348309`. Ce qui n'a jamais eu lieu, c'est une
+  personne qui **clique** sur la notification : le `notificationclick` du
+  service worker (`app/src/sw.ts`) est écrit et relu, et le deep link est
+  couvert par des tests unitaires (`app/src/modules/deep-links.test.tsx`),
+  mais le geste réel — clic sur la bannière, atterrissage sur le bon écran —
+  n'a pas été consigné. Un chemin dont chaque maillon est vérifié peut encore ne pas
   s'emboîter : c'est le genre de fait que seule une main sur la souris établit,
   et il ne se déduit pas des tests.
 * **Cadence des rappels** : `profiles.reminder_frequency` est enregistrée et
@@ -1426,11 +1428,12 @@ Functions, espace disque, expiration des certificats, résultat de
   compteur partagé si le service est répliqué.
 * **Solde de l'Ardoise** : calculé par `private.household_balances()` et
   `private.simplify_household_debts()`, exposés au client par l'Edge Function
-  `expense-settlement` (§6.2). Le frontend **calcule encore ses soldes
-  localement** : il faut le brancher sur la fonction serveur avant la mise en
-  production, sinon deux vérités coexistent. C'est un choix assumé : **le client
-  ne doit jamais recalculer un solde**, sinon l'affichage divergerait de la
-  vérité serveur.
+  `expense-settlement` (§6.2). Le frontend est **branché sur la fonction
+  serveur** : `fetchArdoiseSettlement` (`app/src/modules/ardoise/api.ts`,
+  appelée par `use-settlement.ts` et couverte par `settlement-fetch.test.ts`)
+  lit le résumé de référence en base, et ne recalcule jamais un solde
+  localement — tous les affichages citent la même vérité serveur. Réaligné le
+  2026-10-23 : la phrase qui affirmait le branchement en attente était fausse.
 * **Déclenchement manuel des routines** : `generate-routine-occurrences`
   accepte le mode `user` pour un administrateur, mais aucun écran ne l'appelle
   encore ; la maintenance quotidienne est assurée par le job `pg_cron`.

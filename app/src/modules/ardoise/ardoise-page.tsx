@@ -31,6 +31,7 @@ export default function ArdoisePage() {
   return (
     <ModuleShell
       module="ardoise"
+      infoTo="/ardoise/aide"
       actions={
         <>
           <Button icon="plus" onClick={() => setCreateOpen(true)}>
@@ -83,8 +84,10 @@ export default function ArdoisePage() {
                 <div
                   key={ardoise.id}
                   role="listitem"
-                  className={`relative flex flex-wrap items-center gap-3 overflow-hidden rounded-[12px] border px-3.5 py-3 ${
-                    coverUrl ? 'border-transparent' : 'border-border'
+                  className={`relative flex min-h-[68px] flex-wrap items-center gap-3 overflow-hidden rounded-[18px] border px-3 py-2.5 transition-colors duration-[var(--duration-quick)] ${
+                    coverUrl
+                      ? 'border-transparent'
+                      : 'border-border/70 bg-bg/50 hover:border-accent/30 hover:bg-accent-faint'
                   }`}
                 >
                   {coverUrl ? (
@@ -97,18 +100,25 @@ export default function ArdoisePage() {
                       />
                       <div aria-hidden="true" className="absolute inset-0 bg-fg/60" />
                     </>
-                  ) : null}
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-sage text-sage-strong"
+                    >
+                      <Icon name="wallet" size="sm" />
+                    </span>
+                  )}
                   <div className="relative min-w-[150px] flex-1">
-                    <p className={`m-0 text-[14px] font-[760] ${coverUrl ? 'text-white' : ''}`}>
+                    <p className={`m-0 text-[15px] font-[700] ${coverUrl ? 'text-white' : ''}`}>
                       {ardoise.name}
                     </p>
-                    <small className={`text-[11px] ${coverUrl ? 'text-white/75' : 'text-muted'}`}>
+                    <small className={`text-[11.5px] ${coverUrl ? 'text-white/75' : 'text-muted'}`}>
                       {ardoise.description ? `${ardoise.description} · ` : ''}
                       {ardoise.is_active ? 'Partage actif' : 'Partage coupé'}
                     </small>
                   </div>
                   <div className="relative">
-                    <Button variant="secondary" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
+                    <Button variant="secondary" size="sm" onClick={() => navigate(`/ardoise/${ardoise.id}`)}>
                       Ouvrir
                     </Button>
                   </div>
@@ -116,8 +126,8 @@ export default function ArdoisePage() {
                     type="button"
                     onClick={() => setPendingDeleteId(ardoise.id)}
                     aria-label={`Supprimer ${ardoise.name}`}
-                    className={`relative grid size-11 place-items-center rounded-[9px] transition-colors hover:bg-coral-soft hover:text-coral ${
-                      coverUrl ? 'text-white/85' : 'text-muted'
+                    className={`relative grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral ${
+                      coverUrl ? 'border-white/25 text-white/85' : 'border-border/70 bg-surface text-muted'
                     }`}
                   >
                     <Icon name="trash" size="sm" />

@@ -113,6 +113,7 @@ export default function VoyagesPage() {
   return (
     <ModuleShell
       module="voyages"
+      infoTo="/voyages/aide"
       actions={
         <Button icon="plus" onClick={openCreate}>
           Créer un voyage
@@ -153,20 +154,20 @@ export default function VoyagesPage() {
 
           <div className="mb-[18px] grid grid-cols-3 gap-3.5 max-[650px]:grid-cols-1">
             <VoyageTasksCard tripId={trip.id} />
-            <div className="rounded-[16px] border border-border bg-surface p-[17px]">
-              <strong className="block font-display text-[25px] tracking-[-0.05em]">{trip.days}</strong>
-              <span className="text-[11px] text-muted">jours sur place</span>
-              <p className="mt-[13px] mb-0 text-[11px] text-muted">{trip.dateLabel}</p>
+            <div className="rounded-[22px] border border-border bg-surface p-4 min-[651px]:p-[22px]">
+              <strong className="block font-display text-[26px] tracking-[-0.05em]">{trip.days}</strong>
+              <span className="eyebrow mt-1 block">jours sur place</span>
+              <p className="mt-2.5 mb-0 text-[11.5px] text-muted">{trip.dateLabel}</p>
             </div>
-            <div className="rounded-[16px] border border-border bg-surface p-[17px]">
-              <strong className="block font-display text-[25px] tracking-[-0.05em]">{members.length}</strong>
-              <span className="text-[11px] text-muted">membres du foyer</span>
-              <div className="mt-[13px] flex items-center">
+            <div className="rounded-[22px] border border-border bg-surface p-4 min-[651px]:p-[22px]">
+              <strong className="block font-display text-[26px] tracking-[-0.05em]">{members.length}</strong>
+              <span className="eyebrow mt-1 block">membres du foyer</span>
+              <div className="mt-3 flex items-center">
                 {stack.shown.map((member) => (
                   <MemberAvatar key={member.id} member={member} size="sm" className="-ml-[7px] border-2 border-surface first:ml-0" />
                 ))}
                 {stack.overflow > 0 ? (
-                  <span className="-ml-[7px] grid size-[23px] place-items-center rounded-[8px] border-2 border-surface bg-fg text-[9px] font-extrabold text-surface">
+                  <span className="-ml-[7px] grid size-[23px] place-items-center rounded-full border-2 border-surface bg-fg text-[9px] font-extrabold text-surface">
                     +{stack.overflow}
                     <span className="sr-only">
                       {stack.overflow} autre{stack.overflow > 1 ? 's' : ''} membre{stack.overflow > 1 ? 's' : ''}
@@ -189,7 +190,7 @@ export default function VoyagesPage() {
                     key={other.id}
                     role="listitem"
                     className={cn(
-                      'rounded-[16px] border border-border bg-surface p-[17px]',
+                      'rounded-[22px] border border-border bg-surface p-4 transition-shadow duration-[var(--duration-quick)] hover:shadow-md min-[651px]:p-[22px]',
                       other.id === selectedId && 'border-accent shadow-[inset_0_0_0_1px_var(--color-accent)]',
                     )}
                   >
@@ -199,7 +200,7 @@ export default function VoyagesPage() {
                         alt=""
                         aria-hidden="true"
                         loading="lazy"
-                        className="mb-3 h-24 w-full rounded-[10px] object-cover"
+                        className="mb-3 h-24 w-full rounded-[14px] object-cover"
                       />
                     ) : null}
                     <button
@@ -255,9 +256,9 @@ function VoyageTasksCard({ tripId }: { tripId: string }) {
   const stats = computeTripPrepStats((tasksQuery.data ?? []).map((task) => ({ status: task.status })));
   const display = tasksQuery.isLoading || tasksQuery.isError ? '—' : String(stats.openTasks);
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-[17px]">
-      <strong className="block font-display text-[25px] tracking-[-0.05em]">{display}</strong>
-      <span className="text-[11px] text-muted">tâches du voyage à préparer</span>
+    <div className="rounded-[22px] border border-border bg-surface p-4 min-[651px]:p-[22px]">
+      <strong className="block font-display text-[26px] tracking-[-0.05em]">{display}</strong>
+      <span className="eyebrow mt-1 block">tâches du voyage à préparer</span>
       <Progress value={tasksQuery.isError || tasksQuery.isLoading ? 0 : stats.progress} label="Avancement des tâches du voyage" />
       {tasksQuery.isError ? (
         <p className="mt-2 mb-0 text-[11px] text-muted" role="status">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ModuleShell, MetricRow, Panel, CountBadge } from '@/components/shared/module-shell';
+import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,6 +10,7 @@ import { Field } from '@/components/ui/field';
 import { Select, Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useCalendarGrid } from '@/hooks/use-calendar';
+import { usePrintSheet } from '@/hooks/use-print-sheet';
 import { useMembers, useIsAdmin, useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { addDays, formatLongDate, formatMonthLabel, formatShortDate, pad, pluralize, todayIso } from '@/lib/utils';
 import { CalendarGrid } from './components/calendar-grid';
@@ -19,9 +21,12 @@ import { useRefDays } from './hooks/use-ref-days';
 import { useSchoolZone } from './hooks/use-school-zone';
 import { createPersonalCalendar, createCategory, deleteCalendar, moveCalendarEvents, CATEGORY_COLORS } from './api';
 import { suggestZoneForCity } from './lib/zone-resolver';
-import { buildAgenda, buildDayMarkers, isExitingPerso } from './types';
+import { toCalendarPrintModel } from './lib/print';
+import { buildAgenda, buildDayMarkers, eventCategoryIcon, isExitingPerso } from './types';
 import type { CalendarEvent, EventFormValues } from './types';
 import type { EventCalendarRow } from '@/types';
+import './components/calendar-export.css';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const titleCase = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
@@ -62,6 +67,7 @@ export default function CalendrierPage() {
   const currentMember = useCurrentMember();
   const householdId = useHouseholdStore((state) => state.householdId);
   const city = useHouseholdStore((state) => state.city);
+  const householdName = useHouseholdStore((state) => state.householdName);
   const [isDetectingZone, setIsDetectingZone] = useState(false);
   // Curseur calé sur le 1er du mois courant : la grille démarre bien le lundi.
   const today = new Date();
@@ -87,6 +93,7 @@ export default function CalendrierPage() {
   const [pendingCalendarDelete, setPendingCalendarDelete] = useState<EventCalendarRow | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryIcon, setCategoryIcon] = useState('');
   const [categoryColor, setCategoryColor] = useState<string>(CATEGORY_COLORS[0]);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
@@ -186,8 +193,63 @@ export default function CalendrierPage() {
       .filter((section) => section.items.length > 0);
   }, [selected, visibleEvents, tasks, visibleBirthdays, visibleHolidays, visibleVacations]);
 
-  const openCreate = (date: string) => setDialog({ open: true, event: null, date });
-  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });
+  /**
+   * Feuille imprimée : la période de la vue affichée, jour par jour. Le mois
+   * se compte sur ses propres jours (pas sur les cases de la grille, qui
+   * débordent sur les mois voisins) ; la liste garde ses 30 jours.
+   */
+  const printModel = useMemo(() => {
+    const sources = { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() };
+    const monthDays = Array.from(
+      { length: new Date(grid.year, grid.month + 1, 0).getDate() },
+      (_, index) => `${grid.year}-${pad(grid.month + 1)}-${pad(index + 1)}`,
+    );
+    let isos: string[];
+    let title: string;
+    if (view === 'jour') {
+      isos = [selected];
+      title = titleCase(formatLongDate(selected));
+    } else if (view === 'semaine') {
+      isos = weekDays;
+      title = `Semaine du ${formatShortDate(weekDays[0])}`;
+    } else if (view === 'mois') {
+      isos = monthDays;
+      title = titleCase(formatMonthLabel(new Date(grid.year, grid.month, 1)));
+    } else {
+      isos = Array.from({ length: 30 }, (_, index) => addDays(selected, index));
+      title = `30 jours à partir du ${formatShortDate(selected)}`;
+    }
+    const period = isos.map((iso) => ({ iso, items: buildAgenda(iso, sources) }));
+    const count = period.reduce((total, day) => total + day.items.length, 0);
+    // La feuille ne montre que ce que l'écran montre : si un filtre est actif,
+    // elle le dit, sinon un événement « manquant » passerait pour un oubli.
+    const filtered =
+      categoryFilter !== 'toutes' || memberFilter !== 'tous' || calendarFilter !== 'tous' || !showBirthdays;
+    const meta = `${householdName} · ${pluralize(count, 'élément')}${filtered ? ' · filtres actifs' : ''}`;
+    return toCalendarPrintModel(title, meta, period);
+  }, [
+    selected,
+    view,
+    weekDays,
+    grid.year,
+    grid.month,
+    visibleEvents,
+    tasks,
+    visibleBirthdays,
+    visibleHolidays,
+    visibleVacations,
+    categoryFilter,
+    memberFilter,
+    calendarFilter,
+    showBirthdays,
+    householdName,
+  ]);
+
+  const { printing, print } = usePrintSheet();
+
+  const openCreate = (date: string) => setDialog({ open: true, event: null, date });  const openEdit = (event: CalendarEvent) => setDialog({ open: true, event, date: event.date });  // Lien profond : `/calendrier?ouvrir=<id>` ouvre la fiche de l’événement.
+  useOpenRecord(events, openEdit);
+
 
   // Les enfants taguent sans créer (D-06) : aucun bouton de création affiché.
   const isChild = currentMember?.role === 'enfant';
@@ -259,191 +321,226 @@ export default function CalendrierPage() {
   return (
     <ModuleShell
       module="calendrier"
+      infoTo="/calendrier/aide"
       actions={
-        isChild ? undefined : (
-          <>
-            <Button icon="plus" onClick={() => openCreate(selected)}>
-              Ajouter un événement
-            </Button>
-            <Button icon="plus" onClick={() => navigate('/taches', { state: { dueDate: selected } })}>
-              Ajouter une tâche
-            </Button>
-          </>
-        )
+        <>
+          <Button variant="secondary" icon="download" disabled={isLoading || isError} onClick={print}>
+            Imprimer
+          </Button>
+          {isChild ? null : (
+            <>
+              <Button icon="plus" onClick={() => openCreate(selected)}>
+                <span className="max-[650px]:hidden">Ajouter un événement</span>
+                <span className="min-[651px]:hidden">Nouvel événement</span>
+              </Button>
+              <Button
+                icon="plus"
+                onClick={() => navigate('/taches', { state: { dueDate: selected } })}
+              >
+                <span className="max-[650px]:hidden">Ajouter une tâche</span>
+                <span className="min-[651px]:hidden">Nouvelle tâche</span>
+              </Button>
+            </>
+          )}
+        </>
       }
     >
-      <MetricRow
-        items={[
-          { label: 'Ce mois', value: eventsThisMonth, caption: 'événements prévus' },
-          { label: 'Sélection', value: formatShortDate(selected), caption: 'jour affiché' },
-          { label: 'Anniversaires', value: birthdays.length, caption: 'dans le calendrier' },
-          { label: 'Jours fériés', value: holidays.length, caption: 'pour cette année' },
-        ]}
-      />
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="Vues du calendrier" className="flex flex-wrap gap-1.5">
-          {VIEWS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={view === option.value}
-              onClick={() => changeView(option.value)}
-              className={
-                view === option.value
-                  ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
-                  : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
-              }
-            >
-              {option.label}
-            </button>
-          ))}
+      <div className="flex flex-col">
+        {/* Sur mobile, ces quatre chiffres passent après le mois : la grille
+            doit être visible sans faire défiler quatre cartes. */}
+        <div className="max-[650px]:order-last">
+          <MetricRow
+            items={[
+              { label: 'Ce mois', value: eventsThisMonth, caption: 'événements prévus' },
+              { label: 'Sélection', value: formatShortDate(selected), caption: 'jour affiché' },
+              { label: 'Anniversaires', value: birthdays.length, caption: 'dans le calendrier' },
+              { label: 'Jours fériés', value: holidays.length, caption: 'pour cette année' },
+            ]}
+          />
         </div>
-      </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Select
-          aria-label="Filtrer par catégorie"
-          className="w-auto min-w-[170px]"
-          value={categoryFilter}
-          onChange={(event) => setCategoryFilter(event.target.value)}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div role="tablist" aria-label="Vues du calendrier" className="flex flex-wrap gap-1.5">
+            {VIEWS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={view === option.value}
+                onClick={() => changeView(option.value)}
+                className={
+                  view === option.value
+                    ? 'rounded-full bg-accent px-3.5 py-2 text-[12px] font-extrabold text-white'
+                    : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+                }
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          id="calendar-filters"
+          className="mb-3 flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] max-[650px]:-mx-3 max-[650px]:px-3 min-[651px]:mb-4 min-[651px]:flex-wrap min-[651px]:overflow-visible min-[651px]:pb-0 [&::-webkit-scrollbar]:hidden"
         >
-          <option value="toutes">Toutes catégories</option>
-          <option value="sans">Sans catégorie</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          aria-label="Filtrer par membre"
-          className="w-auto min-w-[170px]"
-          value={memberFilter}
-          onChange={(event) => setMemberFilter(event.target.value)}
-        >
-          <option value="tous">Tout le foyer</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.display_name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          aria-label="Filtrer par calendrier"
-          className="w-auto min-w-[170px]"
-          value={calendarFilter}
-          onChange={(event) => setCalendarFilter(event.target.value)}
-        >
-          <option value="tous">Tous calendriers</option>
-          {calendars.map((calendar) => (
-            <option key={calendar.id} value={calendar.id}>
-              {calendar.name}
-              {calendar.visibility === 'perso' ? ' (perso)' : ''}
-            </option>
-          ))}
-        </Select>
-        {ownPerso === null ? (
+          <Select
+            aria-label="Filtrer par catégorie"
+            className="w-auto min-w-[200px] shrink-0 min-[651px]:min-w-[170px]"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+          >
+            <option value="toutes">Toutes catégories</option>
+            <option value="sans">Sans catégorie</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {eventCategoryIcon(category.icon, category.name)} {category.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filtrer par membre"
+            className="w-auto min-w-[200px] shrink-0 min-[651px]:min-w-[170px]"
+            value={memberFilter}
+            onChange={(event) => setMemberFilter(event.target.value)}
+          >
+            <option value="tous">Tout le foyer</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.display_name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filtrer par calendrier"
+            className="w-auto min-w-[200px] shrink-0 min-[651px]:min-w-[170px]"
+            value={calendarFilter}
+            onChange={(event) => setCalendarFilter(event.target.value)}
+          >
+            <option value="tous">Tous calendriers</option>
+            {calendars.map((calendar) => (
+              <option key={calendar.id} value={calendar.id}>
+                {calendar.name}
+                {calendar.visibility === 'perso' ? ' (perso)' : ''}
+              </option>
+            ))}
+          </Select>
+          <button
+            type="button"
+            aria-pressed={showBirthdays}
+            onClick={() => setShowBirthdays((current) => !current)}
+            className={
+              showBirthdays
+                ? 'shrink-0 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-2 text-[12px] font-extrabold text-accent-strong'
+                : 'shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
+            }
+          >
+            Anniversaires
+          </button>
+          {ownPerso === null ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCalendarName('');
+                setCalendarDialogOpen(true);
+              }}
+              hidden={isChild}
+              className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
+            >
+              + Calendrier perso
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPendingCalendarDelete(ownPerso)}
+              hidden={isChild}
+              title={
+                ownPersoEventCount > 0
+                  ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} seront déplacés vers Commun`
+                  : 'Supprimer ce calendrier perso'
+              }
+              className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral"
+            >
+              Supprimer « {ownPerso.name} »
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
-              setCalendarName('');
-              setCalendarDialogOpen(true);
+              setCategoryName('');
+              setCategoryIcon('');
+              setCategoryColor(CATEGORY_COLORS[0]);
+              setCategoryDialogOpen(true);
             }}
             hidden={isChild}
-            className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
+            className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
           >
-            + Calendrier perso
+            + Catégorie
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPendingCalendarDelete(ownPerso)}
-            hidden={isChild}
-            title={
-              ownPersoEventCount > 0
-                ? `${ownPersoEventCount} événement${ownPersoEventCount > 1 ? 's' : ''} seront déplacés vers Commun`
-                : 'Supprimer ce calendrier perso'
-            }
-            className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-coral"
-          >
-            Supprimer « {ownPerso.name} »
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setCategoryName('');
-            setCategoryColor(CATEGORY_COLORS[0]);
-            setCategoryDialogOpen(true);
-          }}
-          hidden={isChild}
-          className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg"
-        >
-          + Catégorie
-        </button>
-        <button
-          type="button"
-          aria-pressed={showBirthdays}
-          onClick={() => setShowBirthdays((current) => !current)}
-          className={
-            showBirthdays
-              ? 'rounded-full bg-accent-faint px-3.5 py-2 text-[12px] font-extrabold text-accent-strong'
-              : 'rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg'
-          }
-        >
-          Anniversaires
-        </button>
-        {isAdmin ? (
-          <>
-            <Select
-              aria-label="Zone scolaire du foyer"
-              className="w-auto min-w-[150px]"
-              value={zone ?? ''}
-              disabled={isZoneLoading || isZoneSaving}
-              onChange={(event) => {
-                const next = event.target.value === '' ? null : (event.target.value as 'A' | 'B' | 'C');
-                void saveZone(next)
-                  .then(() => toast(next ? `Zone ${next} enregistrée.` : 'Zone effacée.'))
-                  .catch((saveError: unknown) =>
-                    toast(saveError instanceof Error ? saveError.message : 'La zone n’a pas pu être enregistrée.', 'error'),
-                  );
-              }}
-            >
-              <option value="">Zone : à choisir</option>
-              <option value="A">Zone A</option>
-              <option value="B">Zone B</option>
-              <option value="C">Zone C</option>
-            </Select>
-            <button
-              type="button"
-              disabled={isDetectingZone || city.trim() === ''}
-              title={city.trim() === '' ? 'Indiquez une ville dans votre profil.' : `Détecter depuis ${city}.`}
-              onClick={() => {
-                setIsDetectingZone(true);
-                void suggestZoneForCity(city)
-                  .then(({ zone: detected, postcode }) => saveZone(detected).then(() => ({ detected, postcode })))
-                  .then(({ detected, postcode }) => toast(`Zone ${detected} détectée (${postcode}).`))
-                  .catch((detectError: unknown) =>
-                    toast(detectError instanceof Error ? detectError.message : 'Zone non détectée.', 'error'),
-                  )
-                  .finally(() => setIsDetectingZone(false));
-              }}
-              className="rounded-full border border-border bg-surface px-3.5 py-2 text-[12px] font-bold text-muted hover:text-fg disabled:opacity-50"
-            >
-              {isDetectingZone ? 'Détection…' : 'Détecter la zone'}
-            </button>
-          </>
-        ) : null}
-      </div>
+        </div>
 
-      {zone === null ? (
-        <p className="mb-4 text-[12px] text-muted" role="status">
-          Choisissez la zone scolaire du foyer (A, B ou C) pour afficher les vacances.
-          {isAdmin ? '' : ' Un administrateur du foyer peut la régler ici.'}
-        </p>
+      {/* La zone scolaire commande les vacances affichées : elle reste près de
+          son explication, hors de la rangée des filtres. */}
+      {isAdmin || zone === null ? (
+        <div
+          role={zone === null ? 'status' : undefined}
+          className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px] text-muted"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="calendar" size="sm" />
+            {zone === null ? 'Zone scolaire à choisir pour afficher les vacances.' : 'Zone scolaire du foyer'}
+          </span>
+          {isAdmin ? (
+            <>
+              <Select
+                aria-label="Zone scolaire du foyer"
+                className="w-auto min-h-9 min-w-[140px] py-1 text-[12px] font-semibold"
+                value={zone ?? ''}
+                disabled={isZoneLoading || isZoneSaving}
+                onChange={(event) => {
+                  const next = event.target.value === '' ? null : (event.target.value as 'A' | 'B' | 'C');
+                  void saveZone(next)
+                    .then(() => toast(next ? `Zone ${next} enregistrée.` : 'Zone effacée.'))
+                    .catch((saveError: unknown) =>
+                      toast(saveError instanceof Error ? saveError.message : 'La zone n’a pas pu être enregistrée.', 'error'),
+                    );
+                }}
+              >
+                <option value="">À choisir</option>
+                <option value="A">Zone A</option>
+                <option value="B">Zone B</option>
+                <option value="C">Zone C</option>
+              </Select>
+              <button
+                type="button"
+                disabled={isDetectingZone || city.trim() === ''}
+                aria-label="Détecter la zone scolaire depuis la ville du profil"
+                title={
+                  city.trim() === ''
+                    ? 'Indiquez une ville dans votre profil.'
+                    : `Détecter depuis ${city}.`
+                }
+                onClick={() => {
+                  setIsDetectingZone(true);
+                  void suggestZoneForCity(city)
+                    .then(({ zone: detected, postcode }) => saveZone(detected).then(() => ({ detected, postcode })))
+                    .then(({ detected, postcode }) => toast(`Zone ${detected} détectée (${postcode}).`))
+                    .catch((detectError: unknown) =>
+                      toast(detectError instanceof Error ? detectError.message : 'Zone non détectée.', 'error'),
+                    )
+                    .finally(() => setIsDetectingZone(false));
+                }}
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-surface text-muted hover:border-accent hover:bg-accent-faint hover:text-fg disabled:opacity-50"
+              >
+                <Icon name="pin" size="sm" />
+              </button>
+            </>
+          ) : zone === null ? (
+            <span>Un administrateur du foyer peut la régler ici.</span>
+          ) : null}
+        </div>
       ) : null}
+
       {isRefError ? (
         <p className="mb-4 text-[12px] text-muted" role="status">
           Référentiel jours fériés / vacances indisponible : seuls les événements du foyer sont affichés.
@@ -483,6 +580,7 @@ export default function CalendrierPage() {
               {weekDays.map((iso) => {
                 const count = buildAgenda(iso, { events: visibleEvents, tasks, birthdays: visibleBirthdays, holidays: visibleHolidays, vacations: visibleVacations, today: todayIso() }).length;
                 const isSelected = iso === selected;
+                const isToday = iso === todayIso();
                 return (
                   <button
                     key={iso}
@@ -492,15 +590,28 @@ export default function CalendrierPage() {
                     aria-label={`${titleCase(formatLongDate(iso))}, ${count} élément${count > 1 ? 's' : ''}`}
                     className={
                       isSelected
-                        ? 'grid place-items-center gap-0.5 rounded-[11px] bg-accent px-1 py-2 text-white'
-                        : 'grid place-items-center gap-0.5 rounded-[11px] border border-border bg-surface px-1 py-2 hover:border-accent'
+                        ? 'grid place-items-center gap-1 rounded-[18px] border border-accent/25 bg-accent-faint px-1 py-2.5'
+                        : 'grid place-items-center gap-1 rounded-[18px] border border-border/70 bg-surface px-1 py-2.5 transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint'
                     }
                   >
-                    <span className="text-[10px] font-bold uppercase opacity-80">
+                    <span className="text-[9.5px] font-extrabold tracking-[0.08em] text-muted uppercase">
                       {titleCase(formatLongDate(iso)).slice(0, 3)}
                     </span>
-                    <span className="text-[15px] font-extrabold">{Number(iso.slice(8, 10))}</span>
-                    <span className={count > 0 ? 'size-[5px] rounded-full bg-current' : 'size-[5px] rounded-full bg-transparent'} aria-hidden="true" />
+                    <span
+                      className={
+                        isToday
+                          ? 'grid size-8 place-items-center rounded-full bg-coral font-display text-[15px] font-semibold text-white tabular-nums'
+                          : isSelected
+                            ? 'grid size-8 place-items-center rounded-full bg-accent font-display text-[15px] font-semibold text-surface tabular-nums'
+                            : 'grid size-8 place-items-center rounded-full font-display text-[15px] font-semibold tabular-nums'
+                      }
+                    >
+                      {Number(iso.slice(8, 10))}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={count > 0 ? 'size-[5px] rounded-full bg-coral' : 'size-[5px] rounded-full bg-transparent'}
+                    />
                   </button>
                 );
               })}
@@ -552,6 +663,7 @@ export default function CalendrierPage() {
       )}
 
       {isLoading && !isError ? <LoadingRows rows={2} className="mt-4" /> : null}
+      </div>
 
       <EventFormDialog
         open={dialog.open}
@@ -651,7 +763,7 @@ export default function CalendrierPage() {
                 return;
               }
               setIsCreatingCategory(true);
-              void createCategory(householdId, currentMember?.id ?? null, categoryName, categoryColor)
+              void createCategory(householdId, currentMember?.id ?? null, categoryName, categoryColor, categoryIcon)
                 .then((category) => {
                   setCategoryDialogOpen(false);
                   setCategoryFilter(category.id);
@@ -674,6 +786,42 @@ export default function CalendrierPage() {
                   autoComplete="off"
                   maxLength={40}
                 />
+              )}
+            </Field>
+            <Field
+              label="Emoji"
+              optional
+              hint="Facultatif : sans choix, l’emoji se déduit du nom de la catégorie."
+            >
+              {(props) => (
+                <div className="grid gap-2">
+                  <Input
+                    {...props}
+                    value={categoryIcon}
+                    onChange={(change) => setCategoryIcon(change.target.value)}
+                    placeholder="🍽️"
+                    autoComplete="off"
+                    maxLength={32}
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['🍽️', '🩺', '🎒', '⚽', '🎉', '✈️', '🎵', '💼'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        aria-pressed={categoryIcon === emoji}
+                        aria-label={`Choisir l’emoji ${emoji}`}
+                        onClick={() => setCategoryIcon(emoji)}
+                        className={
+                          categoryIcon === emoji
+                            ? 'grid size-9 place-items-center rounded-full border-2 border-accent bg-accent-soft text-[16px]'
+                            : 'grid size-9 place-items-center rounded-full border border-border bg-surface text-[16px] hover:border-accent'
+                        }
+                      >
+                        <span aria-hidden="true">{emoji}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </Field>
             <div>
@@ -765,6 +913,30 @@ export default function CalendrierPage() {
             );
         }}
       />
+
+      {printing ? (
+        <div className="calendar-print" aria-hidden="true">
+          <h2>{printModel.title}</h2>
+          <p>{printModel.meta}</p>
+          {printModel.days.length === 0 ? (
+            <p>Aucun élément sur cette période.</p>
+          ) : (
+            printModel.days.map((day) => (
+              <section key={day.iso}>
+                <h3>{day.label}</h3>
+                <ul>
+                  {day.items.map((item) => (
+                    <li key={item.key}>
+                      <span className="heure">{item.time}</span> {item.icon} {item.title}
+                      {item.subtitle ? <span className="precision">{item.subtitle}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      ) : null}
     </ModuleShell>
   );
 }

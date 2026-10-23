@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
-import { isChildHiddenModule, moduleMap, modulePath, type ModuleKey } from '@/lib/modules';
+import { isChildHiddenModule, isModuleDisabled, moduleMap, modulePath, type ModuleKey } from '@/lib/modules';
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { signOut } from '@/hooks/use-auth';
 import { useToast } from '@/components/ui/toast';
 import { Icon, type IconName } from './icon';
 import { memberTagClass } from './member-avatar';
 import { Input } from '@/components/ui/input';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 
 type DrawerKey = ModuleKey | 'accueil';
 
@@ -32,28 +32,36 @@ function entryFor(key: DrawerKey): DrawerEntry {
  * (chaque espace du catalogue + la maison) reste branché dessus.
  */
 export const MOBILE_DRAWER_GROUPS: Array<{ title: string; keys: DrawerKey[] }> = [
-  { title: 'Au quotidien', keys: ['accueil', 'taches', 'calendrier', 'courses', 'routines', 'notes'] },
-  { title: 'Le foyer', keys: ['ardoise', 'cadeaux', 'anniversaires', 'contacts', 'cercle', 'messages'] },
+  { title: 'Au quotidien', keys: ['accueil', 'taches', 'calendrier', 'courses', 'routines', 'notes', 'frigo', 'menu'] },
+  { title: 'Le foyer', keys: ['ardoise', 'cadeaux', 'anniversaires', 'contacts', 'cercle', 'messages', 'documents'] },
   { title: 'Pratique', keys: ['prestataires', 'fidelite', 'adresses', 'voyages', 'animaux', 'recettes'] },
 ];
 
-const ALL_ENTRIES: DrawerEntry[] = MOBILE_DRAWER_GROUPS.flatMap((group) => group.keys.map(entryFor));
-
 /**
- * Entrées visibles pour le rôle courant (phase 14, D-05) : le rôle `enfant`
- * ne voit ni les 5 modules hors périmètre, ni un intitulé de groupe vidé de
- * son contenu. Le tiroir rend aujourd'hui une liste plate (aucun intitulé
- * affiché), mais le filtrage se fait au niveau des groupes pour qu'un
- * regroupement futur n'y réexpose jamais un espace masqué.
+ * Entrées visibles pour le rôle courant (phase 14, D-05) et pour le foyer
+ * (menu des applications, 0140) : le rôle `enfant` ne voit ni les 5 modules
+ * hors périmètre, ni un intitulé de groupe vidé de son contenu ; le foyer
+ * éteint ses propres espaces, pour tous ses membres. Le tiroir rend
+ * aujourd'hui une liste plate (aucun intitulé affiché), mais le filtrage se
+ * fait au niveau des groupes pour qu'un regroupement futur n'y réexpose
+ * jamais un espace masqué.
  */
-function useVisibleDrawerEntries(): DrawerEntry[] {
+export function useVisibleDrawerEntries(): DrawerEntry[] {
   const isChild = useCurrentMember()?.role === 'enfant';
-  return useMemo(() => {
-    if (!isChild) return ALL_ENTRIES;
-    return MOBILE_DRAWER_GROUPS.flatMap((group) =>
-      group.keys.filter((key) => key === 'accueil' || !isChildHiddenModule(key)).map(entryFor),
-    );
-  }, [isChild]);
+  const disabledModules = useDisabledModules();
+  return useMemo(
+    () =>
+      MOBILE_DRAWER_GROUPS.flatMap((group) =>
+        group.keys
+          .filter((key) => {
+            if (key === 'accueil') return true;
+            if (isChild && isChildHiddenModule(key)) return false;
+            return !isModuleDisabled(key, disabledModules);
+          })
+          .map(entryFor),
+      ),
+    [isChild, disabledModules],
+  );
 }
 
 /** `id` stable du tiroir, visé par `aria-controls` du hamburger. */

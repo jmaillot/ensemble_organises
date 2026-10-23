@@ -23,19 +23,19 @@ begin
   for r in
     select * from (values
           ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at', 'age_attested_at']::text[]),
-          ('households', ARRAY['id', 'name', 'avatar_color', 'school_zone', 'created_by', 'created_at', 'updated_at']::text[]),
+          ('households', ARRAY['id', 'name', 'avatar_color', 'school_zone', 'created_by', 'created_at', 'updated_at', 'disabled_modules']::text[]),
           ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('invitations', ARRAY['id', 'household_id', 'email', 'phone', 'role', 'status', 'created_at']::text[]),
           ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at', 'trip_id']::text[]),
-          ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'product_id', 'created_at']::text[]),
+          ('shopping_list_items', ARRAY['id', 'list_id', 'household_id', 'name', 'quantity', 'unit', 'category', 'checked', 'added_by', 'product_id', 'position', 'created_at']::text[]),
           ('events', ARRAY['id', 'household_id', 'title', 'description', 'start_at', 'end_at', 'all_day', 'location', 'color', 'category_id', 'calendar_id', 'created_by', 'created_at']::text[]),
           ('event_categories', ARRAY['id', 'household_id', 'name', 'color', 'icon', 'is_default', 'created_by', 'created_at']::text[]),
           ('event_calendars', ARRAY['id', 'household_id', 'name', 'visibility', 'owner_member_id', 'color', 'created_at', 'updated_at']::text[]),
           ('public_holidays', ARRAY['holiday_date', 'name', 'year']::text[]),
           ('school_holidays', ARRAY['id', 'zone', 'school_year', 'name', 'start_date', 'end_date']::text[]),
           ('event_reminders', ARRAY['id', 'event_id', 'remind_at']::text[]),
-          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at', 'trip_id']::text[]),
+          ('notes', ARRAY['id', 'household_id', 'title', 'content', 'category', 'color', 'folder_id', 'created_by', 'created_at', 'updated_at', 'trip_id', 'cover_attachment_id', 'is_locked']::text[]),
           ('note_attachments', ARRAY['id', 'note_id', 'household_id', 'file_url', 'file_name', 'mime_type', 'size_bytes', 'created_at']::text[]),
           ('tasks', ARRAY['id', 'household_id', 'name', 'description', 'due_date', 'priority_order', 'status', 'folder_id', 'created_by', 'created_at', 'trip_id']::text[]),
           ('task_assignees', ARRAY['task_id', 'member_id']::text[]),
@@ -91,7 +91,9 @@ begin
           ('products', ARRAY['id', 'household_id', 'ean', 'name', 'brand', 'category', 'photo_url', 'off_data', 'created_by', 'created_at', 'updated_at']::text[]),
           ('gift_ideas', ARRAY['id', 'household_id', 'name', 'price', 'url', 'comment', 'photo_url', 'status', 'giftee_text', 'giftee_contact_id', 'created_by', 'created_at', 'updated_at']::text[]),
           ('contact_lists', ARRAY['id', 'household_id', 'name', 'owner_member_id', 'is_default', 'created_at']::text[]),
-          ('contacts', ARRAY['id', 'list_id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[])
+          ('contacts', ARRAY['id', 'list_id', 'household_id', 'name', 'birth_date', 'photo_url', 'linked_member_id']::text[]),
+          ('pantry_items', ARRAY['id', 'household_id', 'name', 'category', 'quantity', 'unit', 'location', 'expires_on', 'opened_on', 'notes', 'created_by', 'created_at']::text[]),
+          ('meal_entries', ARRAY['id', 'household_id', 'entry_date', 'slot', 'recipe_id', 'free_text', 'servings', 'member_ids', 'created_by', 'created_at']::text[])
     ) as expected(table_name, columns)
   loop
     perform testkit.ok(

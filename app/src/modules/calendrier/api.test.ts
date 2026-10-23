@@ -24,7 +24,7 @@ vi.mock('@/lib/data', async (importOriginal) => {
   return { ...actual, data: { create: mockCreate, list: mockList, remove: mockRemove, update: mockUpdate } };
 });
 
-const { replaceEventReminder, saveEvent } = await import('./api');
+const { createCategory, replaceEventReminder, saveEvent } = await import('./api');
 
 /**
  * Fuseau épinglé à celui du foyer : sans cela, l'instant attendu serait celui de
@@ -113,5 +113,46 @@ describe('saveEvent — le rappel s’écrit en instant, la date reste murale (W
   it('`replaceEventReminder` reçoit un instant, jamais une chaîne naïve castée par le serveur', async () => {
     await replaceEventReminder('event-1', '2026-10-15T16:30:00.000Z');
     expect(written('event_reminders')).toEqual([{ event_id: 'event-1', remind_at: '2026-10-15T16:30:00.000Z' }]);
+  });
+});
+
+/**
+ * 0138 — l'emoji d'une catégorie est facultatif, mais ce qui part en base est
+ * borné comme la contrainte le fera : un champ laissé vide ne doit pas écrire
+ * une chaîne vide, qui passerait pour une icône posée et donnerait un chip
+ * sans signe. La borne haute est refusée ici, avant l'aller-retour.
+ */
+describe('createCategory — emoji borné (0138)', () => {
+  it('écrit l’emoji fourni, espaces de bord retirés', async () => {
+    await createCategory('household-1', 'member-1', 'École', '#3E7CB1', ' 🎒 ');
+
+    expect(written('event_categories')).toEqual([
+      {
+        household_id: 'household-1',
+        name: 'École',
+        color: '#3E7CB1',
+        icon: '🎒',
+        created_by: 'member-1',
+      },
+    ]);
+  });
+
+  it('n’écrit aucune icône quand le champ est vide ou blanc', async () => {
+    await createCategory('household-1', 'member-1', 'Divers', '#4CAF50', '   ');
+
+    expect(written('event_categories')[0]?.icon).toBeNull();
+  });
+
+  it('refuse plus de 32 signes avant l’aller-retour', async () => {
+    await expect(
+      createCategory('household-1', 'member-1', 'Trop long', '#4CAF50', '🎒'.repeat(33)),
+    ).rejects.toThrow('Emoji de catégorie invalide (32 signes au maximum).');
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('compte les signes, pas les unités UTF-16 : 17 emoji tiennent dans la borne', async () => {
+    await createCategory('household-1', 'member-1', 'Drapeaux', '#4CAF50', '🎒'.repeat(17));
+
+    expect(written('event_categories')[0]?.icon).toBe('🎒'.repeat(17));
   });
 });

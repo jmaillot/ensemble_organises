@@ -8,6 +8,8 @@ import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
+import { isSupabaseConfigured } from '@/lib/supabase/client';
+import { applyPlaceHit, searchPlacesOnline, type PlaceSearchHit } from '../api';
 import { placeTypeIcon, placeTypes, type Place, type PlaceInput, type PlaceType } from '../types';
 
 const schema = z.object({
@@ -79,6 +81,14 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
+  // Recherche d'adresse en ligne : la requête part après un temps de pause
+  // (400 ms) — taper une adresse n'est pas la demander. Le compteur d'ordre
+  // ignore toute réponse qui arrive après une requête plus récente.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchHits, setSearchHits] = useState<PlaceSearchHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const searchSeqRef = useRef(0);
   // L'aperçu affiche la valeur RÉSOLUE (URL signée) ; la valeur transportée
   // par le champ, elle, est la valeur STOCKÉE (D-06, WR-05) — voir
   // `defaultsFor.photoUrl` plus bas. Le `key` de la page ne change pas quand la
@@ -115,10 +125,56 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
     reset(defaultsFor(place));
     setPhotoPreview(place?.photoUrl ?? null);
     setPickedFile(null);
+    setSearchQuery('');
+    setSearchHits(null);
+    setSearchError(null);
+    setSearching(false);
     // Le champ fichier garde la sélection d'une ouverture précédente : un
     // fichier abandonné serait resoumis si on ne le vidait pas.
     if (fileRef.current) fileRef.current.value = '';
   }, [open, place?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const terms = searchQuery.trim();
+    if (terms.length < 3) {
+      setSearchHits(null);
+      setSearchError(null);
+      setSearching(false);
+      return;
+    }
+    const rank = ++searchSeqRef.current;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      void searchPlacesOnline(terms)
+        .then((hits) => {
+          if (searchSeqRef.current !== rank) return;
+          setSearchHits(hits);
+          setSearchError(null);
+        })
+        .catch((error: unknown) => {
+          if (searchSeqRef.current !== rank) return;
+          setSearchHits(null);
+          setSearchError(error instanceof Error ? error.message : 'La recherche a échoué.');
+        })
+        .finally(() => {
+          if (searchSeqRef.current === rank) setSearching(false);
+        });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [open, searchQuery]);
+
+  /** Applique un résultat : adresse remplie, nom seulement s'il est vide. */
+  const pickHit = (hit: PlaceSearchHit) => {
+    const applied = applyPlaceHit(hit, { name: getValues('name') ?? '' });
+    if (applied.name !== undefined) setValue('name', applied.name, { shouldValidate: true });
+    setValue('street', applied.street);
+    setValue('postalCode', applied.postalCode);
+    setValue('city', applied.city);
+    setSearchQuery('');
+    setSearchHits(null);
+    setSearchError(null);
+  };
 
   const submit = handleSubmit(async (values) => {
     await onSubmit({
@@ -210,6 +266,66 @@ export function PlaceFormDialog({ open, onOpenChange, place, isSaving, onSubmit 
               />
             </div>
           </div>
+
+          {isSupabaseConfigured ? (
+            <div className="rounded-[13px] border border-accent/20 bg-accent-faint px-3 py-3">
+              <Field
+                label="Chercher l’adresse en ligne"
+                optional
+                hint="OpenStreetMap propose des adresses : choisissez-en une, les champs se remplissent."
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Ex. 12 rue des Tilleuls, Lyon"
+                    autoComplete="off"
+                  />
+                )}
+              </Field>
+              {searching ? (
+                <p className="m-0 mt-2 text-xs text-muted" role="status">
+                  Recherche en cours…
+                </p>
+              ) : null}
+              {searchError ? (
+                <p className="m-0 mt-2 text-xs text-fg" role="alert">
+                  {searchError}
+                </p>
+              ) : null}
+              {searchHits !== null && searchHits.length === 0 && !searching && searchQuery.trim().length >= 3 ? (
+                <p className="m-0 mt-2 text-xs text-muted" role="status">
+                  Aucun résultat pour « {searchQuery.trim()} ». Vérifiez l’orthographe, ou remplissez les champs à la main
+                  ci-dessous.
+                </p>
+              ) : null}
+              {searchHits !== null && searchHits.length > 0 ? (
+                <ul className="mt-2 grid gap-1.5" role="list" aria-label="Adresses proposées">
+                  {searchHits.map((hit, index) => (
+                    <li key={`${hit.label}-${index}`} role="listitem">
+                      <button
+                        type="button"
+                        onClick={() => pickHit(hit)}
+                        aria-label={`Remplir l’adresse avec ${hit.label}`}
+                        className="flex w-full min-h-11 items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3 py-2 text-left transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint"
+                      >
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong">
+                          <Icon name="pin" size="sm" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <strong className="block truncate text-[13px] font-[700]">{hit.name}</strong>
+                          <small className="block truncate text-[11px] text-muted">
+                            {[hit.street, hit.postalCode, hit.city].filter(Boolean).join(', ') || hit.label}
+                          </small>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
 
           <Field label="Nom du lieu" error={errors.name?.message}>
             {(props) => (

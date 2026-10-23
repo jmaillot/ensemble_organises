@@ -2,7 +2,7 @@ import { data } from '@/lib/data';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
 import { depositHouseholdFile, storedValueOf } from '@/lib/storage';
 import { randomId } from '@/lib/utils';
-import { resolveCategory, visibilityToColor, type NoteFormValues } from './types';
+import { resolveCategory, visibilityToColor, type NoteCoverChoice, type NoteFormValues } from './types';
 
 export const NOTES_TABLE = 'notes';
 export const NOTE_FOLDERS_TABLE = 'note_folders';
@@ -26,6 +26,25 @@ export function toNotePayload(values: NoteFormValues): NotePayload {
     color: visibilityToColor(values.visibility),
     folder_id: values.folderId === '' ? null : values.folderId,
   };
+}
+
+/**
+ * Valeur de `notes.cover_attachment_id` correspondant au choix du dialogue.
+ *
+ * `auto` rend `null` : la couverture est alors la première image jointe, sans
+ * ligne à écrire. Un identifiant de pièce jointe retirée dans le même envoi est
+ * ignoré — la couverture ne désigne jamais une ligne absente, et la base
+ * refuserait de toute façon la référence.
+ */
+export function coverToPayload(
+  choice: NoteCoverChoice,
+  context: { keptAttachmentIds: string[]; createdAttachmentIds: string[] },
+): string | null {
+  if (choice.kind === 'auto') return null;
+  if (choice.kind === 'attachment') {
+    return context.keptAttachmentIds.includes(choice.id) ? choice.id : null;
+  }
+  return context.createdAttachmentIds[choice.fileIndex] ?? null;
 }
 
 /** Dossiers de notes : création (propriétaire = soi), renommage. */

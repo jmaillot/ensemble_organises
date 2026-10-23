@@ -28,6 +28,7 @@ import {
   type PetRecord,
   type PetRecordDraft,
 } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -50,9 +51,9 @@ function RecordList({ records, kind }: { records: PetRecord[]; kind: PetRecord['
         return (
           <div
             key={record.id}
-            className="flex items-start justify-between gap-2.5 border-t border-border py-3 text-xs first:border-t-0"
+            className="flex items-start justify-between gap-2.5 rounded-[14px] px-2 py-3 text-xs transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
           >
-            <span className="min-w-0 text-muted">{record.name}</span>
+            <span className="min-w-0 font-semibold text-fg">{record.name}</span>
             <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
               <strong className="text-xs">
                 {record.nextDueDate
@@ -84,6 +85,8 @@ export default function AnimauxPage() {
   const { pets, isLoading, isError, error, refetch, isMutating, savePet, deletePet } = usePets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [petForm, setPetForm] = useState<{ open: boolean; pet: Pet | null }>({ open: false, pet: null });
+  // Lien profond : `/animaux?ouvrir=<id>` ouvre la fiche de l’animal.
+  useOpenRecord(pets, (pet) => setPetForm({ open: true, pet }));
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<PetRecord | null>(null);
   const [pendingPetDeletion, setPendingPetDeletion] = useState<Pet | null>(null);
@@ -197,6 +200,7 @@ export default function AnimauxPage() {
   return (
     <ModuleShell
       module="animaux"
+      infoTo="/animaux/aide"
       actions={
         <Button icon="plus" onClick={() => setPetForm({ open: true, pet: null })}>
           Ajouter une fiche

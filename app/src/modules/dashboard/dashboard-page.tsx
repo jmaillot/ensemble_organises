@@ -22,9 +22,9 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { CountBadge, SectionHeading } from '@/components/shared/module-shell';
 import { ModuleTile } from '@/components/shared/module-tile';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { useSessionUser } from '@/hooks/use-auth';
-import { isChildHiddenModule, modules } from '@/lib/modules';
+import { filterModuleEntries, modules } from '@/lib/modules';
 import type { TaskRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { useDashboard } from './hooks/use-dashboard';
@@ -57,7 +57,13 @@ export default function DashboardPage() {
   // (totaux Ardoise, activité) avec elles — présentation seulement, le
   // serveur renvoie de toute façon 0 ligne à un enfant.
   const isChild = useCurrentMember()?.role === 'enfant';
-  const visibleTiles = isChild ? modules.filter((entry) => entry.tile && !isChildHiddenModule(entry.key)) : modules.filter((entry) => entry.tile);
+  // Menu des applications (0140) : les espaces éteints par le foyer sortent
+  // de la grille des tuiles — même signal que le masquage enfant (D-05).
+  const disabledModules = useDisabledModules();
+  const visibleTiles = filterModuleEntries(
+    modules.filter((entry) => entry.tile),
+    { isChild, disabledModules },
+  );
 
   // Souris : déplacement immédiat. Tactile : appui long (le défilement
   // garde la priorité sur un toucher bref) ; `touch-action: none` sur les
@@ -107,7 +113,7 @@ export default function DashboardPage() {
       <header className="mb-6 flex items-end justify-between gap-6 max-[650px]:block">
         <div>
           <p className="eyebrow mb-2">{formatDashboardEyebrow(new Date(), householdName)}</p>
-          <h1 className="mb-2 text-[clamp(30px,3.2vw,47px)] leading-[1.02]">
+          <h1 className="mb-2 text-[clamp(34px,4.2vw,54px)] leading-[1.02]">
             Bonjour {firstName(displayName)}
             <span className="text-coral">.</span>
           </h1>
@@ -116,6 +122,16 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2.5 max-[650px]:mt-4 max-[650px]:justify-start">
+          {/* L'accueil n'a pas de ModuleShell : son bouton de mode d'emploi
+              est posé ici, avec le même libellé et la même icône que
+              partout ailleurs. */}
+          <Button
+            variant="secondary"
+            size="icon"
+            icon="info"
+            aria-label="Comment ça marche"
+            onClick={() => navigate('/accueil/aide')}
+          />
           <Button
             variant="secondary"
             icon="grid"
@@ -188,7 +204,7 @@ export default function DashboardPage() {
           />
 
           {dashboard.placements.length === 0 ? (
-            <p className="panel-surface mb-[34px] rounded-[16px] p-[19px] text-xs text-muted">
+            <p className="panel-surface mb-[34px] rounded-[20px] p-[19px] text-xs text-muted">
               Tous les widgets sont masqués. Utilisez « Personnaliser l’accueil » pour en réactiver.
             </p>
           ) : (
@@ -232,7 +248,7 @@ export default function DashboardPage() {
             />
             <ul
               aria-label="Espaces du foyer"
-              className="m-0 grid list-none grid-cols-4 gap-3 p-0 max-[1180px]:grid-cols-3 max-[650px]:grid-cols-1"
+              className="m-0 grid list-none grid-cols-4 gap-3 p-0 max-[1180px]:grid-cols-3 max-[650px]:grid-cols-3 max-[650px]:gap-2.5"
             >
               {visibleTiles
                 .map((entry) => (
@@ -348,11 +364,11 @@ function TodayGroup({ title, listLabel, items }: { title: string; listLabel: str
   return (
     <div className="min-w-0">
       <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{title}</h3>
-      <ul className="m-0 grid list-none gap-1.5 p-0" aria-label={listLabel}>
+      <ul className="m-0 grid min-w-0 list-none grid-cols-[minmax(0,1fr)] gap-1.5 p-0" aria-label={listLabel}>
         {visible.map((item) => (
-          <li key={item.id} className="flex items-baseline gap-2 text-[13px] text-ink-soft">
+          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-ink-soft">
             <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
-            <span className="min-w-0 truncate">
+            <span className="line-clamp-2 min-w-0 min-[651px]:line-clamp-1">
               <strong className="font-semibold text-fg">{item.title}</strong>
               {item.detail ? <span> · {item.detail}</span> : null}
             </span>
@@ -374,7 +390,7 @@ function BirthdayPreview({
   onOpen: () => void;
 }) {
   return (
-    <section className="side-card panel-surface rounded-[16px] p-[17px]">
+    <section className="side-card panel-surface rounded-[22px] p-[18px]">
       <div className="mb-3 flex items-start justify-between gap-2.5">
         <div>
           <h3 className="mb-1 font-display text-base tracking-[-0.035em]">Anniversaires</h3>

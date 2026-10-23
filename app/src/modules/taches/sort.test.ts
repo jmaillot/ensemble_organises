@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, todayIso } from '@/lib/utils';
-import { sortTasks, type Task } from './types';
+import { sortTasks, sortedIdsFor, type Task } from './types';
 
 /**
  * `isLate` et `lateDays` sont décoratifs ici : le tri **relit** la règle de
@@ -110,5 +110,55 @@ describe('sortTasks — l’ordre manuel gouverne, le retard est épinglé (D-11
     const sorted = sortTasks(tasks);
     expect(ids(tasks)).toEqual(['a', 'b']);
     expect(sorted).not.toBe(tasks);
+  });
+});
+
+
+/** Un membre assigné : la liste porte son nom, c'est lui qui départage. */
+const membre = (id: string, nom: string) =>
+  ({
+    id,
+    household_id: 'hh-1',
+    user_id: null,
+    display_name: nom,
+    avatar_url: null,
+    color_tag: 'ink',
+    role: 'membre',
+    created_at: '2026-10-02T10:00:00.000Z',
+  }) as unknown as Task['assignees'][number]['member'];
+
+describe('sortedIdsFor — le tri en un clic', () => {
+  it('range par échéance, les tâches sans échéance en dernier', () => {
+    const tasks = [
+      task({ id: 'c', dueDate: '2026-10-20' }),
+      task({ id: 'a', dueDate: '2026-10-12' }),
+      task({ id: 'sans', dueDate: null }),
+      task({ id: 'b', dueDate: '2026-10-18' }),
+    ];
+    expect(sortedIdsFor(tasks, 'echeance')).toEqual(['a', 'b', 'c', 'sans']);
+  });
+
+  it('range par responsable, les tâches sans assigné en dernier', () => {
+    const tasks = [
+      task({ id: 'z', assignees: [{ memberId: 'm2', member: membre('m2', 'Zoé') }] }),
+      task({ id: 'a', assignees: [{ memberId: 'm1', member: membre('m1', 'Alix') }] }),
+      task({ id: 'sans', assignees: [] }),
+    ];
+    expect(sortedIdsFor(tasks, 'responsable')).toEqual(['a', 'z', 'sans']);
+  });
+
+  it('départage à l’identifiant : deux tâches à la même échéance ne s’échangent pas', () => {
+    const tasks = [
+      task({ id: 'b', dueDate: '2026-10-12' }),
+      task({ id: 'a', dueDate: '2026-10-12' }),
+    ];
+    expect(sortedIdsFor(tasks, 'echeance')).toEqual(['a', 'b']);
+  });
+
+  it('ne touche pas aux tâches : le tri ne renvoie qu’un ordre', () => {
+    const tasks = [task({ id: 'b', dueDate: '2026-10-20' }), task({ id: 'a', dueDate: '2026-10-12' })];
+    const avant = tasks.map((entry) => entry.id);
+    sortedIdsFor(tasks, 'echeance');
+    expect(tasks.map((entry) => entry.id)).toEqual(avant);
   });
 });

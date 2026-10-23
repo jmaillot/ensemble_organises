@@ -274,6 +274,26 @@ describe('CalendrierPage', () => {
     expect(rows.find((row) => row.id === secretId)?.calendar_id).toBe(communId);
   });
 
+  it('crée une catégorie avec l’emoji choisi et l’affiche dans le filtre', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+
+    await user.click(await screen.findByRole('button', { name: '+ Catégorie' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Nom de la catégorie/), 'Devoirs');
+    await user.click(within(dialog).getByRole('button', { name: 'Choisir l’emoji 🎒' }));
+    expect(within(dialog).getByRole('button', { name: 'Choisir l’emoji 🎒' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(dialog).getByRole('button', { name: 'Créer la catégorie' }));
+
+    expect(await screen.findByText('Catégorie « Devoirs » créée.')).toBeInTheDocument();
+    const rows = await data.list<{ name: string; icon: string | null }>('event_categories', {
+      household_id: DEMO_HOUSEHOLD_ID,
+    });
+    expect(rows.find((row) => row.name === 'Devoirs')?.icon).toBe('🎒');
+    // L'option du filtre porte le signe, comme le sélecteur du formulaire.
+    expect(await screen.findByRole('option', { name: '🎒 Devoirs' })).toBeInTheDocument();
+  });
+
   it('masque les boutons de création à un enfant, qui tague sans créer (D-06)', async () => {
     renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
 
@@ -482,5 +502,35 @@ describe('CalendrierPage', () => {
         (row) => row.id === persoId,
       ),
     ).toBe(false);
+  });
+
+  it('imprime la période de la vue affichée, puis retire la feuille', async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    try {
+      renderWithProviders(<CalendrierPage />, { route: '/calendrier' });
+      const todayTask = await screen.findByText('Valider les rendez-vous du carnet');
+      expect(todayTask).toBeInTheDocument();
+
+      // Vue Jour : la feuille ne porte que la date sélectionnée, pas le mois.
+      await user.click(screen.getByRole('tab', { name: 'Jour' }));
+      await user.click(screen.getByRole('button', { name: 'Imprimer' }));
+
+      expect(print).toHaveBeenCalledTimes(1);
+      const sheet = document.querySelector('.calendar-print');
+      expect(sheet).not.toBeNull();
+      const label = formatLongDate(today);
+      expect(sheet?.querySelector('h2')?.textContent).toBe(`${label[0].toUpperCase()}${label.slice(1)}`);
+      expect(sheet?.querySelector('h3')?.textContent).toBe(`${label[0].toUpperCase()}${label.slice(1)}`);
+      // La tâche due aujourd’hui part sur la feuille avec son jour.
+      expect(sheet?.textContent).toContain('Valider les rendez-vous du carnet');
+
+      act(() => {
+        window.dispatchEvent(new Event('afterprint'));
+      });
+      expect(document.querySelector('.calendar-print')).toBeNull();
+    } finally {
+      print.mockRestore();
+    }
   });
 });

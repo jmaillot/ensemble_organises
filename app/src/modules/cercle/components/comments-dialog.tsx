@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { Icon } from '@/components/shared/icon';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMomentLabel } from '../types';
 import { COMMENT_CONTENT_MAX } from '../types';
@@ -109,7 +110,7 @@ export function CommentsDialog({
         </DialogHeader>
 
         {post.comments.length > 0 ? (
-          <ul className="mb-4 grid gap-3">
+          <ul className="mb-4 grid gap-0.5">
             {post.comments.map((comment) => {
               const mine = comment.authorId === currentMemberId;
               const editing = editingId === comment.id;
@@ -119,12 +120,15 @@ export function CommentsDialog({
                 editTrimmed.length <= COMMENT_CONTENT_MAX &&
                 editTrimmed !== comment.content;
               return (
-                <li key={comment.id} className="flex items-start gap-2.5 border-t border-border pt-3 first:border-0 first:pt-0">
+                <li
+                  key={comment.id}
+                  className="group/comment flex items-start gap-2.5 rounded-[14px] px-1.5 py-2 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
+                >
                   <MemberAvatar member={comment.author} name={comment.author?.display_name ?? 'Membre'} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="mb-0.5 flex items-baseline gap-2">
-                      <strong className="text-[12px] font-bold">{comment.author?.display_name ?? 'Membre du foyer'}</strong>
-                      <small className="text-[10px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
+                      <strong className="text-[12.5px] font-bold">{comment.author?.display_name ?? 'Membre du foyer'}</strong>
+                      <small className="text-[10.5px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
                     </div>
                     {editing ? (
                       <form
@@ -156,36 +160,34 @@ export function CommentsDialog({
                         </div>
                       </form>
                     ) : (
-                      <p className="m-0 text-[12px] leading-[1.55] text-ink-soft">{comment.content}</p>
+                      <p className="m-0 text-[12.5px] leading-[1.55] text-ink-soft">{comment.content}</p>
                     )}
-                    {!editing && (mine || canDeleteComment(comment)) ? (
-                      <div className="mt-1 flex justify-end gap-1">
-                        {mine ? (
-                          <Button
-                            type="button"
-                            variant="quiet"
-                            size="sm"
-                            icon="edit"
-                            onClick={() => startEdit(comment)}
-                            aria-label="Modifier ce commentaire"
-                          >
-                            <span className="sr-only">Modifier</span>
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          icon="trash"
-                          onClick={() => setPendingDelete(comment)}
-                          aria-label="Supprimer ce commentaire"
-                          className="text-coral hover:bg-coral-soft hover:text-coral"
-                        >
-                          <span className="sr-only">Supprimer</span>
-                        </Button>
-                      </div>
-                    ) : null}
                   </div>
+                  {/* Même règle que dans le fil : les commandes tiennent la
+                      ligne du commentaire, à droite, et ne s'affichent qu'au
+                      survol ou au focus — toujours visibles au tactile. */}
+                  {!editing && (mine || canDeleteComment(comment)) ? (
+                    <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 [@media(hover:none)]:opacity-100 max-[650px]:opacity-100">
+                      {mine ? (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(comment)}
+                          aria-label="Modifier ce commentaire"
+                          className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-surface hover:text-fg"
+                        >
+                          <Icon name="edit" size="sm" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(comment)}
+                        aria-label="Supprimer ce commentaire"
+                        className="grid size-7 place-items-center rounded-full text-muted transition-colors duration-[var(--duration-quick)] hover:bg-coral-soft hover:text-coral"
+                      >
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -212,6 +214,7 @@ export function CommentsDialog({
                 className="min-h-[84px]"
                 placeholder="Répondre au foyer…"
                 aria-label="Répondre au foyer"
+                autoFocus
               />
             )}
           </Field>

@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 19 octobre 2026.
+Dernière mise à jour : 22 octobre 2026.
 
 ---
 
@@ -620,14 +620,58 @@ bien `buildTasks`).
 
 ---
 
+- [x] **23. Deux tests de glisser-déposer sont sensibles à la charge de la machine**
+
+**Clos le 2026-10-22.** La cause n'est pas celle supposée ici — ni le seuil
+d'activation de `dnd-kit`, ni une image sautée. La sonde (initialisation d'un
+journal d'événements de pointeur côté page, puis reproduction du geste sous
+charge) l'a attribuée sans ambiguïté : **la mise en page de l'accueil bouge
+encore après que le test la croit prête**. Au moment où le titre « Bonjour »
+est visible, la météo affiche encore « Chargement de la météo… » et les
+widgets Tâches et Anniversaires sont vides ; une salve unique (lectures de
+démonstration, puis deux allers-retours HTTP de la météo) fait passer la
+poignée de y≈506 à y≈549. Le test mesurait la boîte de la poignée **avant** la
+salve : le `pointerdown` tombait sur la colonne vide, le drag ne démarrait
+jamais, et l'ancien test échouait en silence sur le résultat attendu — un
+échec qui n'apprenait rien, exactement le cas que cette section existe pour
+refuser.
+
+**Le correctif est dans les tests** (`app/e2e/critical-paths.spec.ts`), le
+produit n'a pas bougé — le décalage est un comportement de chargement normal,
+pas un défaut visible à l'écran :
+
+1. `attendreMiseEnPageStable` : deux mesures de la boîte de la poignée,
+   séparées d'une fenêtre d'observation de 250 ms, doivent coïncider. L'état
+   observé est la stabilité elle-même ; la salve tombe forcément entre deux
+   mesures d'une passe en désaccord, donc la convergence n'exige aucune
+   hypothèse sur sa date — et rien ne bouge ensuite (aucun rechargement
+   périodique sous la minute en démo).
+2. `viserPoigneeWidget` : mesurer ne suffit pas, la visée est **vérifiée** —
+   `elementFromPoint` doit renvoyer la poignée sous le curseur, sinon on
+   re-mesure et on revise (jusqu'à dix fois, échec final explicite). Les
+   lectures de travail du test (état « avant », boîte de la cible) passent
+   **avant** la visée : celle-ci reste le dernier pas avant l'appui.
+3. Le geste attend l'état observable `widgets-dragging` après l'appui avant
+   de se poursuivre — un drag qui ne s'engage pas échoue là, avec sa cause,
+   et non plus loin sur le résultat.
+
+**Preuves.** Sous saturation (6 brûleurs CPU sur 6 cœurs, le pire cas observé)
+: l'ancienne forme perdait 3 à 5 passages sur 8 ; la nouvelle passe **8/8**
+avec un worker et **8/8** avec le parallélisme par défaut. Machine au repos :
+**10/10**. Suite e2e complète : 136 passées, 6 sautées (mobile, par contrat).
+Chaîne : typecheck, 1498 tests unitaires, build — verts. Pendant
+l'investigation, le contrôle a aussi été vu rouge à bon escient : la version
+intermédiaire qui ne faisait qu'attendre `widgets-dragging` échouait
+**explicitement** sur l'attente, ce qui a fourni la signature de l'échec
+(`pointerdown` sur `DIV`, poignée déplacée) que le silence de l'ancien test
+cachait.
+
+---
+
 ## Plus tard
 
-- **4. Le parcours humain (rappels de tâche) n'a jamais été fait.** Parké le
-28/09 : les rappels ne se déclenchent pas du tout en usage (rien n'arrive,
-pas seulement un défaut d'affichage). À rouvrir avec, dans l'ordre : le
-rappel est-il créé en base (`task_reminders`) ? la fenêtre du dispatch le
-couvre-t-elle ? le push part-il (`delivered`, voir #1) ? Voir l'historique
-dans git (`TODO.md`).
+(Rien pour le moment — le #4 est soldé en production le 2026-10-21, voir
+« Validé, pour mémoire ».)
 
 ---
 
@@ -862,6 +906,13 @@ encore :
 - l'empreinte de l'abonnement en base correspond à celle du navigateur ;
 - le bundle déployé contient l'écouteur `push` ;
 - `showNotification` fonctionne depuis la console ;
+- **les rappels de tâche fonctionnent en production**, validé en usage le
+  2026-10-21 (retour utilisateur) : c'était le dernier segment que
+  `scope: 'test'` ne pouvait pas prouver, puisque cette branche construit sa
+  notification sans lire `task_reminders`. Le segment client est tenu par deux
+  tests de page (écriture du rappel saisi, retrait quand le champ est vidé,
+  chacun vu rouge sur sa propre mutation) et la sélection par
+  `supabase/tests/0007_push.sql` ;
 - le parcours « archiver pour vous / quitter / supprimer pour vous » a été
   validé en production le 2026-10-19 sur le protocole en trois gestes (retour
   utilisateur), après `0131` et `0132`.

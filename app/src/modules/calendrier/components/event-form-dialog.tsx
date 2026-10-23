@@ -11,7 +11,7 @@ import { useMembers } from '@/stores/household-store';
 import { useResource } from '@/lib/data/useResource';
 import { instantToLocalInput } from '@/lib/datetime';
 import type { EventCalendarRow, EventCategoryRow } from '@/types';
-import { toColorTag } from '../types';
+import { eventCategoryIcon, toColorTag } from '../types';
 import type { CalendarEvent, EventFormValues } from '../types';
 
 const TIME_PATTERN = /^\d{2}:\d{2}$/;
@@ -232,7 +232,7 @@ export function EventFormDialog({ open, onOpenChange, event, defaultDate, remind
                 <option value="">Sans catégorie</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}
+                    {eventCategoryIcon(category.icon, category.name)} {category.name}
                   </option>
                 ))}
               </Select>

@@ -5,6 +5,8 @@ import { AppRouter } from '@/app/router';
 import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
 import { seedOnlineStatus } from '@/lib/online-status';
+import '@fontsource-variable/fraunces';
+import '@fontsource-variable/inter-tight';
 import '@/styles/app.css';
 
 registerSW({ immediate: true });

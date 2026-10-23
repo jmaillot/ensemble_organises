@@ -110,6 +110,7 @@ export default function AdressesPage() {
   return (
     <ModuleShell
       module="adresses"
+      infoTo="/adresses/aide"
       actions={
         <>
           <Button
@@ -262,16 +263,16 @@ interface PlaceCardProps {
 function PlaceCard({ place, onEdit, onDelete, onToggleVisited }: PlaceCardProps) {
   const itinerary = encodeURIComponent([place.addressLine, place.city].filter(Boolean).join(' '));
   return (
-    <article className="panel-surface overflow-hidden rounded-[16px] p-0">
+    <article className="panel-surface overflow-hidden rounded-[20px] p-0 transition-shadow duration-[var(--duration-slow)] hover:shadow-md">
       {place.photoUrl ? (
-        <img src={place.photoUrl} alt="" loading="lazy" className="h-[138px] w-full object-cover" />
+        <img src={place.photoUrl} alt="" loading="lazy" className="h-[150px] w-full object-cover" />
       ) : (
-        <div className="grid h-[138px] w-full place-items-center bg-accent-soft text-accent-strong">
+        <div className="grid h-[150px] w-full place-items-center bg-accent-soft text-accent-strong">
           <Icon name={placeTypeIcon[place.type]} size="lg" />
         </div>
       )}
 
-      <div className="p-[15px]">
+      <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="mb-1 truncate font-display text-[17px] tracking-[-0.035em]">{place.name}</h3>
           <div className="flex shrink-0 items-center gap-1">

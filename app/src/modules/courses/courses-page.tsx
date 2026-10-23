@@ -1,4 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,8 +22,9 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { useHouseholdStore, useMemberName } from '@/stores/household-store';
+import { useCurrentMember, useHouseholdStore, useMemberName } from '@/stores/household-store';
 import { formatMediumDate, formatWeekday, pluralize, relativeDayLabel, toLocalDate } from '@/lib/utils';
+import { usePrintSheet } from '@/hooks/use-print-sheet';
 import { useCourses } from './hooks/use-courses';
 import { ItemFormDialog } from './components/item-form-dialog';
 import { ScanDialog } from './components/scan-dialog';
@@ -21,7 +32,16 @@ import { ProductSheet } from './components/product-sheet';
 import { ShoppingGroupCard } from './components/shopping-group-card';
 import { fetchOffResult, isQueryableEan, type OffProduct } from './off-client';
 import { findProductByEan, offProductFromRow } from './products-api';
-import type { Grouping, ItemFormValues, ShoppingItem, ShoppingListView } from './types';
+import {
+  sectionsForList,
+  toShoppingPrintModel,
+  type Grouping,
+  type ItemFormValues,
+  type ShoppingItem,
+  type ShoppingListView,
+} from './types';
+import './components/courses-export.css';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const listSchema = z.object({
   name: z.string().trim().min(2, 'Donnez un nom à la liste.').max(60, '60 caractères maximum.'),
@@ -54,6 +74,7 @@ export default function CoursesPage() {
     addItem,
     addItemToList,
     addCatalogProductToList,
+    reorder,
     addList,
     removeItem,
     removeList,
@@ -63,6 +84,10 @@ export default function CoursesPage() {
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
+  // Rôle `enfant` : il lit la liste, il ne la réordonne pas. Le serveur
+  // refuserait l'écriture — mais une poignée qui ne peut pas faire son geste
+  // ne doit pas s'afficher.
+  const isChild = useCurrentMember()?.role === 'enfant';
   const [itemDialog, setItemDialog] = useState<{ open: boolean }>({ open: false });
   const [listDialogOpen, setListDialogOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
@@ -73,6 +98,12 @@ export default function CoursesPage() {
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [pendingItem, setPendingItem] = useState<ShoppingItem | null>(null);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
+
+  // Lien profond : `/courses?ouvrir=<id>` ouvre la fiche de l'article. La
+  // recherche porte sur TOUTES les listes : un lien vers un article d'une
+  // autre liste doit l'ouvrir aussi.
+  const tousLesItems = useMemo(() => lists.flatMap((list) => list.items), [lists]);
+  useOpenRecord(tousLesItems, (item) => setEditingItem(item));
   const [pendingList, setPendingList] = useState<ShoppingListView | null>(null);
   const navigate = useNavigate();
 
@@ -181,9 +212,77 @@ export default function CoursesPage() {
     }
   };
 
+  /**
+   * Liste affichée : sert à la fois l'écran et la feuille imprimée, pour que
+   * les deux ne puissent pas diverger.
+   */
+  const visibleList = lists.find((list) => list.id === activeListId) ?? lists[0] ?? null;
+
+  const sensors = useSensors(
+    // Un simple clic ne doit pas démarrer un déplacement.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Les annonces du glisser-déposer citent le NOM de l'article, pas son
+  // identifiant : c'est ce que le lecteur d'écran doit entendre.
+  const itemNames = useRef<Map<string, string>>(new Map());
+  itemNames.current = new Map((visibleList?.items ?? []).map((item) => [item.id, item.name]));
+  const itemNameOf = (id: string | number) => itemNames.current.get(String(id)) ?? String(id);
+
+  const announcements = {
+    onDragStart: ({ active }: { active: { id: string | number } }) => `${itemNameOf(active.id)} saisie.`,
+    onDragOver: ({ over }: { over: { id: string | number } | null }) =>
+      over ? `Position de ${itemNameOf(over.id)} atteinte.` : 'Position hors liste.',
+    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) => {
+      if (!over) return 'Déplacement annulé.';
+      return `${itemNameOf(active.id)} déposée à la place de ${itemNameOf(over.id)}.`;
+    },
+    onDragCancel: () => 'Déplacement annulé.',
+  };
+
+  /**
+   * Dépôt d'un article.
+   *
+   * Le geste se fait À L'INTÉRIEUR d'un groupe : dans la vue « par rayon »,
+   * un article reste dans son rayon (le rayon est une propriété de
+   * l'article, pas une place dans la liste) ; dans la vue « l'ordre du
+   * foyer », la liste est à plat et le dépôt porte sur toute la liste.
+   *
+   * Le rang écrit est donc le nouvel ordre du GROUPE déplacé : les articles
+   * déplacés occupent les places de ceux qu'ils remplacent, et les autres ne
+   * bougent pas. C'est ce qui fait qu'un réordonnancement dans un rayon ne
+   * détruit pas l'ordre du foyer pour les autres rayons.
+   */
+  const handleItemDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!visibleList || !over || active.id === over.id) return;
+    const sections = sectionsForList(visibleList.items, grouping);
+    const section = sections.find((entry) => entry.items.some((item) => item.id === String(active.id)));
+    if (!section) return;
+    const ids = section.items.map((item) => item.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    void reorder(visibleList.id, next)
+      .then(() => toast('Ordre de la liste mis à jour.'))
+      .catch((reorderError: unknown) =>
+        toast(
+          reorderError instanceof Error ? reorderError.message : 'L’ordre n’a pas pu être enregistré.',
+          'error',
+        ),
+      );
+  };
+
+  const printModel = visibleList ? toShoppingPrintModel(visibleList, householdName ?? 'Foyer') : null;
+  const { printing, print } = usePrintSheet();
+
   return (
     <ModuleShell
       module="courses"
+      infoTo="/courses/aide"
       actions={
         <>
           <Button variant="secondary" icon="scan" disabled={isLoading} onClick={() => setScanOpen(true)}>
@@ -191,6 +290,14 @@ export default function CoursesPage() {
           </Button>
           <Button variant="secondary" icon="grid" onClick={() => navigate('/courses/catalogue')}>
             Catalogue
+          </Button>
+          <Button
+            variant="secondary"
+            icon="download"
+            disabled={!printModel}
+            onClick={print}
+          >
+            Imprimer
           </Button>
           <Button variant="secondary" icon="plus" onClick={openNewList}>
             Nouvelle liste
@@ -233,11 +340,11 @@ export default function CoursesPage() {
               <Select
                 id="courses-grouping"
                 value={grouping}
-                onChange={(event) => setGrouping(event.target.value === 'ajout' ? 'ajout' : 'rayon')}
+                onChange={(event) => setGrouping(event.target.value === 'ordre' ? 'ordre' : 'rayon')}
                 className="min-w-[170px] max-[650px]:min-w-0 max-[650px]:flex-1"
               >
                 <option value="rayon">Par rayon</option>
-                <option value="ajout">Par ordre d’ajout</option>
+                <option value="ordre">L’ordre du foyer</option>
               </Select>
             </div>
           }
@@ -283,18 +390,23 @@ export default function CoursesPage() {
                   })}
                 </div>
               ) : null}
-              {(() => {
-                const visible = lists.find((list) => list.id === activeListId) ?? lists[0];
-                return (
-                  <div className="grid grid-cols-1 gap-[17px]">
+              {visibleList ? (
+                <div className="grid grid-cols-1 gap-[17px]">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    accessibility={{ announcements }}
+                    onDragEnd={handleItemDragEnd}
+                  >
                     <ShoppingGroupCard
-                      key={visible.id}
-                      list={visible}
+                      key={visibleList.id}
+                      list={visibleList}
                       grouping={grouping}
-                      suggestions={suggestionsFor(visible.id)}
+                      suggestions={suggestionsFor(visibleList.id)}
                       catalogue={products}
                       photoUrls={productPhotoUrls}
                       disabled={isMutating}
+                      readOnly={isChild}
                       onToggle={handleToggle}
                       onQuickAdd={handleQuickAdd}
                       onQuickAddProduct={handleQuickAddProduct}
@@ -303,18 +415,18 @@ export default function CoursesPage() {
                       onEdit={setEditingItem}
                       onDeleteList={setPendingList}
                     />
-                  </div>
-                );
-              })()}
+                  </DndContext>
+                </div>
+              ) : null}
             </>
           ) : null}
         </Panel>
 
         <aside className="grid min-w-0 grid-cols-1 gap-[14px]">
-          <div className="relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
+          <div className="relative min-h-[160px] overflow-hidden rounded-[24px] bg-accent p-5 text-surface max-[650px]:min-h-0 max-[650px]:p-[18px]">
             <span aria-hidden="true" className="coupon-ring" />
-            <p className="mb-4 text-[11px] text-on-dark">Liste partagée · {householdName}</p>
-            <strong className="block font-display text-[27px] tracking-[-0.06em]">
+            <p className="mb-4 text-[11px] tracking-[0.04em] text-on-dark">Liste partagée · {householdName}</p>
+            <strong className="block font-display text-[32px] leading-tight font-semibold tracking-[-0.03em]">
               {pluralize(lists.length, 'liste')}
             </strong>
             <small className="text-[10px] text-on-dark">
@@ -359,6 +471,26 @@ export default function CoursesPage() {
           </Panel>
         </aside>
       </div>
+
+      {printing && printModel ? (
+        <div className="courses-print" aria-hidden="true">
+          <h2>{printModel.title}</h2>
+          <p>{printModel.meta}</p>
+          {printModel.sections.map((section) => (
+            <section key={section.title}>
+              <h3>{section.title}</h3>
+              <ul>
+                {section.items.map((item, index) => (
+                  <li key={`${section.key}-${index}`}>
+                    <span>{item.checked ? '☑' : '☐'}</span> {item.name}
+                    {item.quantity ? <span className="quantite">{item.quantity}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : null}
 
       <ItemFormDialog
         open={itemDialog.open || editingItem !== null}

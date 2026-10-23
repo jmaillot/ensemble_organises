@@ -112,6 +112,7 @@ mécanismes sont ici.
 cd app && npm run typecheck && npm test && npm run build
 cd app && npm run test:e2e
 python3 scripts/check-sql-statique.py
+python3 scripts/test-check-sql-statique.py   # ses propres cas qui doivent échouer
 sh scripts/test-db.sh          # sur une machine qui a Docker
 sh scripts/test-dispatch-push.sh   # en plus, et ce n'est pas équivalent
 ```
@@ -213,6 +214,18 @@ Trois règles qui rendent le contrôle digne de confiance :
   n'a jamais refusé quelque chose n'a pas été exercé. Et un vérificateur qui
   refuse du code que les tests couvrent est pire qu'aucun : on apprend à
   l'ignorer avant qu'il ne trouve un vrai défaut.
+
+Un refus à tort, trouvé le 2026-10-22 : le contrôle 3 signalait l'**ouverture**
+d'un dollar-quote nommé (`$q$`) dès la fin de sa ligne d'ouverture. Or un tag
+nommé traverse légitimement une ligne — le dépôt l'emploie pour passer un SQL
+multi-lignes à une assertion (`testkit.expect_denied($q$insert … $q$, '…')`) —
+et PostgreSQL l'autorise. Le contrôle était donc rouge sur un test **sain**
+(`0138`), et c'est ce rouge-là qui aurait fait perdre foi dans le contrôle. Le
+tag nommé n'est plus signalé qu'à la fin du fichier, où l'on sait qu'il n'a
+jamais été refermé — le symptôme d'un guillemet mal placé en amont.
+`python3 scripts/test-check-sql-statique.py` donne au contrôle ses cas qui
+doivent échouer **et** le cas qui doit passer ; il a été vu rouge avant d'être
+vu vert, sur le contrôle lui-même.
 
 #### C. La frontière du conteneur
 
@@ -370,7 +383,12 @@ second demande une preuve d'absence, ce qui est plus dur que l'inverse.
       /cercle
       /voyages
       /messages
-      /widgets
+      /contacts
+      /frigo
+      /menu
+      /dashboard                  # tableau de bord personnalisé (ex-/widgets)
+      /parametres
+      /landing
     /components/ui               # primitives et composants UI locaux
     /components/shared            # composants métier partagés
     /lib
@@ -426,21 +444,23 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 
 ### Foyer & membres
 - `profiles` (id = user_id Supabase Auth, email, display_name, avatar_url, provider [google/email])
-- `households` (id, name, avatar_color)
+- `households` (id, name, avatar_color, disabled_modules text[] default '{}' — les CLÉS des espaces éteints du foyer, 0140 : liste vide = tout activé, le catalogue des espaces est un choix du foyer)
 - `household_members` (id, household_id, user_id, display_name, avatar_url, color_tag, role [admin/membre/enfant])
 - `household_invite_tokens` (id, household_id, token_hash, created_by, expires_at nullable, max_uses, use_count, is_active) — `token_hash` est un HMAC-SHA-256 calculé avec un secret dédié `INVITE_TOKEN_HMAC_SECRET`, stocké dans Vault/secret manager et jamais en base; le token brut n'est affiché qu'à sa génération
 - `invitations` (id, household_id, email/phone, role, statut) — réservé aux invitations ciblées (ex: partage d'une liste de cadeaux à un externe), distinct du token d'accès au foyer
 
 ### Courses
 - `shopping_lists` (id, household_id, name)
-- `shopping_list_items` (id, list_id, name, quantity, unit, category, checked boolean, added_by)
+- `shopping_list_items` (id, list_id, name, quantity, unit, category, checked boolean, added_by, position — rang manuel de l'article DANS SA LISTE (0 = premier), porté par le glisser-déposer (0139) : le rang est global à la liste, c'est la vue qui décide du regroupement par rayon)
 
 ### Calendrier
 - `events` (id, household_id, title, description, start_at, end_at, all_day, location, color, created_by)
 - `event_reminders` (id, event_id, remind_at)
 
 ### Notes
-- `notes` (id, household_id, title, content, category, color, created_by)
+- `notes` (id, household_id, title, content, category, color, folder_id, trip_id, cover_attachment_id, is_locked, created_by) — `is_locked` fige titre, contenu, catégorie, visibilité et pièces jointes pour tous ; la levée est réservée à l'autrice ou à un administrateur (0137 : déclencheur `private.enforce_note_lock`, politiques `note_attachments` complétées)
+- `note_attachments` (id, note_id, household_id, file_url [chemin du bucket, jamais une URL signée], file_name, mime_type, size_bytes) — `notes.cover_attachment_id` désigne l'une d'elles comme photo de couverture (0136 : FK `on delete set null`, et déclencheur `private.check_note_cover` qui impose que la pièce jointe appartienne à la même note)
+- `note_folders` (id, household_id, name, visibility [foyer/perso], owner_member_id, is_default)
 
 ### Tâches
 - `tasks` (id, household_id, name, description, due_date, priority_order, status [à faire/en cours/fait], created_by)
@@ -454,7 +474,11 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 - `routine_completions` (id, routine_id, occurrence_date, completed_by, completed_at, status [fait/en retard/manqué])
 
 ### Recettes
-- Placeholder : `recipes` (id, household_id, title) — schéma complet à définir plus tard (ingrédients, étapes, temps de préparation, liaison possible avec Courses)
+- `recipes` (id, household_id, title, servings, prep_minutes, cook_minutes, cover_photo [chemin du bucket `household-media`], category_id, created_by)
+- `recipe_categories` (catégories du foyer, « Recettes du foyer » par défaut), `recipe_tags` + `recipe_tag_links` (étiquettes multiples)
+- `recipe_ingredients` (quantity nullable = « au goût », unit, position), `recipe_steps` (content, position, `photo_path` nullable)
+- `recipe_favorites` (par membre), `recipe_shares` (code partagé haché, expiration, max_uses, is_active)
+- Envoi des ingrédients vers une liste de Courses du foyer, qui incrémente la ligne existante au lieu de la dupliquer
 
 ### Ardoise
 - `expenses` (id, household_id, title, amount, paid_by member_id, expense_date, split_type [égal/personnalisé])
@@ -497,6 +521,17 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 - `conversation_members` (conversation_id, member_id, left_at, archived_at) — `left_at` est la pierre tombale (départ), `archived_at` l'archive **personnelle** : le fil sort de la liste du membre sans qu'il le quitte, reste lisible, et le premier message le ramène (0131)
 - `messages` (id, conversation_id, sender_id, content, media_url, created_at)
 - ⚠️ Point d'attention : une vraie messagerie temps réel est un gros morceau (accusés de lecture, notifications, pièces jointes). envisager un scope réduit (fil de discussion simple par foyer, sans conversations privées)
+
+### Contacts (répertoire du foyer : listes personnelles et partagées)
+- `contact_lists` (id, household_id, name, owner_member_id nullable — NULL = liste partagée « Famille » —, is_default) ; les listes personnelles sont lisibles par leur propriétaire et les admins uniquement, jamais par les autres membres (0077, OQ-2)
+- `contacts` (id, list_id, household_id dénormalisé justifié et contraint par trigger `align_household`, name, birth_date, photo_url, linked_member_id nullable) ; un trigger `ensure_default_contact_list` sème « Famille » + liste perso à l'arrivée de chaque membre adulte (mirror 0097/0098 pour les masquages)
+
+### Frigo (vague 3.1)
+- `pantry_items` (id, household_id, name, category [produit_frais/surgele/epicerie/boisson/autre], quantity, unit, location [frigo/congelateur/garde_manger], expires_on, opened_on, notes, created_by) — une ligne par article physique, index foyer + péremption (0141)
+
+### Menu de la semaine (vague 3.1)
+- `meal_entries` (id, household_id, entry_date, slot [matin/midi/soir], recipe_id nullable, free_text nullable, servings, member_ids text[], created_by) — une table, pas deux : une ligne = un repas ; soit recette, soit texte libre (0142) ; la génération des Courses collecte les
+  ingrédients des repas déjà placés (menu → liste, 77998a1)
 
 ### Widgets (tableau de bord personnalisé)
 - `dashboard_widgets` (id, member_id, widget_type [calendrier/tâches/météo/anniversaires/routines], position_x, position_y, width, height, settings jsonb) — préférences personnelles; le foyer est dérivé du membre

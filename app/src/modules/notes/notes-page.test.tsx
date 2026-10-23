@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import { data } from '@/lib/data';
+import type { NoteAttachmentRow, NoteRow } from '@/types';
 import userEvent from '@testing-library/user-event';
 import NotesPage from './notes-page';
 import { renderWithProviders } from '@/test/render';
@@ -63,6 +65,28 @@ describe('NotesPage', () => {
 
     expect(await screen.findByText('Courses de la semaine')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('prévisualise le Markdown sans perdre la saisie', async () => {
+    supportScrollIntoView();
+    const user = userEvent.setup();
+    renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Créer une note' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const textarea = within(dialog).getByLabelText(/Contenu/);
+    await user.type(textarea, '**Préparer** les cartables');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Aperçu' }));
+    expect(await within(dialog).findByText('Préparer', { selector: 'strong' })).toBeInTheDocument();
+    // Le champ reste monté mais masqué : c'est lui qui porte la valeur envoyée.
+    expect(textarea).not.toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Écrire' }));
+    expect(textarea).toBeVisible();
+    expect(textarea).toHaveValue('**Préparer** les cartables');
   });
 
   it('joint un PDF à la création et l’affiche sur la carte', async () => {
@@ -165,6 +189,23 @@ describe('NotesPage', () => {
       await user.click(within(createDialog).getByRole('button', { name: 'Créer le dossier' }));
       await screen.findByRole('tab', { name: 'Vacances' });
 
+      // « À demander à Léa » arrive verrouillée par la graine (0137) : une note
+      // verrouillée n'offre pas « Modifier », donc on lève d'abord le verrou.
+      // Ce n'est pas un contournement du test : c'est l'état initial voulu de
+      // la démo, et le refus lui-même est vérifié dans son propre test.
+      await user.click(
+        within(screen.getByText('À demander à Léa').closest('article') as HTMLElement).getByRole('button', {
+          name: 'Déverrouiller',
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          within(screen.getByText('À demander à Léa').closest('article') as HTMLElement).getByRole('button', {
+            name: 'Modifier',
+          }),
+        ).toBeInTheDocument(),
+      );
+
       // Ranger toutes les notes du Général dans le dossier : Général devient
       // vide alors que des notes existent toujours (le titre du dossier, lui,
       // porte les notes).
@@ -186,5 +227,101 @@ describe('NotesPage', () => {
     } finally {
       window.localStorage.removeItem(`eo:notes:folder:${DEMO_HOUSEHOLD_ID}`);
     }
+  });
+
+  /**
+   * 0136 — la couverture est un bandeau sur la carte. La graine donne une photo
+   * désignée à « Liste de rentrée » et une photo non désignée à « Idées de
+   * week-end » : le second cas prouve le repli sur la première image, sans quoi
+   * la fonctionnalité ne s'afficherait que pour qui a fait le geste exprès.
+   */
+  it('affiche la photo de couverture, et la première image à défaut de choix', async () => {
+    const { container } = renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+
+    const coverOf = (title: string) =>
+      (screen.getByText(title).closest('article') as HTMLElement).querySelector('img');
+    // `alt=""` : le bandeau est décoratif, le titre de la carte nomme déjà la
+    // note et la pièce jointe reparaît plus bas avec son nom de fichier.
+    expect(coverOf('Liste de rentrée')).toHaveAttribute('src', '/assets/adresses.jpg');
+    expect(coverOf('Liste de rentrée')).toHaveAttribute('alt', '');
+    expect(coverOf('Idées de week-end')).toHaveAttribute('src', '/assets/lisbonne.jpg');
+    expect(container.querySelectorAll('article img[alt=""]')).toHaveLength(2);
+  });
+
+  it('désigne une autre photo comme couverture depuis le dialogue', async () => {
+    supportScrollIntoView();
+    const second: NoteAttachmentRow = await data.create<NoteAttachmentRow>('note_attachments', {
+      id: 'note-attachment-test-2',
+      note_id: 'note-1',
+      household_id: DEMO_HOUSEHOLD_ID,
+      file_url: '/assets/courses.jpg',
+      file_name: 'Liste imprimée.jpg',
+      mime_type: 'image/jpeg',
+      size_bytes: 1024,
+      created_at: '2026-10-21T09:00:00.000Z',
+    });
+
+    try {
+      const user = userEvent.setup();
+      const { container } = renderWithProviders(<NotesPage />, { route: '/notes' });
+
+      expect(await screen.findByText('Liste de rentrée')).toBeInTheDocument();
+      const coverOf = () =>
+        (screen.getByText('Liste de rentrée').closest('article') as HTMLElement).querySelector('img');
+      expect(coverOf()).toHaveAttribute('src', '/assets/adresses.jpg');
+
+      await user.click(
+        within(screen.getByText('Liste de rentrée').closest('article') as HTMLElement).getByRole('button', {
+          name: 'Modifier',
+        }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      const group = within(dialog).getByRole('group', { name: 'Choisir la photo de couverture' });
+      // La photo désignée est celle qui est enfoncée à l'ouverture.
+      expect(within(group).getByRole('button', { name: 'Choisir Cartables prêts.jpg comme couverture' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      await user.click(within(group).getByRole('button', { name: 'Choisir Liste imprimée.jpg comme couverture' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les modifications' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      await waitFor(() => expect(coverOf()).toHaveAttribute('src', '/assets/courses.jpg'));
+      const [stored] = await data.list<NoteRow>('notes', { id: 'note-1' });
+      expect(stored.cover_attachment_id).toBe(second.id);
+      expect(container.querySelectorAll('article img[alt=""]')).toHaveLength(2);
+    } finally {
+      await data.remove('note_attachments', second.id);
+    }
+  });
+
+  /**
+   * 0137 — le verrou se voit et se lève sans passer par le dialogue : une note
+   * verrouillée n'ouvre pas son formulaire, et l'action de modification
+   * disparaît tant qu'elle l'est. La démo verrouille « À demander à Léa », dont
+   * Camille est l'autrice : le cas « je peux lever » est donc jouable tel quel.
+   */
+  it('affiche le verrou, retire les actions de modification et laisse l’autrice le lever', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotesPage />, { route: '/notes' });
+
+    expect(await screen.findByText('À demander à Léa')).toBeInTheDocument();
+    const card = screen.getByText('À demander à Léa').closest('article') as HTMLElement;
+
+    expect(within(card).getByText('Verrouillée')).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Supprimer À demander à Léa' })).not.toBeInTheDocument();
+    // Pas de dialogue non plus : c'est l'action qui manque, pas un refus tardif.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Déverrouiller' }));
+
+    await waitFor(() => expect(within(card).getByRole('button', { name: 'Modifier' })).toBeInTheDocument());
+    expect(within(card).queryByText('Verrouillée')).not.toBeInTheDocument();
+    const [stored] = await data.list<NoteRow>('notes', { id: 'note-3' });
+    expect(stored.is_locked).toBe(false);
   });
 });

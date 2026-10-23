@@ -21,6 +21,7 @@ import {
   type Note,
   type NoteTone,
 } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 const toneDot: Record<NoteTone, string> = {
   accent: 'bg-accent',
@@ -58,6 +59,8 @@ export default function NotesPage() {
     isMutating,
     refetch,
     addNote,
+    setNoteLock,
+    canUnlock,
     editNote,
     removeNote,
   } = useNotes();
@@ -65,8 +68,24 @@ export default function NotesPage() {
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
 
   const openCreate = () => setDialog({ open: true, note: null });
-  const openEdit = (note: Note) => setDialog({ open: true, note });
+  // Une note verrouillée ne s'ouvre pas : le verrou se lève d'abord, et la
+  // base refuserait de toute façon l'écriture.
+  const openEdit = (note: Note) => {
+    if (note.locked) return;
+    setDialog({ open: true, note });
+  };
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+  // Lien profond : `/notes?ouvrir=<id>` ouvre la fiche de la note.
+  useOpenRecord(notes, openEdit);
+
+  const toggleLock = async (note: Note, locked: boolean) => {
+    try {
+      await setNoteLock(note, locked);
+      toast(locked ? 'Note verrouillée : son contenu ne bouge plus.' : 'Note déverrouillée.');
+    } catch (lockError) {
+      toast(lockError instanceof Error ? lockError.message : 'Le verrou n’a pas pu être changé.', 'error');
+    }
+  };
 
   const latestAuthor = latest?.authorId
     ? memberFirstName(members.find((member) => member.id === latest.authorId)?.display_name ?? '')
@@ -75,6 +94,7 @@ export default function NotesPage() {
   return (
     <ModuleShell
       module="notes"
+      infoTo="/notes/aide"
       actions={
         canWrite ? (
           <Button icon="plus" onClick={openCreate}>
@@ -136,6 +156,7 @@ export default function NotesPage() {
       <SectionHeading
         title="Vos pensées, au même endroit"
         description="Une note peut rester privée ou devenir un point de repère partagé."
+        stackOnMobile
         action={
           <SearchInput
             aria-label="Rechercher une note"
@@ -241,19 +262,40 @@ export default function NotesPage() {
                 <article
                   key={note.id}
                   className={cn(
-                    'panel-surface flex min-h-[170px] flex-col rounded-[16px] p-[17px]',
+                    'panel-surface group flex min-h-[180px] flex-col rounded-[22px] p-[18px] transition-shadow duration-[var(--duration-quick)] hover:shadow-md',
                     featured && 'border-accent/20 bg-accent-faint',
                   )}
                 >
+                  {/*
+                    Bandeau décoratif : le titre de la carte nomme déjà la note,
+                    et la photo reparaît dans la liste des pièces jointes avec son
+                    nom de fichier. Un `alt` la ferait annoncer deux fois.
+                  */}
+                  {note.cover?.url ? (
+                    <img
+                      src={note.cover.url}
+                      alt=""
+                      className="-mx-[18px] -mt-[18px] mb-[15px] h-[110px] w-[calc(100%_+_36px)] rounded-t-[22px] object-cover"
+                    />
+                  ) : null}
+
                   <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
-                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-bg px-2 py-[3px]">
                       <span
                         aria-hidden="true"
                         className={cn('size-2 shrink-0 rounded-full', toneDot[noteCategoryTone(note.category)])}
                       />
                       <span className="truncate">{note.category}</span>
                     </span>
-                    <span className="shrink-0">{featured ? 'Épinglée' : note.ageLabel}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {note.locked ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[9.5px] text-amber">
+                          <Icon name="lock" size="sm" className="size-3" />
+                          Verrouillée
+                        </span>
+                      ) : null}
+                      <span>{featured ? 'Épinglée' : note.ageLabel}</span>
+                    </span>
                   </div>
 
                   <h3 className="mt-[15px] mb-1.5 font-display text-[17px] tracking-[-0.035em]">{note.title}</h3>
@@ -292,23 +334,47 @@ export default function NotesPage() {
                     <span>{noteVisibilityLabels[note.visibility]}</span>
                     {canWrite ? (
                       <span className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-[9px] hover:bg-coral-soft hover:text-coral"
-                          aria-label={`Supprimer ${note.title}`}
-                          onClick={() => setPendingDelete(note)}
-                        >
-                          <Icon name="trash" size="sm" />
-                        </Button>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[11px] font-extrabold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:text-accent-deep"
-                          onClick={() => openEdit(note)}
-                        >
-                          Modifier
-                          <Icon name="arrow" size="sm" />
-                        </button>
+                        {note.locked ? (
+                          canUnlock(note) ? (
+                            <button
+                              type="button"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
+                              onClick={() => void toggleLock(note, false)}
+                            >
+                              Déverrouiller
+                              <Icon name="unlock" size="sm" />
+                            </button>
+                          ) : null
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-accent hover:bg-accent-faint hover:text-accent-strong"
+                              aria-label={`Verrouiller ${note.title}`}
+                              onClick={() => void toggleLock(note, true)}
+                            >
+                              <Icon name="lock" size="sm" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 rounded-full border border-border/70 bg-surface text-muted hover:border-coral hover:bg-coral-soft hover:text-coral"
+                              aria-label={`Supprimer ${note.title}`}
+                              onClick={() => setPendingDelete(note)}
+                            >
+                              <Icon name="trash" size="sm" />
+                            </Button>
+                            <button
+                              type="button"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-surface px-3 text-[11.5px] font-bold text-accent-strong transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-accent-deep"
+                              onClick={() => openEdit(note)}
+                            >
+                              Modifier
+                              <Icon name="arrow" size="sm" />
+                            </button>
+                          </>
+                        )}
                       </span>
                     ) : null}
                   </div>
@@ -325,12 +391,14 @@ export default function NotesPage() {
         note={dialog.note}
         initialFolderId={activeFolderId}
         folders={folders}
+        members={members}
+        notes={notes.map((entry) => ({ id: entry.id, title: entry.title }))}
         isSaving={isMutating}
-        onSubmit={async (values, files, removedAttachmentIds) => {
+        onSubmit={async (values, files, removedAttachmentIds, cover) => {
           const editing = dialog.note;
           try {
-            if (editing) await editNote(editing, values, files, removedAttachmentIds);
-            else await addNote(values, files);
+            if (editing) await editNote(editing, values, files, removedAttachmentIds, cover);
+            else await addNote(values, files, cover);
             closeDialog();
             toast(editing ? 'Note mise à jour.' : 'Note enregistrée dans votre espace.');
           } catch (submissionError) {

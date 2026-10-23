@@ -14,6 +14,9 @@ const note = (overrides: Partial<Note>): Note => ({
   updatedAt: '2026-10-02T10:00:00.000Z',
   ageLabel: 'À l’instant',
   attachments: [],
+  coverAttachmentId: null,
+  cover: null,
+  locked: false,
   ...overrides,
 });
 

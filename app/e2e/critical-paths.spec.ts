@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * Parcours critiques (AGENTS.md §2.4) : connexion, création/rejoint de foyer,
@@ -22,6 +22,68 @@ async function openDemoSession(page: Page) {
     await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toBeVisible();
   }
   await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
+}
+
+/**
+ * Attend que la mise en page de l'accueil ait fini de bouger. Après le titre
+ * « Bonjour », les lectures de démonstration atterrissent dans un second
+ * temps (tâches, anniversaires…), puis la météo revient du réseau (deux
+ * allers-retours HTTP), et chaque arrivée change la hauteur d'une carte —
+ * mesurée le 2026-10-22 : la poignée passe de y≈506 à y≈549 en une seule
+ * salve. Un geste visé avant la salve tombe sur la colonne vide et le drag
+ * ne démarre jamais (TODO #23).
+ *
+ * L'état observé est la stabilité elle-même : deux mesures de la boîte de la
+ * poignée séparées d'une fenêtre d'observation doivent coïncider. La salve
+ * tombe forcément entre deux mesures d'une passe en désaccord, donc la
+ * convergence n'exige aucune hypothèse sur sa date ; rien ne bouge ensuite
+ * (aucun rechargement périodique sous la minute, aucun flux en démo). Ce
+ * n'est pas un délai d'action : l'action reste portée par la visée vérifiée
+ * de `viserPoigneeWidget`, le temps ne délimite ici qu'une fenêtre de mesure.
+ */
+async function attendreMiseEnPageStable(page: Page, handle: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const a = await handle.boundingBox();
+        await page.waitForTimeout(250);
+        const b = await handle.boundingBox();
+        return (
+          a !== null &&
+          b !== null &&
+          Math.abs(a.x - b.x) < 1 &&
+          Math.abs(a.y - b.y) < 1
+        );
+      },
+      { timeout: 15_000, message: 'la mise en page de l’accueil n’a jamais cessé de bouger' },
+    )
+    .toBe(true);
+}
+
+/**
+ * Vise le centre de la poignée et ne rend la main que lorsque le pointeur
+ * tombe dessus. Même une fois la mise en page stable, une boîte mesurée
+ * reste une hypothèse : `elementFromPoint` confirme la poignée sous le
+ * curseur, et l'échec final est explicite. À appeler en DERNIER avant
+ * `mouse.down()` — chaque aller-retour entre la visée et l'enfoncement est
+ * une fenêtre pour un décalage imprévu.
+ */
+async function viserPoigneeWidget(page: Page, handle: Locator) {
+  for (let tentative = 0; tentative < 10; tentative++) {
+    await handle.scrollIntoViewIfNeeded();
+    const boite = (await handle.boundingBox())!;
+    const x = boite.x + boite.width / 2;
+    const y = boite.y + boite.height / 2;
+    await page.mouse.move(x, y);
+    const viseLaPoignee = await page.evaluate(
+      ([cx, cy]) =>
+        document.elementFromPoint(cx, cy) instanceof Element &&
+        document.elementFromPoint(cx, cy)?.closest('button[aria-label^="Réordonner"]') !== null,
+      [x, y],
+    );
+    if (viseLaPoignee) return { x, y };
+  }
+  throw new Error('le pointeur n’a jamais visé la poignée : la mise en page n’a jamais cessé de bouger');
 }
 
 test.describe('Connexion et foyer', () => {
@@ -146,6 +208,70 @@ test.describe('Parcours des modules', () => {
     await expect(page.getByRole('dialog')).toBeHidden();
   });
 
+  test('chaque espace a son mode d’emploi', async ({ page }) => {
+    await openDemoSession(page);
+    // Deux espaces différents, pour prouver que le bouton suit le module et
+    // ne mène pas toujours à la même page.
+    const espaces = [
+      { cle: 'taches', question: 'Qui peut supprimer une tâche ?', reponse: 'Le refus est dit, jamais silencieux' },
+      { cle: 'voyages', question: 'Qui peut ouvrir un voyage ?', reponse: 'il administre le voyage sans y écrire' },
+    ];
+    for (const espace of espaces) {
+      await page.goto(`/${espace.cle}`);
+      await page.getByRole('button', { name: 'Comment ça marche' }).click();
+      await expect(page).toHaveURL(new RegExp(`/${espace.cle}/aide`));
+      await expect(page.getByRole('heading', { level: 1, name: 'Comment ça marche' })).toBeVisible();
+      // Une question s’ouvre, et sa réponse est lisible.
+      await page.getByRole('button', { name: espace.question }).click();
+      await expect(page.getByText(espace.reponse)).toBeVisible();
+    }
+  });
+
+  test('un article se réordonne à la poignée', async ({ page }) => {
+    await openDemoSession(page);
+    await page.goto('/courses');
+
+    await page.getByLabel('Regroupement').selectOption('ordre');
+    const liste = page.getByRole('region', { name: 'Fresque' });
+    await expect(liste.getByRole('button', { name: 'Réordonner : Yaourts' })).toBeVisible();
+
+    // Le geste se fait au clavier : Espace saisit l'article, la flèche le
+    // descend d'un cran, Espace le dépose. On attend l'ANNONCE de chaque
+    // étape : le capteur clavier n'écoute qu'au tour de boucle suivant, et
+    // une durée fixe serait une course.
+    const poignee = liste.getByRole('button', { name: 'Réordonner : Yaourts' });
+    await poignee.focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByText(/Position de Yaourts atteinte/)).toBeAttached();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByText(/Position de Fruits atteinte/)).toBeAttached();
+    await page.keyboard.press('Space');
+    await expect(page.getByText(/déposée à la place de Fruits/)).toBeAttached();
+
+    // Yaourts a quitté la première place — l'ordre est écrit, pas seulement
+    // affiché.
+    await expect
+      .poll(async () => {
+        const noms = await liste.getByRole('listitem').allInnerTexts();
+        return noms.findIndex((texte) => texte.includes('Yaourts'));
+      }, { timeout: 8000 })
+      .toBe(1);
+  });
+
+  test('le mode d’emploi des courses s’ouvre depuis l’espace', async ({ page }) => {
+    await openDemoSession(page);
+    await page.goto('/courses');
+
+    await page.getByRole('button', { name: 'Comment ça marche' }).click();
+    await expect(page).toHaveURL(/\/courses\/aide/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Comment ça marche' })).toBeVisible();
+
+    // Une question s’ouvre, et sa réponse est lisible.
+    const question = page.getByRole('button', { name: 'Les quantités sont-elles obligatoires ?' });
+    await question.click();
+    await expect(page.getByText(/Un article s’ajoute avec son seul nom/)).toBeVisible();
+  });
+
   test('le calendrier affiche les jours fériés et l’agenda du jour', async ({ page }) => {
     await page.goto('/calendrier');
     await expect(page.getByRole('heading', { name: 'Calendrier' })).toBeVisible();
@@ -170,6 +296,69 @@ test.describe('Parcours des modules', () => {
     await page.getByLabel('Nom de la catégorie').fill('Devoirs');
     await page.getByRole('button', { name: 'Créer la catégorie' }).click();
     await expect(page.getByLabel('Filtrer par catégorie').getByRole('option', { name: 'Devoirs' })).toBeAttached();
+  });
+});
+
+test.describe('Recherche globale', () => {
+  test('le bouton de recherche mène à un espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await expect(palette).toBeVisible();
+
+    await palette.getByRole('combobox').fill('fidelite');
+    await expect(palette.getByRole('option', { name: /Fidélité/ })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/fidelite/);
+  });
+
+  test('trouve une entrée du foyer et mène à son espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await palette.getByRole('combobox').fill('canine');
+    // Une routine du foyer : le nom est dans la graine de démonstration.
+    await expect(palette.getByRole('option', { name: /sortie canine/i })).toBeVisible();
+  });
+
+  test('la palette ouvre la fiche trouvée, pas seulement son espace', async ({ page }) => {
+    await openDemoSession(page);
+
+    await page.getByRole('button', { name: /Rechercher/ }).click();
+    const palette = page.getByRole('dialog');
+    await palette.getByRole('combobox').fill('yaour');
+    await palette.getByRole('option', { name: /yaourts/i }).click();
+
+    // L'URL demande la fiche, et la page l'ouvre : le formulaire de l'article.
+    await expect(page).toHaveURL(/ouvrir=/);
+    await expect(page.getByRole('dialog', { name: /Modifier l’article/ })).toBeVisible();
+  });
+
+  test('le raccourci ouvre la palette depuis n’importe quelle page', async ({ page }) => {
+    test.skip(viewportIsMobile(page), 'raccourci clavier : bureau uniquement');
+
+    await openDemoSession(page);
+    await page.goto('/courses');
+    // Le raccourci n'existe qu'une fois l'effet posé sur `window` : on attend
+    // que la page soit montée, sinon la frappe part dans le vide.
+    await expect(page.getByRole('heading', { level: 1, name: 'Courses' })).toBeVisible();
+
+    const palette = page.getByRole('dialog');
+    // La frappe est un événement UNIQUE : si elle part trop tôt, elle est
+    // perdue. On réessaie jusqu'à ce que la palette réponde — sans jamais
+    // re-frapper une palette déjà ouverte, qui se refermerait.
+    await expect(async () => {
+      if (await palette.isVisible()) return;
+      await page.keyboard.press('Control+k');
+      await expect(palette).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20000 });
+    await expect(palette.getByRole('combobox')).toBeFocused();
+
+    // La palette se referme sur Échap.
+    await page.keyboard.press('Escape');
+    await expect(palette).toBeHidden();
   });
 });
 
@@ -241,20 +430,39 @@ test.describe('Mises en page', () => {
     }
   });
 
-  test('le tiroir mobile expose les dix-huit espaces, filtre et se referme', async ({ page }) => {
+  test('le tiroir mobile expose les vingt espaces, filtre et se referme', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'le tiroir n’existe que sous 650 px');
 
     await openDemoSession(page);
     await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(18);
+    // Maison + dix-neuf modules du catalogue (frigo et menu, vague 3.1).
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
 
     await page.getByRole('searchbox', { name: 'Rechercher un espace' }).fill('courses');
     await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(1);
 
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
+  });
+
+  test('le « Plus » de la barre basse ouvre la feuille des espaces, pas le tiroir', async ({ page }) => {
+    test.skip(!viewportIsMobile(page), 'la barre basse n’existe que sous 650 px');
+
+    await openDemoSession(page);
+    await page.getByRole('button', { name: 'Plus' }).click();
+
+    // La feuille dédiée : le tiroir (réglages) reste fermé pendant ce parcours.
+    const sheet = page.getByRole('dialog', { name: 'Tous les espaces' });
+    await expect(sheet).toBeVisible();
+    // Même invariant de couverture que le tiroir : maison + dix-neuf modules.
+    await expect(sheet.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
+    expect(page.getByRole('dialog', { name: 'Menu des espaces du foyer' })).toHaveCount(0);
+
+    await sheet.getByRole('link', { name: 'Ouvrir Courses' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(/\/courses$/);
   });
 
   test('les pages du parcours foyer démarrent en haut sur mobile', async ({ page }) => {
@@ -302,16 +510,28 @@ test.describe('Mises en page', () => {
     await openDemoSession(page);
 
     const widgets = page.locator('[data-widget]');
-    const before = await widgets.first().getAttribute('data-widget');
     const handle = page.getByRole('button', { name: /Réordonner : / }).first();
-    // Le clic sur « Personnaliser » a fait défiler la page : la poignée est
-    // hors viewport, et un drag hors viewport ne touche aucun élément.
-    await handle.scrollIntoViewIfNeeded();
+    // Les lectures de travail (état avant, cible du dépôt) passent AVANT la
+    // visée : la visée confirmée doit rester le dernier pas avant l'appui,
+    // sinon chaque aller-retour rouvre la fenêtre du décalage.
+    await attendreMiseEnPageStable(page, handle);
+    const before = await widgets.first().getAttribute('data-widget');
     const target = widgets.nth(1);
-    const from = (await handle.boundingBox())!;
     const to = (await target.boundingBox())!;
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    // Le clic sur « Personnaliser » a fait défiler la page : la poignée est
+    // hors viewport, et un drag hors viewport ne touche aucun élément —
+    // `viserPoigneeWidget` fait défiler et confirme la cible avant le geste.
+    const from = await viserPoigneeWidget(page, handle);
     await page.mouse.down();
+    // Dépasse d'abord le seuil d'activation (6 px), puis attend l'état
+    // observable : tant que la grille n'est pas en `widgets-dragging`, le
+    // drag n'a pas démarré, et relâcher ici ferait un simple clic. On ne
+    // poursuit donc jamais sans la preuve qu'il est tenu (même attente que
+    // le test du curseur, plus bas).
+    await page.mouse.move(from.x + 30, from.y + 30, { steps: 5 });
+    await expect
+      .poll(async () => page.evaluate(() => document.querySelector('.widgets-dragging') !== null), { timeout: 5000 })
+      .toBe(true);
     await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
     await page.mouse.up();
 
@@ -326,9 +546,8 @@ test.describe('Mises en page', () => {
     await openDemoSession(page);
 
     const handle = page.getByRole('button', { name: /Réordonner : / }).first();
-    await handle.scrollIntoViewIfNeeded();
-    const from = (await handle.boundingBox())!;
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await attendreMiseEnPageStable(page, handle);
+    const from = await viserPoigneeWidget(page, handle);
     await page.mouse.down();
     // Au-delà du seuil d'activation (6 px), dnd-kit démarre le drag : la
     // grille bascule en `widgets-dragging` et tout passe en `grabbing`.

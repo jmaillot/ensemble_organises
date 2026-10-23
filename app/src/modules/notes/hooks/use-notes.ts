@@ -5,7 +5,7 @@ import { useResource } from '@/lib/data/useResource';
 import { householdMediaPathOf, isHouseholdMediaPath, removeHouseholdFile, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { useCurrentMember, useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import type { NoteAttachmentRow, NoteFolderRow, NoteRow } from '@/types';
-import { NOTES_TABLE, NOTE_FOLDERS_TABLE, createNoteAttachment, createNoteFolder, nowIso, removeNoteAttachment, renameNoteFolder, toNotePayload } from '../api';
+import { NOTES_TABLE, NOTE_FOLDERS_TABLE, coverToPayload, createNoteAttachment, createNoteFolder, nowIso, removeNoteAttachment, renameNoteFolder, toNotePayload } from '../api';
 import {
   emptyNoteFilters,
   filterNotes,
@@ -18,6 +18,7 @@ import {
   toNoteAttachment,
   type Note,
   type NoteAttachment,
+  type NoteCoverChoice,
   type NoteFilters,
   type NoteFormValues,
   type NoteMetrics,
@@ -72,10 +73,25 @@ export interface UseNotesResult extends NoteMetrics {
   error: Error | null;
   isMutating: boolean;
   refetch: () => void;
-  addNote: (values: NoteFormValues, files?: File[]) => Promise<void>;
-  editNote: (note: Note, values: NoteFormValues, files?: File[], removedAttachmentIds?: string[]) => Promise<void>;
+  addNote: (values: NoteFormValues, files?: File[], cover?: NoteCoverChoice) => Promise<void>;
+  editNote: (
+    note: Note,
+    values: NoteFormValues,
+    files?: File[],
+    removedAttachmentIds?: string[],
+    cover?: NoteCoverChoice,
+  ) => Promise<void>;
   removeNote: (note: Note) => Promise<void>;
+  /** Verrouille ou déverrouille une note (0137), sous les mêmes droits que la base. */
+  setNoteLock: (note: Note, locked: boolean) => Promise<void>;
+  /** Auteur de la note ou administrateur : eux seuls lèvent un verrou. */
+  canUnlock: (note: Pick<Note, 'authorId'>) => boolean;
 }
+
+/** Refus local, avant l'I/O ; le message est celui que la base rend aussi. */
+const LOCKED_EDIT = 'Cette note est verrouillée : levez le verrou avant de la modifier.';
+const LOCKED_DELETE = 'Cette note est verrouillée : levez le verrou avant de la supprimer.';
+const UNLOCK_FORBIDDEN = 'Seul l’auteur de la note ou un administrateur peut lever son verrou.';
 
 /** Espace de notes du foyer : recherche, catégories, visibilité. */
 export function useNotes(): UseNotesResult {
@@ -202,15 +218,19 @@ export function useNotes(): UseNotesResult {
     [queryClient],
   );
 
+  /** Dépose les fichiers un par un et rend leurs lignes : le choix de
+   *  couverture désigne un **fichier**, qui n'a pas encore d'identifiant. */
   const depositFiles = useCallback(async (noteId: string, files: File[]) => {
     if (!householdId) throw new Error('Aucun foyer sélectionné.');
+    const created: NoteAttachmentRow[] = [];
     for (const file of files) {
-      await createNoteAttachment(householdId, noteId, file);
+      created.push(await createNoteAttachment(householdId, noteId, file));
     }
+    return created;
   }, [householdId]);
 
   const addNote = useCallback(
-    async (values: NoteFormValues, files: File[] = []) => {
+    async (values: NoteFormValues, files: File[] = [], cover: NoteCoverChoice = { kind: 'auto' }) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
       const created = await create({
@@ -221,22 +241,37 @@ export function useNotes(): UseNotesResult {
         updated_at: nowIso(),
       });
       // La note existe : son identifiant sert de dossier de stockage.
+      let deposited: NoteAttachmentRow[] = [];
       if (files.length > 0) {
         try {
-          await depositFiles(created.id, files);
+          deposited = await depositFiles(created.id, files);
         } catch (filesError) {
           await refresh();
           throw filesError;
         }
       }
+      // La couverture ne peut être écrite qu'une fois la photo créée : le choix
+      // porte un index de fichier, la ligne n'existe qu'après le dépôt.
+      const coverId = coverToPayload(cover, {
+        keptAttachmentIds: [],
+        createdAttachmentIds: deposited.map((row) => row.id),
+      });
+      if (coverId !== null) await update(created.id, { cover_attachment_id: coverId });
       await refresh();
     },
-    [canWrite, create, currentMember?.id, depositFiles, householdId, refresh],
+    [canWrite, create, currentMember?.id, depositFiles, householdId, refresh, update],
   );
 
   const editNote = useCallback(
-    async (note: Note, values: NoteFormValues, files: File[] = [], removedAttachmentIds: string[] = []) => {
+    async (
+      note: Note,
+      values: NoteFormValues,
+      files: File[] = [],
+      removedAttachmentIds: string[] = [],
+      cover: NoteCoverChoice = { kind: 'auto' },
+    ) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (note.locked) throw new Error(LOCKED_EDIT);
       await update(note.id, { ...toNotePayload(values), updated_at: nowIso() });
       for (const attachmentId of removedAttachmentIds) {
         // La pièce jointe retirée emporte son objet (D-03, WR-10) : la ligne
@@ -248,14 +283,26 @@ export function useNotes(): UseNotesResult {
         await removeNoteAttachment(attachmentId);
         await removeStoredObjects(removed.map((row) => row.file_url));
       }
+      let deposited: NoteAttachmentRow[] = [];
       if (files.length > 0) {
         try {
-          await depositFiles(note.id, files);
+          deposited = await depositFiles(note.id, files);
         } catch (filesError) {
           await refresh();
           throw filesError;
         }
       }
+      // Écrit APRÈS les retraits : une couverture ne peut pas désigner une
+      // pièce jointe que ce même envoi vient de supprimer.
+      await update(note.id, {
+        cover_attachment_id: coverToPayload(cover, {
+          keptAttachmentIds: note.attachments
+            .filter((attachment) => !removedAttachmentIds.includes(attachment.id))
+            .map((attachment) => attachment.id),
+          createdAttachmentIds: deposited.map((row) => row.id),
+        }),
+        updated_at: nowIso(),
+      });
       await refresh();
     },
     [canWrite, depositFiles, refresh, update],
@@ -264,6 +311,7 @@ export function useNotes(): UseNotesResult {
   const removeNote = useCallback(
     async (note: Note) => {
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (note.locked) throw new Error(LOCKED_DELETE);
       // Les objets suivent leurs lignes (D-03, WR-10) : les chemins sont lus
       // AVANT la suppression des lignes, les objets retirés APRÈS.
       const attachments = await data
@@ -278,6 +326,21 @@ export function useNotes(): UseNotesResult {
       await refresh();
     },
     [canWrite, refresh, remove],
+  );
+
+  const canUnlock = useCallback(
+    (note: Pick<Note, 'authorId'>) => isAdmin || Boolean(currentMember && note.authorId === currentMember.id),
+    [currentMember, isAdmin],
+  );
+
+  const setNoteLock = useCallback(
+    async (note: Note, locked: boolean) => {
+      if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+      if (!locked && !canUnlock(note)) throw new Error(UNLOCK_FORBIDDEN);
+      await update(note.id, { is_locked: locked, updated_at: nowIso() });
+      await refresh();
+    },
+    [canUnlock, canWrite, refresh, update],
   );
 
   const createFolder = useCallback(
@@ -346,6 +409,8 @@ export function useNotes(): UseNotesResult {
     addNote,
     editNote,
     removeNote,
+    setNoteLock,
+    canUnlock,
     ...metrics,
   };
 }

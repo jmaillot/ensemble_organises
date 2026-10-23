@@ -1,16 +1,14 @@
 import { useState } from 'react';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { cn } from '@/lib/utils';
 import { CountBadge } from '@/components/shared/module-shell';
 import { Icon } from '@/components/shared/icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/primitives';
 import {
   guessRayon,
-  itemStateLabel,
   matchCatalogue,
   normalizeSearchText,
-  quantityLabel,
   sectionsForList,
   RAYONS,
   type Grouping,
@@ -18,11 +16,31 @@ import {
   type ShoppingItem,
   type ShoppingListView,
 } from '../types';
+import { ShoppingItemRow } from './shopping-item-row';
 import { productPhotoUrl } from '../products-api';
 import type { ProductRow } from '@/types';
 
-/** Sur-titre de rayon : même traitement que `.section-kicker` de l'export. */
-const kickerClass = 'mb-1 mt-3 text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase';
+/**
+ * Chaque rayon porte son aplat et son pictogramme, comme les en-têtes de rayon
+ * de Melimelo : la couleur n'est jamais seule, le texte reste lisible.
+ */
+function rayonVisual(title: string): { emoji: string; tone: string } {
+  if (title.startsWith('Crèmerie')) return { emoji: '🥛', tone: 'bg-sky' };
+  if (title.startsWith('Viande')) return { emoji: '🍗', tone: 'bg-blush' };
+  if (title.startsWith('Charcuterie')) return { emoji: '🥓', tone: 'bg-blush' };
+  if (title.startsWith('Boulangerie')) return { emoji: '🥖', tone: 'bg-butter' };
+  if (title.startsWith('Fruits')) return { emoji: '🥕', tone: 'bg-sage' };
+  if (title.startsWith('Épicerie salée')) return { emoji: '🍝', tone: 'bg-sand' };
+  if (title.startsWith('Épicerie sucrée')) return { emoji: '🍪', tone: 'bg-butter' };
+  if (title.startsWith('Boissons')) return { emoji: '🧃', tone: 'bg-lilac' };
+  if (title.startsWith('Surgelés')) return { emoji: '❄️', tone: 'bg-sky' };
+  if (title.startsWith('Bébé')) return { emoji: '🍼', tone: 'bg-blush' };
+  if (title.startsWith('Hygiène') || title.startsWith('Parapharmacie')) return { emoji: '🧴', tone: 'bg-lilac' };
+  if (title.startsWith('Animalerie')) return { emoji: '🐾', tone: 'bg-sand' };
+  if (title.startsWith('Entretien')) return { emoji: '🧽', tone: 'bg-sage' };
+  if (title.startsWith('Maison')) return { emoji: '🏠', tone: 'bg-butter' };
+  return { emoji: '🛒', tone: 'bg-sand' };
+}
 
 export interface ShoppingGroupCardProps {
   list: ShoppingListView;
@@ -33,6 +51,12 @@ export interface ShoppingGroupCardProps {
   /** Photos affichables du catalogue (chemins re-signés à la lecture, D-01). */
   photoUrls: Record<string, string>;
   disabled?: boolean;
+  /**
+   * Rôle `enfant` : la liste se lit, elle ne se réordonne pas. Le serveur
+   * refuserait l'écriture de toute façon — mais une poignée qui ne peut pas
+   * faire son geste ne doit pas s'afficher.
+   */
+  readOnly?: boolean;
   onToggle: (item: ShoppingItem) => void;
   onQuickAdd: (listId: string, name: string, options?: { quantity?: string | null; rayon?: string | null }) => void;
   onQuickAddProduct: (listId: string, productId: string) => void;
@@ -54,6 +78,7 @@ export function ShoppingGroupCard({
   catalogue,
   photoUrls,
   disabled = false,
+  readOnly = false,
   onToggle,
   onQuickAdd,
   onQuickAddProduct,
@@ -130,7 +155,7 @@ export function ShoppingGroupCard({
       <div className="flex items-center justify-between gap-3">
         {/* Le compteur reste hors du titre : l'étiquette du groupe doit rester
             égale au nom de la liste pour les lecteurs d'écran. */}
-        <h3 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[15px]">
+        <h3 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
           {list.name}
         </h3>
         <div className="flex items-center gap-1.5">
@@ -159,11 +184,12 @@ export function ShoppingGroupCard({
             id={inputId}
             value={draft}
             disabled={disabled}
-            placeholder="Ajouter un article puis Entrée"
+            placeholder="Ajouter dans ta liste…"
             role="combobox"
             aria-expanded={liveHits.length > 0}
             aria-controls={`catalogue-matches-${list.id}`}
             aria-autocomplete="list"
+            className="min-h-12 rounded-full border-transparent bg-bg pl-4 text-[14px] focus-visible:bg-surface"
             onChange={(event) => {
               setDraft(event.target.value);
               setMatch(null);
@@ -184,6 +210,7 @@ export function ShoppingGroupCard({
             disabled={disabled || !draft.trim()}
             onClick={submitDraft}
             aria-label={`Ajouter l’article à la liste ${list.name}`}
+            className="shrink-0"
           >
             Ajouter
           </Button>
@@ -352,58 +379,34 @@ export function ShoppingGroupCard({
       ) : (
         sections.map((section, sectionIndex) => (
           <div key={section.key}>
-            {section.title ? <p className={cn(kickerClass, sectionIndex === 0 && 'mt-0')}>{section.title}</p> : null}
-            <ul className="m-0 grid list-none gap-0 p-0">
-              {section.items.map((item) => (
-                <li
-                  key={item.id}
-                  className={cn(
-                    'group flex min-h-11 items-center gap-2.5 border-t border-border first:border-t-0',
-                    item.checked && 'done',
-                  )}
+            {section.title ? (
+              <div className={cn('mb-2 flex items-center gap-2.5', sectionIndex === 0 ? 'mt-0' : 'mt-5')}>
+                <span
+                  aria-hidden="true"
+                  className={cn('grid size-9 shrink-0 place-items-center rounded-full text-[16px]', rayonVisual(section.title).tone)}
                 >
-                  <Checkbox
-                    checked={item.checked}
-                    disabled={disabled}
-                    onCheckedChange={() => onToggle(item)}
-                    aria-label={`${item.checked ? 'Rouvrir' : 'Terminer'} ${item.name}`}
-                    className="size-6"
+                  {rayonVisual(section.title).emoji}
+                </span>
+                <h4 className="m-0 font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{section.title}</h4>
+              </div>
+            ) : null}
+            {/* Le geste se fait À L'INTÉRIEUR du groupe : dans la vue « par
+                rayon », un article reste dans son rayon ; dans la vue « l'ordre
+                du foyer », la liste est à plat. */}
+            <SortableContext items={section.items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+              <ul className="m-0 grid list-none gap-0.5 p-0">
+                {section.items.map((item) => (
+                  <ShoppingItemRow
+                    key={item.id}
+                    item={item}
+                    readOnly={readOnly}
+                    onToggle={onToggle}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
                   />
-                  <span className={cn('min-w-0 flex-1 text-[13px]', item.checked && 'text-muted line-through')}>
-                    {item.name}
-                  </span>
-                  <small className="text-[10px] text-muted">
-                    {quantityLabel(item) ? `${quantityLabel(item)} · ${item.rayon}` : item.rayon}
-                  </small>
-                  <span
-                    className={cn(
-                      'text-[10px] font-semibold whitespace-nowrap',
-                      item.checked ? 'text-accent-strong' : 'text-muted',
-                    )}
-                  >
-                    {itemStateLabel(item.checked)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      icon="edit"
-                      className="size-8 min-h-8 hover:bg-accent-faint hover:text-fg"
-                      aria-label={`Modifier ${item.name}`}
-                      onClick={() => onEdit(item)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      icon="trash"
-                      className="size-8 min-h-8 hover:bg-coral-soft hover:text-coral"
-                      aria-label={`Supprimer ${item.name}`}
-                      onClick={() => onDelete(item)}
-                    />
-                  </span>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </ul>
+            </SortableContext>
           </div>
         ))
       )}

@@ -84,7 +84,7 @@ export function InvitationsPanel() {
   if (!isAdmin) {
     return (
       <Panel title="Inviter un membre" description="Les invitations sont gérées par les administrateurs du foyer.">
-        <div className="grid gap-3 rounded-[16px] border border-dashed border-accent/40 bg-accent-faint p-4">
+        <div className="grid gap-3 rounded-[20px] border border-dashed border-accent/40 bg-accent-faint p-4">
           <p className="m-0 text-xs text-muted">
             Seul un administrateur peut générer, régénérer ou révoquer un token d’invitation. Demandez-le-lui depuis son
             téléphone ou son ordinateur : le token n’est affiché qu’au moment de sa création.
@@ -134,7 +134,7 @@ export function InvitationsPanel() {
         </div>
 
         {displayed ? (
-          <div className="grid gap-4 rounded-[16px] border border-border bg-bg p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-4 rounded-[20px] border border-border bg-bg p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div>
               <p className="eyebrow mb-2">Token d’invitation</p>
               <p className="mb-4 font-mono text-lg tracking-[0.12em] break-all">{displayed.token}</p>
@@ -169,14 +169,14 @@ export function InvitationsPanel() {
               </p>
             </div>
             {showQr ? (
-              <div id={qrId} className="rounded-[16px] border border-border bg-surface p-3">
+              <div id={qrId} className="rounded-[20px] border border-border bg-surface p-3">
                 <QrCode value={displayed.token} size={168} label="QR code du token d’invitation" />
               </div>
             ) : null}
           </div>
         ) : null}
 
-        <div className="rounded-[16px] border border-border p-4">
+        <div className="rounded-[20px] border border-border p-4">
           <p className="eyebrow mb-3">Token en cours</p>
           <div className="grid gap-0">
             <div className="flex items-center justify-between gap-2.5 py-[11px] text-xs">

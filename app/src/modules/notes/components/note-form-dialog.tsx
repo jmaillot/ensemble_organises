@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,14 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
+import { cn } from '@/lib/utils';
 import { formatBytes, isImageMime } from '@/lib/storage';
+import { NoteMarkdown } from './note-markdown';
+import { MentionPicker } from './mention-picker';
 import {
   NOTE_CATEGORIES,
   OTHER_CATEGORY,
+  isCoverImage,
+  mentionAt,
+  mentionCandidates,
   noteVisibilityOptions,
+  type MentionCandidate,
+  type MentionContext,
   type Note,
   type NoteAttachment,
   type NoteCategoryChoice,
+  type NoteCoverChoice,
   type NoteFormValues,
 } from '../types';
 
@@ -58,26 +67,123 @@ export interface NoteFormDialogProps {
   /** Dossier pré-rempli à la création (onglet courant). */
   initialFolderId?: string | null;
   folders?: { id: string; name: string }[];
+  /** Les membres du foyer : cibles des mentions `@`. */
+  members?: { id: string; display_name: string }[];
+  /** Les autres notes : cibles des mentions `$`. */
+  notes?: { id: string; title: string }[];
   isSaving?: boolean;
-  onSubmit: (values: NoteFormValues, files: File[], removedAttachmentIds: string[]) => Promise<void> | void;
+  onSubmit: (
+    values: NoteFormValues,
+    files: File[],
+    removedAttachmentIds: string[],
+    cover: NoteCoverChoice,
+  ) => Promise<void> | void;
 }
 
 /** Création et modification d'une note du foyer, pièces jointes comprises. */
-export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = null, folders = [], isSaving = false, onSubmit }: NoteFormDialogProps) {
-  const { register, handleSubmit, reset, watch, formState } = useForm<NoteFormValues>({
+export function NoteFormDialog({
+  open,
+  onOpenChange,
+  note,
+  initialFolderId = null,
+  folders = [],
+  members = [],
+  notes = [],
+  isSaving = false,
+  onSubmit,
+}: NoteFormDialogProps) {
+  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<NoteFormValues>({
     resolver: zodResolver(noteSchema),
     mode: 'onSubmit',
   });
+  const contentField = register('content');
   const errors = formState.errors;
   const category = watch('category');
+  const contentValue = watch('content') ?? '';
+  const [isPreview, setIsPreview] = useState(false);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [cover, setCover] = useState<NoteCoverChoice>({ kind: 'auto' });
+
+  /**
+   * LES MENTIONS : `@` propose un membre du foyer, `$` propose une autre
+   * note. L'éditeur garde le focus — on tape, on choisit dans la liste.
+   */
+  const [mention, setMention] = useState<MentionContext | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const listboxId = 'notes-mentions';
+
+  const candidates = useMemo(
+    () =>
+      mention
+        ? mentionCandidates(mention.kind, mention.query, members, notes, note?.id ?? null)
+        : [],
+    [mention, members, notes, note?.id],
+  );
+
+  // La liste s'allonge et se raccourcit : l'option active doit rester dans
+  // la liste, sinon le curseur entre dans le vide.
+  useEffect(() => {
+    if (mentionIndex > candidates.length - 1) setMentionIndex(Math.max(0, candidates.length - 1));
+  }, [candidates.length, mentionIndex]);
+
+  const detectMention = (element: HTMLTextAreaElement) => {
+    const cursor = element.selectionStart ?? element.value.length;
+    setMention(mentionAt(element.value, cursor));
+    setMentionIndex(0);
+  };
+
+  const insertMention = (candidate: MentionCandidate) => {
+    const context = mention;
+    if (!context) return;
+    const current = textareaRef.current?.value ?? contentValue;
+    const next = current.slice(0, context.start) + candidate.text + current.slice(context.end);
+    setValue('content', next, { shouldDirty: true, shouldTouch: true });
+    setMention(null);
+    // Le curseur revient APRÈS l'insertion : le texte inséré est long (un
+    // lien Markdown), et le curseur resterait avant lui.
+    const position = context.start + candidate.text.length;
+    requestAnimationFrame(() => {
+      const element = textareaRef.current;
+      if (!element) return;
+      element.focus();
+      element.setSelectionRange(position, position);
+    });
+  };
+
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mention || candidates.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setMentionIndex((index) => (index + 1) % candidates.length);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setMentionIndex((index) => (index - 1 + candidates.length) % candidates.length);
+      return;
+    }
+    if (event.key === 'Enter') {
+      // Sans `preventDefault`, Entrée ENVERRAIT le formulaire au lieu de
+      // choisir la mention.
+      event.preventDefault();
+      insertMention(candidates[mentionIndex]);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setMention(null);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
     reset(defaultValues(note, initialFolderId));
     setNewFiles([]);
     setRemovedIds([]);
+    setCover(note?.coverAttachmentId ? { kind: 'attachment', id: note.coverAttachmentId } : { kind: 'auto' });
+    setIsPreview(false);
     // `note` — objet recréé par la page à chaque rendu — identifie une ouverture
     // par son `note?.id` stable : le formulaire n'est pas réinitialisé à chaque
     // frappe, et `reset` (react-hook-form) est stable.
@@ -86,6 +192,35 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
   const existing: NoteAttachment[] = (note?.attachments ?? []).filter(
     (attachment) => !removedIds.includes(attachment.id),
   );
+
+  /**
+   * Choix effectif : une couverture désignée puis retirée dans le même envoi
+   * retombe sur « première photo », plutôt que de désigner une ligne absente.
+   */
+  const effectiveCover: NoteCoverChoice =
+    cover.kind === 'attachment' && removedIds.includes(cover.id) ? { kind: 'auto' } : cover;
+
+  /** Photos candidates : les pièces jointes images déjà là, puis les nouveaux fichiers. */
+  type CoverCandidate = { key: string; label: string; url: string | null; choice: NoteCoverChoice };
+  const coverCandidates: CoverCandidate[] = [
+    ...existing.filter(isCoverImage).map((attachment): CoverCandidate => ({
+      key: `existing:${attachment.id}`,
+      label: attachment.fileName,
+      url: attachment.url,
+      choice: { kind: 'attachment', id: attachment.id },
+    })),
+    ...newFiles.flatMap((file, index): CoverCandidate[] =>
+      file.type.startsWith('image/')
+        ? [{ key: `new:${index}`, label: file.name, url: null, choice: { kind: 'new', fileIndex: index } }]
+        : [],
+    ),
+  ];
+
+  const isCoverChosen = (choice: NoteCoverChoice) => {
+    if (choice.kind === 'auto') return effectiveCover.kind === 'auto';
+    if (choice.kind === 'attachment') return effectiveCover.kind === 'attachment' && effectiveCover.id === choice.id;
+    return effectiveCover.kind === 'new' && effectiveCover.fileIndex === choice.fileIndex;
+  };
 
   const addFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -108,7 +243,7 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
           noValidate
           className="grid gap-3.5"
           onSubmit={handleSubmit(async (values) => {
-            await onSubmit(values, newFiles, removedIds);
+            await onSubmit(values, newFiles, removedIds, effectiveCover);
           })}
         >
           <Field label="Titre" error={errors.title?.message}>
@@ -177,14 +312,92 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
             </Field>
           ) : null}
 
-          <Field label="Contenu" error={errors.content?.message}>
+          <Field
+            label="Contenu"
+            hint="Markdown accepté : **gras**, *italique*, - liste, [lien](https://exemple.fr)"
+            error={errors.content?.message}
+          >
             {(props) => (
-              <Textarea
-                {...props}
-                {...register('content')}
-                rows={6}
-                placeholder="Cartables, crayons, gourdes et un goûter pour le premier jour."
-              />
+              <div className="grid gap-2">
+                <div className="flex justify-end">
+                  <div
+                    role="group"
+                    aria-label="Affichage du contenu"
+                    className="flex gap-0.5 rounded-full border border-border/70 bg-bg p-0.5"
+                  >
+                    {(
+                      [
+                        { preview: false, label: 'Écrire' },
+                        { preview: true, label: 'Aperçu' },
+                      ] as const
+                    ).map((mode) => (
+                      <button
+                        key={mode.label}
+                        type="button"
+                        aria-pressed={isPreview === mode.preview}
+                        onClick={() => setIsPreview(mode.preview)}
+                        className={cn(
+                          'min-h-9 rounded-full px-3 text-[11.5px] font-bold transition-colors duration-[var(--duration-quick)]',
+                          isPreview === mode.preview
+                            ? 'bg-surface text-fg shadow-sm'
+                            : 'text-muted hover:text-fg',
+                        )}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/*
+                  Le champ reste monté en aperçu, masqué : c'est lui qui porte la
+                  valeur enregistrée, et le démonter la perdrait à l'envoi. Il
+                  porte les attributs d'accessibilité du libellé, d'où le
+                  `aria-label` de la zone d'aperçu qui reprend le rôle.
+                */}
+                <Textarea
+                  {...props}
+                  {...contentField}
+                  rows={6}
+                  placeholder="Cartables, crayons, gourdes et un goûter pour le premier jour."
+                  hidden={isPreview}
+                  ref={(element) => {
+                    contentField.ref(element);
+                    textareaRef.current = element;
+                  }}
+                  onChange={(event) => {
+                    contentField.onChange(event);
+                    detectMention(event.currentTarget);
+                  }}
+                  onKeyDown={handleContentKeyDown}
+                  role="combobox"
+                  aria-expanded={candidates.length > 0}
+                  aria-controls={listboxId}
+                  aria-autocomplete="list"
+                  aria-activedescendant={
+                    candidates.length > 0 ? `${listboxId}-${mentionIndex}` : undefined
+                  }
+                />
+                {!isPreview && candidates.length > 0 ? (
+                  <MentionPicker
+                    candidates={candidates}
+                    activeIndex={mentionIndex}
+                    listboxId={listboxId}
+                    onPick={insertMention}
+                  />
+                ) : null}
+                {isPreview ? (
+                  <div
+                    aria-label="Aperçu du contenu"
+                    className="min-h-[132px] rounded-[14px] border border-border bg-surface px-3.5 py-3"
+                  >
+                    {contentValue.trim() === '' ? (
+                      <p className="m-0 text-xs text-muted">Rien à prévisualiser pour l’instant.</p>
+                    ) : (
+                      <NoteMarkdown content={contentValue} />
+                    )}
+                  </div>
+                ) : null}
+              </div>
             )}
           </Field>
 
@@ -258,6 +471,56 @@ export function NoteFormDialog({ open, onOpenChange, note, initialFolderId = nul
               </div>
             )}
           </Field>
+
+          {coverCandidates.length > 0 ? (
+            <Field
+              label="Photo de couverture"
+              optional
+              hint="Elle sert de bandeau sur la carte. À défaut, la première photo jointe."
+            >
+              {(props) => (
+                <div className="grid gap-2" {...props}>
+                  <div role="group" aria-label="Choisir la photo de couverture" className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={isCoverChosen({ kind: 'auto' })}
+                      onClick={() => setCover({ kind: 'auto' })}
+                      className={cn(
+                        'min-h-9 rounded-full border px-3 text-[11.5px] font-bold transition-colors duration-[var(--duration-quick)]',
+                        isCoverChosen({ kind: 'auto' })
+                          ? 'border-accent bg-accent-soft text-accent-strong'
+                          : 'border-border bg-surface text-muted hover:border-accent hover:text-fg',
+                      )}
+                    >
+                      Première photo
+                    </button>
+                    {coverCandidates.map((candidate) => (
+                      <button
+                        key={candidate.key}
+                        type="button"
+                        aria-pressed={isCoverChosen(candidate.choice)}
+                        aria-label={`Choisir ${candidate.label} comme couverture`}
+                        title={candidate.label}
+                        onClick={() => setCover(candidate.choice)}
+                        className={cn(
+                          'grid size-12 place-items-center overflow-hidden rounded-[10px] border-2 transition-colors duration-[var(--duration-quick)]',
+                          isCoverChosen(candidate.choice)
+                            ? 'border-accent'
+                            : 'border-border hover:border-accent',
+                        )}
+                      >
+                        {candidate.url ? (
+                          <img src={candidate.url} alt="" className="size-full object-cover" />
+                        ) : (
+                          <Icon name="image" size="sm" className="text-muted" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Field>
+          ) : null}
 
           <DialogActions>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>

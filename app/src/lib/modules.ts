@@ -22,6 +22,9 @@ export type ModuleKey =
   | 'cercle'
   | 'voyages'
   | 'messages'
+  | 'frigo'
+  | 'menu'
+  | 'documents'
   | 'parametres';
 
 export interface ModuleEntry {
@@ -54,7 +57,7 @@ export const modules: ModuleEntry[] = [
   { key: 'taches', label: 'Tâches', detail: 'Priorités & rappels', kicker: 'Tout avancer', image: 'taches.jpg', icon: 'checkCircle', short: 'À faire', navLabel: 'À faire', tile: true, nav: true },
   { key: 'routines', label: 'Routines', detail: 'Habitudes du foyer', kicker: 'Le rythme juste', image: 'routines.jpg', icon: 'wand', short: 'Routines', tile: true, nav: false },
   { key: 'ardoise', label: 'Ardoise', detail: 'Dépenses & partage', kicker: 'Transparent par nature', image: 'ardoise.jpg', icon: 'wallet', short: 'Ardoise', tile: true, nav: false },
-  { key: 'recettes', label: 'Recettes', detail: 'Bientôt disponible', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
+  { key: 'recettes', label: 'Recettes', detail: 'Carnet de cuisine', kicker: 'La cuisine du foyer', image: 'courses.jpg', icon: 'utensils', short: 'Recettes', tile: true, nav: false },
   { key: 'cadeaux', label: 'Cadeaux', detail: 'Idées à offrir', kicker: 'Pour dire merci', image: 'cadeaux.jpg', icon: 'gift', short: 'Cadeaux', tile: true, nav: false },
   { key: 'anniversaires', label: 'Anniversaires', detail: 'Ne rien oublier', kicker: 'Les petits moments', image: 'calendrier.jpg', icon: 'heart', short: 'Anniversaires', tile: true, nav: false },
   { key: 'contacts', label: 'Contacts', detail: 'Famille & proches', kicker: 'Les visages du foyer', image: 'cercle.jpg', icon: 'people', short: 'Contacts', tile: true, nav: false },
@@ -65,6 +68,9 @@ export const modules: ModuleEntry[] = [
   { key: 'cercle', label: 'Cercle', detail: 'Photos & réactions', kicker: 'Le fil du foyer', image: 'cercle.jpg', icon: 'people', short: 'Cercle', tile: true, nav: true },
   { key: 'voyages', label: 'Voyages', detail: 'Projets à préparer', kicker: 'Partir ensemble', image: 'voyages.jpg', icon: 'map', short: 'Voyages', tile: true, nav: false },
   { key: 'messages', label: 'Messages', detail: 'Échanges privés', kicker: 'Se retrouver', image: 'cercle.jpg', icon: 'message', short: 'Messages', tile: true, nav: false },
+  { key: 'frigo', label: 'Frigo', detail: 'Stocks & péremptions', kicker: 'Rien ne se perd', image: 'courses.jpg', icon: 'archive', short: 'Frigo', tile: true, nav: false },
+  { key: 'menu', label: 'Menu', detail: 'Repas de la semaine', kicker: 'La semaine à table', image: 'courses.jpg', icon: 'calendar', short: 'Menu', tile: true, nav: false },
+  { key: 'documents', label: 'Documents', detail: 'La boîte à papiers du foyer', kicker: 'Tout à portée de main', image: 'taches.jpg', icon: 'receipt', short: 'Documents', tile: true, nav: false },
 ];
 
 export const moduleMap: Record<ModuleKey, ModuleEntry> = Object.fromEntries(
@@ -94,6 +100,40 @@ export const CHILD_HIDDEN_MODULES: ModuleKey[] = ['ardoise', 'cadeaux', 'fidelit
 
 /** Vrai pour les 5 modules masqués au rôle `enfant`. */
 export const isChildHiddenModule = (key: ModuleKey): boolean => CHILD_HIDDEN_MODULES.includes(key);
+
+/**
+ * Vrai quand le foyer a éteint ce module (menu des applications, migration
+ * 0140). La liste vient de `households.disabled_modules` — vide par défaut :
+ * un foyer existant et un module futur restent actifs. Masquer le module
+ * partout (tuile, navigation, recherche, route) est un choix de PRÉSENTATION
+ * : la frontière d'autorisation reste la RLS, qui ne connaît pas cette
+ * colonne.
+ */
+export const isModuleDisabled = (key: ModuleKey, disabledModules: readonly string[]): boolean =>
+  disabledModules.includes(key);
+
+/**
+ * Filtre les clés visibles : hors périmètre `enfant` ET espaces éteints par
+ * le foyer. Une seule couture pour les surfaces de navigation (rail, tiroir,
+ * palette, tuiles) — chaque surface compose son propre rendu, jamais sa
+ * propre règle.
+ */
+export const filterModuleKeys = (
+  keys: readonly ModuleKey[],
+  { isChild = false, disabledModules = [] as readonly string[] } = {},
+): ModuleKey[] =>
+  keys.filter(
+    (key) => !(isChild && isChildHiddenModule(key)) && !isModuleDisabled(key, disabledModules),
+  );
+
+/** Filtre les entrées du catalogue par le même signal que `filterModuleKeys`. */
+export const filterModuleEntries = (
+  entries: readonly ModuleEntry[],
+  { isChild = false, disabledModules = [] as readonly string[] } = {},
+): ModuleEntry[] =>
+  entries.filter(
+    (entry) => !(isChild && isChildHiddenModule(entry.key)) && !isModuleDisabled(entry.key, disabledModules),
+  );
 
 export const modulePath = (key: ModuleKey) => `/${key}`;
 export const assetUrl = (file: string) => `/assets/${file}`;

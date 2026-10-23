@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CalendarGrid } from './calendar-grid';
+import { CalendarGrid, isoWeekNumber } from './calendar-grid';
 import { buildDayMarkers, toCalendarEvent } from '../types';
 import type { EventRow } from '@/types';
 
@@ -65,5 +65,21 @@ describe('CalendarGrid couches de référence', () => {
     // Pastille événement (corail) + pastille férié (ambre) : les deux couches.
     expect(button.querySelector('.bg-coral')).not.toBeNull();
     expect(button.querySelector('.bg-amber')).not.toBeNull();
+  });
+
+  it('affiche le numéro de semaine à gauche de la grille', () => {
+    renderGrid(false);
+    expect(screen.getByText('46')).toHaveAttribute('title', 'Semaine 46');
+  });
+});
+
+describe('numéro de semaine ISO 8601', () => {
+  it('suit la règle du premier jeudi, y compris au changement d’année', () => {
+    // 21 octobre 2026, un mercredi : semaine 43.
+    expect(isoWeekNumber('2026-10-21')).toBe(43);
+    // Le lundi 30 décembre 2024 appartient à la semaine 1 de 2025.
+    expect(isoWeekNumber('2024-12-30')).toBe(1);
+    // Le dimanche 1er janvier 2023 reste dans la semaine 52 de 2022.
+    expect(isoWeekNumber('2023-01-01')).toBe(52);
   });
 });

@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
 import { NavLink } from 'react-router';
 import { cn } from '@/lib/utils';
-import { catalogueModules, isChildHiddenModule, modulePath } from '@/lib/modules';
-import { useCurrentMember } from '@/stores/household-store';
+import { catalogueModules, filterModuleEntries, modulePath } from '@/lib/modules';
+import { useCurrentMember, useDisabledModules } from '@/stores/household-store';
 import { Icon } from './icon';
 
 /**
@@ -11,8 +11,8 @@ import { Icon } from './icon';
  */
 export const navItemClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
-    isActive && 'bg-accent-soft font-[750] text-accent-strong',
+    'flex min-h-11 w-full items-center gap-3 rounded-full px-3.5 text-left text-[13.5px] text-muted transition-colors duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:bg-accent-faint hover:text-fg max-[920px]:justify-center max-[920px]:px-0',
+    isActive && 'bg-accent font-[650] text-surface hover:bg-accent-strong hover:text-surface',
   );
 
 /**
@@ -26,9 +26,11 @@ export function ModuleCatalogueNav({ className }: { className?: string }) {
   const [open, setOpen] = useState(true);
   const panelId = useId();
   // Rôle `enfant` (phase 14, D-05) : les 5 modules hors périmètre sortent du
-  // catalogue, comme les tuiles et le tiroir — présentation seulement.
+  // catalogue, comme les tuiles et le tiroir — présentation seulement. Menu
+  // des applications (0140) : les espaces éteints par le foyer sortent aussi.
   const isChild = useCurrentMember()?.role === 'enfant';
-  const visibleModules = isChild ? catalogueModules.filter((entry) => !isChildHiddenModule(entry.key)) : catalogueModules;
+  const disabledModules = useDisabledModules();
+  const visibleModules = filterModuleEntries(catalogueModules, { isChild, disabledModules });
 
   return (
     <div className={cn('mt-6', className)}>

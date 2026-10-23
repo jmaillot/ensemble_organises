@@ -14,16 +14,42 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ModuleShell, MetricRow, Panel } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
+import { Fab } from '@/components/ui/fab';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { Select } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { FolderTabs } from '@/components/shared/folder-tabs';
-import { memberFirstName, isOpenForMe, taskFilters, taskGroup, type Task, type TaskGroup } from './types';
+import {
+  memberFirstName,
+  isOpenForMe,
+  sortedIdsFor,
+  taskFilters,
+  taskGroup,
+  type Task,
+  type TaskGroup,
+  type TaskSort,
+  type TaskStatus,
+} from './types';
 import { TaskRow } from './components/task-row';
 import { TaskFormDialog } from './components/task-form-dialog';
+import { TaskBoard } from './components/task-board';
 import { useTaches } from './hooks/use-taches';
+import { useOpenRecord } from '@/hooks/use-open-record';
+
+type TaskView = 'liste' | 'tableau';
+
+const VIEW_STORAGE_KEY = 'eo:taches:view';
+
+/** Vue choisie la dernière fois ; la liste reste le défaut d'un premier passage. */
+function readStoredView(): TaskView {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'tableau' ? 'tableau' : 'liste';
+  } catch {
+    return 'liste';
+  }
+}
 
 const screenReaderInstructions = {
   draggable:
@@ -76,7 +102,9 @@ export default function TachesPage() {
     error,
     isMutating,
     refetch,
+    boardTasks,
     toggleStatus,
+    setTaskStatus,
     saveTask,
     removeTask,
     reorder,
@@ -88,6 +116,8 @@ export default function TachesPage() {
   });
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [dragged, setDragged] = useState<Task | null>(null);
+  const [view, setView] = useState<TaskView>(readStoredView);
+  const [sort, setSort] = useState<TaskSort | 'manuel'>('manuel');
 
   // Raccourci depuis le calendrier : l'échéance voyage dans l'état de
   // navigation et ouvre la création, consommé une seule fois (sans quoi chaque
@@ -113,9 +143,26 @@ export default function TachesPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const changeView = (next: TaskView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Stockage indisponible : la vue reste en mémoire pour la session.
+    }
+  };
+
+  const moveTask = (task: Task, status: TaskStatus) => {
+    void setTaskStatus(task, status).catch((moveError: unknown) =>
+      toast(moveError instanceof Error ? moveError.message : 'Le statut n’a pas pu être mis à jour.', 'error'),
+    );
+  };
+
   const openCreate = () => setDialog({ open: true, task: null, dueDate: null });
   const openEdit = (task: Task) => setDialog({ open: true, task, dueDate: null });
   const closeDialog = () => setDialog((current) => ({ ...current, open: false }));
+  // Lien profond : `/taches?ouvrir=<id>` ouvre la fiche de la tâche.
+  useOpenRecord(tasks, openEdit);
 
   // Compteur « À faire » personnel : ouvertes sans assigné (foyer) ou pour
   // moi — jamais celles des autres membres.
@@ -158,6 +205,26 @@ export default function TachesPage() {
     setDragged(visibleTasks.find((task) => task.id === String(event.active.id)) ?? null);
   };
 
+  /**
+   * LE TRI EN UN CLIC : réordonner tout d'un coup, par échéance ou par
+   * responsable. Les rangs sont ÉCRITS, comme au glisser-déposer — l'ordre
+   * trié devient l'ordre du foyer.
+   */
+  const appliquerTri = (value: TaskSort | 'manuel') => {
+    setSort(value);
+    if (value === 'manuel') return;
+    void reorder(sortedIdsFor(visibleTasks, value))
+      .then(() =>
+        toast(value === 'echeance' ? 'Tâches triées par échéance.' : 'Tâches triées par responsable.'),
+      )
+      .catch((sortError: unknown) =>
+        toast(
+          sortError instanceof Error ? sortError.message : 'Le tri n’a pas pu être enregistré.',
+          'error',
+        ),
+      );
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setDragged(null);
     const { active, over } = event;
@@ -189,9 +256,10 @@ export default function TachesPage() {
   return (
     <ModuleShell
       module="taches"
+      infoTo="/taches/aide"
       actions={
         canWrite ? (
-          <Button icon="plus" onClick={openCreate}>
+          <Button icon="plus" onClick={openCreate} className="max-[650px]:hidden">
             Ajouter une tâche
           </Button>
         ) : null
@@ -244,30 +312,90 @@ export default function TachesPage() {
         />
       </div>
 
+      <div className="mb-4 flex items-center justify-end">
+        <div
+          role="group"
+          aria-label="Affichage des tâches"
+          className="flex gap-1 rounded-full border border-border bg-surface p-1"
+        >
+          {(
+            [
+              { value: 'liste', label: 'Liste' },
+              { value: 'tableau', label: 'Tableau' },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={view === option.value}
+              onClick={() => changeView(option.value)}
+              className={
+                view === option.value
+                  ? 'rounded-full bg-accent px-3 py-1.5 text-[11.5px] font-extrabold text-white'
+                  : 'rounded-full px-3 py-1.5 text-[11.5px] font-bold text-muted hover:text-fg'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {isError ? (
         <ErrorState
           message={error?.message ?? 'Les tâches du foyer n’ont pas pu être chargées.'}
           onRetry={refetch}
         />
       ) : (
-        <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] items-start gap-[18px] max-[920px]:grid-cols-1">
+        // Le tableau prend toute la largeur : trois colonnes dans la colonne
+        // de gauche écrasaient les titres à un mot par ligne.
+        <div
+          className={
+            view === 'tableau'
+              ? 'grid grid-cols-1 items-start gap-[18px]'
+              : 'grid grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] items-start gap-[18px] max-[920px]:grid-cols-1'
+          }
+        >
           <Panel
             id="task-list-panel"
-            title="Vos prochaines tâches"
-            description="Glissez les lignes pour réordonner, ou changez la priorité."
+            title={view === 'tableau' ? 'Tableau des tâches' : 'Vos prochaines tâches'}
+            description={
+              view === 'tableau'
+                ? 'Trois colonnes valent tous les statuts : glissez une carte par sa poignée, ou choisissez le statut sur la carte.'
+                : 'Glissez les lignes pour réordonner, ou changez la priorité.'
+            }
             action={
-              <div className="flex flex-wrap gap-2">
-                <Select
+              <div className="flex flex-wrap items-end gap-2">
+                {view === 'liste' ? (
+                  <Select
                   aria-label="Filtrer les tâches"
                   className="w-auto min-w-[190px] max-[650px]:w-full max-[650px]:min-w-0"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value as typeof filter)}
+                  >
+                    {taskFilters.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : null}
+                <Select
+                  aria-label="Trier les tâches"
+                  className="w-auto min-w-[150px] max-[650px]:w-full max-[650px]:min-w-0"
+                  value={sort}
+                  onChange={(event) => appliquerTri(event.target.value as TaskSort | 'manuel')}
+                  title={
+                    assigneesUnknown
+                      ? 'Les assignés ne sont pas encore connus : le tri attendra leur lecture.'
+                      : undefined
+                  }
                 >
-                  {taskFilters.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
+                  <option value="manuel">L’ordre du foyer</option>
+                  <option value="echeance">Par échéance</option>
+                  <option value="responsable" disabled={assigneesUnknown}>
+                    Par responsable
+                  </option>
                 </Select>
                 <Select
                   aria-label="Filtrer par assigné"
@@ -288,6 +416,18 @@ export default function TachesPage() {
           >
             {isLoading ? (
               <LoadingRows rows={4} />
+            ) : view === 'tableau' ? (
+              boardTasks.length === 0 ? (
+                <EmptyState
+                  icon="checkCircle"
+                  title="Aucune tâche dans ce dossier"
+                  description="Les tâches de ce dossier se rangeront ici, par statut. Ajoutez-en une pour commencer."
+                  actionLabel={canWrite ? 'Ajouter une tâche' : undefined}
+                  onAction={canWrite ? openCreate : undefined}
+                />
+              ) : (
+                <TaskBoard tasks={boardTasks} canWrite={canWrite} onEdit={openEdit} onMove={moveTask} />
+              )
             ) : visibleTasks.length === 0 ? (
               <EmptyState
                 icon="checkCircle"
@@ -301,7 +441,7 @@ export default function TachesPage() {
                 onAction={canWrite ? openCreate : undefined}
               />
             ) : !canWrite ? (
-              <div role="list" aria-label="Tâches du foyer" className="grid gap-2.5">
+              <div role="list" aria-label="Tâches du foyer" className="grid gap-1">
                 {visibleTasks.map((task) => (
                   <TaskRow
                     key={task.id}
@@ -333,7 +473,7 @@ export default function TachesPage() {
                 onDragCancel={() => setDragged(null)}
               >
                 <SortableContext items={visibleTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-                  <div role="list" aria-label="Tâches du foyer" className="grid gap-2.5">
+                  <div role="list" aria-label="Tâches du foyer" className="grid gap-1">
                     {visibleTasks.map((task) => (
                       <TaskRow
                         key={task.id}
@@ -358,7 +498,7 @@ export default function TachesPage() {
                 </SortableContext>
                 <DragOverlay>
                   {dragged ? (
-                    <p className="rounded-[10px] border border-accent bg-surface px-3 py-2 text-[13px] font-[760] shadow-[var(--shadow-md)]">
+                    <p className="rounded-[14px] border border-accent/30 bg-surface px-3 py-2 text-[13.5px] font-[700] shadow-[var(--shadow-md)]">
                       {dragged.name}
                     </p>
                   ) : null}
@@ -377,18 +517,18 @@ export default function TachesPage() {
                 Aucun rappel aujourd’hui. Ajoutez-en un depuis le formulaire d’une tâche.
               </p>
             ) : (
-              <div className="grid gap-2.5">
+              <div className="grid gap-1">
                 {reminders.slice(0, 3).map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-[9px] border-t border-border py-2.5 first:border-t-0 first:pt-0"
+                    className="flex items-center gap-2.5 rounded-[14px] px-1 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60"
                   >
-                    <span className="w-[43px] text-[11px] font-extrabold text-accent-strong">
+                    <span className="w-[44px] shrink-0 text-[11.5px] font-extrabold text-accent-strong tabular-nums">
                       {task.reminderTime}
                     </span>
                     <div className="min-w-0">
-                      <p className="m-0 truncate text-xs font-[760]">{task.name}</p>
-                      <small className="text-[10px] text-muted">
+                      <p className="m-0 truncate text-[13px] font-[700]">{task.name}</p>
+                      <small className="text-[11px] text-muted">
                         {task.assignees.length > 0
                           ? task.assignees.map((assignee) => memberFirstName(assignee.member.display_name)).join(', ')
                           : 'Personne assigné'}
@@ -452,6 +592,12 @@ export default function TachesPage() {
             );
         }}
       />
+
+      {/* Le bouton flottant reprend l'action principale du module à portée de
+          pouce sur tactile ; l'en-tête la porte déjà au-delà de 650 px. */}
+      {canWrite ? (
+        <Fab icon="plus" label="Ajouter une tâche" onClick={openCreate} className="min-[651px]:hidden" />
+      ) : null}
     </ModuleShell>
   );
 }

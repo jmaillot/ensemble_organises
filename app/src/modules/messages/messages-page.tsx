@@ -117,6 +117,7 @@ export default function MessagesPage() {
   return (
     <ModuleShell
       module="messages"
+      infoTo="/messages/aide"
       actions={
         <Button icon="edit" onClick={() => setCreateOpen(true)}>
           Nouveau message

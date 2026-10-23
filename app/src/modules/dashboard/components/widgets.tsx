@@ -32,7 +32,7 @@ export function WidgetCard({ placement, isEditing, dragHandleProps, children }: 
   return (
     <article
       className={cn(
-        'widget-shell panel-surface relative min-h-[190px] overflow-hidden rounded-[16px] p-[18px]',
+        'widget-shell panel-surface relative min-h-[190px] overflow-hidden rounded-[20px] p-[18px]',
         isEditing && 'cursor-grab ring-2 ring-accent/40',
         placement.width === 2 && 'sm:col-span-2',
       )}
@@ -135,7 +135,7 @@ export function TasksWidget({
               />
               <div className="min-w-0">
                 <strong className="block truncate text-[12px] font-bold">{task.name}</strong>
-                <small className="block truncate text-[10px] text-muted">
+                <small className="block truncate text-[11px] text-muted">
                   {task.due_date ? relativeDayLabel(task.due_date) : 'Sans échéance'}
                 </small>
               </div>
@@ -203,7 +203,7 @@ export function BirthdaysWidget({
               </span>
               <div className="min-w-0">
                 <strong className="block truncate text-[12px]">{row.name}</strong>
-                <small className="block truncate text-[10px] text-muted">{formatBirthdayDate(row.birth_date)}</small>
+                <small className="block truncate text-[11px] text-muted">{formatBirthdayDate(row.birth_date)}</small>
               </div>
             </div>
           ))}
@@ -253,7 +253,7 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
   const segments = balances.slice(0, 3).map((entry) => Math.abs(entry.amount));
   const scale = segments.reduce((sum, value) => sum + value, 0) || 1;
   return (
-    <section className="side-card panel-surface rounded-[16px] p-[17px]">
+    <section className="side-card panel-surface rounded-[22px] p-[18px]">
       <div className="mb-3 flex items-start justify-between gap-2.5">
         <div>
           <p className="eyebrow mb-1">Ardoise · {monthLabel}</p>
@@ -285,7 +285,7 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
           </strong>
         </div>
       ))}
-      <p className="mt-2 text-[10px] text-muted">
+      <p className="mt-2.5 text-[11px] text-muted">
         Réparties automatiquement. Détail dans <strong className="font-semibold text-fg">l'Ardoise</strong> ({Math.round((totalAbs / 2) * 100) / 100} € en jeu).
       </p>
     </section>
@@ -301,7 +301,7 @@ export function ActivityCard({ entries }: { entries: { id: string; actor: string
     anniversaire: 'gift',
   };
   return (
-    <section className="side-card panel-surface rounded-[16px] p-[17px]">
+    <section className="side-card panel-surface rounded-[22px] p-[18px]">
       <h3 className="mb-1 font-display text-base tracking-[-0.035em]">Activité du foyer</h3>
       <p className="mb-3.5 text-xs text-muted">Les dernières contributions de chacun.</p>
       {entries.length === 0 ? (
@@ -328,7 +328,7 @@ export function ActivityCard({ entries }: { entries: { id: string; actor: string
 
 export function ShoppingCard({ shopping }: { shopping: { title: string; relative: string } | null }) {
   return (
-    <section className="coupon-card relative min-h-[150px] overflow-hidden rounded-[16px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
+    <section className="coupon-card relative min-h-[150px] overflow-hidden rounded-[20px] bg-fg p-[18px] text-surface max-[650px]:min-h-0 max-[650px]:p-[14px]">
       <span aria-hidden="true" className="coupon-ring" />
       <p className="mb-4 text-[11px] text-on-dark">
         {shopping ? 'Prochaine course' : 'Courses'}
@@ -336,7 +336,7 @@ export function ShoppingCard({ shopping }: { shopping: { title: string; relative
       <strong className="block font-display text-[27px] tracking-[-0.06em]">
         {shopping ? shopping.relative : 'à planifier'}
       </strong>
-      <small className="text-[10px] text-on-dark">{shopping?.title ?? 'Aucune course prévue au calendrier.'}</small>
+      <small className="text-[11px] text-on-dark">{shopping?.title ?? 'Aucune course prévue au calendrier.'}</small>
     </section>
   );
 }
@@ -360,7 +360,7 @@ export function CustomizePanel({
     routines: 'Routines',
   };
   return (
-    <section className="panel-surface rounded-[16px] p-4" aria-label="Personnalisation des widgets">
+    <section className="panel-surface rounded-[22px] p-4" aria-label="Personnalisation des widgets">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="mb-0.5 font-display text-base tracking-[-0.03em]">Personnaliser l’accueil</h2>
@@ -372,7 +372,7 @@ export function CustomizePanel({
       </div>
       <ul className="m-0 grid list-none gap-2 p-0">
         {preferences.map((preference) => (
-          <li key={preference.kind} className="flex min-h-[47px] items-center gap-2.5 rounded-[11px] border border-border bg-bg px-3">
+          <li key={preference.kind} className="flex min-h-[47px] items-center gap-2.5 rounded-[14px] border border-border bg-bg px-3">
             <Icon name="drag" size="sm" className="shrink-0 text-muted" />
             <label className="flex-1 text-[12px] font-bold">{labels[preference.kind] ?? preference.kind}</label>
             <Button

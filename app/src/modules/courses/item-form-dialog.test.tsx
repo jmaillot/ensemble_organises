@@ -81,6 +81,7 @@ describe('ItemFormDialog — édition', () => {
           rayon: 'Divers',
           checked: false,
           addedBy: null,
+          position: 0,
           createdAt: new Date().toISOString(),
         }}
       />,

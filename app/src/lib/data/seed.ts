@@ -15,6 +15,7 @@ import type {
   EventRow,
   ExpenseParticipantRow,
   ExpenseRow,
+  ProductRow,
   GiftIdeaRow,
   GiftItemRow,
   GiftListRow,
@@ -24,6 +25,7 @@ import type {
   LoyaltyCardRow,
   MessageRow,
   NoteRow,
+  NoteAttachmentRow,
   PetAttachmentRow,
   PetRecordRow,
   PetRow,
@@ -131,7 +133,35 @@ export const demoHousehold: HouseholdRow = {
   created_by: DEMO_USER_ID,
   created_at: now(),
   updated_at: now(),
+  // Menu des applications (0140) : le foyer de démonstration démarre avec
+  // tous les espaces activés, comme tout foyer réel.
+  disabled_modules: [],
 };
+
+/**
+ * Frigo de démonstration (0141, vague 3.1) : trois emplacements représentés,
+ * avec un article périmé, un bientôt périmé et des articles sans date pour
+ * exercer tous les états de pastille.
+ */
+export const demoPantryItems = [
+  { id: 'pantry-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts nature', category: 'produit_frais', quantity: 8, unit: 'pots', location: 'frigo', expires_on: day(4), opened_on: null, notes: null, created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Jambon blanc', category: 'produit_frais', quantity: 1, unit: 'barquette', location: 'frigo', expires_on: day(1), opened_on: todayIso(), notes: 'Ouvert mardi', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème fraîche', category: 'produit_frais', quantity: 1, unit: 'pot', location: 'frigo', expires_on: day(-2), opened_on: day(-5), notes: 'À jeter', created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'pantry-4', household_id: DEMO_HOUSEHOLD_ID, name: 'Pois du jardin', category: 'surgele', quantity: 2, unit: 'sacs', location: 'congelateur', expires_on: day(120), opened_on: null, notes: null, created_by: DEMO_MEMBERS.lina, created_at: now() },
+  { id: 'pantry-5', household_id: DEMO_HOUSEHOLD_ID, name: 'Pâtes penne', category: 'epicerie', quantity: 3, unit: 'paquets', location: 'garde_manger', expires_on: null, opened_on: null, notes: null, created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'pantry-6', household_id: DEMO_HOUSEHOLD_ID, name: 'Jus de pomme', category: 'boisson', quantity: 2, unit: 'briques', location: 'garde_manger', expires_on: day(30), opened_on: null, notes: null, created_by: DEMO_MEMBERS.thomas, created_at: now() },
+];
+
+/**
+ * Menu de démonstration (0142, vague 3.1) : la semaine courante, recette du
+ * foyer et textes libres mêlés, pour exercer les deux contenus et les trois
+ * moments de la journée.
+ */
+export const demoMealEntries = [
+  { id: 'meal-1', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(0), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 4, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas, DEMO_MEMBERS.lina], created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'meal-2', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(1), slot: 'midi', recipe_id: null, free_text: 'Restes du frigo', servings: 2, member_ids: [], created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'meal-3', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(2), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 2, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas], created_by: DEMO_MEMBERS.camille, created_at: now() },
+];
 
 export const demoMembers: HouseholdMemberRow[] = [
   {
@@ -192,11 +222,48 @@ export const demoShoppingLists: ShoppingListRow[] = [
 ];
 
 export const demoShoppingItems: ShoppingListItemRow[] = [
-  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'item-2', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fruits', quantity: 1, unit: 'sachet', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, created_at: now() },
-  { id: 'item-3', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Lait d’agne', quantity: 3, unit: 'briques', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.thomas, product_id: null, created_at: now() },
-  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'item-5', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Savon liquide', quantity: 1, unit: 'flacon', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, created_at: now() },
+  { id: 'item-1', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Yaourts', quantity: 8, unit: 'pots', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.camille, product_id: 'product-1', position: 0, created_at: now() },
+  { id: 'item-2', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Fruits', quantity: 1, unit: 'sachet', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
+  { id: 'item-3', list_id: 'list-fresque', household_id: DEMO_HOUSEHOLD_ID, name: 'Lait d’agne', quantity: 3, unit: 'briques', category: 'Frais', checked: false, added_by: DEMO_MEMBERS.thomas, product_id: null, position: 2, created_at: now() },
+  { id: 'item-4', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Papier toilette', quantity: 2, unit: 'paquets', category: 'Hygiène', checked: true, added_by: DEMO_MEMBERS.camille, product_id: 'product-2', position: 0, created_at: now() },
+  { id: 'item-5', list_id: 'list-maison', household_id: DEMO_HOUSEHOLD_ID, name: 'Savon liquide', quantity: 1, unit: 'flacon', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.lina, product_id: null, position: 1, created_at: now() },
+];
+
+/**
+ * Catalogue de démonstration (0071) : des produits que le foyer a « scannés ».
+ *
+ * Ils sont reliés à des articles des listes (`product_id`), et c'est ce lien
+ * qui compte pour le tri par fréquence : un produit jamais mis en liste
+ * compte zéro. Les deux autres articles de la démo sont SAISIS À LA MAIN
+ * (pas de `product_id`) — c'est le régime de la maison.
+ */
+export const demoProducts: ProductRow[] = [
+  {
+    id: 'product-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ean: '3027620042733',
+    name: 'Yaourts x8',
+    brand: 'Danone',
+    category: 'Crèmerie & Produits laitiers',
+    photo_url: null,
+    off_data: {},
+    created_by: DEMO_MEMBERS.camille,
+    created_at: now(),
+    updated_at: now(),
+  },
+  {
+    id: 'product-2',
+    household_id: DEMO_HOUSEHOLD_ID,
+    ean: '3245412872018',
+    name: 'Papier toilette 4 pak',
+    brand: 'Velux',
+    category: 'Hygiène & Beauté',
+    photo_url: null,
+    off_data: {},
+    created_by: DEMO_MEMBERS.lina,
+    created_at: now(),
+    updated_at: now(),
+  },
 ];
 
 export const demoEvents: EventRow[] = [
@@ -269,10 +336,10 @@ export const demoEventReminders: EventReminderRow[] = [
 
 /** Seed des 4 catégories du foyer de démonstration (miroir du seed SQL). */
 export const demoEventCategories: EventCategoryRow[] = [
-  { id: 'category-repas', household_id: DEMO_HOUSEHOLD_ID, name: 'Repas', color: '#E8930C', icon: null, is_default: true, created_by: null, created_at: now() },
-  { id: 'category-medical', household_id: DEMO_HOUSEHOLD_ID, name: 'Médical', color: '#D64545', icon: null, is_default: true, created_by: null, created_at: now() },
-  { id: 'category-ecole', household_id: DEMO_HOUSEHOLD_ID, name: 'École', color: '#3E7CB1', icon: null, is_default: true, created_by: null, created_at: now() },
-  { id: 'category-sport', household_id: DEMO_HOUSEHOLD_ID, name: 'Sport', color: '#4CAF50', icon: null, is_default: true, created_by: null, created_at: now() },
+  { id: 'category-repas', household_id: DEMO_HOUSEHOLD_ID, name: 'Repas', color: '#E8930C', icon: '🍽️', is_default: true, created_by: null, created_at: now() },
+  { id: 'category-medical', household_id: DEMO_HOUSEHOLD_ID, name: 'Médical', color: '#D64545', icon: '🩺', is_default: true, created_by: null, created_at: now() },
+  { id: 'category-ecole', household_id: DEMO_HOUSEHOLD_ID, name: 'École', color: '#3E7CB1', icon: '🎒', is_default: true, created_by: null, created_at: now() },
+  { id: 'category-sport', household_id: DEMO_HOUSEHOLD_ID, name: 'Sport', color: '#4CAF50', icon: '⚽', is_default: true, created_by: null, created_at: now() },
 ];
 
 export const demoNotes: NoteRow[] = [
@@ -284,6 +351,10 @@ export const demoNotes: NoteRow[] = [
     category: 'Maison',
     color: 'accent',
     folder_id: null,
+    // La liste de rentrée porte sa photo de couverture (0136) : la démo montre
+    // un bandeau choisi, et les autres notes le repli sur la première image.
+    cover_attachment_id: 'note-attachment-1',
+    is_locked: false,
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-2)}T18:45:00`,
     updated_at: `${day(0)}T18:45:00`,
@@ -296,6 +367,8 @@ export const demoNotes: NoteRow[] = [
     category: 'Loisirs',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.lina,
     created_at: `${day(-3)}T10:12:00`,
     updated_at: `${day(-2)}T09:20:00`,
@@ -308,9 +381,36 @@ export const demoNotes: NoteRow[] = [
     category: 'Foyer',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
+    // Verrouillée dans la démo, et par son autrice : le cas « je peux lever le
+    // verrou » est visible sans geste, l'autre est décrit par le badge.
+    is_locked: true,
     created_by: DEMO_MEMBERS.camille,
     created_at: `${day(-4)}T21:02:00`,
     updated_at: `${day(-4)}T21:02:00`,
+  },
+];
+
+export const demoNoteAttachments: NoteAttachmentRow[] = [
+  {
+    id: 'note-attachment-1',
+    note_id: 'note-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    file_url: '/assets/adresses.jpg',
+    file_name: 'Cartables prêts.jpg',
+    mime_type: 'image/jpeg',
+    size_bytes: 184_320,
+    created_at: `${day(-2)}T18:50:00`,
+  },
+  {
+    id: 'note-attachment-2',
+    note_id: 'note-2',
+    household_id: DEMO_HOUSEHOLD_ID,
+    file_url: '/assets/lisbonne.jpg',
+    file_name: 'Le lac au lever du jour.jpg',
+    mime_type: 'image/jpeg',
+    size_bytes: 226_100,
+    created_at: `${day(-3)}T10:20:00`,
   },
 ];
 
@@ -447,7 +547,7 @@ export const demoRoutineCompletions: RoutineCompletionRow[] = [
 ];
 
 export const demoRecipes: RecipeRow[] = [
-  { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', created_at: now() },
+  { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', servings: 4, created_at: now() },
 ];
 
 /** Categorie par defaut + 14 tags (miroir des seeds SQL 0122, R2/R4). */
@@ -473,7 +573,19 @@ export const demoRecipeTags: RecipeTagRow[] = [
 ].map((name, index) => ({ id: `recipe-tag-${index + 1}`, household_id: DEMO_HOUSEHOLD_ID, name }));
 
 export const demoRecipeTagLinks: RecipeTagLinkRow[] = [];
-export const demoRecipeIngredients: RecipeIngredientRow[] = [];
+/**
+ * Ingrédients de la tartiflette (pour 4) : sans eux, « Générer les courses »
+ * du menu planifiait des repas-recette et n'envoyait jamais rien — le semis
+ * doit exercer le chemin Recettes → Courses de bout en bout.
+ */
+export const demoRecipeIngredients: RecipeIngredientRow[] = [
+  { id: 'recipe-ingredient-1', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Pommes de terre', quantity: 1000, unit: 'g', position: 0 },
+  { id: 'recipe-ingredient-2', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Reblochon', quantity: 450, unit: 'g', position: 1 },
+  { id: 'recipe-ingredient-3', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Lardons', quantity: 200, unit: 'g', position: 2 },
+  { id: 'recipe-ingredient-4', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Oignon', quantity: 1, unit: 'pièce', position: 3 },
+  { id: 'recipe-ingredient-5', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Vin blanc sec', quantity: 20, unit: 'cl', position: 4 },
+  { id: 'recipe-ingredient-6', recipe_id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Beurre', quantity: null, unit: null, position: 5 },
+];
 export const demoRecipeSteps: RecipeStepRow[] = [];
 export const demoRecipeFavorites: RecipeFavoriteRow[] = [];
 
@@ -1096,8 +1208,8 @@ export const demoTripShoppingLists: ShoppingListRow[] = [
 ];
 
 export const demoTripShoppingItems: ShoppingListItemRow[] = [
-  { id: 'trip-item-1', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème solaire', quantity: 1, unit: 'tube', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, created_at: now() },
-  { id: 'trip-item-2', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Guide de Lisbonne', quantity: 1, unit: 'exemplaire', category: 'Loisirs', checked: true, added_by: DEMO_MEMBERS.thomas, product_id: null, created_at: now() },
+  { id: 'trip-item-1', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Crème solaire', quantity: 1, unit: 'tube', category: 'Hygiène', checked: false, added_by: DEMO_MEMBERS.camille, product_id: null, position: 0, created_at: now() },
+  { id: 'trip-item-2', list_id: 'trip-list-valise', household_id: DEMO_HOUSEHOLD_ID, name: 'Guide de Lisbonne', quantity: 1, unit: 'exemplaire', category: 'Loisirs', checked: true, added_by: DEMO_MEMBERS.thomas, product_id: null, position: 1, created_at: now() },
 ];
 
 export const demoTripNotes: NoteRow[] = [
@@ -1110,6 +1222,8 @@ export const demoTripNotes: NoteRow[] = [
     category: 'Voyage',
     color: 'accent',
     folder_id: null,
+    cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.camille,
     created_at: now(),
     updated_at: now(),
@@ -1123,6 +1237,8 @@ export const demoTripNotes: NoteRow[] = [
     category: 'Loisirs',
     color: null,
     folder_id: null,
+    cover_attachment_id: null,
+    is_locked: false,
     created_by: DEMO_MEMBERS.thomas,
     created_at: now(),
     updated_at: now(),
@@ -1376,6 +1492,21 @@ export const demoWidgets: DashboardWidgetRow[] = [
   },
 ];
 
+/** Dossiers du module Documents (démo). */
+export const demoDocumentFolders = [
+  { id: 'docfolder-1', household_id: DEMO_HOUSEHOLD_ID, name: 'Assurance', color: 'sage', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'docfolder-2', household_id: DEMO_HOUSEHOLD_ID, name: 'Santé', color: 'blush', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'docfolder-3', household_id: DEMO_HOUSEHOLD_ID, name: 'Maison', color: 'butter', created_by: DEMO_MEMBERS.thomas, created_at: now() },
+];
+
+/** Documents du module Documents (démo) : deux dossiers, un papier à la racine. */
+export const demoDocuments = [
+  { id: 'doc-1', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-1', name: 'Attestation habitation', mime: 'application/pdf', size: 320484, storage_path: 'demo/documents/attestation-habitation.pdf', expires_on: day(200), notes: 'Renouveler à la fin du bail.', created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'doc-2', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-1', name: 'Carte grise voiture', mime: 'image/jpeg', size: 124800, storage_path: 'demo/documents/carte-grise.jpg', expires_on: null, notes: null, created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'doc-3', household_id: DEMO_HOUSEHOLD_ID, folder_id: 'docfolder-2', name: 'Ordonnance lunettes', mime: 'image/jpeg', size: 145200, storage_path: 'demo/documents/ordonnance-lunettes.jpg', expires_on: day(15), notes: 'Valable jusqu’à la mi-mois.', created_by: DEMO_MEMBERS.lina, created_at: now() },
+  { id: 'doc-4', household_id: DEMO_HOUSEHOLD_ID, folder_id: null, name: 'Notice lave-linge', mime: 'application/pdf', size: 1452030, storage_path: 'demo/documents/notice-lave-linge.pdf', expires_on: null, notes: 'Mise en série C-384.', created_by: DEMO_MEMBERS.camille, created_at: now() },
+];
+
 /** Clé de la copie locale (`table` dans `src/lib/data/local-adapter.ts`). */
 const seedTables: Record<string, Row[]> = {
   profiles: [demoProfile as unknown as Row],
@@ -1395,8 +1526,13 @@ const seedTables: Record<string, Row[]> = {
     } as unknown as Row,
   ],
   household_members: demoMembers as unknown as Row[],
+  pantry_items: demoPantryItems as unknown as Row[],
+  meal_entries: demoMealEntries as unknown as Row[],
+  document_folders: demoDocumentFolders as unknown as Row[],
+  documents: demoDocuments as unknown as Row[],
   shopping_lists: [...demoShoppingLists, ...demoTripShoppingLists] as unknown as Row[],
   shopping_list_items: [...demoShoppingItems, ...demoTripShoppingItems] as unknown as Row[],
+  products: demoProducts as unknown as Row[],
   events: demoEvents as unknown as Row[],
   event_reminders: demoEventReminders as unknown as Row[],
   event_categories: demoEventCategories as unknown as Row[],
@@ -1431,6 +1567,7 @@ const seedTables: Record<string, Row[]> = {
   pets: demoPets as unknown as Row[],
   pet_records: demoPetRecords as unknown as Row[],
   pet_attachments: demoPetAttachments as unknown as Row[],
+  note_attachments: demoNoteAttachments as unknown as Row[],
   provider_types: demoProviderTypes as unknown as Row[],
   providers: demoProviders as unknown as Row[],
   loyalty_cards: demoLoyaltyCards as unknown as Row[],

@@ -10,10 +10,18 @@ interface HouseholdState {
   members: HouseholdMemberRow[];
   /** Membre correspondant à l'utilisateur connecté (profil géré par un parent). */
   currentMemberId: string;
+  /**
+   * Clés des espaces éteints par le foyer (menu des applications, migration
+   * 0140). Vide = tout activé. Source de vérité : la ligne `households`,
+   * rechargée à chaque session ; ce cache rend le masquage immédiat dans le
+   * shell sans attendre une lecture.
+   */
+  disabledModules: string[];
   /** Ville du profil (`profiles.city`) : cache local, repli hors ligne et démo. */
   city: string;
   setCity: (city: string) => void;
   setHousehold: (household: HouseholdRow, members: HouseholdMemberRow[], currentMemberId?: string) => void;
+  setDisabledModules: (disabledModules: string[]) => void;
   switchHousehold: (householdId: string, householdName: string) => void;
   setMembers: (members: HouseholdMemberRow[]) => void;
   reset: () => void;
@@ -25,6 +33,7 @@ const initialState = {
   householdColor: 'accent',
   members: [] as HouseholdMemberRow[],
   currentMemberId: DEMO_MEMBERS.camille,
+  disabledModules: [] as string[],
   city: 'Lyon',
 };
 
@@ -39,7 +48,11 @@ export const useHouseholdStore = create<HouseholdState>()(
           householdColor: household.avatar_color,
           members,
           currentMemberId: currentMemberId ?? members[0]?.id ?? '',
+          // `?? []` : une ligne démo ou un cache ancien peut ne pas porter la
+          // colonne ; l'absence de configuration veut dire tout activé.
+          disabledModules: household.disabled_modules ?? [],
         }),
+      setDisabledModules: (disabledModules) => set({ disabledModules }),
       switchHousehold: (householdId, householdName) => set({ householdId, householdName }),
       setMembers: (members) => set({ members }),
       setCity: (city) => set({ city }),
@@ -47,13 +60,21 @@ export const useHouseholdStore = create<HouseholdState>()(
     }),
     {
       name: 'ensemble-organises-household',
-      version: 1,
+      version: 2,
+      // v1 → v2 : la colonne `disabled_modules` n'existait pas dans l'état
+      // persisté. La valeur persistée reste entière, seule la clé manquante
+      // reçoit le défaut (tout activé) — jamais une remise à zéro du foyer.
+      migrate: (persisted) => {
+        const state = (persisted ?? {}) as Partial<HouseholdState>;
+        return { ...initialState, ...state, disabledModules: state.disabledModules ?? [] };
+      },
       partialize: (state) => ({
         householdId: state.householdId,
         householdName: state.householdName,
         householdColor: state.householdColor,
         members: state.members,
         currentMemberId: state.currentMemberId,
+        disabledModules: state.disabledModules,
         city: state.city,
       }),
     },
@@ -81,4 +102,14 @@ export function useMemberName(): string {
 
 export function useMemberRole(): Role {
   return useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role ?? 'membre');
+}
+
+/**
+ * Espaces éteints par le foyer (menu des applications, migration 0140).
+ * Lecture seule : l'écriture passe par `setDisabledModules` — appelé par le
+ * panneau des paramètres après l'enregistrement en base — ou par
+ * `setHousehold`, qui recharge la valeur depuis la ligne foyer.
+ */
+export function useDisabledModules(): string[] {
+  return useHouseholdStore((state) => state.disabledModules);
 }

@@ -60,6 +60,42 @@ export interface Note {
   ageLabel: string;
   /** Pièces jointes de la note, comme pour le Cercle. */
   attachments: NoteAttachment[];
+  /** Pièce jointe **désignée** comme couverture (`notes.cover_attachment_id`). */
+  coverAttachmentId: string | null;
+  /** Note verrouillée : son contenu ne peut plus être modifié (0137). */
+  locked: boolean;
+  /**
+   * Couverture affichable : la photo désignée, sinon la première image jointe,
+   * sinon `null`. Résolue à la lecture, donc jamais une image morte : une photo
+   * supprimée laisse `coverAttachmentId` à `NULL` côté base et la carte retombe
+   * sur l'image suivante.
+   */
+  cover: NoteAttachment | null;
+}
+
+/**
+ * Choix de couverture fait dans le dialogue. `auto` désigne la première image
+ * jointe sans rien écrire ; `new` porte l'index du fichier dans la sélection
+ * courante, parce que son identifiant n'existe qu'après le dépôt.
+ */
+export type NoteCoverChoice =
+  | { kind: 'auto' }
+  | { kind: 'attachment'; id: string }
+  | { kind: 'new'; fileIndex: number };
+
+/** Vrai pour une pièce jointe affichable comme couverture. */
+export function isCoverImage(attachment: Pick<NoteAttachment, 'mime'>): boolean {
+  return attachment.mime.startsWith('image/');
+}
+
+/**
+ * Couverture effective d'une note : la photo désignée si elle est encore là et
+ * qu'elle est une image, sinon la première image jointe.
+ */
+export function pickCover(attachments: NoteAttachment[], coverId: string | null): NoteAttachment | null {
+  const images = attachments.filter(isCoverImage);
+  const chosen = coverId ? images.find((attachment) => attachment.id === coverId) : undefined;
+  return chosen ?? images[0] ?? null;
 }
 
 /** Pièce jointe d'une note : photo ou PDF. */
@@ -152,6 +188,9 @@ export function toNote(row: NoteRow, attachments: NoteAttachment[] = []): Note {
     updatedAt: row.updated_at,
     ageLabel: ageLabel(row.updated_at),
     attachments,
+    coverAttachmentId: row.cover_attachment_id ?? null,
+    locked: row.is_locked ?? false,
+    cover: pickCover(attachments, row.cover_attachment_id ?? null),
   };
 }
 
@@ -229,8 +268,146 @@ export function noteMetrics(notes: Note[]): NoteMetrics {
   };
 }
 
+/**
+ * Texte nu d'un contenu Markdown.
+ *
+ * L'extrait de carte tient sur une ou deux lignes : les repères de syntaxe y
+ * seraient du bruit (« **Préparer** les cartables »). On retire donc les
+ * marques en gardant le texte qu'elles portaient — un lien perd son adresse
+ * mais pas son libellé, une image garde sa légende.
+ */
+export function notePlainText(content: string): string {
+  // Le code est mis de côté avant le nettoyage : `snake_case` dans une portée
+  // de code n'est pas de l'italique, et retirer ses soulignés changerait le
+  // texte qu'on prétend seulement débarrasser de ses repères.
+  const code: string[] = [];
+  const stash = (body: string) => `\u0000${code.push(body.trim()) - 1}\u0000`;
+
+  const withoutCode = content
+    .replace(/```[^\n]*\n?([\s\S]*?)```/g, (_match, body: string) => stash(body))
+    .replace(/`([^`\n]+)`/g, (_match, body: string) => stash(body));
+
+  return withoutCode
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s{0,3}(?:[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, ' ')
+    .replace(/^\s*```[^\n]*$/gm, ' ')
+    // Les bornes évitent de prendre `snake_case` ou `2 * 3` pour de l'italique :
+    // un marqueur n'ouvre pas sur une espace et ne ferme pas après elle.
+    .replace(/\b__(?!\s)(.+?)(?<!\s)__\b/g, '$1')
+    .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*/g, '$1')
+    .replace(/(?<!\*)\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)/g, '$1')
+    .replace(/\b_(?![\s_])(.+?)(?<![\s_])_\b/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/\u0000(\d+)\u0000/g, (_match, index: string) => code[Number(index)] ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Contenu de carte, raccourci pour garder des cartes homogènes. */
 export function noteExcerpt(content: string, maxLength = 140): string {
-  const clean = content.trim();
+  const clean = notePlainText(content);
   return clean.length <= maxLength ? clean : `${clean.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+/**
+ * LES MENTIONS : `@` pour un membre du foyer, `$` pour une autre note.
+ *
+ * La référence : « L'arobase appelle un membre du foyer, le dollar renvoie
+ * vers une autre note. De quoi relier ce qui va ensemble sans tout
+ * recopier. »
+ *
+ * La mention est du TEXTE dans la note, pas une table à côté : elle
+ * survit à l'export, elle se cherche, et elle ne demande pas une migration.
+ * Une mention de note est un lien Markdown vers le lien profond de la note
+ * — donc cliquable dans l'aperçu, et le lien profond sert les deux.
+ */
+export type MentionKind = 'membre' | 'note';
+
+export interface MentionContext {
+  kind: MentionKind;
+  /** Ce qui est tapé après le déclencheur. */
+  query: string;
+  /** Position du déclencheur dans le texte. */
+  start: number;
+  /** Position du curseur (la fin de la frappe). */
+  end: number;
+}
+
+/**
+ * La mention demandée au curseur, s'il y en a une.
+ *
+ * Le déclencheur doit OUVRIR un mot : « e-mail@ » n'est pas une mention,
+ * et « a@b.fr » non plus. La frappe s'arrête à l'espace : « @Ca » propose
+ * Camille, « @Camille Ma » ne propose plus rien — on ne cherche pas un
+ * nom complet à la main, on le choisit dans la liste.
+ */
+export function mentionAt(text: string, cursor: number): MentionContext | null {
+  if (cursor <= 0 || cursor > text.length) return null;
+  const before = text.slice(0, cursor);
+  const found = /(?:^|\s)([@$])([\p{L}\p{N}'’-]*)$/u.exec(before);
+  if (!found) return null;
+  const query = found[2];
+  return {
+    kind: found[1] === '@' ? 'membre' : 'note',
+    query,
+    start: cursor - query.length - 1,
+    end: cursor,
+  };
+}
+
+export interface MentionCandidate {
+  id: string;
+  /** Le libellé inséré et affiché. */
+  label: string;
+  /** Le texte mis dans la note (un lien Markdown pour une note). */
+  text: string;
+  /** Le genre de cible, pour l'icône. */
+  kind: MentionKind;
+}
+
+/** Le texte d'une mention de note : un lien Markdown vers son lien profond. */
+export function noteMentionText(id: string, title: string): string {
+  // Un titre qui contient un crochet casserait le lien : on l'enlève.
+  const label = title.replace(/[\[\]]/g, '').trim();
+  return `[${label}](/notes?ouvrir=${encodeURIComponent(id)})`;
+}
+
+/**
+ * Les candidats d'une mention : les membres pour `@`, les autres notes pour
+ * `$`. La note en cours de modification n'est jamais proposée — se mentionner
+ * soi-même n'aide à rien.
+ */
+export function mentionCandidates(
+  kind: MentionKind,
+  query: string,
+  members: { id: string; display_name: string }[],
+  notes: { id: string; title: string }[],
+  currentNoteId: string | null,
+): MentionCandidate[] {
+  const needle = query.trim().toLowerCase();
+  if (kind === 'membre') {
+    return members
+      .filter((member) => needle === '' || member.display_name.toLowerCase().includes(needle))
+      .slice(0, 6)
+      .map((member) => ({
+        id: member.id,
+        label: member.display_name,
+        text: `@${member.display_name}`,
+        kind,
+      }));
+  }
+  return notes
+    .filter((note) => note.id !== currentNoteId)
+    .filter((note) => needle === '' || note.title.toLowerCase().includes(needle))
+    .slice(0, 6)
+    .map((note) => ({
+      id: note.id,
+      label: note.title,
+      text: noteMentionText(note.id, note.title),
+      kind,
+    }));
 }

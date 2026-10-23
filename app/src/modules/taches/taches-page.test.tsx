@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { instantOfDatetimeLocal } from '@/lib/datetime';
 import { data } from '@/lib/data';
 import { DEMO_MEMBERS } from '@/lib/data/seed';
 import { todayIso } from '@/lib/utils';
@@ -83,7 +84,7 @@ describe('TachesPage', () => {
     renderWithProviders(<TachesPage />, { route: '/taches' });
 
     await findTaskList();
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]);
 
     const dialog = within(await screen.findByRole('dialog'));
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche' }));
@@ -101,6 +102,63 @@ describe('TachesPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     // Le foyer compte désormais une tâche de plus.
     expect(screen.getByText('dans la liste').previousElementSibling).toHaveTextContent('5');
+  });
+
+  /**
+   * TODO #4, segment client : le rappel d'une tâche était le seul maillon que
+   * rien ne couvrait. Le formulaire écrit `task_reminders` par
+   * `replace_task_reminders` (0133) — une seule fonction, donc une transaction
+   * — et la relecture doit rendre le même instant, pas un décalage de fuseau
+   * (WR-07). Le serveur est prouvé séparément : `test-db.sh` pour les
+   * fonctions, et la sonde du dispatch pour la sélection.
+   */
+  async function remindersOf(name: string) {
+    const task = (await data.list<{ id: string; name: string }>('tasks')).find((row) => row.name === name);
+    if (!task) throw new Error(`tâche introuvable : ${name}`);
+    return data.list<{ task_id: string; remind_at: string }>('task_reminders', { task_id: task.id });
+  }
+
+  async function createTaskWithReminder(name: string, reminder: string) {
+    supportDialogEnvironment();
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+    await findTaskList();
+    await user.click(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]);
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(/Nom de la tâche/), name);
+    // `datetime-local` se remplit par un changement de valeur : `type` y écrit
+    // segment par segment et laisse le champ dans un état intermédiaire.
+    fireEvent.change(dialog.getByLabelText(/Rappel/), { target: { value: reminder } });
+    await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await (await findTaskList()).findByText(name);
+    return user;
+  }
+
+  it('écrit le rappel saisi et le relit à l’édition', async () => {
+    const name = 'Appeler le plombier';
+    const reminder = '2030-01-02T09:30';
+    const user = await createTaskWithReminder(name, reminder);
+
+    expect((await remindersOf(name)).map((row) => row.remind_at)).toEqual([instantOfDatetimeLocal(reminder)]);
+
+    await user.click(screen.getByRole('button', { name: `Modifier ${name}` }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByLabelText(/Rappel/)).toHaveValue(reminder);
+  });
+
+  it('retire le rappel quand le champ est vidé', async () => {
+    const name = 'Passer chez le dentiste';
+    const user = await createTaskWithReminder(name, '2030-01-02T09:30');
+    expect(await remindersOf(name)).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: `Modifier ${name}` }));
+    const dialog = within(await screen.findByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText(/Rappel/), { target: { value: '' } });
+    await user.click(dialog.getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(async () => expect(await remindersOf(name)).toHaveLength(0));
   });
 
   it('ouvre la création pré-remplie depuis l’état de navigation (raccourci calendrier)', async () => {
@@ -255,6 +313,35 @@ describe('TachesPage — le dépôt tient la promesse du tri (WR-13, D-11)', () 
 });
 
 /**
+ * LE TRI EN UN CLIC : la référence range les tâches « d'un coup par date
+ * limite ou par responsable », à côté du glisser-déposer.
+ *
+ * Le tri ÉCRIT les rangs : l'ordre trié devient l'ordre du foyer, comme au
+ * dépôt. Un simple filtre d'affichage se disputerait avec le geste — les deux
+ * voudraient tenir l'ordre.
+ */
+describe('TachesPage — le tri en un clic', () => {
+  it('range par responsable et écrit les rangs', async () => {
+    const updateSpy = vi.spyOn(data, 'update');
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+    await findTaskList();
+
+    await user.selectOptions(screen.getByLabelText('Trier les tâches'), 'responsable');
+
+    // Les rangs sont écrits : l'ordre trié devient l'ordre du foyer.
+    await waitFor(() => {
+      const ecrits = updateSpy.mock.calls.filter(([table]) => table === 'tasks');
+      expect(ecrits.length).toBeGreaterThan(0);
+    });
+    // Et le foyer est prévenu, parce qu'un ordre qui change en silence
+    // ressemblerait à un tri qui n'a rien fait.
+    const toastRegion = () => within(screen.getByRole('region', { name: 'Notifications de l’application' }));
+    expect(await toastRegion().findByText(/Tâches triées par responsable/)).toBeInTheDocument();
+  });
+});
+
+/**
  * WR-02 : la corbeille suit le rôle, pas la capacité d'écriture.
  *
  * Le mode démo (Dexie) ne porte **ni RLS ni contrainte** : c'est la raison
@@ -285,6 +372,52 @@ describe('TachesPage — corbeille réservée à l’administrateur', () => {
 
     expect(taskList().queryByRole('button', { name: TRASH })).not.toBeInTheDocument();
     expect(taskList().getByRole('button', { name: EDIT })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ajouter une tâche' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Ajouter une tâche' })[0]).toBeInTheDocument();
+  });
+});
+
+describe('TachesPage — la vue Tableau (Lot 2)', () => {
+  afterEach(() => {
+    // La vue choisie est retenue d'une session à l'autre : sans ce nettoyage,
+    // le test suivant démarrerait sur le tableau.
+    window.localStorage.removeItem('eo:taches:view');
+  });
+
+  it('change le statut depuis une carte et range la tâche dans sa colonne', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    await user.click(screen.getByRole('button', { name: 'Tableau' }));
+
+    const aFaire = screen.getByRole('region', { name: 'À faire' });
+    expect(within(aFaire).getByText('Ajouter le lait d’agne')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Statut de « Ajouter le lait d’agne »'), 'en_cours');
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('region', { name: 'En cours' })).getByText('Ajouter le lait d’agne'),
+      ).toBeInTheDocument();
+    });
+    expect(within(aFaire).queryByText('Ajouter le lait d’agne')).not.toBeInTheDocument();
+    const rows = await data.list<{ name: string; status: string }>('tasks');
+    expect(rows.find((row) => row.name === 'Ajouter le lait d’agne')?.status).toBe('en_cours');
+  });
+
+  it('montre les tâches terminées même quand le filtre par défaut masque les tâches closes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TachesPage />, { route: '/taches' });
+
+    await findTaskList();
+    // Filtrer les tâches terminées est impossible : la colonne le porte.
+    expect(screen.getByLabelText('Filtrer les tâches')).toHaveValue('ouvertes');
+
+    await user.click(screen.getByRole('button', { name: 'Tableau' }));
+
+    expect(screen.queryByLabelText('Filtrer les tâches')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Terminée' })).getByText('Ranger les photos de l’été'),
+    ).toBeInTheDocument();
   });
 });

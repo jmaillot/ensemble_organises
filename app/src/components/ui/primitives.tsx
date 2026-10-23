@@ -55,7 +55,7 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...rest }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn('scrollbar-slim mb-3.5 flex gap-1 overflow-x-auto border-b border-border', className)}
+      className={cn('scrollbar-slim mb-3.5 flex gap-1.5 overflow-x-auto', className)}
       {...rest}
     />
   );
@@ -65,7 +65,7 @@ export function TabsTrigger({ className, ...rest }: React.ComponentProps<typeof 
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        'min-h-10 shrink-0 border-b-2 border-transparent px-2.5 text-xs font-[750] whitespace-nowrap text-muted transition-colors duration-[var(--duration-quick)] hover:text-accent-strong data-[state=active]:border-accent data-[state=active]:text-accent-strong',
+        'min-h-10 shrink-0 rounded-full border border-border bg-surface px-3.5 text-[12px] font-bold whitespace-nowrap text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:text-fg data-[state=active]:border-accent data-[state=active]:bg-accent data-[state=active]:text-surface',
         className,
       )}
       {...rest}
@@ -81,7 +81,7 @@ export function Badge({ className, tone = 'accent', ...rest }: React.HTMLAttribu
   const tones = {
     accent: 'bg-accent-soft text-accent-strong',
     coral: 'bg-coral-soft text-coral',
-    amber: 'bg-amber-soft text-[oklch(52%_0.11_78)]',
+    amber: 'bg-amber-soft text-amber-strong',
     muted: 'bg-bg text-muted',
   } as const;
   return (

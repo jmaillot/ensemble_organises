@@ -4,20 +4,26 @@ import { cn, initials } from '@/lib/utils';
 import {
   moduleMap,
   modulePath,
-  isChildHiddenModule,
+  filterModuleKeys,
+  isModuleDisabled,
   navLabelOf,
   navModules,
   type ModuleKey,
 } from '@/lib/modules';
-import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
+import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/stores/household-store';
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
 import { ModuleCatalogueNav, navItemClass } from '@/components/shared/module-catalogue';
 import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
+import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
+import { AllSpacesSheet } from '@/components/shared/all-spaces-sheet';
+import { ModuleDisabled } from '@/components/shared/module-disabled';
+import { CommandPalette } from '@/components/shared/command-palette';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
+import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
@@ -28,6 +34,35 @@ import type { TaskRow } from '@/types';
 
 const homeIcon: IconName = 'home';
 
+/**
+ * Libellé du raccourci, selon la plateforme. `platform` n'est pas normalisé
+ * (`MacIntel`, `iPad`…), et le test jsdom rend une chaîne vide : il obtient
+ * donc « Ctrl K », la forme juste sur la machine qui l'exécute.
+ */
+const searchShortcutLabel =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
+/**
+ * Garde « espace éteint » (menu des applications, migration 0140) : un accès
+ * direct à l'URL d'un espace désactivé par le foyer rend un avis sobre —
+ * jamais une 404 mensongère, jamais une redirection silencieuse (même
+ * philosophie que `RequireGrownUp`, phase 14 D-06). Posée ICI, sur la sortie
+ * du shell, plutôt qu'autour de chaque route : une seule couture couvre les
+ * 17 espaces et leurs sous-routes (`/courses/catalogue`, `/recettes/:id`…),
+ * dont le premier segment du chemin nomme toujours le module.
+ *
+ * `accueil` et `parametres` ne figurent pas dans `moduleMap` : ils ne sont
+ * jamais gated — on doit toujours pouvoir rejoindre le tableau de bord et
+ * réactiver l'espace depuis les paramètres.
+ */
+function ModuleGate({ disabledModules, isAdmin }: { disabledModules: string[]; isAdmin: boolean }) {
+  const location = useLocation();
+  const key = (location.pathname.replace(/^\//, '').split('/')[0] || 'accueil') as ModuleKey;
+  const entry = moduleMap[key];
+  if (!entry || !isModuleDisabled(key, disabledModules)) return <Outlet />;
+  return <ModuleDisabled label={entry.label} isAdmin={isAdmin} />;
+}
+
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,6 +72,7 @@ export function AppShell() {
   const members = useHouseholdStore((state) => state.members);
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
+  const isMobileLayout = useIsMobileLayout();
   // Navigation fiable (D-09) : précharge les morceaux de routes en
   // arrière-plan, à l'idle et en ligne seulement. Monté une fois, échec avalé
   // (T-09-07) : le préchargement ne doit jamais casser le shell.
@@ -48,7 +84,9 @@ export function AppShell() {
     }
   }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [spacesSheetOpen, setSpacesSheetOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const notifications = useNotifications();
   const unread = notifications.total;
   const { rows: openTasks } = useResource<TaskRow>('tasks', {
@@ -81,6 +119,20 @@ export function AppShell() {
     return () => {
       document.body.dataset.scrollLock = 'false';
     };
+  }, []);
+
+  // Ctrl/Cmd + K ouvre la palette partout dans l'application. L'écouteur est
+  // posé une fois sur `window` : la palette n'est pas un composant de route, et
+  // un raccourci qui ne marcherait que sur l'accueil ne serait pas un raccourci.
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      setSearchOpen((value) => !value);
+    };
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
   }, []);
 
   useEffect(() => {
@@ -117,7 +169,12 @@ export function AppShell() {
     return () => container.removeEventListener('message', onServiceWorkerMessage);
   }, [toast]);
 
-  const currentKey = (location.pathname.replace(/^\//, '') || 'accueil') as ModuleKey;
+  // Le fil d'Ariane nomme l'ESPACE, pas la page : une sous-route
+  // (`/courses/aide`, `/courses/catalogue`, `/recettes/:id`) reste dans son
+  // module. Le chemin ENTIER était cherché dans le catalogue, et une
+  // sous-route retombait sur « Maison » — le lecteur perdait le module
+  // sous ses yeux.
+  const currentKey = (location.pathname.replace(/^\//, '').split('/')[0] || 'accueil') as ModuleKey;
   // `parametres` n'appartient pas au catalogue des espaces du foyer : il a son
   // propre libellé de navigation.
   const fallbackLabels: Partial<Record<string, string>> = { parametres: 'Paramètres' };
@@ -126,9 +183,12 @@ export function AppShell() {
   const isAdmin = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'admin');
   // Rôle `enfant` (phase 14, D-05) : les accès rapides épinglés suivent le
   // même masquage que le catalogue (aucun des 5 n'y figure aujourd'hui, mais
-  // un ajout futur ne doit pas les réexposer par mégarde).
+  // un ajout futur ne doit pas les réexposer par mégarde). Menu des
+  // applications (0140) : les espaces éteints par le foyer sortent aussi de
+  // la navigation — présentation seulement, la RLS reste la frontière.
   const isChild = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'enfant');
-  const visibleNavModules = isChild ? navModules.filter((key) => !isChildHiddenModule(key)) : navModules;
+  const disabledModules = useDisabledModules();
+  const visibleNavModules = filterModuleKeys(navModules, { isChild, disabledModules });
 
   return (
     <div className="flex min-h-screen">
@@ -138,14 +198,14 @@ export function AppShell() {
       >
         Aller au contenu principal
       </a>
-      <aside className="sticky top-0 flex h-screen w-[246px] shrink-0 flex-col gap-7 border-r border-border bg-surface px-4 py-6 max-[1180px]:w-[218px] max-[920px]:w-[76px] max-[920px]:items-center max-[920px]:px-2.5 max-[650px]:hidden">
+      <aside className="sticky top-0 flex h-screen w-[246px] shrink-0 flex-col gap-7 border-r border-border/70 bg-bg px-4 py-6 max-[1180px]:w-[218px] max-[920px]:w-[76px] max-[920px]:items-center max-[920px]:px-2.5 max-[650px]:hidden">
         <div className="flex items-center gap-2.5 px-2.5 max-[920px]:px-0">
-          <div className="relative grid size-[38px] place-items-center overflow-hidden rounded-[13px] bg-fg text-surface">
+          <div className="relative grid size-[40px] place-items-center overflow-hidden rounded-full bg-accent text-surface">
             <Icon name={homeIcon} />
-            <span aria-hidden="true" className="absolute right-[5px] bottom-[5px] size-[17px] rounded-full border-2 border-accent" />
+            <span aria-hidden="true" className="absolute right-[4px] bottom-[4px] size-[16px] rounded-full border-2 border-bg bg-transparent" />
           </div>
           <div className="max-[920px]:hidden">
-            <div className="font-display text-base font-extrabold tracking-[-0.02em]">Ensemble &amp; Organisés</div>
+            <div className="font-display text-[15px] font-semibold tracking-[-0.02em]">Ensemble &amp; Organisés</div>
             <div className="mt-px text-[11px] text-muted">Votre foyer, en mouvement</div>
           </div>
         </div>
@@ -194,9 +254,9 @@ export function AppShell() {
             « Préférences » en dessous de la sienne. */}
         <div className="w-full">
           <p className="section-kicker mx-2.5 mb-2.5 max-[920px]:hidden">Votre espace</p>
-          <div className="mx-0.5 mb-3 rounded-[16px] border border-border bg-bg p-3.5 max-[920px]:hidden">
+          <div className="mx-0.5 mb-3 rounded-[22px] border border-border/60 bg-surface p-3.5 shadow-[var(--shadow-sm)] max-[920px]:hidden">
             <div className="flex items-center gap-2.5">
-              <span className={`grid size-[30px] place-items-center rounded-[10px] ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
+              <span className={`grid size-[34px] place-items-center rounded-full ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
                 {initials(householdName)}
               </span>
               <div>
@@ -241,9 +301,20 @@ export function AppShell() {
             aria-haspopup="dialog"
             aria-controls={MOBILE_DRAWER_ID}
             aria-label="Ouvrir le menu"
-            className="grid size-11 shrink-0 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-border/70 bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
           >
             <Icon name="menu" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label={`Espaces du foyer ${householdName}`}
+            className="flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-border/70 bg-surface py-1 pr-3.5 pl-1.5 text-[13px] font-[650] min-[651px]:hidden"
+          >
+            <span className={`grid size-8 shrink-0 place-items-center rounded-full ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
+              {initials(householdName)}
+            </span>
+            <span className="truncate">{householdName}</span>
           </button>
           <nav aria-label="Fil d’Ariane" className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted max-[650px]:hidden">
             <Link to="/accueil" className="transition-colors hover:text-fg">
@@ -253,6 +324,19 @@ export function AppShell() {
             <strong className="font-[750] text-fg">{currentLabel}</strong>
           </nav>
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label={`Rechercher (${searchShortcutLabel})`}
+              aria-keyshortcuts="Control+K Meta+K"
+              className="flex min-h-11 items-center gap-2 rounded-full border border-border/70 bg-surface px-3 text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg max-[650px]:w-11 max-[650px]:justify-center max-[650px]:px-0"
+            >
+              <Icon name="search" size="sm" />
+              <span className="text-[12.5px] font-[650] max-[650px]:sr-only">Rechercher</span>
+              <kbd className="hidden rounded-[5px] border border-border bg-surface-2 px-1 py-px text-[10px] font-[650] min-[1180px]:inline">
+                {searchShortcutLabel}
+              </kbd>
+            </button>
             {canInstall ? (
               <Button variant="secondary" size="sm" icon="download" className="max-[650px]:hidden" onClick={install}>
                 Installer l’app
@@ -260,7 +344,7 @@ export function AppShell() {
             ) : null}
             <button
               type="button"
-              className="relative grid min-h-11 min-w-11 place-items-center rounded-[13px] border border-border bg-surface text-fg transition-[background,border-color,transform] duration-[var(--duration-quick)] hover:-translate-y-px hover:border-accent hover:bg-accent-faint"
+              className="relative grid min-h-11 min-w-11 place-items-center rounded-full border border-border/70 bg-surface text-fg transition-[background,border-color,transform] duration-[var(--duration-quick)] hover:-translate-y-px hover:border-accent hover:bg-accent-faint"
               aria-label={unread > 0 ? `Notifications : ${unread} nouvelles` : 'Notifications'}
               onClick={() => setNotificationsOpen(true)}
             >
@@ -300,8 +384,8 @@ export function AppShell() {
           </div>
         </header>
 
-        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(28px+env(safe-area-inset-bottom))]">
-          <Outlet />
+        <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(92px+env(safe-area-inset-bottom))]">
+          <ModuleGate disabledModules={disabledModules} isAdmin={isAdmin} />
         </main>
       </div>
 
@@ -312,6 +396,11 @@ export function AppShell() {
         memberCount={members.length}
         isAdmin={isAdmin}
       />
+
+      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
+
+      {isMobileLayout ? <MobileBottomNav onMore={() => setSpacesSheetOpen(true)} /> : null}
+      <AllSpacesSheet open={spacesSheetOpen} onOpenChange={setSpacesSheetOpen} />
     </div>
   );
 }

@@ -27,6 +27,7 @@ export default function CerclePage() {
   return (
     <ModuleShell
       module="cercle"
+      infoTo="/cercle/aide"
       actions={
         <Button icon="plus" onClick={() => setFocusSignal((value) => value + 1)}>
           Publier un moment
@@ -52,6 +53,7 @@ export default function CerclePage() {
             title="Le fil du foyer"
             description="Photos, petites nouvelles et réactions, dans l’ordre où elles arrivent."
             action={unreadTotal > 0 ? <Badge tone="coral">{unreadTotal} non lus</Badge> : <Badge tone="muted">Tout est lu</Badge>}
+            stackOnMobile
           />
 
           <PostComposer onPublish={publish} focusSignal={focusSignal} />
@@ -122,11 +124,14 @@ export default function CerclePage() {
           <Panel title="Membres du foyer" description={`${members.length} personne${members.length > 1 ? 's' : ''} sur le fil.`}>
             <div className="grid">
               {members.map((member) => (
-                <div key={member.id} className="flex items-center gap-2.5 border-t border-border py-2.5 first:border-0 first:pt-0">
+                <div
+                  key={member.id}
+                  className="flex items-center gap-2.5 rounded-[14px] px-2 py-2 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
+                >
                   <MemberAvatar member={member} size="sm" />
                   <div className="min-w-0 flex-1">
                     <strong className="block text-[12px] font-bold">{member.display_name}</strong>
-                    <small className="block text-[10px] text-muted">{ROLE_LABELS[member.role]}</small>
+                    <small className="block text-[11px] text-muted">{ROLE_LABELS[member.role]}</small>
                   </div>
                 </div>
               ))}

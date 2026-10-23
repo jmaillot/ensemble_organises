@@ -73,6 +73,13 @@ export interface HouseholdRow {
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
+  /**
+   * Clés des espaces éteints par le foyer (menu des applications, migration
+   * 0140). Vide = tout activé : un foyer existant et un module futur restent
+   * actifs par défaut. L'écriture est administrateur-seul par la RLS
+   * (`households_update`, 0007).
+   */
+  disabled_modules: string[];
 }
 
 export interface HouseholdMemberRow {
@@ -132,6 +139,8 @@ export interface ShoppingListItemRow {
   added_by: Uuid | null;
   /** Produit du foyer d'origine (0071) : NULL si saisi a la main ou produit supprime. */
   product_id: Uuid | null;
+  /** Rang manuel de l'article dans sa liste (0 = premier) — 0139. */
+  position: number;
   created_at: IsoDateTime;
 }
 
@@ -230,6 +239,10 @@ export interface NoteRow {
   category: string;
   color: string | null;
   folder_id: Uuid | null;
+  /** Photo de couverture, choisie parmi les pièces jointes (0136). */
+  cover_attachment_id: Uuid | null;
+  /** Verrou de la note : contenu figé tant qu'il n'est pas levé (0137). */
+  is_locked: boolean;
   created_by: Uuid | null;
   created_at: IsoDateTime;
   updated_at: IsoDateTime;
@@ -559,6 +572,36 @@ export interface ContactRow {
   linked_member_id: string | null;
 }
 
+/** Frigo du foyer (migration 0141) : un article par ligne. */
+export interface PantryItemRow {
+  id: string;
+  household_id: Uuid;
+  name: string;
+  category: 'produit_frais' | 'surgele' | 'epicerie' | 'boisson' | 'autre';
+  quantity: number;
+  unit: string | null;
+  location: 'frigo' | 'congelateur' | 'garde_manger';
+  expires_on: IsoDate | null;
+  opened_on: IsoDate | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
+/** Menu du foyer (migration 0142) : un repas par date et moment de journée. */
+export interface MealEntryRow {
+  id: string;
+  household_id: Uuid;
+  entry_date: IsoDate;
+  slot: 'matin' | 'midi' | 'soir';
+  recipe_id: string | null;
+  free_text: string | null;
+  servings: number;
+  member_ids: string[];
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
 export interface PetRow {
   id: Uuid;
   household_id: Uuid;
@@ -797,4 +840,33 @@ export interface DashboardWidgetRow {
   width: number;
   height: number;
   settings: Record<string, unknown> | null;
+}
+
+/** Dossier coloré du module Documents (migration 0143). */
+export interface DocumentFolderRow {
+  id: Uuid;
+  household_id: Uuid;
+  name: string;
+  /** Teinte de la pastille : palette fermée vérifiée par la base. */
+  color: 'sage' | 'blush' | 'butter' | 'sky' | 'lilac' | 'sand';
+  created_by: string | null;
+  created_at: IsoDateTime;
+}
+
+/** Document du foyer : toujours un fichier (photo ou PDF), jamais un texte. */
+export interface DocumentRow {
+  id: Uuid;
+  household_id: Uuid;
+  folder_id: string | null;
+  name: string;
+  /** Type déclaré : images et PDF uniquement (contrainte 0143). */
+  mime: string;
+  /** Taille du fichier en octets, toujours positive. */
+  size: number;
+  /** Chemin du bucket privé `household-media`, jamais une URL signée. */
+  storage_path: string;
+  expires_on: IsoDate | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: IsoDateTime;
 }

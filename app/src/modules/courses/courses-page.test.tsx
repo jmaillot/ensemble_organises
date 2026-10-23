@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
-import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
+import { useHouseholdStore } from '@/stores/household-store';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import CoursesPage from './courses-page';
 import ProductCatalogPage from './product-catalog-page';
 
@@ -14,6 +15,51 @@ const listRegion = (name: string) => screen.getByRole('region', { name });
 /** Les listes sont derrière des onglets : n'affiche que celle demandée. */
 async function selectList(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(await screen.findByRole('tab', { name }));
+}
+
+/**
+ * dnd-kit mesure pour de vrai : jsdom rend des rectangles nuls, donc aucune
+ * cible n'est désignable et le dépôt n'a lieu nulle part. Chaque article reçoit
+ * ici une bande verticale distincte, ce qui rend le geste clavier
+ * déterministe : Espace saisit, la flèche descend d'un cran, Espace dépose.
+ */
+const ITEM_HEIGHT = 56;
+
+function stubItemRects() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function stub(this: Element) {
+    const element = this as HTMLElement;
+    const isItem = element.tagName === 'LI';
+    const index = element.parentElement ? Array.from(element.parentElement.children).indexOf(element) : 0;
+    const height = isItem ? ITEM_HEIGHT : 600;
+    const top = isItem ? 100 + index * ITEM_HEIGHT : 0;
+    return {
+      x: 0,
+      y: top,
+      width: 300,
+      height,
+      top,
+      left: 0,
+      right: 300,
+      bottom: top + height,
+      toJSON: () => ({}),
+    } as DOMRect;
+  });
+}
+
+/** Saisit la poignée, descend d'un cran, dépose. */
+async function dragItemDown(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const grip = screen.getByRole('button', { name: `Réordonner : ${name}` });
+  grip.focus();
+  await user.keyboard(' ');
+  await user.keyboard('{ArrowDown}');
+  await user.keyboard(' ');
+}
+
+/** Les noms des articles affichés, dans l'ordre où l'utilisateur les voit. */
+function visibleItemNames(name: string) {
+  return within(listRegion(name))
+    .getAllByRole('listitem')
+    .map((row) => row.textContent ?? '');
 }
 
 describe('Module Courses', () => {
@@ -83,7 +129,7 @@ describe('Module Courses', () => {
     expect(within(listRegion('Fresque')).getByText('12 pièces · Crèmerie & Produits laitiers')).toBeInTheDocument();
   });
 
-  it('regroupe les articles par rayon puis par ordre d’ajout', async () => {
+  it('regroupe les articles par rayon, ou les laisse dans l’ordre du foyer', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CoursesPage />);
     await selectList(user, 'Maison');
@@ -92,7 +138,7 @@ describe('Module Courses', () => {
     // Vue par défaut : les articles sont rangés sous un en-tête de rayon.
     expect(within(maison).getByText('Hygiène & Beauté')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Regroupement'), 'ajout');
+    await user.selectOptions(screen.getByLabelText('Regroupement'), 'ordre');
     await waitFor(() => {
       expect(within(listRegion('Maison')).queryByText('Hygiène & Beauté')).not.toBeInTheDocument();
     });
@@ -173,8 +219,15 @@ describe('Module Courses', () => {
       const created = rows.find((row) => row.name === 'Comté affiné');
       expect(created?.product_id).not.toBeNull();
     } finally {
-      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
-      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      // Le nettoie ne retire que le produit créé par le test : le catalogue
+      // du foyer peut contenir d'autres produits (la graine en a).
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        ean: string;
+      }[];
+      await Promise.all(
+        rows.filter((row) => row.ean === '3017620422003').map((row) => data.remove('products', row.id)),
+      );
       const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
         id: string;
         name: string;
@@ -245,8 +298,15 @@ describe('Module Courses', () => {
         expect(within(listRegion('Fresque')).getByText('Marss')).toBeInTheDocument();
       });
     } finally {
-      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as { id: string }[];
-      await Promise.all(rows.map((row) => data.remove('products', row.id)));
+      // Le nettoie ne retire que le produit créé par le test : le catalogue
+      // du foyer peut contenir d'autres produits (la graine en a).
+      const rows = (await data.list('products', { household_id: DEMO_HOUSEHOLD_ID })) as {
+        id: string;
+        ean: string;
+      }[];
+      await Promise.all(
+        rows.filter((row) => row.ean === '3017620422003').map((row) => data.remove('products', row.id)),
+      );
       const items = (await data.list('shopping_list_items', { household_id: DEMO_HOUSEHOLD_ID })) as {
         id: string;
         name: string;
@@ -276,5 +336,130 @@ describe('Module Courses', () => {
       const row = screen.getByText('Savon liquide').closest('li') as HTMLElement;
       expect(within(row).getByText(/5/)).toBeInTheDocument();
     });
+  });
+
+  it('imprime la liste par rayon même dans la vue « l’ordre du foyer », puis retire la feuille', async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    try {
+      renderWithProviders(<CoursesPage />);
+      await selectList(user, 'Maison');
+      await user.selectOptions(screen.getByLabelText('Regroupement'), 'ordre');
+      await waitFor(() => {
+        expect(within(listRegion('Maison')).queryByText('Hygiène & Beauté')).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Imprimer' }));
+
+      expect(print).toHaveBeenCalledTimes(1);
+      const sheet = document.querySelector('.courses-print');
+      expect(sheet).not.toBeNull();
+      // La feuille range par rayon : c'est le parcours en magasin qui compte,
+      // pas l'ordre dans lequel les articles ont été saisis.
+      expect(within(sheet as HTMLElement).getByText('Hygiène & Beauté')).toBeInTheDocument();
+      expect(within(sheet as HTMLElement).getByText('Savon liquide')).toBeInTheDocument();
+      expect(sheet?.textContent).toContain('☐');
+
+      // `afterprint` est émis à la fermeture du dialogue (annulation comprise).
+      act(() => {
+        window.dispatchEvent(new Event('afterprint'));
+      });
+      expect(document.querySelector('.courses-print')).toBeNull();
+    } finally {
+      print.mockRestore();
+    }
+  });
+});
+
+describe('Module Courses — l’ordre du foyer (0139)', () => {
+  it('fait descendre les articles cochés, et les nomme', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+    await user.selectOptions(screen.getByLabelText('Regroupement'), 'ordre');
+
+    // « Papier toilette » est coché : il descend en bas, ce qu’il reste à
+    // prendre reste sous les yeux. Le groupe est NOMMÉ : le lecteur sait
+    // pourquoi l’article est là.
+    await waitFor(() => {
+      const noms = visibleItemNames('Maison');
+      expect(noms[noms.length - 1]).toContain('Papier toilette');
+    });
+    expect(within(listRegion('Maison')).getByText('Dans le panier')).toBeInTheDocument();
+  });
+
+  it('garde les articles cochés dans leur rayon quand on regroupe', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Maison');
+
+    // Vue par rayon : l'article coché reste dans son rayon, avec la part
+    // déjà cochée de ce rayon.
+    await waitFor(() => {
+      expect(within(listRegion('Maison')).getByText('Hygiène & Beauté')).toBeInTheDocument();
+    });
+    const noms = visibleItemNames('Maison');
+    expect(noms[0]).toContain('Papier toilette');
+  });
+
+  it('réordonne les articles à la poignée, et l’ordre tient après le rechargement', async () => {
+    stubItemRects();
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Fresque');
+    await user.selectOptions(screen.getByLabelText('Regroupement'), 'ordre');
+
+    await waitFor(() => {
+      expect(visibleItemNames('Fresque')[0]).toContain('Yaourts');
+    });
+    expect(visibleItemNames('Fresque')[1]).toContain('Fruits');
+
+    await dragItemDown(user, 'Yaourts');
+
+    // Le dépôt a survécu au rechargement de la liste : le rang est écrit en
+    // base, pas seulement dans l'écran.
+    await waitFor(() => {
+      expect(visibleItemNames('Fresque')[1]).toContain('Yaourts');
+    });
+    expect(visibleItemNames('Fresque')[0]).toContain('Fruits');
+  });
+
+  it('range aussi les articles dans la vue par rayon', async () => {
+    stubItemRects();
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    await selectList(user, 'Fresque');
+
+    // Vue par défaut : les trois articles du foyer sont rangés sous LEUR
+    // rayon — « Frais » est normalisé en « Crèmerie & Produits laitiers ».
+    await waitFor(() => {
+      expect(within(listRegion('Fresque')).getByText('Crèmerie & Produits laitiers')).toBeInTheDocument();
+    });
+    expect(visibleItemNames('Fresque')[0]).toContain('Yaourts');
+
+    await dragItemDown(user, 'Yaourts');
+
+    await waitFor(() => {
+      expect(visibleItemNames('Fresque')[1]).toContain('Yaourts');
+    });
+  });
+
+  it('n’offre pas de poignée à un enfant', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CoursesPage />);
+    // Le rendu remet le foyer de démonstration en place : le membre change
+    // APRÈS, sinon le test porterait sur Camille.
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+    try {
+      await selectList(user, 'Fresque');
+      await waitFor(() => {
+        expect(within(listRegion('Fresque')).getByText('Yaourts')).toBeInTheDocument();
+      });
+      // Le serveur refuserait l’écriture : une poignée qui ne peut pas faire
+      // son geste ne doit pas s’afficher.
+      expect(screen.queryByRole('button', { name: /Réordonner : Yaourts/ })).not.toBeInTheDocument();
+    } finally {
+      useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.camille });
+    }
   });
 });

@@ -55,7 +55,7 @@ export function PetRecordsTimeline({ records, busyId, onEdit, onDelete }: PetRec
             <li
               key={record.id}
               className={cn(
-                'flex items-start gap-3 border-t border-border py-3 first:border-t-0',
+                'flex items-start gap-3 rounded-[16px] px-2 py-3.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/60',
                 busyId === record.id && 'opacity-55',
               )}
             >

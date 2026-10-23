@@ -9,19 +9,22 @@ import { SearchInput } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { cn, pluralize } from '@/lib/utils';
 import { ContactFormDialog } from './components/contact-form-dialog';
+import { ContactImportDialog } from './components/contact-import-dialog';
 import { useHouseholdStore } from '@/stores/household-store';
 import { useContacts } from './hooks/use-contacts';
 import { formatFrDate } from './types';
 import type { Contact } from './types';
+import { useOpenRecord } from '@/hooks/use-open-record';
 
 export default function ContactsPage() {
   const toast = useToast();
-  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact, moveToFamily } =
+  const { lists, contacts, contactsOfList, isLoading, isError, error, refetch, isMutating, saveContact, removeContact, moveToFamily, importContacts } =
     useContacts();
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<{ open: boolean; contact: Contact | null }>({ open: false, contact: null });
+  const [importOpen, setImportOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Contact | null>(null);
   const [pendingMove, setPendingMove] = useState<Contact | null>(null);
 
@@ -53,14 +56,22 @@ export default function ContactsPage() {
 
   const openCreate = () => setDialog({ open: true, contact: null });
   const openEdit = (contact: Contact) => setDialog({ open: true, contact });
+  // Lien profond : `/contacts?ouvrir=<id>` ouvre la fiche du contact.
+  useOpenRecord(contacts, openEdit);
 
   return (
     <ModuleShell
       module="contacts"
+      infoTo="/contacts/aide"
       actions={
-        <Button icon="plus" onClick={openCreate}>
-          Ajouter un contact
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon="people" onClick={() => setImportOpen(true)}>
+            Importer un vCard
+          </Button>
+          <Button icon="plus" onClick={openCreate}>
+            Ajouter un contact
+          </Button>
+        </div>
       }
     >
       <MetricRow
@@ -149,7 +160,7 @@ export default function ContactsPage() {
                     <div
                       key={contact.id}
                       role="listitem"
-                      className="flex items-center gap-3 border-t border-border py-3.5 first:border-t-0 first:pt-0"
+                      className="group flex min-h-[68px] items-center gap-3 rounded-[16px] px-2 py-2.5 transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint/70"
                     >
                       {contact.photoUrl ? (
                         <img
@@ -161,8 +172,8 @@ export default function ContactsPage() {
                         <MemberAvatar member={contact.linkedMember} name={contact.name} size="lg" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <strong className="block text-[13px]">{contact.name}</strong>
-                        <small className="text-[11px] text-muted">
+                        <strong className="block text-[14px] font-[700]">{contact.name}</strong>
+                        <small className="text-[11.5px] text-muted">
                           {contact.birthDate ? `Né(e) le ${formatFrDate(contact.birthDate)}` : 'Sans date de naissance'}
                           {contact.linkedMember ? ` · ${contact.linkedMember.display_name}` : ''}
                         </small>
@@ -174,7 +185,7 @@ export default function ContactsPage() {
                             onClick={() => setPendingMove(contact)}
                             aria-label={`Déplacer la fiche de ${contact.name} vers Famille`}
                             title="Déplacer vers Famille"
-                            className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                            className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-accent hover:bg-accent-faint hover:text-fg"
                           >
                             <Icon name="send" size="sm" />
                           </button>
@@ -183,7 +194,7 @@ export default function ContactsPage() {
                           type="button"
                           onClick={() => openEdit(contact)}
                           aria-label={`Modifier la fiche de ${contact.name}`}
-                          className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-accent hover:bg-accent-faint hover:text-fg"
                         >
                           <Icon name="edit" size="sm" />
                         </button>
@@ -191,7 +202,7 @@ export default function ContactsPage() {
                           type="button"
                           onClick={() => setPendingDelete(contact)}
                           aria-label={`Supprimer la fiche de ${contact.name}`}
-                          className="grid min-h-[44px] min-w-[44px] place-items-center rounded-[9px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral"
+                          className="relative grid size-8 place-items-center rounded-full border border-border/70 bg-surface text-muted transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-coral hover:bg-coral-soft hover:text-coral"
                         >
                           <Icon name="trash" size="sm" />
                         </button>
@@ -222,6 +233,15 @@ export default function ContactsPage() {
             toast(error instanceof Error ? error.message : 'Le contact n’a pas pu être enregistré.', 'error');
           }
         }}
+      />
+
+      <ContactImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        lists={lists}
+        existingContacts={contacts}
+        isImporting={isMutating}
+        onImport={(listId, people) => importContacts(listId, people)}
       />
 
       <ConfirmDialog

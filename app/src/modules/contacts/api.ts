@@ -78,3 +78,37 @@ export async function createContactFromBirthday(input: {
     linked_member_id: input.linkedMemberId,
   });
 }
+
+/**
+ * Import vCard : crée les fiches d'un coup, sans photo et sans membre lié —
+ * le fichier ne dit rien de tel. Chaque écriture passe par le même chemin
+ * `data.create` qu'une fiche saisie : la RLS et le miroir anniversaire
+ * (trigger 0078) s'appliquent à l'identique. Une fiche qui échoue ne bloque
+ * pas les autres : le compte rendu dit combien sont passées.
+ */
+export async function createContactsBulk(
+  people: ReadonlyArray<{ name: string; birthDate: string | null }>,
+  householdId: string,
+  listId: string,
+): Promise<number> {
+  const results = await Promise.allSettled(
+    people.map((person) =>
+      data.create<ContactRow>(CONTACTS, {
+        household_id: householdId,
+        list_id: listId,
+        name: person.name.trim(),
+        birth_date: person.birthDate,
+        photo_url: null,
+        linked_member_id: null,
+      }),
+    ),
+  );
+  const created = results.filter((result) => result.status === 'fulfilled');
+  if (created.length === 0 && results.length > 0) {
+    const firstRejection = results.find((result) => result.status === 'rejected') as
+      | PromiseRejectedResult
+      | undefined;
+    throw firstRejection?.reason instanceof Error ? firstRejection.reason : new Error('Aucune fiche n’a pu être importée.');
+  }
+  return created.length;
+}

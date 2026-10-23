@@ -14,6 +14,63 @@ export function toColorTag(color: string | null | undefined, fallback: MemberCol
 
 const capitalize = (value: string) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
+/**
+ * Emoji d'une catégorie, résolu dans cet ordre : l'icône posée par le foyer,
+ * puis une correspondance par mots-clés du nom, puis la pastille neutre.
+ *
+ * La table de correspondance n'est pas un doublon de la colonne : les
+ * catégories créées avant `0138`, et celles qu'on crée sans choisir d'emoji,
+ * n'en portent pas. Sans elle, la plupart des chips resteraient sur 🗓️ alors
+ * que « Repas » ou « Médical » se lisent d'un coup d'œil avec leur signe.
+ */
+const CATEGORY_ICON_HINTS: readonly (readonly [readonly string[], string])[] = [
+  [['repas', 'dejeuner', 'diner', 'gouter', 'apero', 'resto', 'restaurant', 'pique-nique'], '🍽️'],
+  [['medical', 'sante', 'medecin', 'docteur', 'pharmacie', 'dentiste', 'hopital', 'vaccin', 'kine'], '🩺'],
+  [['ecole', 'rentree', 'devoir', 'classe', 'cantine', 'college', 'lycee'], '🎒'],
+  [['sport', 'foot', 'match', 'entrainement', 'gym', 'piscine', 'randonnee', 'velo', 'danse'], '⚽'],
+  [['anniversaire', 'fete', 'soiree'], '🎉'],
+  [['voyage', 'vacances', 'train', 'avion', 'week-end'], '✈️'],
+  [['musique', 'concert', 'spectacle', 'cinema', 'theatre'], '🎵'],
+  [['travail', 'boulot', 'reunion', 'bureau', 'rendez-vous'], '💼'],
+];
+
+/**
+ * Nom comparable : minuscules, sans accents. Le repli par mots-clés ne peut pas
+ * s'appuyer sur `\b` — en JavaScript, la frontière de mot est ASCII, donc
+ * « École » n'en a pas avant son É, et le mot-clé ne serait jamais trouvé.
+ */
+const foldCategoryName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+/** Emoji de repli quand ni la catégorie ni son nom ne disent quelque chose. */
+export const NEUTRAL_EVENT_ICON = '🗓️';
+
+export function eventCategoryIcon(icon: string | null | undefined, name: string | null | undefined): string {
+  const explicit = icon?.trim();
+  if (explicit) return explicit;
+  const label = foldCategoryName(name ?? '');
+  for (const [keywords, emoji] of CATEGORY_ICON_HINTS) {
+    if (keywords.some((keyword) => label.includes(keyword))) return emoji;
+  }
+  return NEUTRAL_EVENT_ICON;
+}
+
+/** Signes fixes des genres d'agenda qui ne portent pas de catégorie. */
+const AGENDA_KIND_ICONS: Record<Exclude<AgendaItem['kind'], 'event'>, string> = {
+  tache: '✅',
+  anniversaire: '🎂',
+  ferie: '🏛️',
+  vacances: '🏖️',
+};
+
+/** Emoji d'une entrée d'agenda : la catégorie pour un événement, un signe fixe sinon. */
+export function agendaItemIcon(item: AgendaItem): string {
+  return item.kind === 'event' ? item.icon : AGENDA_KIND_ICONS[item.kind];
+}
+
 export interface CalendarEvent {
   id: string;
   householdId: string;
@@ -32,6 +89,8 @@ export interface CalendarEvent {
   /** Couleur hex de la catégorie (`event_categories.color`) : colore
    * l'événement (D-07). La couleur membre reste sur `colorTag`/avatars. */
   categoryColor: string | null;
+  /** Emoji de la catégorie, ou 🗓️ : lu par le chip de l'agenda et l'export. */
+  categoryIcon: string;
   createdBy: string | null;
   /** Jour local (`YYYY-MM-DD`) affiché dans la grille. */
   date: string;
@@ -43,7 +102,7 @@ export interface CalendarEvent {
 export function toCalendarEvent(
   row: EventRow,
   members: readonly HouseholdMemberRow[] = [],
-  categories: readonly { id: string; name: string; color?: string | null }[] = [],
+  categories: readonly { id: string; name: string; color?: string | null; icon?: string | null }[] = [],
 ): CalendarEvent {
   const author = members.find((member) => member.id === row.created_by) ?? null;
   const category = categories.find((entry) => entry.id === row.category_id) ?? null;
@@ -61,6 +120,7 @@ export function toCalendarEvent(
     categoryId: row.category_id,
     categoryName: category?.name ?? null,
     categoryColor: category?.color ?? null,
+    categoryIcon: eventCategoryIcon(category?.icon, category?.name),
     createdBy: row.created_by,
     date: row.start_at.slice(0, 10),
     timeLabel: row.all_day ? 'Toute la journée' : row.start_at.slice(11, 16),
@@ -132,6 +192,8 @@ export type AgendaItem =
       colorTag: MemberColorTag;
       /** Couleur hex de la catégorie (D-07), quand l'événement est catégorisé. */
       categoryColor: string | null;
+      /** Emoji du chip : celui de la catégorie, ou 🗓️. */
+      icon: string;
       chipLabel: string;
       author: HouseholdMemberRow | null;
     }
@@ -225,6 +287,7 @@ export function buildAgenda(
       subtitle: event.location,
       colorTag: event.colorTag,
       categoryColor: event.categoryColor,
+      icon: event.categoryIcon,
       chipLabel: event.categoryName ?? (event.allDay ? 'Journée entière' : 'Événement'),
       author: event.author,
     }))

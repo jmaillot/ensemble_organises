@@ -125,8 +125,25 @@ export async function createShoppingItem(input: ShoppingItemInput): Promise<Shop
     checked: false,
     added_by: input.addedBy,
     product_id: input.productId ?? null,
+    // Rang du foyer (0139) : un article ajouté à la suite vient APRÈS ceux
+    // qui sont déjà là. Sans ce rang, il se retrouverait au premier rang.
+    position: input.position ?? 0,
     created_at: new Date().toISOString(),
   });
+}
+
+/**
+ * Persiste le réordonnancement manuel issu du glisser-déposer.
+ *
+ * Seuls les rangs CHANGÉS sont écrits : un glisser sur une liste de trente
+ * articles n'écrit pas trente lignes, mais les deux ou trois qui bougent.
+ */
+export async function updateShoppingItemPositions(orders: Record<string, number>): Promise<void> {
+  await Promise.all(
+    Object.entries(orders).map(([id, position]) =>
+      data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, id, { position }),
+    ),
+  );
 }
 
 export async function deleteShoppingItem(id: string): Promise<void> {
