@@ -395,19 +395,23 @@ function TodayGroup({ title, listLabel, items }: { title: string; listLabel: str
   const extra = items.length - visible.length;
   return (
     <div className="min-w-0">
-      <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{title}</h3>
+      {/* Toutes les teintes sont « sur sapin » : le groupe ne vit que dans la
+          carte héro du point du jour — les jetons d'encre (muted, ink-soft,
+          fg) y étaient quasi invisibles, encre sombre sur fond sombre
+          (retour du 23 octobre). on-dark mesure 5,59:1, surface 11,1:1. */}
+      <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-on-dark uppercase">{title}</h3>
       <ul className="m-0 grid min-w-0 list-none grid-cols-[minmax(0,1fr)] gap-1.5 p-0" aria-label={listLabel}>
         {visible.map((item) => (
-          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-ink-soft">
-            <span className="shrink-0 font-extrabold text-fg tabular-nums">{item.time ?? '•'}</span>
+          <li key={item.id} className="flex min-w-0 items-baseline gap-2 text-[13px] text-on-dark">
+            <span className="shrink-0 font-extrabold text-surface tabular-nums">{item.time ?? '•'}</span>
             <span className="line-clamp-2 min-w-0 min-[651px]:line-clamp-1">
-              <strong className="font-semibold text-fg">{item.title}</strong>
+              <strong className="font-semibold text-surface">{item.title}</strong>
               {item.detail ? <span> · {item.detail}</span> : null}
             </span>
           </li>
         ))}
         {extra > 0 ? (
-          <li className="text-[12px] text-muted">…et {extra} autre{extra > 1 ? 's' : ''}.</li>
+          <li className="text-[12px] text-on-dark">…et {extra} autre{extra > 1 ? 's' : ''}.</li>
         ) : null}
       </ul>
     </div>
