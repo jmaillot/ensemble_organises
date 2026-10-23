@@ -3,6 +3,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -222,6 +223,11 @@ export default function CoursesPage() {
   const sensors = useSensors(
     // Un simple clic ne doit pas démarrer un déplacement.
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Tactile : appui long, comme sur la grille de l'accueil. Un PointerSensor
+    // à 6 px capturait un toucher qui glisse : la page scrollait sous le
+    // doigt PUIS le drag partait — le geste natif et le geste applicatif se
+    // disputaient le même toucher (critique UI 2026-10-23, P2).
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
