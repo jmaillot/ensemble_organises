@@ -220,7 +220,12 @@ export default function DashboardPage() {
         <div className="min-w-0">
           <SectionHeading
             title="Les essentiels du jour"
-            description="Glissez les poignées pour réorganiser (appui long sur mobile)."
+            /* L'instruction de glisser ne se lit pas sur une grille à peine
+               peuplée : elle décrit un geste qu'on n'a pas encore de raison de
+               faire (critique UI 2026-10-23, persona Marie). */
+            description={
+              dashboard.placements.length > 1 ? 'Glissez les poignées pour réorganiser (appui long sur mobile).' : undefined
+            }
             action={<CountBadge value={dashboard.placements.length} label="widgets affichés" />}
           />
 

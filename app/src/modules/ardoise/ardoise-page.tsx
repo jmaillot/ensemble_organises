@@ -122,11 +122,14 @@ export default function ArdoisePage() {
                       Ouvrir
                     </Button>
                   </div>
+                  {/* Séparée d'« Ouvrir » par une marge propre : la cible
+                      destructive ne doit pas être à une Tab du bouton
+                      principal (critique UI 2026-10-23, persona Sam). */}
                   <button
                     type="button"
                     onClick={() => setPendingDeleteId(ardoise.id)}
                     aria-label={`Supprimer ${ardoise.name}`}
-                    className={`relative grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text ${
+                    className={`relative ml-2 grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text ${
                       coverUrl ? 'border-white/25 text-white/85' : 'border-border/70 bg-surface text-muted'
                     }`}
                   >

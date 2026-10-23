@@ -204,6 +204,7 @@ export function CommentsDialog({
         <form onSubmit={onSubmitComment} className="grid gap-3" noValidate>
           <Field
             label="Votre commentaire"
+            optional
             hint={`${contentValue.trim().length} / ${COMMENT_CONTENT_MAX} caractères`}
             error={errors.content?.message}
           >

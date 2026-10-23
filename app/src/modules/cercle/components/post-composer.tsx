@@ -91,6 +91,7 @@ export function PostComposer({ onPublish, focusSignal = 0, disabled }: PostCompo
       <form onSubmit={onSubmit} className="grid gap-4" noValidate>
         <Field
           label="Votre commentaire"
+          optional
           error={errors.text?.message}
           hint={`Les publications sont visibles par tout le foyer. ${text.trim().length} / ${POST_TEXT_MAX} caractères.`}
         >
