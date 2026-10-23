@@ -64,11 +64,15 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
       {/* L'objet de la tuile, calé en bas à droite mais ENTIER : rogné à
           moitié dans l'angle, il ne se lisait plus (retour du 23 octobre
           2026) ; recentré au plein centre, il perdait son ancrage. Le
-          compromis : posé sur le coin, à peine effleuré par le bord. La
-          pastille-compteur le chevauche en bas à gauche, comme le « 21 »
-          de melimelo pose sur son caddie. `select-none` : un double-tac
-          ne doit jamais sélectionner l'emoji. */}
-      <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 select-none pr-1.5 pb-0.5 text-[58px] leading-none">
+          compromis : posé sur le coin, à peine effleuré par le bord. Sur
+          PC la tuile de l'accueil approche 280 px de large : l'objet y
+          suit la surface (112 px), il restait un timbre-poste à 58 px
+          (retour du 23 octobre : « sur PC le dessin est trop petit »).
+          La pastille-compteur le chevauche en bas à gauche, comme le
+          « 21 » de melimelo pose sur son caddie, et grandit avec lui.
+          `select-none` : un double-tac ne doit jamais sélectionner
+          l'emoji. */}
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 select-none pr-1.5 pb-0.5 text-[58px] leading-none min-[651px]:text-[112px]">
         {emoji}
       </span>
       {/* Jamais un zéro décoratif : la pastille ne paraît que si la valeur
@@ -76,7 +80,7 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
       {counter ? (
         <span
           aria-hidden="true"
-          className="absolute bottom-2.5 left-3 z-1 grid size-[26px] place-items-center rounded-full bg-[oklch(100%_0_0/0.78)] text-[12px] font-bold text-fg"
+          className="absolute bottom-2.5 left-3 z-1 grid size-[26px] place-items-center rounded-full bg-[oklch(100%_0_0/0.78)] text-[12px] font-bold text-fg min-[651px]:bottom-3 min-[651px]:left-3.5 min-[651px]:size-[30px] min-[651px]:text-[13px]"
         >
           {counter.value > 99 ? '99+' : counter.value}
         </span>
