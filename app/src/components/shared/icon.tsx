@@ -64,12 +64,15 @@ const paths = {
 
 export type IconName = keyof typeof paths;
 
-export type IconSize = 'sm' | 'md' | 'lg';
+export type IconSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizes: Record<IconSize, string> = {
   sm: 'size-[15px]',
   md: 'size-[18px]',
   lg: 'size-[21px]',
+  /* Dessin des états vides : une icône de 21 px dans une pastille de 112 px
+     se noie — le trait reste fin (1,8 sur 24), l'échelle le met en valeur. */
+  xl: 'size-[34px]',
 };
 
 export interface IconProps extends React.SVGProps<SVGSVGElement> {

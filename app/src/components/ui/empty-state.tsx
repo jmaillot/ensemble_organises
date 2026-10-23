@@ -28,9 +28,15 @@ export function EmptyState({
   return (
     <div className={cn('grid min-h-[280px] place-items-center px-6 py-10 text-center', className)}>
       <div>
-        <div className="relative mx-auto mb-5 grid size-[76px] place-items-center rounded-[30px] bg-sage/70 text-accent-strong">
-          <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-butter" />
-          <Icon name={icon} size="lg" />
+        {/* Le dessin grandit sur PC (≥651 px) : une pastille de 76 px avec
+            une icône de 21 px passait pour un timbre-poste sur un grand
+            écran. Mobile inchangé. */}
+        <div className="relative mx-auto mb-5 grid size-[76px] place-items-center rounded-[30px] bg-sage/70 text-accent-strong min-[651px]:mb-6 min-[651px]:size-[112px] min-[651px]:rounded-[44px]">
+          <span
+            aria-hidden="true"
+            className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-butter min-[651px]:-top-2 min-[651px]:-right-2 min-[651px]:size-5"
+          />
+          <Icon name={icon} size="xl" className="max-[650px]:size-[21px]" />
         </div>
         <h3 className="mb-1.5 font-display text-[22px] leading-tight tracking-[-0.03em]">{title}</h3>
         <p className="mx-auto mb-5 max-w-[350px] text-[13px] leading-relaxed text-muted">{description}</p>
