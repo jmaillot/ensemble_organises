@@ -279,7 +279,13 @@ export default function DashboardPage() {
               {visibleTiles
                 .map((entry) => (
                   <li key={entry.key} className="min-w-0">
-                    <AppTile label={entry.label} tint={entry.tint} emoji={entry.emoji} to={`/${entry.key}`} />
+                    <AppTile
+                      label={entry.label}
+                      tint={entry.tint}
+                      emoji={entry.emoji}
+                      to={`/${entry.key}`}
+                      counter={dashboard.tileCounters[entry.key]}
+                    />
                   </li>
                 ))}
             </ul>
