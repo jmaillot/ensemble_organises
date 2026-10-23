@@ -61,13 +61,14 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
       <strong className="relative z-1 text-[16px] font-bold leading-tight tracking-[-0.01em] text-fg hyphens-auto">
         {label}
       </strong>
-      {/* L'objet de la tuile, CENTRÉ et entier : rogné dans l'angle, il ne
-          se lisait plus (retour du 23 octobre 2026 — « c'est un peu
-          compliqué de comprendre ce que c'est »). La pastille-compteur le
-          chevauche en bas à gauche, comme le « 21 » de melimelo pose sur
-          son caddie — elle passe devant (`z-1`). `select-none` : un
-          double-tac ne doit jamais sélectionner l'emoji. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 flex select-none items-end justify-center pb-1 text-[58px] leading-none">
+      {/* L'objet de la tuile, calé en bas à droite mais ENTIER : rogné à
+          moitié dans l'angle, il ne se lisait plus (retour du 23 octobre
+          2026) ; recentré au plein centre, il perdait son ancrage. Le
+          compromis : posé sur le coin, à peine effleuré par le bord. La
+          pastille-compteur le chevauche en bas à gauche, comme le « 21 »
+          de melimelo pose sur son caddie. `select-none` : un double-tac
+          ne doit jamais sélectionner l'emoji. */}
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 select-none pr-1.5 pb-0.5 text-[58px] leading-none">
         {emoji}
       </span>
       {/* Jamais un zéro décoratif : la pastille ne paraît que si la valeur
