@@ -77,4 +77,14 @@ Thumbs.db
 app/shot-toggle-on.mjs
 
 # ── Planning local (non versionné) ───────────────────────────────────────────
-.planning/
+# Le planning est suivi pour ses documents durables (l'écrasement du
+# 24/10/2026 a perdu le journal de STATE.md : jamais plus). Le travail
+# courant des phases (plans, reviews, brouillons) reste ignoré.
+# `/*` et non `/` : une négation ne peut ressusciter un fichier sous un
+# répertoire exclu entier.
+.planning/*
+!.planning/ROADMAP.md
+!.planning/PROJECT.md
+!.planning/STATE.md
+!.planning/milestones/
+!.planning/v*-MILESTONE-AUDIT.md
