@@ -3,14 +3,16 @@
 # sont jamais démarrés par le même fichier.
 #
 #   cp .env.app.example .env.app    # puis renseigner URL et clé publiable
-#   GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml config
-#   GIT_SHA="$(git rev-parse HEAD)" docker compose --env-file .env.app -f compose.app.yaml up -d --build --wait
+#   sh scripts/build-app.sh         # build + up + preuve de l'estampille
 #
-# Le SHA se calcule par le shell à CHAQUE build : Compose n'exécute PAS les
-# substitutions shell (un `$(git …)` écrit ici passerait littéralement), et le
-# `--build` est obligatoire — `up -d` ne reconstruit rien, ni à un changement
-# d'argument ni à un changement de contexte (mesuré sur Compose v5.6.0) :
-# sans lui, l'estampille ne se republierait jamais.
+# L'estampille suit les releases GitHub : le script calcule
+# `git describe --tags --always` (tag exact sur un tag, « tag-N-gsha »
+# sinon, SHA court à défaut) et le passe au build. Le SHA se calcule par le
+# shell à CHAQUE build : Compose n'exécute PAS les substitutions shell (un
+# `$(git …)` écrit ici passerait littéralement), et le `--build` est
+# obligatoire — `up -d` ne reconstruit rien, ni à un changement d'argument
+# ni à un changement de contexte (mesuré sur Compose v5.6.0) : sans lui,
+# l'estampille ne se republierait jamais.
 #
 # TLS est terminé par Traefik sur le réseau externe `frontend` : ce service
 # n'ouvre aucun port sur l'hôte.

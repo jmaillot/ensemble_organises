@@ -789,10 +789,11 @@ sh ../scripts/migrate.sh
 # Publier la stack seulement après le succès des migrations
 sh run.sh start
 
-# Frontend, une fois le schéma disponible
+# Frontend, une fois le schéma disponible — `build-app.sh` calcule
+# l'estampille (git describe, release GitHub) et prouve `/version.json`
+# en fin de script ; un rebuild manuel sans elle produit « unknown ».
 cd ..
-docker compose --env-file .env.app -f compose.app.yaml config
-docker compose --env-file .env.app -f compose.app.yaml up -d --wait
+sh scripts/build-app.sh
 ```
 
 `sh run.sh config add traefik` ajoute `docker-compose.traefik.yml` à la variable officielle `COMPOSE_FILE`; ne pas maintenir une seconde liste manuelle de fichiers Compose.
