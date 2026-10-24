@@ -230,7 +230,7 @@ export function AppShell() {
           <nav aria-label="Navigation principale">
             <ul className="grid list-none gap-1 p-0">
               <li>
-                <NavLink to="/accueil" className={navItemClass}>
+                <NavLink to="/accueil" className={navItemClass} title="Maison">
                   <Icon name={homeIcon} />
                   <span className="max-[920px]:sr-only">Maison</span>
                 </NavLink>
@@ -239,7 +239,7 @@ export function AppShell() {
                 const entry = moduleMap[key];
                 return (
                   <li key={key}>
-                    <NavLink to={modulePath(key)} className={navItemClass}>
+                    <NavLink to={modulePath(key)} className={navItemClass} title={entry.label}>
                       <Icon name={entry.icon} />
                       <span className="max-[920px]:sr-only">{entry.label}</span>
                       {key === 'taches' && openTaskCount !== null && openTaskCount > 0 ? (
@@ -282,6 +282,7 @@ export function AppShell() {
           {isAdmin ? (
             <NavLink
               to="/parametres"
+              title="Préférences"
               className={({ isActive }) =>
                 cn(
                   // `min-h-11 w-full` comme tous les autres liens de la barre :
@@ -316,17 +317,21 @@ export function AppShell() {
           >
             <Icon name="menu" />
           </button>
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label={`Espaces du foyer ${householdName}`}
-            className="flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-border/70 bg-surface py-1 pr-3.5 pl-1.5 text-[13px] font-[650] min-[651px]:hidden"
+          {/* Un seul contrôleur ouvre le tiroir : le hamburger. La pastille-foyer
+              était un second bouton vers le même MobileDrawer (critique du
+              24/10/2026 : deux affordances jumelles, l'une pilule et l'autre
+              icône, pour une même action) ; elle navigue maintenant vers le
+              point du jour — son nom porte le foyer, sa fonction est d'y
+              ramener, pas de rouvrir le catalogue. */}
+          <Link
+            to="/accueil"
+            className="flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-border/70 bg-surface py-1 pr-3.5 pl-1.5 text-[13px] font-[650] transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
           >
             <span className={`grid size-8 shrink-0 place-items-center rounded-full ${memberTagClass(householdColor)} text-[11px] font-extrabold text-surface`}>
               {initials(householdName)}
             </span>
             <span className="truncate">{householdName}</span>
-          </button>
+          </Link>
           <nav aria-label="Fil d’Ariane" className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted max-[650px]:hidden">
             <Link to="/accueil" className="transition-colors hover:text-fg">
               Ensemble &amp; Organisés

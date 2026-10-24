@@ -24,11 +24,21 @@
      10-11 px (critique UI 2026-10-23). Mesuré : 4,81:1 sur coral-soft,
      5,91:1 sous blanc. */
   --color-coral-text: oklch(52% 0.14 25);
+  /* Corail profond : l'aplat des pastilles PORTEUSES DE TEXTE (initiales
+     d'avatar, badge du jour du calendrier, pastille non lue des messages).
+     Le corail vif #d95f5c n'atteint que 3,65:1 avec le blanc (retour du
+     détecteur impeccable du 24/10/2026) ; la variante sombre donne 6,4:1
+     tout en gardant la famille du corail. Les aplats décoratifs (points,
+     bordures) restent en --color-coral. */
+  --color-coral-deep: oklch(50% 0.14 25);
   --color-coral-strong: #f7c3bf;
   --color-coral-soft: #f8e3e1;
   --color-amber: #b9822f;
   /* Texte sombre posé sur un aplat --color-amber-soft (ex. notes d'information). */
   --color-amber-strong: oklch(52% 0.11 78);
+  /* Ambre profond : même rôle que --color-coral-deep pour les pastilles de
+     membre à teinte ambre (#b9822f = 3,34:1 avec le blanc ; ici 6,1:1). */
+  --color-amber-deep: oklch(50% 0.11 78);
   --color-amber-soft: #f7ebd3;
   --color-ink-soft: #2c4a46;
   --color-on-dark: rgb(255 255 255 / 0.72);

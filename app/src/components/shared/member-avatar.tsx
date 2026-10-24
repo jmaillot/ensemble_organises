@@ -4,8 +4,13 @@ import type { HouseholdMemberRow, MemberColorTag } from '@/types';
 const tagClass: Record<MemberColorTag, string> = {
   accent: 'bg-accent',
   ink: 'bg-fg',
-  coral: 'bg-coral',
-  amber: 'bg-amber',
+  // Initiales blanches sur aplat : les teintes claires du corail et de
+  // l'ambre (3,65:1 et 3,34:1 avec le blanc) passent par leurs variantes
+  // profondes (6,4:1 et 6,1:1 — critiques du 24/10/2026). Le violet
+  // passe déjà à 5,12:1. Les points de couleur (sans texte) partagent
+  // ces classes : la même teinte profonde garde l'identité du membre.
+  coral: 'bg-coral-deep',
+  amber: 'bg-amber-deep',
   violet: 'bg-[oklch(55%_0.13_300)]',
 };
 

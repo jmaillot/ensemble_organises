@@ -180,7 +180,7 @@ export default function MenuPage() {
                     <strong className={`text-[12.5px] font-[700] ${isToday ? 'text-accent-strong' : 'text-fg'}`}>
                       {formatDayLabel(date)}
                     </strong>
-                    {isToday ? <span className="rounded-full bg-accent px-1.5 py-px text-[9.5px] font-[700] text-surface">Auj.</span> : null}
+                    {isToday ? <span className="rounded-full bg-accent px-1.5 py-px text-[10px] font-[700] text-surface">Auj.</span> : null}
                   </div>
                   <div className="grid gap-1.5">
                     {mealSlots.map((slot) => {

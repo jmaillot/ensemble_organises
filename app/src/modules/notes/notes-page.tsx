@@ -289,7 +289,7 @@ export default function NotesPage() {
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       {note.locked ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[9.5px] text-amber">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[10px] text-amber-strong">
                           <Icon name="lock" size="sm" className="size-3" />
                           Verrouillée
                         </span>

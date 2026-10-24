@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 import type { ModuleTint } from '@/lib/modules';
+import { ModuleObject, type ModuleObjectKey } from '@/components/shared/module-object';
 
 /**
  * Tuile « Mes applications » — reprise FIDÈLE du vrai site melimelo.co
@@ -9,8 +10,9 @@ import type { ModuleTint } from '@/lib/modules';
  * - le nom est en gras SANS-serif, en haut à gauche — pas en Fraunces :
  *   chez melimelo, le serif reste réservé aux chiffres et au héro, la
  *   tuile parle en encre droite ;
- * - l'objet (ici l'emoji, faute d'illustration 3D — aucun asset copié)
- *   déborde en bas à droite ;
+ * - l'objet (dessin SVG du catalogue `module-object.tsx` — l'emoji système
+ *   a été remplacé le 24 octobre 2026 : la police emoji de l'OS ne doit plus
+ *   décider de l'identité du catalogue) déborde en bas à droite ;
  * - le compteur est une pastille ronde translucide en BAS À GAUCHE,
  *   posée sur l'illustration ;
  * - le format est presque carré (≈ 6:5 dans leur mockup).
@@ -37,7 +39,8 @@ export interface TileCounter {
 export interface AppTileProps {
   label: string;
   tint: ModuleTint;
-  emoji: string;
+  /** Clé du dessin SVG à afficher en bas à droite (catalogue `module-object.tsx`). */
+  module: ModuleObjectKey;
   /** Destination du clic (omis quand le parent pilote la navigation). */
   to?: string;
   onClick?: () => void;
@@ -51,7 +54,7 @@ const TILE_CLASS = cn(
   'relative flex aspect-[6/5] w-full flex-col items-start justify-between overflow-hidden rounded-[20px] p-3.5 text-left shadow-[var(--shadow-sm)] transition-[transform,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-out)] hover:-translate-y-[3px] hover:shadow-[var(--shadow-md)] active:translate-y-[-1px] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[var(--color-accent-strong)]',
 );
 
-function TileContent({ label, emoji, counter }: { label: string; emoji: string; counter?: TileCounter }) {
+function TileContent({ label, module, counter }: { label: string; module: ModuleObjectKey; counter?: TileCounter }) {
   return (
     <>
       {/* `hyphens-auto` : en trois colonnes (feuille « Plus », 390 px),
@@ -70,10 +73,10 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
           (retour du 23 octobre : « sur PC le dessin est trop petit »).
           La pastille-compteur le chevauche en bas à gauche, comme le
           « 21 » de melimelo pose sur son caddie, et grandit avec lui.
-          `select-none` : un double-tac ne doit jamais sélectionner
-          l'emoji. */}
-      <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 select-none pr-1.5 pb-0.5 text-[58px] leading-none min-[651px]:text-[112px]">
-        {emoji}
+          `select-none` : un double-tap ne doit jamais sélectionner le
+          dessin. */}
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 block w-[58px] select-none pr-1.5 pb-1 leading-none min-[651px]:w-[112px]">
+        <ModuleObject module={module} className="h-auto w-full text-fg" />
       </span>
       {/* Jamais un zéro décoratif : la pastille ne paraît que si la valeur
           est informative. */}
@@ -89,7 +92,7 @@ function TileContent({ label, emoji, counter }: { label: string; emoji: string; 
   );
 }
 
-export function AppTile({ label, tint, emoji, to, onClick, active = false, counter, className }: AppTileProps) {
+export function AppTile({ label, tint, module, to, onClick, active = false, counter, className }: AppTileProps) {
   // Le nom accessible porte le compteur : un lecteur d'écran entend
   // « Ouvrir Courses, 21 articles à acheter » et pas « Ouvrir Courses 21 ».
   const accessibleName = counter ? `Ouvrir ${label}, ${counter.value} ${counter.label}` : `Ouvrir ${label}`;
@@ -103,7 +106,7 @@ export function AppTile({ label, tint, emoji, to, onClick, active = false, count
         aria-current={active ? 'page' : undefined}
         className={classes}
       >
-        <TileContent label={label} emoji={emoji} counter={counter} />
+        <TileContent label={label} module={module} counter={counter} />
       </Link>
     );
   }
@@ -115,7 +118,7 @@ export function AppTile({ label, tint, emoji, to, onClick, active = false, count
       aria-current={active ? 'page' : undefined}
       className={classes}
     >
-      <TileContent label={label} emoji={emoji} counter={counter} />
+      <TileContent label={label} module={module} counter={counter} />
     </button>
   );
 }

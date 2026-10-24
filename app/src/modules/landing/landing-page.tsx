@@ -9,7 +9,7 @@ import { demoMembers } from '@/lib/data/seed';
 const highlights: { icon: IconName; title: string; text: string }[] = [
   { icon: 'checkCircle', title: 'Priorités partagées', text: 'Chacun voit ce qui le concerne, avec son code couleur et ses rappels.' },
   { icon: 'wallet', title: 'Ardoise transparente', text: 'Le partage est calculé automatiquement, chacun sait ce qu’il doit à qui.' },
-  { icon: 'people', title: 'Un seul fil', text: 'Tâches, courses, anniversaires et souvenirs reunited au même endroit.' },
+  { icon: 'people', title: 'Un seul fil', text: 'Tâches, courses, anniversaires et souvenirs réunis au même endroit.' },
   { icon: 'wifi', title: 'En ligne d’abord', text: 'Chaque lecture et chaque écriture part directement sur le serveur du foyer.' },
 ];
 
@@ -32,7 +32,7 @@ export default function LandingPage() {
           </div>
           <div>
             <div className="font-display text-base font-extrabold tracking-[-0.02em]">Ensemble &amp; Organisés</div>
-            <div className="text-[11px] text-muted">Votre foyer, en mouvement</div>
+            <div className="text-xs text-muted">Votre foyer, en mouvement</div>
           </div>
         </div>
         <Button asChild size="sm">
@@ -68,7 +68,7 @@ export default function LandingPage() {
                   <MemberAvatar key={member.id} member={member} size="md" className="border-2 border-bg" />
                 ))}
               </span>
-              <p className="m-0 text-xs text-muted">Pensé pour les foyers de 2 à 6 personnes, avec des rôles Kids.</p>
+              <p className="m-0 text-xs text-muted">Pensé pour les foyers de 2 à 6 personnes, avec des rôles pour les enfants.</p>
             </div>
           </div>
 
@@ -87,11 +87,11 @@ export default function LandingPage() {
                     <Icon name={entry.icon} size="sm" />
                   </span>
                   <strong className="block font-display text-[15px] tracking-[-0.03em]">{entry.label}</strong>
-                  <span className="text-[11px] text-muted">{entry.detail}</span>
+                  <span className="text-xs text-muted">{entry.detail}</span>
                 </div>
               ))}
             </div>
-            <p className="mt-4 mb-0 text-[11px] text-muted">
+            <p className="mt-4 mb-0 text-xs text-muted">
               {moduleMap.taches.label}, {moduleMap.ardoise.label} et {moduleMap.cercle.label} partagent les mêmes membres et
               les mêmes règles d’accès.
             </p>
@@ -146,8 +146,8 @@ export default function LandingPage() {
           <div className="grid gap-2.5">
             {[
               {
-                q: 'Comment Invite-t-on un proche ?',
-                a: 'Un administrateur génère un token d’invitation depuis les préférences du foyer. Le token brut n’est affiché qu’à sa génération : la base ne conserve que son empreinte HMAC, avec expiration et nombre d’utilisations.',
+                q: 'Comment invite-t-on un proche ?',
+                a: 'Un administrateur génère une invitation depuis les préférences du foyer. Le code n’est affiché qu’à sa création : il expire automatiquement et ne peut être utilisé qu’un nombre limité de fois.',
               },
               {
                 q: 'Qui peut voir les données du foyer ?',
@@ -199,7 +199,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-5 py-6 text-[11px] text-muted max-[650px]:px-[15px]">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-muted max-[650px]:px-[15px]">
           <span>Ensemble &amp; Organisés — l’espace familial pour tout garder en mouvement.</span>
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>Application web installable, utilisable en ligne.</span>

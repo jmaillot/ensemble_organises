@@ -49,7 +49,7 @@ export function ConversationList({ conversations, archivedConversations = [], ac
             ) : null}
             {conversation.unread > 0 ? (
               <span
-                className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral px-1 text-[10px] font-extrabold text-white"
+                className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral-deep px-1 text-[10px] font-extrabold text-white"
                 aria-hidden="true"
               >
                 {conversation.unread}

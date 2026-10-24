@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { OBJECTS } from '@/components/shared/module-object';
 import { catalogueModules, filterModuleEntries, filterModuleKeys, isModuleDisabled, modules, navModules } from './modules';
 
 
@@ -22,15 +23,17 @@ describe('Catalogue des espaces', () => {
     }
   });
 
-  it('associe à chaque espace un pastel et un emoji de tuile valides', () => {
+  it('associe à chaque espace un pastel valide et un objet dessiné', () => {
     // Les tuiles sont passées au pastel Melimelo le 23 octobre 2026 (demande
-    // explicite : « les tuiles du site melimelo à la place des miennes ») —
-    // le garde vérifie le contrat qui remplace la photo : un aplat de la
-    // liste fermée des six pastels, et un emoji non vide par espace.
+    // explicite : « les tuiles du site melimelo à la place des miennes »),
+    // puis à l'objet SVG le 24 octobre (critique : « l'identité du catalogue
+    // dépend de la police emoji de l'OS »). Le garde vérifie le contrat :
+    // un aplat de la liste fermée des six pastels, et une clé dont le
+    // catalogue d'objets dessine un dessin pour chaque espace.
     const TINTS = new Set(['sage', 'blush', 'butter', 'sky', 'lilac', 'sand']);
     for (const entry of catalogueModules) {
       expect(TINTS.has(entry.tint), `${entry.key} porte un pastel inconnu : ${entry.tint}`).toBe(true);
-      expect(entry.emoji.trim().length, `${entry.key} n'a pas d'objet (emoji) sur sa tuile`).toBeGreaterThan(0);
+      expect(entry.key in OBJECTS, `${entry.key} n'a pas d'objet dessiné sur sa tuile`).toBe(true);
     }
   });
 

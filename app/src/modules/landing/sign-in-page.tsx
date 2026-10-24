@@ -117,7 +117,7 @@ export default function SignInPage() {
             connectez-vous en ligne pour les retrouver, où que vous soyez.
           </p>
         </div>
-        <p className="m-0 text-[11px] text-on-dark">Données hébergées sur votre propre instance Supabase.</p>
+        <p className="m-0 text-xs text-on-dark">Données hébergées sur votre propre instance Supabase.</p>
       </section>
 
       <section className="flex items-center justify-center px-5 py-10 max-[650px]:px-[15px]">
@@ -129,7 +129,7 @@ export default function SignInPage() {
           <p className="eyebrow mb-2">Connexion</p>
           <h2 className="mb-2 text-[clamp(24px,2.6vw,32px)] leading-[1.08]">Ravi de vous revoir</h2>
           <p className="lede mb-6 text-[13px]">Utilisez votre compte Google ou votre adresse e-mail.</p>
-          <p className="mb-5 text-[11px] text-muted">
+          <p className="mb-5 text-xs text-muted">
             Déjà un compte e-mail ? Connectez-vous avec, puis liez Google depuis Paramètres → Profil :
             les deux connexions mèneront au même foyer.
           </p>

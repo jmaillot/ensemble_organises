@@ -62,8 +62,11 @@ describe('CalendarGrid couches de référence', () => {
   it('garde la pastille férié visible même avec un événement du foyer', () => {
     renderGrid(true);
     const button = screen.getByRole('button', { name: /11 novembre 2026, 1 événement, jour férié/ });
-    // Pastille événement (corail) + pastille férié (ambre) : les deux couches.
-    expect(button.querySelector('.bg-coral')).not.toBeNull();
+    // Pastille événement (corail profond, contraste AA) + pastille férié
+    // (ambre) : les deux couches. Le corail profond remplace `bg-coral`
+    // depuis le 24/10/2026 (critique : les initiales et pastilles porteuses
+    // de texte passent par leurs variantes sombres).
+    expect(button.querySelector('.bg-coral-deep')).not.toBeNull();
     expect(button.querySelector('.bg-amber')).not.toBeNull();
   });
 

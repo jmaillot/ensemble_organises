@@ -598,13 +598,13 @@ export default function CalendrierPage() {
                         : 'grid place-items-center gap-1 rounded-[18px] border border-border/70 bg-surface px-1 py-2.5 transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint'
                     }
                   >
-                    <span className="text-[9.5px] font-extrabold tracking-[0.08em] text-muted uppercase">
+                    <span className="text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
                       {titleCase(formatLongDate(iso)).slice(0, 3)}
                     </span>
                     <span
                       className={
                         isToday
-                          ? 'grid size-8 place-items-center rounded-full bg-coral font-display text-[15px] font-semibold text-white tabular-nums'
+                          ? 'grid size-8 place-items-center rounded-full bg-coral-deep font-display text-[15px] font-semibold text-white tabular-nums'
                           : isSelected
                             ? 'grid size-8 place-items-center rounded-full bg-accent font-display text-[15px] font-semibold text-surface tabular-nums'
                             : 'grid size-8 place-items-center rounded-full font-display text-[15px] font-semibold tabular-nums'

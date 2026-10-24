@@ -67,7 +67,7 @@ export function AllSpacesSheet({ open, onOpenChange }: { open: boolean; onOpenCh
                     // Le filtre au-dessus a déjà retiré « accueil » : la clé
                     // restante nomme toujours un module du catalogue.
                     tint={moduleMap[entry.key as ModuleKey].tint}
-                    emoji={moduleMap[entry.key as ModuleKey].emoji}
+                    module={moduleMap[entry.key as ModuleKey].key}
                     to={entry.to}
                     onClick={() => onOpenChange(false)}
                     active={pathname === entry.to}

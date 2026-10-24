@@ -1,413 +1,190 @@
 # Ensemble & Organisés — Système de design
 
-> Document de référence pour le prototype PWA et son export React.
-> Source visuelle : `ensemble-organises.html` et `react-export/src/styles.css`.
-> Version : 1.0 · Produit : PWA familiale de gestion du foyer · Langue produit : français
+> **Source de vérité : `app/src/styles/app.css`** et `app/index.html`. Ce document la décrit ; si les deux divergent, le code fait foi et ce document est corrigé le jour même (AGENTS.md §2.7 I : une affirmation de doc se vérifie en ouvrant le fichier).
+> Version : 2.0 (2026-10-24, réécrite depuis `app.css` — la v1 décrivait le prototype ivoire/Söhne, jamais l'application en production)
+> Produit : PWA familiale de gestion du foyer · Langue produit : français
 
 ## 1. Intention
 
-**Ensemble & Organisés** est un espace calme et concret pour organiser la vie d’un foyer. L’interface doit réduire la charge mentale : elle montre l’essentiel du jour, permet d’agir immédiatement, puis laisse chaque module secondaire devenir un espace de travail plus détaillé.
+**Ensemble & Organisés** est un espace calme et concret pour organiser la vie d'un foyer. L'interface réduit la charge mentale : elle montre l'essentiel du jour, permet d'agir immédiatement, puis laisse chaque module secondaire devenir un espace de travail plus détaillé.
 
-La direction est **chaleureuse, éditoriale et utilitaire** : un fond ivoire lumineux, une encre bleu-pétrole pour la hiérarchie, un vert pétrole pour l’action et le progrès, et un corail réservé aux alertes et aux moments qui demandent une attention particulière.
+La direction est **chaleureuse, éditoriale et utilitaire** (relevé Melimelo, benchmark §2.3) : fond crème, encre vert sapin, pastels doux pour les aplats des tuiles et des groupes, un corail et un ambre réservés aux alertes et aux informations temporelles. Fraunces (serif variable, `WONK` actif) porte les titres et les chiffres ; Inter Tight porte le texte courant.
 
 ### Règle de synthèse
 
-> Fond ivoire + encre bleu-pétrole + accent pétrole + corail parcimonieux ; trois zones éditoriales — navigation, résumé du jour, modules.
+> Fond crème + encre sapin + accents pastel par espace + corail parcimonieux ; trois zones sur l'accueil — héro du jour, personnalisation, catalogue des espaces.
 
 ## 2. Principes
 
-1. **Le jour d’abord.** L’accueil commence par le point du jour, les tâches ouvertes et les widgets, pas par une navigation de fonctions.
-2. **Un accent, pas une décoration.** Le vert pétrole structure l’action et la progression. Le corail signale l’urgence, la notification ou l’état qui doit être vu.
-3. **La couleur ne porte jamais seule une information.** Priorité, état et sélection sont toujours accompagnés d’un libellé, d’une forme ou d’une icône.
-4. **Les surfaces sont calmes.** Les cartes sont blanches ou ivoire, légèrement bordées ; les ombres restent discrètes.
-5. **Chaque module a une action principale.** Une vue ne doit pas présenter plusieurs boutons pleins réalisant la même action.
-6. **Le produit reste calme en profondeur.** Une vue détaillée peut être dense, mais jamais bruyante.
+1. **Le jour d'abord.** L'accueil commence par le héro « Le point du jour », pas par la navigation.
+2. **Un accent, pas une décoration.** La couleur ne porte jamais seule une information : libellé, forme ou icône accompagnent état, priorité et sélection.
+3. **Les surfaces sont calmes.** Cartes blanches sur fond crème, bordures fines, ombres discrètes ; le seul dégradé du système est celui de la carte héro (`hero-surface`).
+4. **Chaque module a une action principale.** Un seul bouton plein par vue pour la même fonction.
+5. **Le produit reste calme en profondeur.** Une vue détaillée peut être dense, jamais bruyante.
+6. **Un objet par espace.** Tuiles et en-têtes parlent d'un objet d'illustration maison, jamais d'un emoji système (§5).
 
 ## 3. Tokens de couleur
 
-Les tokens ci-dessous sont normatifs. Ne pas introduire de valeurs hexadécimales dans les composants : toute variation doit être dérivée en `oklch()`.
+Normatifs, définis dans `@theme`. Aucune valeur hexadécimale locale dans les composants : toute variation se dérive avec `color-mix()` ou rejoint le contrat.
 
-### Couleurs de base
-
-| Token | Valeur | Rôle |
+| `--color-*` | Valeur | Rôle |
 |---|---|---|
-| `--bg` | `oklch(98% 0.004 240)` | Fond global, ivoire lumineux |
-| `--surface` | `oklch(100% 0 0)` | Cartes, panneaux, surfaces surélevées |
-| `--fg` | `oklch(20% 0.02 240)` | Texte principal, encre bleu-pétrole |
-| `--muted` | `oklch(50% 0.018 240)` | Texte secondaire, aides, métadonnées |
-| `--border` | `oklch(90% 0.006 240)` | Séparateurs, contours discrets |
-| `--ink-soft` | `oklch(28% 0.025 240)` | Texte de tableau et zones denses |
+| `bg` | `#f2f0ec` | Fond global, crème |
+| `surface` | `#ffffff` | Cartes, panneaux |
+| `fg` | `#20413d` | Texte principal, encre sapin |
+| `muted` | `#5e6f6b` | Texte secondaire, jamais le contenu essentiel |
+| `border` | `#e3dfd7` | Séparateurs, contours |
+| `accent` | `#20413d` | État actif (même encre que `fg`) |
+| `accent-strong` | `#16302d` | Focus, texte sur pastels |
+| `accent-deep` | `#0e201e` | Fond du dégradé héro |
+| `accent-soft` | `#dfeae5` | Fonds sélectionnés, chips |
+| `accent-faint` | `#eef3f0` | Hover discret |
+| `coral` | `#d95f5c` | Alerte, badge erreur |
+| `coral-text` | `oklch(52% 0.14 25)` | Texte sur `coral-soft` (4,81:1 au lieu de 2,97:1 — critique UI 23/10/2026) |
+| `coral-strong` | `#f7c3bf` | Corail sur fond sombre |
+| `coral-soft` | `#f8e3e1` | Fond d'alerte |
+| `amber` | `#b9822f` | Information temporelle |
+| `amber-strong` | `oklch(52% 0.11 78)` | Texte sur `amber-soft` |
+| `amber-soft` | `#f7ebd3` | Fond d'information temporelle |
+| `on-dark` | `rgb(255 255 255 / 0.72)` | Texte secondaire sur aplat sapin (5,59:1 mesuré) |
 
-### Accent et états
+Pastels de catégorie (aplaits des tuiles et des en-têtes ; sapin dessus ≥ 7:1) :
 
-| Token | Valeur | Rôle |
+| Pastel | Valeur | Texte sur aplat |
 |---|---|---|
-| `--accent` | `oklch(56% 0.12 170)` | Progression, avatars, confirmation légère |
-| `--accent-strong` | `oklch(47% 0.11 170)` | CTA principal, focus, sélection forte |
-| `--accent-soft` | `oklch(94% 0.045 170)` | Fonds sélectionnés et chips positifs |
-| `--accent-faint` | `oklch(97% 0.018 170)` | Hover très discret, pistes, fond de progression |
-| `--coral` | `oklch(64% 0.15 32)` | Alerte, notification, état urgent |
-| `--coral-soft` | `oklch(95% 0.04 32)` | Fond d’alerte ou de réaction |
-| `--amber` | `oklch(68% 0.12 78)` | Rappel, jour férié, information temporelle |
-| `--amber-soft` | `oklch(95% 0.045 78)` | Fond d’information temporelle |
+| `sage` | `#cfe0d6` | sapin |
+| `blush` | `#f6d9d6` | sapin |
+| `butter` | `#f6e7c4` | sapin |
+| `sky` | `#d6e6ec` | `sky-strong #1f4e79` |
+| `lilac` | `#e2dceb` | sapin |
+| `sand` | `#efe7da` | sapin |
 
-```css
-:root {
-  --bg: oklch(98% 0.004 240);
-  --surface: oklch(100% 0 0);
-  --fg: oklch(20% 0.02 240);
-  --muted: oklch(50% 0.018 240);
-  --border: oklch(90% 0.006 240);
-  --accent: oklch(56% 0.12 170);
-  --accent-strong: oklch(47% 0.11 170);
-  --accent-soft: oklch(94% 0.045 170);
-  --accent-faint: oklch(97% 0.018 170);
-  --coral: oklch(64% 0.15 32);
-  --coral-soft: oklch(95% 0.04 32);
-  --amber: oklch(68% 0.12 78);
-  --amber-soft: oklch(95% 0.045 78);
-  --ink-soft: oklch(28% 0.025 240);
-  --shadow-sm: 0 2px 10px oklch(20% 0.02 240 / 0.06);
-  --shadow-md: 0 14px 34px oklch(20% 0.02 240 / 0.08);
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-}
-```
+`meta name="theme-color"` = `#f2f0ec` (le crème réel ; la v1 annonçait un oklch ivoire — corrigé le 24/10/2026).
 
 ### Règles de contraste
 
-- `--fg` sur `--bg` / `--surface` est la paire de texte normale.
-- `--muted` est réservé aux métadonnées, jamais au contenu principal.
-- `--accent-strong` sur fond clair est utilisé pour les CTA, le focus et les labels actifs.
-- `--coral` ne doit pas être utilisé comme couleur de texte normal sur `--bg` : le réserver aux marques, icônes, badges et textes courts en gros corps. Sur fond sombre, inverser les deux couleurs de l’élément.
-- Un changement d’état ne doit jamais diminuer le contraste du texte. Sur un hover, déplacer le fond ou le contour ; ne pas simplement rendre le texte plus gris.
-- Les contrôles focus utilisent une bordure de 3 px `var(--accent-strong)` avec 3 px de décalage.
+- Corps et libellés de 10–14 px : ≥ 4,5:1 dans leur contexte réel (mesures commentées dans `app.css`).
+- `muted` réservé aux métadonnées.
+- Un changement d'état ne réduit jamais le contraste du texte ; sur hover, déplacer fond ou contour.
+- Focus clavier : `outline: 3px solid var(--color-accent-strong)`, offset 3 px (gage global dans `app.css`).
+- < 4,5:1 interdit, initiales d'avatar comprises : sur une pastille de membre, éclaircir la pastille ou renforcer l'initiale (retour du 24/10/2026 : blanc sur `coral` = 3,7:1).
 
 ## 4. Typographie
 
-### Familles
-
 ```css
---font-display: 'Söhne', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
---font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+--font-display: 'Fraunces Variable', 'Fraunces', ui-serif, Georgia, serif;
+--font-body: 'Inter Tight Variable', 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace; /* codes de fidélité et données tabulaires */
 ```
 
-- **Display** : titres, chiffres importants, montants, salutations, titres de cartes.
-- **Body** : libellés, paragraphes, formulaires, tableaux, messages, contenu secondaire.
-- **Mono** : codes de fidélité uniquement : `ui-monospace, SFMono-Regular, Menlo, monospace`.
+Titres : `font-optical-sizing: auto`, `font-variation-settings: 'SOFT' 20, 'WONK' 1`, tracking `−0.022em`.
 
-### Échelle
+| Rôle | Taille | Interligne |
+|---|---|---|
+| `--text-display` (héro accueil) | `clamp(38px, 5.2vw, 76px)` | 0.98 |
+| `--text-module` (titre de module) | `clamp(38px, 4.4vw, 62px)` | 1.02 |
+| `--text-section` | 24px | 1.18 |
+| Corps (`--text-body`) | 15.5px | 1.5 |
+| Eyebrow (utilitaire CSS) | 11px, 850, uppercase, tracking .12em, `accent-strong` | — |
+| `section-kicker` (utilitaire) | 10px, 800, uppercase, tracking .14em, `muted` | — |
+| Noms de tuile | 16px bold, tracking −0.01em | tight |
 
-| Rôle | Taille | Poids | Traitement |
-|---|---:|---:|---|
-| `h1` | `clamp(30px, 3.2vw, 47px)` | 780 | line-height `1.02`, tracking `-0.035em` |
-| `h2` | `clamp(22px, 2.1vw, 30px)` | 780 | line-height `1.08` |
-| `h3` | `18px` | 780 | line-height `1.15` |
-| `h4` | `15px` | 760 | line-height serré |
-| Corps | `15px` | 400–500 | line-height `1.45` |
-| Lede | `15px` | 400 | largeur max `520px` |
-| Métadonnée | `12px` | 400 | couleur `--muted` |
-| Eyebrow | `11px` | 850 | uppercase, tracking `.12em` |
-| Micro-label | `10px` | 800 | uppercase, tracking `.08em` |
-| Widget label | `11px` | 800 | uppercase, tracking `.09em` |
+Règles éditoriales : dates (`19 h 30`, `15/09`) et montants (`24,90 €`) en français ; chiffres en `tabular-nums` quand alignés ; la langue du produit ne contient pas d'anglicisme (rôles « enfant », pas « Kids ») ; le jargon technique (HMAC, RLS) reste dans la documentation, jamais sur une page destinée aux familles ; le corps de texte mesure ≤ 75ch ; `lang="fr"` sur `<html>` (césure française autorisée).
 
-### Règles éditoriales
+## 5. Iconographie, objets et identité
 
-- Une seule phrase forte par section ; les détails restent en `12px`.
-- Les titres ne doivent pas être forcés sur une seule ligne. Réduire la taille ou laisser le texte passer à la ligne avant d’utiliser `nowrap`.
-- Éviter les paragraphes de plus de 3 lignes dans une carte.
-- Le nom d’un produit, d’une personne ou d’un lieu reste une donnée réelle ; ne pas le remplacer par un texte de remplissage décoratif.
-
-## 5. Iconographie et identité
-
-- Jeu d’icônes SVG local, trait `1.8px`, extrémités et jointures arrondies.
-- Tailles : `15px` (en ligne / bouton), `18px` (navigation), `21px` (état prominent).
-- Les icônes sont décoratives (`aria-hidden="true"`) ; le contrôle qui les contient porte le libellé.
-- Ne pas utiliser d’emoji comme icône fonctionnelle.
-- Le brand mark combine encre et accent pétrole ; il n’utilise pas de dégradé ni d’illustration.
-- Les cartes photo utilisent un overlay sombre uniquement pour garantir la lisibilité du texte blanc.
+- Icônes : SVG locaux (`components/shared/icon`, trait 1,8 px, extrémités/jointures arrondis). Tailles : 15px (en ligne), 18px (navigation), 21px (état prominent). Décoratives (`aria-hidden`), le contrôle porte le libellé. **Chaque module a son icône distincte** : `receipt` ne sert pas deux espaces, `people` non plus.
+- **Emoji proscrits** comme icône, illustration, ou objet de tuile (ilos v1 §5, désormais suivi par l'implémentation). L'« objet » d'une tuile est un dessin maison : SVG à deux tons (sapin + pastel), ou photo locale `public/assets/*` avec `object-fit`, `width`/`height` déclarés et `loading="lazy"`.
+- Brand mark : carré sapin 38px, rayon 13px, cercle accent en coin bas droit.
+- Overlays de photo (`tile-overlay`, `trip-overlay`) : dégradé encre 5%→84% avec texte clair ≥ 4,5:1 garanti.
 
 ## 6. Espacements, rayons et relief
 
-### Espacements
+Espacements : échelle 4px. Gutter principal 38px desktop (26px ≤1180, 15px ≤650). Padding carte 14px, panneau 16–20px.
 
-Utiliser une échelle de 4 px, avec des exceptions uniquement pour composer une grille :
+Rayons (tokens `app.css`) : contrôle `14px`, carte/tuile `20px`, panneau/dialogue `22–28px`, chip/avatar `999px`, pilule nav basse `26px`.
 
-`4 · 6 · 8 · 10 · 12 · 14 · 16 · 18 · 20 · 22 · 24 · 26 · 32 · 34 · 38 · 40 · 48 · 64`
-
-- Padding de carte : `17–19px`.
-- Padding de panneau : `19–23px`.
-- Gap widget : `14px`.
-- Gap module : `12px`.
-- Gap de formulaire : `14px`.
-- Marge de section : `24–34px`.
-
-### Rayons
-
-| Token / usage | Valeur |
-|---|---:|
-| Petit contrôle | `10px` |
-| Carte, champ, avatar secondaire | `16px` |
-| Panneau, boîte de dialogue | `22px` |
-| Cible de date, petit badge | `10–13px` |
-| Chip, switch, avatar circulaire | `999px` |
-
-### Ombres
-
-```css
---shadow-sm: 0 2px 10px oklch(20% 0.02 240 / 0.06);
---shadow-md: 0 14px 34px oklch(20% 0.02 240 / 0.08);
-```
-
-- `--shadow-sm` : cartes, widgets, panneaux, fenêtres contextuelles.
-- `--shadow-md` : hover de tuile photo, toast, boîte de dialogue.
-- Ne pas empiler plusieurs ombres sur une même surface.
+Ombres : `--shadow-sm` (0 1px 2px / 0,05) surfaces au repos · `--shadow-md` (0 12px 32px / 0,07) hover · `--shadow-lg` (0 30px 80px / 0,16) nav basse et toasts. Jamais deux ombres empilées.
 
 ## 7. Mouvement
 
-```css
---ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-```
+- `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` ; `--duration-quick: 180ms`, `--duration-slow: 300ms`.
+- Hover : fond ou translation `-3px` + `shadow-md`, jamais une perte de contraste de texte.
+- Drag : curseur `grabbing` global pendant le geste (`widgets-dragging`), opacité 0,55 sur la carte déplacée.
+- Confettis du jour J : vitesse constante, `transform` + `opacity` seules, sortie à 104vh avant le bord.
+- `prefers-reduced-motion: reduce` coupe transitions et animations.
+- Interdictions : `scale(0)` en entrée, `ease-in` en entrée, la même animation d'entrée partout.
 
-| Interaction | Durée | Comportement |
-|---|---:|---|
-| Hover bouton / nav | `180ms` | fond, contour, légère translation |
-| Glissement de widget | `180ms` | opacité et cible accentuées |
-| Tuile module | `180ms` | `translateY(-3px)` + shadow-md |
-| Photo de tuile | `300ms` | zoom très léger `scale(1.04)` |
-| Toast | `180ms` | entrée/sortie ease-out |
-| Focus / reduced motion | immédiat | `prefers-reduced-motion` désactive les transitions |
+## 8. Architecture de l'écran
 
-Règles :
+Desktop : rail (sidebar) fixe, topbar sticky translucide (`topbar-surface`, blur 18px), contenu max 1480px, padding 38px.
 
-- Ne jamais démarrer une animation à `scale(0)`.
-- Ne pas utiliser `ease-in` pour l’entrée d’un élément.
-- Le hover ne doit pas rendre le texte moins contrasté.
-- Le focus clavier doit être au moins aussi visible que le hover.
+### Navigation
+- Rail desktop : « Maison » + accès rapides épinglés (`nav: true`) + **tous les espaces** en un seul groupe (`catalogueModules`) — délibérément plat (retour utilisateur du 23/10/2026). Actif = `accent-soft` + libellé.
+- Sous 920px : rail 76px, icônes seules. Chaque espace garde un moyen de reconnaissance (tooltip `title` + libellé au hover/focus) et une icône distincte.
+- Mobile ≤ 650px : sidebar masquée, tiroir pour la carte foyer et les préférences, **barre basse flottante** (`MobileBottomNav`) : Maison, Courses, Agenda, Tâches + « Plus » (feuille dédiée « Tous les espaces » + réglages). Cibles ≥ 52px, positionnée avec `env(safe-area-inset-bottom)` ; le `main` réserve la hauteur pour la dégager.
+- Réglages : focus piégé dans tiroir et feuille, `aria-modal`, fermeture Échap/overlay.
 
-## 8. Architecture de l’écran
+### Grilles
+- Accueil : héro → personnalisation → widgets (2 col) → grille de tuiles 4 col / 3 (≤1180) / 1 (≤650).
+- Catalogue : 4 col desktop, 3 tablette, 1 mobile.
+- Détail : `minmax(0, 1.3fr) minmax(280px, .7fr)`.
+- Ardoise : tableau desktop, cartes empilées mobile via `useIsMobileLayout` — **jamais de scroll horizontal, même interne** ; `.table-wrap` desktop seul.
 
-### Desktop — trois zones
-
-1. **Navigation** : sidebar fixe, largeur `246px`, fond `--surface`, bordure droite.
-2. **Résumé du jour** : topbar sticky hauteur `76px`, puis le header de page et le bandeau `pulse-banner`.
-3. **Modules** : contenu principal, largeur maximale `1480px`, padding horizontal `38px`.
-
-Grilles principales :
-
-- Dashboard : `minmax(0, 1fr) 290px`.
-- Contenu détaillé : `minmax(0, 1.3fr) minmax(280px, .7fr)`.
-- Calendrier : `minmax(0, 1.25fr) minmax(270px, .75fr)`.
-- Cercle : `minmax(0, 1fr) 285px`.
-- Messages : `290px minmax(0, 1fr)`.
-- Widgets : 2 colonnes.
-- Catalogue de modules : 4 colonnes desktop, 3 colonnes tablette, 1 colonne mobile.
-
-### Breakpoints
-
-| Breakpoint | Comportement |
-|---|---|
-| `> 1180px` | Layout complet, sidebar `246px`, modules en 4 colonnes |
-| `≤ 1180px` | Sidebar `218px`, contenu `26px`, modules en 3 colonnes |
-| `≤ 920px` | Sidebar réduite à `76px`, icônes seules, side column en 2 colonnes |
-| `≤ 650px` | Sidebar masquée, hamburger + tiroir, grilles en 1 colonne, padding `12px` |
-
-Le mobile ne doit jamais scroller horizontalement. Les tableaux longs utilisent une zone de scroll interne (`.table-wrap`), pas la page entière.
-
-### Contrat mobile `≤ 650px`
-
-Ces règles sont normatives : toute nouvelle vue mobile les applique sans exception. Source : run OpenDesign `deb572da` (28/09/2026), validé 6/6.
-
-| Sujet | Règle |
-|---|---|
-| Dégagement bas | Le `main` réserve `calc(28px + env(safe-area-inset-bottom))` (plus de barre basse) ; aucun padding-bottom supplémentaire sur `body` (pas de double scroll) |
-| Topbar mobile | Hauteur `56px`, trois éléments : hamburger, marque `34px`, notifications + avatar `44px`. Fil d'Ariane et CTA « Installer » supprimés sous `650px` |
-| Tiroir | Unique menu mobile : recherche `44px`, les 17 espaces en liste plate (aucune catégorie imposée), carte foyer, préférences (admin), déconnexion. Fermeture overlay / bouton / `Échap` / balayage gauche ; focus piégé, rendu au hamburger, `aria-modal` synchronisé |
-| Toast | `bottom: calc(16px + env(safe-area-inset-bottom))` sur mobile |
-| Contrôles | Filtres et recherches passent en `w-full` + `min-width: 0` sous `650px` ; plus aucune largeur fixe `min-w-[170-220px]` sans override mobile |
-| Cibles tactiles | Notifications, avatar, fermeture de dialogue et `.check-option` `≥ 44px` sur mobile ; poignées de widgets `44px` permanentes avec `touch-action: none`, `select-none` et `-webkit-touch-callout: none` (TouchSensor : appui long 180ms, le scroll garde la priorité ; pas de loupe de sélection) |
-| En-têtes de module | Retour en pastille `44px` (libellé `sr-only`), titre `24px`, eyebrow et lede masqués sous `650px` ; l'action principale reste visible |
-| Densité mobile | Contenu `14px 12px`, panneaux et cartes `14px`, tuiles de module `104px` (accroche masquée), `BalanceCard` compacte (`34px`, texte masqué), coupons sans hauteur minimale |
-| Tableaux | Ardoise : une seule variante montée via `useIsMobileLayout` — tableau sur bureau, cartes empilées sur mobile. Aucun scroll horizontal, même interne |
-| Formulaires | Grilles fixes (`[1fr_130px]`, `.form-row`) en 1 colonne sous `650px` |
-| Dialogues | Feuille de bas de page sous `650px`, `border-radius: 22px 22px 0 0`, hauteur bornée par `100dvh`, actions empilées en colonne inversée |
-| Bande KPI | `MetricRow` reste à 2 colonnes (bandeau compact) — les grilles de contenu passent, elles, à 1 colonne |
-| Débordement | `html, body` en `overflow-x: hidden` avec repli `clip`, enfants de grille en `min-width: 0` |
-| Parcours pré-connexion | Pages `/foyer*` et `/connexion` : contenu aligné en haut sous `650px` (`items-start`), jamais centré verticalement dans `min-h-screen` |
+### Breakpoints et garde-fous
+`>1180` complet · `≤1180` rail compact · `≤920` rail icônes 76px · `≤650` mobile. Sous 650px : `html, body` en `overflow-x: clip` (gage `app.css`), padding latéral 15px, `MetricRow` reste à 2 colonnes, le contrat mobile détaillé (cibles 44px, feuilles bas d'écran, dialogues) reste normatif — validé 6/6 le 28/09/2026 (run deb572da).
 
 ## 9. Composants
 
-### Navigation et chrome
-
-- **Brand mark** : carré `38px`, fond encre, rayon `13px`, accent pétrole dans le coin.
-- **Nav item** : hauteur min `44px`, rayon `12px`, état actif `accent-soft` + `accent-strong`.
-- **Topbar** : sticky, fond translucide ivoire, blur `18px`, bordure basse.
-- **Avatar** : rond, fond encre, initiales en `800`.
-- **Notification dot** : corail, `7px`, bordure surface de `2px`.
-
-### Boutons
-
-| Variante | Fond | Texte | Usage |
-|---|---|---|---|
-| `primary` | `--accent-strong` | `--surface` | Une action principale par vue |
-| `secondary` | `--surface` | `--fg` | Action de navigation ou alternative |
-| `quiet` | transparent | `--accent-strong` | Lien d’action, retour, gestion |
-| `danger` | `--coral-soft` | `--coral` | Suppression, action destructive |
-
-- Hauteur normale : `44px` minimum.
-- Icône : `15–18px`, jamais seule sans `aria-label` ni texte.
-- Un bouton plein ne doit pas être répété dans le même viewport pour la même fonction.
-
-### Surfaces
-
-- **Panel** : fond surface, rayon `16px`, bordure `1px`, padding `19px`, shadow-sm.
-- **Side card** : même base, padding `17px`.
-- **Metric card** : pas d’ombre lourde, valeur display forte, légende muted.
-- **Module tile** : hauteur min `154px`, photo en fond, overlay bas, contenu en bas à gauche, flèche en haut à droite.
-- **Widget card** : hauteur min `190px`, déplaçable, padding `18px`, bordure accent pendant le drop.
-- **Post** : carte éditoriale, média en flux naturel, commentaires dans un bloc `bg` interne.
-
-### Contrôles de formulaire
-
-- Champ : hauteur min `44px`, rayon `11px`, bordure `--border`.
-- Focus : `outline: 3px solid var(--accent-strong)`, offset `3px`.
-- Label : `11px`, poids `800`, couleur `--muted`.
-- Champ multiligne : `textarea`, hauteur min `100px`, resize vertical.
-- Champ obligatoire : astérisque dans le label ; validation HTML native conservée.
-- Checkbox groupe : `.check-option`, bordure, état `:has(input:checked)` en accent-soft.
-- Select : même hauteur et même focus que les champs texte.
-
-### Calendrier
-
-- Semaine lundi → dimanche.
-- Jour sélectionné : contour accent-strong et inset shadow.
-- Aujourd’hui : fond accent-strong, texte surface.
-- Événement : point corail de `4–5px`.
-- Jour férié / rappel : point ambre.
-- Agenda : colonne heure `55px`, contenu flexible, actions à droite.
-- Les anniversaires sont récurrants par mois et jour, pas limités à l’année de naissance.
-
-### Statuts
-
-| Statut | Traitement |
-|---|---|
-| Normal | texte `--fg`, surface neutre |
-| Terminé | titre muted + strikethrough |
-| Haute priorité | chip `coral-soft` + libellé |
-| Normale | chip `amber-soft` + libellé |
-| Basse | chip `bg` + libellé |
-| Visitée | switch accent + libellé explicite dans l’aria-label |
-| Non lu | dot corail + libellé accessible |
+- **Boutons** : `primary` (sapin plein, texte surface) — *un* par vue · `secondary` (surface, bordure) · `quiet` (accent-strong) · `danger` (`coral-soft`, texte `coral-text`). Hauteur ≥ 44px, rayon 14px.
+- **Panel** : surface blanche, bordure 1px, rayon 20px, `shadow-sm`.
+- **Tuile d'espace** (`AppTile`) : aspect 6:5, rayon 20px, aplat pastel, nom bold 16px en haut-gauche, objet en bas-droite (58px mobile / 112px PC, jamais rogné à moitié), pastille-compteur translucide bas-gauche, `select-none` sur l'objet. Compteur jamais à 0 (règle du mur de zéros). Nom accessible avec compteur : « Ouvrir Courses, 21 articles à acheter ».
+- **Barre basse mobile** : pilule flottante, hauteur ≥ 52px, actif = aplat sapin + texte surface.
+- **Champs** : hauteur ≥ 44px, rayon 11–14px, label 11px bold `muted`, focus gage global, `.check-option` avec `:has(:checked)`.
+- **Statuts** : terminé = `muted` + strikethrough · haute = chip `coral-soft` + `coral-text` · normale = `amber-soft` · basse = neutre · non lu = point corail + libellé accessible.
+- **Toasts** : bas d'écran, `calc(16px + env(safe-area-inset-bottom))` mobile.
+- **Surfaces navigateur** : `::selection` accent-soft/sapin, scrollbar slim à poignée d'encre 32% sur crème — thémées ici, jamais laissées au défaut.
 
 ## 10. Contenu et modules
 
-Les modules du catalogue sont :
+20 espaces (`lib/modules.ts`) : Courses, Calendrier, Notes, Tâches, Routines, Ardoise, Recettes, Cadeaux, Anniversaires, Contacts, Animaux, Prestataires, Fidélité, Adresses, Cercle, Voyages, Messages, Frigo, Menu, Documents. Chacun porte : label, accroche (`detail`), kicker, tint, objet, icône, route `/key`.
 
-1. Courses
-2. Calendrier
-3. Notes
-4. Tâches
-5. Routines
-6. Ardoise
-7. Recettes
-8. Cadeaux
-9. Anniversaires
-10. Animaux
-11. Prestataires
-12. Fidélité
-13. Adresses
-14. Cercle
-15. Voyages
-16. Messages
+Règles : une phrase forte et une information principale par carte ; données de démonstration signalées comme telles ; aucune marque/produit/lieu inventés ; jamais un emoji ni du texte de remplissage à la place d'une donnée.
 
-### Règles de contenu
+## 11. Médias
 
-- Écrire en français, avec des phrases courtes et une information principale par carte.
-- Utiliser des dates et montants en formats français (`15/09`, `24,90 €`).
-- Ne pas inventer de marque, de produit, de lieu ou de personne pour une démonstration qui prétend représenter une réalité.
-- Les données de démonstration sont signalées comme telles et ne doivent pas ressembler à une donnée de production.
-- Une icône n’est jamais un substitut à un label.
-
-## 11. Médias et images
-
-- Toutes les images sont locales au projet ; aucun hotlink.
-- `public/assets/` contient les médias du prototype et `ATTRIBUTION.md`.
-- Les images de tuiles, cartes de lieux, cadeaux et voyages sont des visuels décoratifs ou de couverture : `object-fit: cover` est autorisé pour un cadrage volontaire.
-- Les portraits et photos de contenu doivent conserver leur ratio mesuré, avec `width`/`height` ou `aspect-ratio`, et utiliser `object-fit: contain` quand le cadrage complet est important.
-- Le média de voyage `lisbonne.jpg` est attribué dans `public/assets/ATTRIBUTION.md` (Wikimedia Commons, CC BY 4.0).
-- Une image manquante doit être corrigée ou remplacée par un état étiqueté explicitement ; pas de placeholder silencieux.
+Images locales uniquement (`public/assets/`), `ATTRIBUTION.md` à jour. `width`/`height` ou `aspect-ratio` sur toute photo de contenu, `object-fit` volontaire, `loading="lazy"` hors héro. Image manquante = état étiqueté explicitement, pas placeholder silencieux.
 
 ## 12. Accessibilité
 
-- Structure sémantique : `header`, `nav`, `main`, `section`, `article`, `aside`, `footer` selon le sens de lecture.
-- Un `h1` par vue ; les sections utilisent `h2` puis `h3`.
-- Tous les contrôles à icône seule ont `aria-label`.
-- Les champs ont un `label` associé ; les groupes de checkboxes ont un label de groupe.
-- Les zones décoratives sont `aria-hidden` quand elles n’ajoutent pas d’information.
-- Ne jamais supprimer le focus outline sans remplacement.
-- Les cibles tactiles principales font au minimum `44px`.
-- Prévoir un ordre de tabulation : navigation → actions de page → contenu → dialogues.
-- Les images informatives ont un `alt` précis ; les images purement décoratives ont un `alt` vide.
-- Ne pas transmettre une information par la seule couleur.
+Un `h1` par vue (h2/h3 ensuite) ; rôles sémantiques ; tout contrôle à icône seule porte `aria-label` ; champs avec `label` associé ; zones décoratives `aria-hidden` ; focus jamais supprimé sans remplacement ; cibles ≥ 44px (52px en barre basse) ; `lang="fr"` ; l'information ne passe jamais par la seule couleur ; `role="alert"` sur les erreurs de formulaire ; drag accessible au clavier avec instructions lecteur d'écran.
 
 ## 13. PWA et persistance
 
-- Manifest : nom, description, couleur de thème, affichage `standalone`, icône locale.
-- Service worker : cache d’abord pour les ressources versionnées, repli vers `index.html` pour une navigation.
-- Notifications : app ouverte et visible → popup in-app (toast via `postMessage EO_PUSH`) + notification système **silencieuse** (Chrome impose une notification visible par push, sous peine d'un message générique) ; app fermée ou cachée → notification système classique (rideau Android, centre Windows). Le clic ouvre ou refocalise la page cible, jamais de doublon de fenêtre.
-- Après réinstallation de la PWA, l'abonnement push change d'`endpoint` : réactiver dans Préférences → « Synchroniser cet appareil », puis « Envoyer un test ».
-- Les données de démonstration utilisent `localStorage` avec une clé de version.
-- Une évolution de schéma doit prévoir une migration ou une réinitialisation explicite.
-- Les médias importés par l’utilisateur doivent être limités à une taille raisonnable et l’échec de quota doit être annoncé.
+Manifest : `standalone`, thème `#f2f0ec`, icônes locales SVG + PNG (iOS ignore le SVG). `meta theme-color` = crème réel ; `mobile-web-app-capable` remplace `apple-mobile-web-app-capable` déprécié (posé le 24/10/2026). SW : précache + push uniquement. Push : notification système silencieuse quand l'app est visible + toast in-app (`EO_PUSH`), sinon notification classique ; l'`endpoint` change à la réinstallation → re-synchronisation dans Préférences.
 
-## 14. Règles d’implémentation React
+## 14. Règles d'implémentation
 
-Le composant exporté est `EnsembleOrganisesApp` dans `react-export/src/App.tsx`.
-
-Props publiques minimales :
-
-```tsx
-interface EnsembleOrganisesAppProps {
-  initialState?: Partial<AppState>;
-  assetBase?: string;
-  storageKey?: string;
-}
-```
-
-Contraintes :
-
-- React `18.3.1`, TypeScript strict, Vite.
-- Pas d’iframe.
-- Pas de Tailwind dans cet export ; les styles sont dans `react-export/src/styles.css`.
-- Pas d’insertion HTML brute.
-- Les icônes sont des SVG React locaux et décoratifs.
-- Les composants de module doivent conserver leurs libellés, leurs états et leurs `data-od-id` lorsqu’ils sont exposés à l’aperçu.
-- Les mutations de l’état sont centralisées dans le composant principal afin de pouvoir les remplacer par des appels API.
+- Stack : React 19, React Router 8 (importé depuis `react-router`), Tailwind CSS 4 CSS-first (`@theme`), TypeScript strict, dnd-kit modulaire, TanStack Query v5, Zustand.
+- Aucun hex local dans les composants : `@theme` fait foi, variations par `color-mix()`.
+- Classes arbitraires tolérées pour une mesure précise (`text-[11px]`), jamais pour une couleur.
+- Icônes et objets : composants React du jeu local ; pas d'emoji ; pas d'`innerHTML` brut.
+- Mutations via les adaptateurs `@/lib/data`, état UI Zustand, cache serveur TanStack Query.
+- Avant tout commit : `cd app && npm run typecheck && npm test && npm run build` (chaîne §2.7 d'AGENTS.md, sans linter).
 
 ## 15. Checklist de livraison
 
-- [ ] Les six tokens `--bg`, `--surface`, `--fg`, `--muted`, `--border`, `--accent` sont utilisés sans hexadécimal.
-- [ ] Le fond global est ivoire et non blanc pur.
-- [ ] Le corail est limité aux accents et alertes.
-- [ ] Le display et le body ne sont pas confondus.
-- [ ] Les rayons et ombres proviennent des tokens.
-- [ ] Les breakpoints 1180 / 920 / 650 sont respectés.
-- [ ] Aucun élément ne déborde horizontalement sur mobile.
-- [ ] Le contrat mobile `≤ 650px` (section 8) est appliqué en entier sur toute nouvelle vue.
-- [ ] Les états de focus sont visibles.
-- [ ] Les images sont locales et attribuées lorsque nécessaire.
-- [ ] Les données de démonstration sont signalées.
-- [ ] `pnpm build` passe pour l’export React.
-- [ ] Le HTML source et l’export React restent cohérents.
+- [ ] Tokens réels appliqués sans hex local ; `theme-color` = `#f2f0ec`
+- [ ] Aucun emoji fonctionnel ou décoratif (icônes et objets SVG/photos)
+- [ ] Français pur : « réunis » pas « reunited », « enfant » pas « Kids », pas de jargon crypto en page publique
+- [ ] Icônes de rail distinctes par espace ; < 920px, reconnaissance pas uniquement par l'icône
+- [ ] Aucun texte < 12px hors micro-labels prévus (eyebrow 11px, kicker 10px, nav basse 10,5px)
+- [ ] Tout texte sur son aplat réel ≥ 4,5:1, initiales d'avatar comprises
+- [ ] Breakpoints 1180/920/650 respectés ; aucun scroll horizontal < 650px
+- [ ] Focus visible, icônes seules étiquetées, `aria-current` sur l'actif
+- [ ] Images locales avec dimensions + attribution à jour
+- [ ] `typecheck`, `test`, `build` verts ; changement SQL → `test-db.sh` (machine avec Docker)
 
-## 16. Fichiers de référence
+## 16. Périmètre documentaire
 
-- Prototype PWA : `ensemble-organises.html`
-- Manifest PWA : `manifest.webmanifest`
-- Service worker source : `sw.js`
-- Export React : `react-export/src/App.tsx`
-- Styles React : `react-export/src/styles.css`
-- Médias React : `react-export/public/assets/`
-- Guide d’intégration : `react-export/README.md`
+Les fichiers du prototype (`ensemble-organises.html`, `react-export/`) ne sont plus une source de vérité : l'application réelle vit dans `app/src`. Toute évolution visuelle met à jour ce document et `app.css` dans le même changement.

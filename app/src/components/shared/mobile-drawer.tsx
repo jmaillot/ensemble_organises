@@ -219,7 +219,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
                   <AppTile
                     label={entry.label}
                     tint={entry.key === 'accueil' ? 'sage' : moduleMap[entry.key].tint}
-                    emoji={entry.key === 'accueil' ? '🏡' : moduleMap[entry.key].emoji}
+                    module={entry.key}
                     to={entry.to}
                     onClick={() => onOpenChange(false)}
                     active={pathname === entry.to}
