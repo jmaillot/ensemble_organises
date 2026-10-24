@@ -1,7 +1,13 @@
+import { cn } from '@/lib/utils';
 import type { ModuleKey } from '@/lib/modules';
 
 /**
- * Objets d'illustration des espaces — le pendant SVG des emoji qu'ils
+ * Objets d'illustration des espaces. Depuis le 24/10/2026, les tuiles
+ * affichent des illustrations générées puis normalisées sur la palette du
+ * système (`assets/module-objects/`, brief dans docs/OBJETS-TUILES-GEN.md).
+ * Les dessins SVG ci-dessous restent le repli documenté.
+ *
+ * Historique : ce catalogue est le pendant SVG des emoji qu'ils
  * remplacent (24 octobre 2026, critique : « l'identité du catalogue dépend
  * de la police emoji de l'OS » ; DESIGN.md §5 proscrit l'emoji en objet de
  * tuile).
@@ -304,11 +310,28 @@ export const OBJECTS: Record<ModuleObjectKey, () => React.JSX.Element> = {
 };
 
 /**
- * L'objet de l'espace, en héritant de `currentColor` : la tuile passe
- * `text-fg` (sapin sur son pastel), les surfaces sombres échangent leur
- * propre encre claire.
+ * Objets illustrés générés (24/10/2026, docs/OBJETS-TUILES-GEN.md) : une
+ * image par espace, style flat doux, palette imposée du système, fond
+ * transparent. Ils remplacent les dessins SVG dans les tuiles — où la
+ * couleur est fixée par la palette de l'image elle-même. Les icônes
+ * fonctionnelles (barre basse, boutons) restent en `currentColor`.
+ */
+const OBJECT_IMAGES = import.meta.glob<string>('../assets/module-objects/*.png', {
+  eager: true,
+  import: 'default',
+});
+
+/**
+ * L'objet de l'espace. Version image dans les tuiles ; les dessins SVG
+ * restent dans ce fichier en repli documenté (et servent encore partout où
+ * `currentColor` est requis — la tuile passe `text-fg` sapin sur son
+ * pastel, les surfaces sombres échangent leur propre encre claire).
  */
 export function ModuleObject({ module, className }: ObjectProps) {
+  const src = OBJECT_IMAGES[`../assets/module-objects/${module}.png`];
+  if (src) {
+    return <img src={src} alt="" aria-hidden="true" className={cn('select-none', className)} draggable={false} />;
+  }
   const Draw = OBJECTS[module] ?? Accueil;
   return (
     <svg
