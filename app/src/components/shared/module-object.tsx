@@ -316,11 +316,51 @@ export const OBJECTS: Record<ModuleObjectKey, () => React.JSX.Element> = {
  * couleur est fixée par la palette de l'image elle-même. Les icônes
  * fonctionnelles (barre basse, boutons) restent en `currentColor`.
  */
-const OBJECT_IMAGES = import.meta.glob<string>('../assets/module-objects/*.png', {
-  eager: true,
-  import: 'default',
-});
+import accueilUrl from '../../assets/module-objects/accueil.png';
+import coursesUrl from '../../assets/module-objects/courses.png';
+import calendrierUrl from '../../assets/module-objects/calendrier.png';
+import notesUrl from '../../assets/module-objects/notes.png';
+import tachesUrl from '../../assets/module-objects/taches.png';
+import routinesUrl from '../../assets/module-objects/routines.png';
+import ardoiseUrl from '../../assets/module-objects/ardoise.png';
+import recettesUrl from '../../assets/module-objects/recettes.png';
+import cadeauxUrl from '../../assets/module-objects/cadeaux.png';
+import anniversairesUrl from '../../assets/module-objects/anniversaires.png';
+import contactsUrl from '../../assets/module-objects/contacts.png';
+import animauxUrl from '../../assets/module-objects/animaux.png';
+import prestatairesUrl from '../../assets/module-objects/prestataires.png';
+import fideliteUrl from '../../assets/module-objects/fidelite.png';
+import adressesUrl from '../../assets/module-objects/adresses.png';
+import cercleUrl from '../../assets/module-objects/cercle.png';
+import voyagesUrl from '../../assets/module-objects/voyages.png';
+import messagesUrl from '../../assets/module-objects/messages.png';
+import frigoUrl from '../../assets/module-objects/frigo.png';
+import menuUrl from '../../assets/module-objects/menu.png';
+import documentsUrl from '../../assets/module-objects/documents.png';
 
+const OBJECT_IMAGES: Record<string, string> = {
+  accueil: accueilUrl,
+  courses: coursesUrl,
+  calendrier: calendrierUrl,
+  notes: notesUrl,
+  taches: tachesUrl,
+  routines: routinesUrl,
+  ardoise: ardoiseUrl,
+  recettes: recettesUrl,
+  cadeaux: cadeauxUrl,
+  anniversaires: anniversairesUrl,
+  contacts: contactsUrl,
+  animaux: animauxUrl,
+  prestataires: prestatairesUrl,
+  fidelite: fideliteUrl,
+  adresses: adressesUrl,
+  cercle: cercleUrl,
+  voyages: voyagesUrl,
+  messages: messagesUrl,
+  frigo: frigoUrl,
+  menu: menuUrl,
+  documents: documentsUrl,
+};
 /**
  * L'objet de l'espace. Version image dans les tuiles ; les dessins SVG
  * restent dans ce fichier en repli documenté (et servent encore partout où
@@ -328,7 +368,7 @@ const OBJECT_IMAGES = import.meta.glob<string>('../assets/module-objects/*.png',
  * pastel, les surfaces sombres échangent leur propre encre claire).
  */
 export function ModuleObject({ module, className }: ObjectProps) {
-  const src = OBJECT_IMAGES[`../assets/module-objects/${module}.png`];
+  const src = OBJECT_IMAGES[module];
   if (src) {
     return <img src={src} alt="" aria-hidden="true" className={cn('select-none', className)} draggable={false} />;
   }
