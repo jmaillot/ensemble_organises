@@ -51,7 +51,7 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[10.5px] font-[650] text-muted transition-colors',
+                  'flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[11px] font-[650] text-muted transition-colors',
                   isActive && 'bg-accent text-surface',
                 )
               }
@@ -65,7 +65,7 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
           <button
             type="button"
             onClick={onMore}
-            className="flex min-h-[52px] w-full flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[10.5px] font-[650] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
+            className="flex min-h-[52px] w-full flex-col items-center justify-center gap-1 rounded-[20px] px-1 text-[11px] font-[650] text-muted transition-colors hover:bg-accent-faint hover:text-fg"
           >
             <Icon name="grid" size="sm" />
             Plus

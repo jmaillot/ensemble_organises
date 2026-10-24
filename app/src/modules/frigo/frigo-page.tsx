@@ -266,7 +266,7 @@ function PantryRow({
       {item.expiresOn ? (
         <span className="hidden shrink-0 text-[11px] text-muted min-[651px]:inline">{formatIsoDateFr(item.expiresOn)}</span>
       ) : null}
-      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-[700] ${expiryToneClass[state]}`}>
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-[700] ${expiryToneClass[state]}`}>
         {expiryLabels[state]}
       </span>
       {canWrite ? (

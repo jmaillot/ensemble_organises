@@ -273,7 +273,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           </ul>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-[10.5px] text-muted">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-[11px] text-muted">
           <span>
             <kbd className="font-[650]">↑↓</kbd> naviguer
           </span>
@@ -298,7 +298,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         {/* Une lecture partielle est dite : masquer un espace en échec ferait
             croire qu'il ne contient rien. */}
         {failedModules.length > 0 ? (
-          <p className="m-0 border-t border-border px-4 py-2 text-[10.5px] text-coral-text" role="status">
+          <p className="m-0 border-t border-border px-4 py-2 text-[11px] text-coral-text" role="status">
             Non lus : {failedModules.map((key) => moduleMap[key].label).join(', ')}.
           </p>
         ) : null}

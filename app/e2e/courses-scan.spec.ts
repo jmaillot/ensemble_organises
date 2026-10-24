@@ -56,12 +56,18 @@ async function openCourses(page: Page) {
   // désactivé jusque-là, et un scan sans `lists[0]` retomberait sur le toast
   // « Créez d'abord une liste ». Attendre la région = listes prêtes.
   await expect(page.getByRole('region', { name: 'Fresque' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Scanner' })).toBeEnabled();
+  // Depuis le 23/10/2026, « Scanner » vit dans le menu « ⋯ » d'en-tête.
+  await page.getByRole('button', { name: 'Plus d’actions' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Scanner un article' })).toBeEnabled();
+  // Referme : scanEan rouvre le menu lui-même, et un second clic sur le
+  // déclencheur le ferait basculer (Radix).
+  await page.keyboard.press('Escape');
 }
 
 /** Dialogue scan → saisie manuelle (le repli sans caméra des navigateurs). */
 async function scanEan(page: Page, ean: string) {
-  await page.getByRole('button', { name: 'Scanner' }).click();
+  await page.getByRole('button', { name: 'Plus d’actions' }).click();
+  await page.getByRole('menuitem', { name: 'Scanner un article' }).click();
   await page.getByLabel('Code-barres').fill(ean);
   await page.getByRole('button', { name: 'Utiliser ce code' }).click();
 }

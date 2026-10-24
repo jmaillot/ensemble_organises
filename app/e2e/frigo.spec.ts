@@ -15,8 +15,10 @@ test.describe('Frigo', () => {
     await expect(page.getByText('Yaourts nature')).toBeVisible();
     await expect(page.getByText('Crème fraîche')).toBeVisible();
     // Les états de péremption du semis : périmé, bientôt périmé, bon.
-    await expect(page.getByText('Périmé').first()).toBeVisible();
-    await expect(page.getByText('Bientôt périmé').first()).toBeVisible();
+    // Pastilles de péremption des lignes (le héro porte les mêmes mots
+    // mais sa légende est masquée sous 650px).
+    await expect(page.getByText('Périmé', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Bientôt périmé', { exact: true }).first()).toBeVisible();
 
     // Ajout d'un article via le formulaire.
     await page.getByRole('button', { name: 'Ajouter un article' }).click();

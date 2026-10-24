@@ -32,7 +32,7 @@ export function OfflineBanner() {
   const message = !isOnline
     ? 'Vous êtes hors ligne : l’application ne peut pas lire les données du foyer pour le moment. Une zone vide peut ne pas être son contenu réel — rétablissez la connexion pour la charger.'
     : realtimeDegraded
-      ? 'Mises à jour en direct interrompues : l’affichage peut dater. Rechargez la page pour retrouver les dernières données du foyer.'
+      ? 'Mises à jour en direct interrompues : l’affichage peut dater. Rechargez la page pour retrouver les dernières données.'
       : null;
   if (!message) return null;
   return (

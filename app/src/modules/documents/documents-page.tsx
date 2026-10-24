@@ -280,7 +280,7 @@ function DocumentRow({
       {document.expiresOn ? (
         <span className="hidden shrink-0 text-[11px] text-muted min-[651px]:inline">{formatIsoDateFr(document.expiresOn)}</span>
       ) : null}
-      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10.5px] font-[700] ${documentExpiryToneClass[state]}`}>
+      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-[700] ${documentExpiryToneClass[state]}`}>
         {documentExpiryLabels[state]}
       </span>
       {canWrite ? (

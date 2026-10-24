@@ -303,7 +303,10 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
           ))}
         </div>
       ) : null}
-      {balances.map((entry) => (
+      {/* Une ligne à « +0,00 € » n'informe pas : seuls les soldes non nuls
+          s'affichent — un foyer au repose reste au total et à la phrase
+          (mur de zéros, critique du 24/10/2026 après-midi). */}
+      {balances.filter((entry) => Math.abs(entry.amount) > 0.004).map((entry) => (
         <div key={entry.memberId} className="flex items-center justify-between gap-2 border-t border-border py-[7px] text-[12px] first-of-type:border-t-0">
           <span className="flex min-w-0 items-center gap-2">
             <MemberAvatar name={entry.displayName} size="sm" />

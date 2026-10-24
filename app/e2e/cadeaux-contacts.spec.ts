@@ -289,13 +289,15 @@ test.describe('Périmètre enfant — masquage client (phase 14, D-05/D-06/D-07)
     await openChildSession(page);
 
     const grid = page.getByRole('list', { name: 'Espaces du foyer' });
-    await expect(grid.getByRole('button', { name: /Ouvrir / })).toHaveCount(12);
+    // Tuiles-liens depuis le 23/10/2026 (comme l'assertion jsdom du
+    // dashboard) : maison non comptée, 15 liens côté enfant.
+    await expect(grid.getByRole('link', { name: /^Ouvrir / })).toHaveCount(15);
     for (const name of hiddenTiles) {
-      await expect(grid.getByRole('button', { name, exact: true })).toHaveCount(0);
+      await expect(grid.getByRole('link', { name, exact: true })).toHaveCount(0);
     }
     // Les espaces autorisés restent joignables.
-    await expect(grid.getByRole('button', { name: 'Ouvrir Courses' })).toBeVisible();
-    await expect(grid.getByRole('button', { name: 'Ouvrir Contacts' })).toBeVisible();
+    await expect(grid.getByRole('link', { name: 'Ouvrir Courses' })).toBeVisible();
+    await expect(grid.getByRole('link', { name: 'Ouvrir Contacts' })).toBeVisible();
     // La colonne latérale qui lit les dépenses disparaît avec elles (D-07).
     await expect(page.getByText('dépenses du foyer')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Activité du foyer' })).toHaveCount(0);
@@ -339,8 +341,9 @@ test.describe('Périmètre enfant — masquage client (phase 14, D-05/D-06/D-07)
     await openDemoSession(page);
 
     const grid = page.getByRole('list', { name: 'Espaces du foyer' });
-    await expect(grid.getByRole('button', { name: /Ouvrir / })).toHaveCount(17);
-    await expect(grid.getByRole('button', { name: 'Ouvrir Ardoise' })).toBeVisible();
+    // Tuiles-liens, 20 espaces (frigo, menu, documents compris).
+    await expect(grid.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
+    await expect(grid.getByRole('link', { name: 'Ouvrir Ardoise' })).toBeVisible();
     await expect(page.getByText('dépenses du foyer')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Activité du foyer' })).toBeVisible();
   });

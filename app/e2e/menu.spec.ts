@@ -44,8 +44,10 @@ test.describe('Menu', () => {
     await page.getByRole('button', { name: 'Semaine suivante' }).click();
     const nextWeek = await page.getByRole('heading', { name: /^Semaine du / }).first().textContent();
     expect(nextWeek).not.toBe(currentWeek);
-    // Une semaine vide d'invitations reste lisible : sept jours, aucun repas.
-    await expect(page.getByText('Tartiflette de saison')).toHaveCount(0);
+    // Le semis place les repas à J+0/J+1/J+2 : en fin de semaine (week-end),
+    // J+2 tombe la semaine SUIVANTE — une assertion « semaine suivante vide »
+    // dépendrait du jour d'exécution. On vérifie donc la navigation, pas le
+    // contenu : retour à la semaine courante et repas toujours en place.
     await page.getByRole('button', { name: 'Cette semaine' }).click();
     await expect(page.getByRole('heading', { name: currentWeek ?? '' }).first()).toBeVisible();
     await expect(page.getByText('Tartiflette de saison').first()).toBeVisible();
@@ -60,8 +62,10 @@ test.describe('Menu', () => {
     await expect(page.getByText('Tartiflette de saison').first()).toBeVisible();
     await page.getByRole('button', { name: 'Générer les courses' }).click();
     const dialog = page.getByRole('dialog');
-    // Deux repas-recette semés cette semaine : la génération a de quoi faire.
-    await expect(dialog.getByText(/^2 repas-recette cette semaine/)).toBeVisible();
+    // Le compte de repas-recette dépend du jour d'exécution (semis à
+    // J+0/J+1/J+2 : J+2 sort de la semaine le week-end) — on vérifie qu'il
+    // y en a au moins un, jamais un nombre précis.
+    await expect(dialog.getByText(/^[12] repas-recette cette semaine/)).toBeVisible();
     await dialog.getByLabel(/Liste de courses/).selectOption({ label: 'Fresque' });
     await dialog.getByRole('button', { name: 'Envoyer vers la liste' }).click();
     // Les ingrédients de la tartiflette arrivent dans la liste, mis à

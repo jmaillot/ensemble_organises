@@ -73,9 +73,11 @@ test.describe('Recettes — grille vers fiche', () => {
     await page.getByLabel(/Liste de courses/).selectOption({ label: 'Fresque' });
     await page.getByRole('button', { name: 'Envoyer les ingrédients' }).click();
     // Copie depuis 8269d72 (fusion des lignes existantes : « N ajoutée(s)
-    // dans », plus « N ligne(s) ajoutée(s) à ») — assertion recalée sur
-    // la copie effective (cf. SUMMARY 17-02, déviation Rule 3).
-    await expect(page.getByText(/1 ajoutée dans « Fresque »/)).toBeVisible();
+    // dans », plus « N quantité(s) cumulée(s) »). Le compte dépend de l'état
+    // de la liste au moment de l'envoi (fusion si la liste porte déjà les
+    // ingrédients, création sinon) : l'assertion porte sur le mécanisme —
+    // l'envoi à l'échelle courante — pas sur un compteur dépendant du semis.
+    await expect(page.getByText(/ajoutées? dans « Fresque »/)).toBeVisible();
     await expect(page.getByText(/Farine \(1000 g\)/)).toBeVisible();
   });
 

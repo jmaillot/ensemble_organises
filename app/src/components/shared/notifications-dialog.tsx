@@ -180,7 +180,9 @@ function NotificationRow({
         <span className="min-w-0 flex-1">
           <strong className="block truncate text-xs">
             {item.title}
-            <span className="ml-1.5 font-semibold text-muted">{meta.label}</span>
+            {/* Séparateur visible ET lu : concaténé, le nom accessible
+                donnait « Appeler le vétérinaireTâche » (critique 24/10). */}
+            <span className="ml-1.5 font-semibold text-muted">{` · ${meta.label}`}</span>
           </strong>
           {item.detail ? (
             <small className="block truncate text-[11px] text-muted">{item.detail}</small>

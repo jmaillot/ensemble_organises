@@ -107,7 +107,7 @@ function BoardColumn({ status, tasks, canWrite, onEdit, onMove }: BoardColumnPro
     >
       <h4 className="mb-2 flex items-center justify-between gap-2 px-1 text-[11px] font-extrabold tracking-[0.04em] text-muted uppercase">
         {label}
-        <span className="rounded-full bg-surface px-1.5 py-0.5 text-[10.5px] text-fg tabular-nums">{tasks.length}</span>
+        <span className="rounded-full bg-surface px-1.5 py-0.5 text-[11px] text-fg tabular-nums">{tasks.length}</span>
       </h4>
       {tasks.length === 0 ? (
         <p className="m-0 px-1 py-3 text-[11.5px] text-muted">Rien ici.</p>
@@ -180,7 +180,7 @@ function BoardCard({ task, canWrite, onEdit, onMove }: BoardCardProps) {
             value={task.status}
             disabled={!canWrite}
             onChange={(event) => onMove(task, event.target.value as TaskStatus)}
-            className="w-full rounded-[7px] border border-border bg-bg px-1 py-0.5 text-[10.5px] font-bold text-muted disabled:opacity-60"
+            className="w-full rounded-[7px] border border-border bg-bg px-1 py-0.5 text-[11px] font-bold text-muted disabled:opacity-60"
           >
             {COLUMNS.map((option) => (
               <option key={option} value={option}>

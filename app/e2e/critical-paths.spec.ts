@@ -390,7 +390,9 @@ test.describe('Mises en page', () => {
     const grid = page.locator('main').getByRole('list', { name: 'Espaces du foyer' });
     await expect(grid).toBeVisible();
 
-    const widths = await grid.locator('button[aria-label^="Ouvrir"]').evaluateAll((tiles) =>
+    // Tuiles-liens depuis le 23/10/2026 : les éléments porteurs de
+    // « Ouvrir … » sont des ancres, plus des boutons.
+    const widths = await grid.locator('a[aria-label^="Ouvrir"]').evaluateAll((tiles) =>
       tiles.map((tile) => ({
         label: tile.getAttribute('aria-label'),
         width: Math.round(tile.getBoundingClientRect().width),

@@ -128,7 +128,7 @@ export function CommentsDialog({
                   <div className="min-w-0 flex-1">
                     <div className="mb-0.5 flex items-baseline gap-2">
                       <strong className="text-[12.5px] font-bold">{comment.author?.display_name ?? 'Membre du foyer'}</strong>
-                      <small className="text-[10.5px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
+                      <small className="text-[11px] text-muted">{formatMomentLabel(comment.createdAt)}</small>
                     </div>
                     {editing ? (
                       <form
