@@ -59,6 +59,38 @@ const HOUSEHOLD_SCOPED = new Set([
  * le client n'envoie aucun filtre de sécurité maison, il transmet uniquement
  * les contraintes métier (foyer, parent).
  */
+/**
+ * Santé du canal temps réel. Un canal en erreur (coupure réseau côté
+ * Realtime, serveur inaccessible) ne fait pas échouer l'application : les
+ * lectures continuent de passer par PostgREST. Mais sans contrepartie
+ * d'interface, l'utilisateur croit voir des données à jour alors que les
+ * événements cessent d'arriver (critique UI 2026-10-24). L'état est
+ * global : un seul canal suffit à dire « en direct », une erreur le passe
+ * en dégradé jusqu'à ce qu'un canal se réabonne.
+ */
+export type RealtimeHealth = 'ok' | 'degraded';
+
+let realtimeHealth: RealtimeHealth = 'ok';
+const healthListeners = new Set<() => void>();
+
+function setRealtimeHealth(next: RealtimeHealth) {
+  if (next === realtimeHealth) return;
+  realtimeHealth = next;
+  healthListeners.forEach((listener) => listener());
+}
+
+/** Lecture synchrone pour `useSyncExternalStore`. */
+export function getRealtimeHealth(): RealtimeHealth {
+  return realtimeHealth;
+}
+
+export function subscribeRealtimeHealth(listener: () => void): () => void {
+  healthListeners.add(listener);
+  return () => {
+    healthListeners.delete(listener);
+  };
+}
+
 export class SupabaseAdapter implements DataAdapter {
   readonly kind = 'supabase' as const;
 
@@ -237,7 +269,12 @@ export class SupabaseAdapter implements DataAdapter {
         .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
           entry.listeners.forEach((listener) => listener());
         })
-        .subscribe();
+        .subscribe((status) => {
+          // `SUBSCRIBED` rétablit — Supabase retente seul après une erreur
+          // transitoire, il ne faut pas rester en « dégradé » pour rien.
+          if (status === 'SUBSCRIBED') setRealtimeHealth('ok');
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setRealtimeHealth('degraded');
+        });
       this.channels.set(table, entry);
     }
     return () => {
@@ -245,6 +282,9 @@ export class SupabaseAdapter implements DataAdapter {
       if (entry.listeners.size === 0 && entry.channel) {
         void client.removeChannel(entry.channel);
         this.channels.delete(table);
+        // Plus aucun canal : l'état dégradé ne doit pas survivre à la page
+        // qui l'a observé — il repart de zéro au prochain abonnement.
+        if (this.channels.size === 0) setRealtimeHealth('ok');
       }
     };
   }

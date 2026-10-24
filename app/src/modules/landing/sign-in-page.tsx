@@ -19,15 +19,29 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-/** Monogramme de marque : évite les pictogrammes tierces non vectoriels. */
-function BrandMark({ initial }: { initial: string }) {
+/** Glyphe « G » officiel de Google (quatre couleurs), vectoriel — la lettre
+    seule dans une pastille lisait « G » comme l'initiale du foyer, pas comme
+    le fournisseur (critique UI 2026-10-24). */
+function GoogleMark() {
   return (
-    <span
-      aria-hidden="true"
-      className="grid size-[18px] shrink-0 place-items-center rounded-[5px] border border-border text-[11px] font-extrabold text-fg"
-    >
-      {initial}
-    </span>
+    <svg aria-hidden="true" viewBox="0 0 18 18" className="size-[18px] shrink-0" role="presentation">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91a8.78 8.78 0 0 0 2.69-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.8.54-1.84.86-3.05.86-2.34 0-4.33-1.58-5.04-3.71H.96v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.96 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.16.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.96l3 2.33C4.67 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
   );
 }
 
@@ -136,7 +150,7 @@ export default function SignInPage() {
 
           <div className="mb-5 grid gap-2.5">
             <Button variant="secondary" disabled={pending !== null} onClick={() => run('google', () => signInWithProvider('google'))}>
-              <BrandMark initial="G" />
+              <GoogleMark />
               {pending === 'google' ? 'Redirection en cours…' : 'Continuer avec Google'}
             </Button>
           </div>

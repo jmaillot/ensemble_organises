@@ -122,7 +122,7 @@ export function Panel({ title, description, action, children, className, id, hea
         headerInlineOnMobile ? (
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-row max-[650px]:gap-2.5">
             <div className="min-w-0 flex-1">
-              {title ? <h3 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h3> : null}
+              {title ? <h2 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h2> : null}
               {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}
             </div>
             {action ? <div className="shrink-0">{action}</div> : null}
@@ -130,7 +130,7 @@ export function Panel({ title, description, action, children, className, id, hea
         ) : (
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3 max-[650px]:flex-col max-[650px]:gap-2.5">
             <div>
-              {title ? <h3 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h3> : null}
+              {title ? <h2 className="mb-0.5 font-display text-lg tracking-[-0.035em]">{title}</h2> : null}
               {description ? <p className="m-0 text-xs text-muted">{description}</p> : null}
             </div>
             {action}

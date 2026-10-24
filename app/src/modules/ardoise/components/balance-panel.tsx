@@ -67,7 +67,7 @@ export function MemberBalances({ balances, source = 'local' }: MemberBalancesPro
               </span>
               <strong
                 className={
-                  positive ? 'text-accent-strong' : negative ? 'text-coral' : 'text-muted'
+                  positive ? 'text-accent-strong' : negative ? 'text-coral-text' : 'text-muted'
                 }
               >
                 {positive ? `+${formatEuro(balance.amount)}` : formatEuro(balance.amount)}

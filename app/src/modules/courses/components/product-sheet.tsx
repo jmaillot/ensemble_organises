@@ -304,7 +304,7 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
 
         {offError && !offProduct && onRetry ? (
           <div className="rounded-[11px] border border-coral/30 bg-coral-soft/40 px-3 py-2.5 text-[12px]">
-            <p className="m-0 mb-2 font-semibold text-coral">
+            <p className="m-0 mb-2 font-semibold text-coral-text">
               Enrichissement indisponible (réseau) : réessayez ou créez l’article manuellement.
             </p>
             <Button variant="secondary" onClick={onRetry}>

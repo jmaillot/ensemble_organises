@@ -209,7 +209,9 @@ describe('CalendrierPage', () => {
     await user.click(day);
     expect(await screen.findByText('Journée libre')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { level: 3, name: new RegExp(`^${escape(formatMonthLabel(new Date()))}`) }),
+      // h2 : le titre de panneau ne saute plus un niveau sous le h1 du module
+      // (audit UI 2026-10-24 — les panneaux sont passés de h3 à h2).
+      screen.getByRole('heading', { level: 2, name: new RegExp(`^${escape(formatMonthLabel(new Date()))}`) }),
     ).toBeInTheDocument();
   });
 

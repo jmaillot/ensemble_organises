@@ -139,6 +139,7 @@ export default function AnniversairesPage() {
                     title="Aucun anniversaire suivi."
                     description="Ajoutez les dates du foyer pour les retrouver dans le calendrier, à côté des événements."
                     actionLabel="Ajouter un anniversaire"
+                    actionVariant="secondary"
                     onAction={openCreate}
                   />
                 ) : filtered.length === 0 ? (

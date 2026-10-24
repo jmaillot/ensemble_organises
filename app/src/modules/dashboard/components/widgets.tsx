@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { Icon, type IconName } from '@/components/shared/icon';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Checkbox } from '@/components/ui/primitives';
@@ -196,7 +197,13 @@ export function BirthdaysWidget({
   return (
     <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       {birthdays.length === 0 ? (
-        <p className="text-xs text-muted">Aucun anniversaire suivi pour l'instant.</p>
+        <p className="text-xs text-muted">
+          Aucun anniversaire suivi —{' '}
+          <Link to="/anniversaires" className="font-semibold text-fg underline underline-offset-2">
+            ajoutez le premier
+          </Link>{' '}
+          pour ne plus jamais l'oublier.
+        </p>
       ) : (
         <>
           {birthdays.slice(0, 2).map(({ row }) => (
@@ -235,6 +242,22 @@ export function RoutinesWidget({
   progress,
   dragHandleProps,
 }: WidgetBase & { progress: { done: number; total: number; nextLabel: string; ratio: number } }) {
+  // Sans rituel du tout, le compteur « 0 / 0 » et sa jauge vide ne disent
+  // rien : la place va à l'invitation à créer le premier (critique UI
+  // 2026-10-24).
+  if (progress.total === 0) {
+    return (
+      <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
+        <p className="text-xs text-muted">
+          Aucun rituel suivi. Un rituel quotidien tient mieux quand il est visible —{' '}
+          <Link to="/routines" className="font-semibold text-fg underline underline-offset-2">
+            créez le premier
+          </Link>
+          .
+        </p>
+      </WidgetCard>
+    );
+  }
   return (
     <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <strong className="block font-display text-[30px] leading-none tracking-[-0.05em]">
@@ -244,7 +267,7 @@ export function RoutinesWidget({
       <Progress value={progress.ratio} label="Rituels suivis aujourd’hui" />
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted">
         <span className="truncate">Prochain : {progress.nextLabel}</span>
-        <strong className="shrink-0 text-fg">{progress.total === 0 ? '—' : `${progress.ratio}%`}</strong>
+        <strong className="shrink-0 text-fg">{progress.ratio}%</strong>
       </div>
     </WidgetCard>
   );
@@ -266,22 +289,27 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
           <Icon name="wallet" size="sm" />
         </span>
       </div>
-      <div className="my-4 flex h-3 overflow-hidden rounded-full bg-accent-faint" role="img" aria-label={`Dont ${formatEuro(positives)} à rembourser`}>
-        {segments.map((value, index) => (
-          <span
-            key={index}
-            className={index === 0 ? 'bg-accent' : index === 1 ? 'bg-fg' : 'bg-coral'}
-            style={{ width: `${(value / scale) * 100}%` }}
-          />
-        ))}
-      </div>
+      {/* Sans dépense du mois, la jauge vide et l'absence de lignes de
+          solde n'apportent rien de plus que le total : on les escamote et la
+          phrase du bas porte seule l'invitation (critique UI 2026-10-24). */}
+      {balances.length > 0 ? (
+        <div className="my-4 flex h-3 overflow-hidden rounded-full bg-accent-faint" role="img" aria-label={`Dont ${formatEuro(positives)} à rembourser`}>
+          {segments.map((value, index) => (
+            <span
+              key={index}
+              className={index === 0 ? 'bg-accent' : index === 1 ? 'bg-fg' : 'bg-coral'}
+              style={{ width: `${(value / scale) * 100}%` }}
+            />
+          ))}
+        </div>
+      ) : null}
       {balances.map((entry) => (
         <div key={entry.memberId} className="flex items-center justify-between gap-2 border-t border-border py-[7px] text-[12px] first-of-type:border-t-0">
           <span className="flex min-w-0 items-center gap-2">
             <MemberAvatar name={entry.displayName} size="sm" />
             <span className="truncate">{entry.displayName}</span>
           </span>
-          <strong className={entry.amount >= 0 ? 'text-accent-strong' : 'text-coral'}>
+          <strong className={entry.amount >= 0 ? 'text-accent-strong' : 'text-coral-text'}>
             {entry.amount >= 0 ? '+' : '−'}
             {formatEuro(Math.abs(entry.amount))}
           </strong>
@@ -293,7 +321,10 @@ export function BoardSummaryCard({ total, monthLabel, balances }: { total: numbe
           annonce déjà : ce qui reste à rembourser ; omise quand il n'y a plus
           rien. */}
       <p className="mt-2.5 text-[11px] text-muted">
-        Réparties automatiquement. Détail dans{' '}
+        {balances.length === 0
+          ? 'Aucune dépense ce mois-ci.'
+          : 'Réparties automatiquement.'}{' '}
+        Détail dans{' '}
         <strong className="font-semibold text-fg">l'Ardoise</strong>
         {positives > 0 ? <> — {formatEuro(positives)} à rembourser entre membres.</> : '.'}
       </p>

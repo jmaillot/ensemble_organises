@@ -343,10 +343,13 @@ function CityGroupsView({ groups, onSelect }: { groups: { city: string; places: 
           <ul className="grid gap-2 sm:grid-cols-2">
             {group.places.map((place) => (
               <li key={place.id}>
+                {/* Carte imbriquée : le groupe de ville porte déjà bordure et
+                    teinte, la ligne n'emporte ni ombre ni bordure pleine — le
+                    relief reste à la carte extérieure (critique UI 2026-10-24). */}
                 <button
                   type="button"
                   onClick={() => onSelect(place)}
-                  className="panel-surface flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left transition-colors duration-[var(--duration-quick)] hover:border-accent"
+                  className="flex w-full items-center gap-2.5 rounded-[12px] border border-border/60 bg-surface px-3 py-2.5 text-left transition-colors duration-[var(--duration-quick)] hover:border-accent"
                 >
                   <Icon name={placeTypeIcon[place.type]} size="sm" className="text-accent-strong" />
                   <span className="min-w-0 flex-1">

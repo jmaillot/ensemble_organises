@@ -66,7 +66,8 @@ export function ShoppingItemRow({ item, readOnly = false, onToggle, onEdit, onDe
         {quantityLabel(item) ? `${quantityLabel(item)} · ${item.rayon}` : item.rayon}
       </small>
       {/* 11px : état fonctionnel de l'article, pas un micro-label décoratif
-          (audit du 24/10/2026 — le 10px reste réservé au section-kicker). */}
+          (audit du 24/10/2026 — le section-kicker est monté à 11px le même
+          jour : 10px n'existe plus dans le système). */}
       <span
         className={cn(
           'text-[11px] font-semibold whitespace-nowrap max-[650px]:hidden',

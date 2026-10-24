@@ -169,7 +169,7 @@ function BoardCard({ task, canWrite, onEdit, onMove }: BoardCardProps) {
         </button>
       </div>
 
-      <p className={cn('mt-1 mb-1.5 text-[10.5px] text-muted', task.isLate && !done && 'font-semibold text-coral')}>
+      <p className={cn('mt-1 mb-1.5 text-[11px] text-muted', task.isLate && !done && 'font-semibold text-coral-text')}>
         {task.dueLabel}
       </p>
 

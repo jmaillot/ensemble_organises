@@ -111,7 +111,9 @@ export function CalendarGrid({
   return (
     <section className={cn('panel-surface rounded-[24px] p-4 min-[651px]:p-6', className)} aria-label="Grille du mois">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h3 className="mb-0 font-display text-[24px] capitalize tracking-[-0.035em]">{monthLabel}</h3>
+        {/* h2 : titre de la vue mois, sous le h1 du module — les panneaux et
+            titres de vue ne sautent plus un niveau (audit UI 2026-10-24). */}
+        <h2 className="mb-0 font-display text-[24px] capitalize tracking-[-0.035em]">{monthLabel}</h2>
         <div className="flex items-center gap-1.5">
           <Button variant="quiet" size="sm" onClick={onToday} icon="calendar">
             <span className="max-[650px]:sr-only">Aujourd’hui</span>

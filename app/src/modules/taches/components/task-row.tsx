@@ -77,7 +77,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-muted">
           <span className="inline-flex items-center gap-1">
             <Icon name="clock" size="sm" />
-            <span className={cn(task.isLate && 'font-semibold text-coral')}>{task.dueLabel}</span>
+            <span className={cn(task.isLate && 'font-semibold text-coral-text')}>{task.dueLabel}</span>
           </span>
           {task.assigneesUnknown ? (
             <PendingAssignee size="sm" />

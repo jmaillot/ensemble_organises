@@ -190,7 +190,7 @@
    latérale les varie selon le point de rupture. */
 @utility section-kicker {
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;

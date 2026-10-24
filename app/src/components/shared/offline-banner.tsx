@@ -1,4 +1,5 @@
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { useRealtimeDegraded } from '@/hooks/use-realtime-health';
 
 /**
  * Bandeau global d'état hors ligne.
@@ -16,20 +17,33 @@ import { useOnlineStatus } from '@/hooks/use-online-status';
  * être son contenu réel — sans jamais laisser croire que l'affichage est à
  * jour. C'est la contrepartie assumée de l'arbitrage : pas d'état d'erreur par
  * widget, mais une explication globale honnête.
+ *
+ * Le bandeau porte aussi la panne du temps réel seul (en ligne, lectures OK,
+ * événements interrompus) : un régime ambre, distinct du corail « hors
+ * ligne », qui nomme ce qui manque et propose le rechargement.
  */
 export function OfflineBanner() {
   const isOnline = useOnlineStatus();
-  if (isOnline) return null;
+  const realtimeDegraded = useRealtimeDegraded();
+  // Coupure réseau totale : le message « hors ligne » prime — il couvre
+  // aussi les lectures. Realtime seul en panne : les lectures passent, ce
+  // sont les mises à jour en direct qui manquent ; le message dit exactement
+  // ça, et propose le rechargement comme voie de rattrapage.
+  const message = !isOnline
+    ? 'Vous êtes hors ligne : l’application ne peut pas lire les données du foyer pour le moment. Une zone vide peut ne pas être son contenu réel — rétablissez la connexion pour la charger.'
+    : realtimeDegraded
+      ? 'Mises à jour en direct interrompues : l’affichage peut dater. Rechargez la page pour retrouver les dernières données du foyer.'
+      : null;
+  if (!message) return null;
   return (
     <div
       role="status"
       aria-live="polite"
-      className="sticky top-0 z-50 border-b border-coral/30 bg-coral-soft/70 px-4 py-2.5 text-center text-[12px] font-semibold text-coral-text"
+      className={`sticky top-0 z-50 border-b px-4 py-2.5 text-center text-[12px] font-semibold ${
+        isOnline ? 'border-amber/30 bg-amber-soft/70 text-amber-strong' : 'border-coral/30 bg-coral-soft/70 text-coral-text'
+      }`}
     >
-      <p className="m-0">
-        Vous êtes hors ligne : l’application ne peut pas lire les données du foyer pour le moment. Une zone vide
-        peut ne pas être son contenu réel — rétablissez la connexion pour la charger.
-      </p>
+      <p className="m-0">{message}</p>
     </div>
   );
 }

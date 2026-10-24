@@ -9,6 +9,8 @@ export interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** `secondary` quand l'en-tête du module porte déjà l'action plein cadre. */
+  actionVariant?: 'primary' | 'secondary';
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   className?: string;
@@ -21,6 +23,7 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
+  actionVariant,
   secondaryActionLabel,
   onSecondaryAction,
   className,
@@ -43,7 +46,7 @@ export function EmptyState({
         {(actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction) ? (
           <div className="flex flex-wrap justify-center gap-2">
             {actionLabel && onAction ? (
-              <Button onClick={onAction} icon="plus">
+              <Button variant={actionVariant ?? 'primary'} onClick={onAction} icon="plus">
                 {actionLabel}
               </Button>
             ) : null}

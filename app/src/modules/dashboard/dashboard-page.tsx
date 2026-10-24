@@ -441,7 +441,13 @@ function BirthdayPreview({
         </Button>
       </div>
       {birthdays.length === 0 ? (
-        <p className="text-xs text-muted">Aucun anniversaire suivi.</p>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="grid w-full place-items-center rounded-[12px] border border-dashed border-border px-3 py-4 text-center text-xs text-muted transition-colors duration-[var(--duration-quick)] hover:border-fg/40 hover:text-fg"
+        >
+          Suivez le premier anniversaire du foyer
+        </button>
       ) : (
         <ul className="m-0 grid list-none gap-0 p-0">
           {birthdays.slice(0, 3).map(({ row, daysUntil }) => (
