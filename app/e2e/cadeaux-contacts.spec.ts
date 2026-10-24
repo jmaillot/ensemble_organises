@@ -305,10 +305,11 @@ test.describe('Périmètre enfant — masquage client (phase 14, D-05/D-06/D-07)
     await openChildSession(page);
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+    await page.getByRole('button', { name: 'Plus' }).click();
     const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    // Maison + douze espaces : 13 liens, aucun intitulé vide, aucun masqué en CSS.
-    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(13);
+    // Maison + quinze espaces : 16 liens (les 5 modules hors périmètre
+    // enfant sont absents), aucun intitulé vide, aucun masqué en CSS.
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(16);
     await expect(dialog.getByRole('link', { name: 'Ouvrir Maison' })).toBeVisible();
     for (const name of hiddenTiles) {
       await expect(dialog.getByRole('link', { name, exact: true })).toHaveCount(0);

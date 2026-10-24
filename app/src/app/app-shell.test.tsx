@@ -88,10 +88,10 @@ describe('AppShell', () => {
     expect(within(breadcrumb).queryByText('Maison')).not.toBeInTheDocument();
   });
 
-  it('propose un hamburger qui ouvre le tiroir des espaces', async () => {
+  it('propose le « Plus » de la barre basse, qui ouvre le tiroir', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     // L'en-tête porte le nom de l'application, pas un « Menu » générique.
@@ -162,10 +162,10 @@ describe('AppShell — catalogue des espaces', () => {
     }
   });
 
-  it('ouvre le tiroir en tuiles depuis le hamburger', async () => {
+  it('ouvre le tiroir en tuiles depuis le « Plus »', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     expect(within(dialog).getAllByRole('link', { name: /^Ouvrir / })).toHaveLength(21);
@@ -175,7 +175,7 @@ describe('AppShell — catalogue des espaces', () => {
   it('ferme le tiroir après avoir choisi un espace', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Ouvrir Courses' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -191,7 +191,7 @@ describe('AppShell — catalogue des espaces', () => {
   it('filtre les espaces depuis la recherche du tiroir', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
 
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'courses');
@@ -201,7 +201,7 @@ describe('AppShell — catalogue des espaces', () => {
   it('retrouve un espace sans taper ses accents', async () => {
     const user = userEvent.setup();
     renderShell('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
 
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByRole('searchbox', { name: 'Rechercher un espace' }), 'taches');
@@ -276,7 +276,7 @@ describe('AppShell — périmètre enfant', () => {
   it('retire les 5 modules du tiroir mobile pour un enfant', async () => {
     const user = userEvent.setup();
     renderShellAsChild('/accueil');
-    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Menu des espaces du foyer' });
     // Maison + quinze espaces : 16 liens, aucun hollow, aucun masqué en CSS.

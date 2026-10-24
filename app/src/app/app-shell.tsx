@@ -13,15 +13,13 @@ import { useCurrentMember, useDisabledModules, useHouseholdStore } from '@/store
 import { memberTagClass } from '@/components/shared/member-avatar';
 import { useSessionUser } from '@/hooks/use-auth';
 import { Icon, type IconName } from '@/components/shared/icon';
-import { MobileDrawer, MOBILE_DRAWER_ID } from '@/components/shared/mobile-drawer';
+import { MobileDrawer } from '@/components/shared/mobile-drawer';
 import { MobileBottomNav } from '@/components/shared/mobile-bottom-nav';
-import { AllSpacesSheet } from '@/components/shared/all-spaces-sheet';
 import { ModuleDisabled } from '@/components/shared/module-disabled';
 import { CommandPalette } from '@/components/shared/command-palette';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
-import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
@@ -81,7 +79,6 @@ export function AppShell() {
   const members = useHouseholdStore((state) => state.members);
   const user = useSessionUser();
   const { install, canInstall } = useInstallPrompt();
-  const isMobileLayout = useIsMobileLayout();
   // Navigation fiable (D-09) : précharge les morceaux de routes en
   // arrière-plan, à l'idle et en ligne seulement. Monté une fois, échec avalé
   // (T-09-07) : le préchargement ne doit jamais casser le shell.
@@ -93,7 +90,6 @@ export function AppShell() {
     }
   }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [spacesSheetOpen, setSpacesSheetOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const notifications = useNotifications();
@@ -309,23 +305,10 @@ export function AppShell() {
 
       <div className="min-w-0 flex-1">
         <header className="topbar-surface sticky top-0 z-10 flex h-[76px] items-center justify-between gap-5 border-b border-border px-[38px] max-[1180px]:px-[26px] max-[920px]:px-5 max-[650px]:h-14 max-[650px]:gap-2.5 max-[650px]:px-3">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-expanded={drawerOpen}
-            aria-haspopup="dialog"
-            aria-controls={MOBILE_DRAWER_ID}
-            aria-label="Ouvrir le menu"
-            className="grid size-11 shrink-0 place-items-center rounded-full border border-border/70 bg-surface text-fg transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
-          >
-            <Icon name="menu" />
-          </button>
-          {/* Un seul contrôleur ouvre le tiroir : le hamburger. La pastille-foyer
-              était un second bouton vers le même MobileDrawer (critique du
-              24/10/2026 : deux affordances jumelles, l'une pilule et l'autre
-              icône, pour une même action) ; elle navigue maintenant vers le
-              point du jour — son nom porte le foyer, sa fonction est d'y
-              ramener, pas de rouvrir le catalogue. */}
+          {/* Un seul contrôleur ouvre le menu mobile : le « Plus » de la
+              barre basse (demande du 24/10/2026 — le hamburger du haut
+              faisait doublon). La pastille-foyer navigue vers le point du
+              jour — son nom porte le foyer, sa fonction est d'y ramener. */}
           <Link
             to="/accueil"
             className="flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-border/70 bg-surface py-1 pr-3.5 pl-1.5 text-[13px] font-[650] transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint min-[651px]:hidden"
@@ -418,8 +401,14 @@ export function AppShell() {
 
       <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
 
-      {isMobileLayout ? <MobileBottomNav onMore={() => setSpacesSheetOpen(true)} /> : null}
-      <AllSpacesSheet open={spacesSheetOpen} onOpenChange={setSpacesSheetOpen} />
+      {/* Le « Plus » ouvre le tiroir complet : les vingt espaces avec
+          recherche, plus le pied foyer/préférences/déconnexion — la feuille
+          « Tous les espaces » séparée a été retirée, un seul menu mobile
+          reste (demande du 24/10/2026). */}
+      {/* Monté sans condition : il se cache lui-même au-delà de 650 px
+          (`min-[651px]:hidden`), et les tests doivent pouvoir ouvrir le
+          tiroir par son seul contrôleur. */}
+      <MobileBottomNav onMore={() => setDrawerOpen(true)} />
     </div>
   );
 }

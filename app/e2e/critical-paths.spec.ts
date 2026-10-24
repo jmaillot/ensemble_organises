@@ -6,7 +6,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * (aucun backend requis) : c'est le mode local documenté de l'application.
  */
 
-/** Le projet Playwright « mobile » utilise le tiroir hamburger. */
+/** Le projet Playwright « mobile » ouvre le tiroir via le « Plus » de la barre basse. */
 function viewportIsMobile(page: Page) {
   return (page.viewportSize()?.width ?? 1280) <= 650;
 }
@@ -16,8 +16,8 @@ async function openDemoSession(page: Page) {
   await page.getByRole('button', { name: 'Entrer dans la démonstration' }).click();
   await page.waitForURL('**/accueil');
   if (viewportIsMobile(page)) {
-    // Sous 650 px, le fil d'Ariane cède la place au hamburger.
-    await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
+    // Sous 650 px, le fil d'Ariane cède la place à la barre basse.
+    await expect(page.getByRole('button', { name: 'Plus' })).toBeVisible();
   } else {
     await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toBeVisible();
   }
@@ -105,8 +105,8 @@ test.describe('Connexion et foyer', () => {
   test('la session de démonstration ouvre le tableau de bord', async ({ page }) => {
     await openDemoSession(page);
     if (viewportIsMobile(page)) {
-      // Sur mobile, le hamburger remplace la barre latérale.
-      await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+      // Sur mobile, la barre basse et son « Plus » remplacent la barre latérale.
+      await page.getByRole('button', { name: 'Plus' }).click();
       await expect(page.getByRole('dialog', { name: 'Menu des espaces du foyer' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Ouvrir Courses' })).toBeVisible();
       await page.keyboard.press('Escape');
@@ -434,11 +434,11 @@ test.describe('Mises en page', () => {
     test.skip(!viewportIsMobile(page), 'le tiroir n’existe que sous 650 px');
 
     await openDemoSession(page);
-    await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+    await page.getByRole('button', { name: 'Plus' }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
-    // Maison + dix-neuf modules du catalogue (frigo et menu, vague 3.1).
-    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
+    // Maison + vingt modules du catalogue (frigo, menu, documents — vague 3.1+).
+    await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(21);
 
     await page.getByRole('searchbox', { name: 'Rechercher un espace' }).fill('courses');
     await expect(dialog.getByRole('link', { name: /^Ouvrir / })).toHaveCount(1);
@@ -447,21 +447,22 @@ test.describe('Mises en page', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('le « Plus » de la barre basse ouvre la feuille des espaces, pas le tiroir', async ({ page }) => {
+  test('le « Plus » de la barre basse ouvre le tiroir complet, unique menu mobile', async ({ page }) => {
     test.skip(!viewportIsMobile(page), 'la barre basse n’existe que sous 650 px');
 
     await openDemoSession(page);
     await page.getByRole('button', { name: 'Plus' }).click();
 
-    // La feuille dédiée : le tiroir (réglages) reste fermé pendant ce parcours.
-    const sheet = page.getByRole('dialog', { name: 'Tous les espaces' });
-    await expect(sheet).toBeVisible();
-    // Même invariant de couverture que le tiroir : maison + dix-neuf modules.
-    await expect(sheet.getByRole('link', { name: /^Ouvrir / })).toHaveCount(20);
-    expect(page.getByRole('dialog', { name: 'Menu des espaces du foyer' })).toHaveCount(0);
+    // Un seul menu depuis le 24/10/2026 : le tiroir porte les vingt espaces
+    // (maison + dix-neuf modules) ET les réglages — la feuille « Tous les
+    // espaces » séparée a été retirée.
+    const tiroir = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+    await expect(tiroir).toBeVisible();
+    // Maison + vingt modules, comme l'assertion jsdom du shell.
+    await expect(tiroir.getByRole('link', { name: /^Ouvrir / })).toHaveCount(21);
 
-    await sheet.getByRole('link', { name: 'Ouvrir Courses' }).click();
-    await expect(sheet).toBeHidden();
+    await tiroir.getByRole('link', { name: 'Ouvrir Courses' }).click();
+    await expect(tiroir).toBeHidden();
     await expect(page).toHaveURL(/\/courses$/);
   });
 

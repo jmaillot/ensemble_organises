@@ -15,9 +15,10 @@ interface BottomNavItem {
  * Barre de navigation basse, réservée au tactile.
  *
  * Melimelo garde la maison et l'action principale à portée de pouce ; ici,
- * quatre espaces du quotidien plus « Plus » qui ouvre la feuille dédiée
- * « Tous les espaces » — le tiroir hamburger reste réservé aux réglages
- * (benchmark §9.2, décision 2). Les entrées masquées au rôle `enfant` ne
+ * quatre espaces du quotidien plus « Plus » qui ouvre le tiroir complet —
+ * depuis le 24/10/2026, c'est le SEUL contrôleur du menu mobile : le
+ * hamburger du haut a été retiré (doublon) et la feuille « Tous les
+ * espaces » avec lui. Les entrées masquées au rôle `enfant` ne
  * figurent pas dans cette barre : elle ne référence que des espaces que
  * l'enfant peut ouvrir.
  */

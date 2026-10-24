@@ -65,7 +65,8 @@ export function useVisibleDrawerEntries(): DrawerEntry[] {
   );
 }
 
-/** `id` stable du tiroir, visé par `aria-controls` du hamburger. */
+/** `id` stable du tiroir, historiquement visé par l'`aria-controls` du
+    hamburger, retiré depuis. */
 export const MOBILE_DRAWER_ID = 'tiroir-mobile';
 
 /** Normalisation insensible aux accents pour la recherche (« taches » → « Tâches »). */
@@ -86,9 +87,11 @@ export interface MobileDrawerProps {
 }
 
 /**
- * Tiroir latéral mobile (≤650px) : l'unique menu des espaces du foyer.
- * Radix fournit l'overlay, Échap, le piège de focus et `aria-modal` ; le
- * balayage vers la gauche et le verrou de scroll sont gérés ici.
+ * Tiroir latéral mobile (≤650px) : l'unique menu du mobile, ouvert par le
+ * « Plus » de la barre basse (le hamburger du haut a été retiré le
+ * 24/10/2026 — un seul contrôleur pour un seul menu). Radix fournit
+ * l'overlay, Échap, le piège de focus et `aria-modal` ; le balayage vers la
+ * gauche et le verrou de scroll sont gérés ici.
  */
 export function MobileDrawer({ open, onOpenChange, householdName, memberCount, isAdmin }: MobileDrawerProps) {
   const householdColor = useHouseholdStore((state) => state.householdColor);
@@ -206,7 +209,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
             aria-label="Rechercher un espace"
           />
 
-          {/* Le hamburger affiche les tuiles directement (demande du
+          {/* Le tiroir affiche les tuiles directement (demande du
               23 octobre 2026) : la grille pastel de melimelo remplace la
               liste textuelle. Seule la grille défile ; le pied (foyer,
               préférences, déconnexion) reste épinglé en bas. Deux colonnes :
