@@ -68,6 +68,9 @@
 
   /* Mouvement */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Courbe des feuilles/tiroirs qui montent du bas (iOS-like) : démarrage
+     franc, arrivée amortie — la gravure du geste « remonter un tiroir ». */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --duration-quick: 180ms;
   --duration-slow: 300ms;
 
@@ -254,6 +257,57 @@
 @utility topbar-surface {
   background: color-mix(in oklch, var(--color-bg) 88%, transparent);
   backdrop-filter: blur(18px);
+}
+
+/* Feuille basse du menu mobile : monte du bas au montage (Radix démonte à
+   la fermeture, le keyframe rejoue à chaque ouverture). transform+opacity
+   uniquement ; reduced-motion garde la tombée d'opacité, sans mouvement. */
+@keyframes monter-feuille {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes apparaitre {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lever-tuile {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feuille-mobile {
+  animation: monter-feuille 340ms var(--ease-drawer) both;
+}
+
+.feuille-mobile-overlay {
+  animation: apparaitre 200ms ease-out both;
+}
+
+.tuile-mobile {
+  animation: lever-tuile 240ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feuille-mobile,
+  .tuile-mobile {
+    animation: apparaitre 150ms ease-out both;
+  }
 }
 
 @utility panel-surface {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
@@ -100,7 +100,6 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   const toast = useToast();
   const [query, setQuery] = useState('');
   const [signingOut, setSigningOut] = useState(false);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
   // Le tiroir n'existe que sous 651px : un redimensionnement au-delà le
   // referme, sinon le piège de focus et le verrou de scroll survivent
   // invisibles.
@@ -153,29 +152,14 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px] min-[651px]:hidden max-[650px]:z-[80]" />
+        <DialogPrimitive.Overlay className="feuille-mobile-overlay fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px] min-[651px]:hidden max-[650px]:z-[80]" />
         <DialogPrimitive.Content
           id={MOBILE_DRAWER_ID}
-          onTouchStart={(event) => {
-            const touch = event.touches[0];
-            touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-          }}
-          onTouchCancel={() => {
-            touchStart.current = null;
-          }}
-          onTouchEnd={(event) => {
-            const start = touchStart.current;
-            const touch = event.changedTouches[0];
-            touchStart.current = null;
-            if (!start || !touch) return;
-            const dx = start.x - touch.clientX;
-            const dy = start.y - touch.clientY;
-            // Balayage franc vers la gauche : un défilement vertical avec
-            // dérive horizontale ne doit pas fermer le tiroir.
-            if (dx > 60 && Math.abs(dx) > 2 * Math.abs(dy)) onOpenChange(false);
-          }}
-          className="fixed top-0 bottom-0 left-0 z-50 flex w-[min(320px,84vw)] flex-col gap-4 overflow-hidden border-r border-border bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] min-[651px]:hidden max-[650px]:z-[80]"
+          className="feuille-mobile fixed right-0 bottom-0 left-0 z-50 flex max-h-[calc(100dvh-56px)] flex-col gap-4 overflow-hidden rounded-t-[32px] border-t border-border bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] min-[651px]:hidden max-[650px]:z-[80]"
         >
+          {/* Poignée décorative : la feuille se referme aussi par l'overlay,
+              le bouton et Échap — la poignée ne porte aucune action. */}
+          <span aria-hidden="true" className="mx-auto block h-[5px] w-[38px] shrink-0 rounded-full bg-border" />
           <DialogPrimitive.Title className="sr-only">Menu des espaces du foyer</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             Choisissez un espace pour y naviguer, ou refermez le menu.
@@ -209,16 +193,18 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
             aria-label="Rechercher un espace"
           />
 
-          {/* Le tiroir affiche les tuiles directement (demande du
-              23 octobre 2026) : la grille pastel de melimelo remplace la
-              liste textuelle. Seule la grille défile ; le pied (foyer,
-              préférences, déconnexion) reste épinglé en bas. Deux colonnes :
-              le tiroir fait 320 px, la grille « 3 colonnes » du benchmark
-              vaut pour la feuille pleine largeur. */}
+          {/* Le tiroir (feuille basse depuis le 24/10/2026) affiche les
+              tuiles directement (demande du 23 octobre 2026) : la grille
+              pastel de melimelo remplace la liste textuelle. Seule la
+              grille défile ; le pied (foyer, préférences, déconnexion)
+              reste épinglé en bas. Deux colonnes. La feuille remonte
+              d'un bloc et les tuiles suivent en cascade courte — le
+              délai plafonné : au-delà de la dixième tuile, la cascade
+              n'ajouterait que de l'attente. */}
           <nav aria-label="Espaces du foyer" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
-            <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 pb-1">
-              {(filtered ?? visibleEntries).map((entry) => (
-                <li key={entry.key} className="min-w-0">
+            <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0 pb-1">
+              {(filtered ?? visibleEntries).map((entry, index) => (
+                <li key={entry.key} className="tuile-mobile min-w-0" style={{ animationDelay: `${Math.min(index * 25, 250)}ms` }}>
                   <AppTile
                     label={entry.label}
                     tint={entry.key === 'accueil' ? 'sage' : moduleMap[entry.key].tint}
