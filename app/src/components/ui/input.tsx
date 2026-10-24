@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Icon } from '@/components/shared/icon';
 
 const controlClass =
-  'w-full max-w-full min-h-11 rounded-[11px] border border-border bg-surface px-3 text-fg outline-none transition-colors duration-[var(--duration-quick)] hover:border-accent focus-visible:border-accent focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-accent-strong disabled:opacity-55 aria-[invalid=true]:border-coral';
+  'w-full max-w-full min-h-11 rounded-[11px] border border-border bg-surface px-3 text-fg outline-none transition-colors duration-[var(--duration-quick)] hover:border-accent focus-visible:border-accent focus-visible:outline-3 focus-visible:outline-offset-[3px] focus-visible:outline-accent-strong disabled:opacity-55 aria-[invalid=true]:border-coral placeholder:text-muted';
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {

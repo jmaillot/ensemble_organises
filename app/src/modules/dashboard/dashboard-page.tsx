@@ -77,8 +77,10 @@ export default function DashboardPage() {
 
   const visibleKinds = useMemo(() => dashboard.placements.map((placement) => placement.kind), [dashboard.placements]);
   // `??` ne rattrape pas une chaîne vide : un displayName vidé (profil sans
-  // nom, session persistée) affichait « Bonjour  ». Le repli couvre aussi ce cas.
-  const displayName = user?.displayName?.trim() ? user.displayName.trim() : 'Camille';
+  // nom, session persistée) affichait « Bonjour  ». Le repli est neutre —
+  // aucun prénom codé en dur, la salutation s'arrête au « Bonjour » (audit
+  // du 24/10/2026).
+  const displayName = user?.displayName?.trim() ?? '';
   // Pendant un drag, le curseur passe en « main fermée » sur toute la grille :
   // au tactile la carte soulevée suffit, à la souris il faut le curseur.
   const [draggingKind, setDraggingKind] = useState<WidgetKind | null>(null);
@@ -114,7 +116,7 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow mb-2">{formatDashboardEyebrow(new Date(), householdName)}</p>
           <h1 className="mb-2 text-[clamp(34px,4.2vw,54px)] leading-[1.02]">
-            Bonjour {firstName(displayName)}
+            {displayName ? `Bonjour ${firstName(displayName)}` : 'Bonjour'}
             <span className="text-coral">.</span>
           </h1>
           <p className="lede mb-0 text-[15px]">
@@ -148,7 +150,9 @@ export default function DashboardPage() {
           de melimelo — l'écran s'ouvre sur l'encre profonde — et il était
           resté au benchmark (critique UI 2026-10-23). L'accent de titre
           reprend sa grammaire : une finale en Fraunces italique beurre. */}
-      <section className="hero-surface pulse-banner relative mb-[31px] flex items-center justify-between gap-[26px] overflow-hidden rounded-[22px] p-[22px] text-surface max-[650px]:block max-[650px]:p-[18px]">
+      {/* Marge du héro resserrée (31→24px) : la grille « Tout le foyer »
+          doit entrer dans le premier écran (audit du 24/10/2026). */}
+      <section className="hero-surface pulse-banner relative mb-6 flex items-center justify-between gap-[26px] overflow-hidden rounded-[22px] p-[22px] text-surface max-[650px]:block max-[650px]:p-[18px]">
         <span aria-hidden="true" className="pulse-ring" />
         <div className="relative z-1">
           <p className="eyebrow mb-1.5 text-on-dark">Le point du jour</p>
@@ -230,7 +234,7 @@ export default function DashboardPage() {
           />
 
           {dashboard.placements.length === 0 ? (
-            <p className="panel-surface mb-[34px] rounded-[20px] p-[19px] text-xs text-muted">
+            <p className="panel-surface mb-7 rounded-[20px] p-[19px] text-xs text-muted">
               Tous les widgets sont masqués. Utilisez « Personnaliser l’accueil » pour en réactiver.
             </p>
           ) : (
@@ -266,7 +270,7 @@ export default function DashboardPage() {
             </DndContext>
           )}
 
-          <section className="mt-[34px]">
+          <section className="mt-7">
             <SectionHeading
               title="Tout le foyer"
               description="Un espace pour chaque petite et grande organisation."
@@ -282,7 +286,7 @@ export default function DashboardPage() {
                     <AppTile
                       label={entry.label}
                       tint={entry.tint}
-                      emoji={entry.emoji}
+                      module={entry.key}
                       to={`/${entry.key}`}
                       counter={dashboard.tileCounters[entry.key]}
                     />

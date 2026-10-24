@@ -90,7 +90,10 @@ export function CalendarWidget({
             key={day.iso}
             className={cn(
               'relative grid min-h-[27px] place-items-center rounded-[8px] text-[11px] text-muted',
-              day.isOutside && 'opacity-40',
+              // Pas d'opacité sur les jours hors mois : muted à 40 % mesurait
+              // 1,75:1 (audit du 24/10/2026) ; muted plein reste 5,3:1 et la
+              // nuance avec les jours du mois (encre fg) suffit à la lecture.
+              day.isOutside && 'text-muted',
               (day.hasEvent || day.isHoliday) && 'font-bold text-fg after:absolute after:bottom-[3px] after:left-1/2 after:size-1 after:-translate-x-1/2 after:rounded-full after:bg-coral',
               day.isHoliday && 'after:bg-amber',
               day.isToday && 'bg-accent-strong font-extrabold text-surface after:bg-surface',
@@ -162,7 +165,7 @@ export function WeatherWidget({
   return (
     <WidgetCard placement={placement} isEditing={isEditing} dragHandleProps={dragHandleProps}>
       <div className="mt-1 flex items-center gap-3">
-        <span className="grid size-[43px] shrink-0 place-items-center rounded-[15px] bg-amber-soft text-amber">
+        <span className="grid size-[43px] shrink-0 place-items-center rounded-[15px] bg-amber-soft text-amber-strong">
           <Icon name={weather.icon} size="lg" />
         </span>
         <div aria-live="polite">

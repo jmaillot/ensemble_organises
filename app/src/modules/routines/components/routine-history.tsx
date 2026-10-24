@@ -219,7 +219,8 @@ export function HistoryCalendar({ days, monthLabel, today, statuses, onPrevious,
               data-state={status?.state ?? 'aucune'}
               className={cn(
                 'relative grid min-h-[48px] place-items-center rounded-[12px] border border-transparent px-2 py-2 text-[12.5px] text-ink-soft transition-colors duration-[var(--duration-quick)]',
-                day.isOutside && 'text-muted/60',
+                // muted/60 mesurait 2,2:1 (audit du 24/10/2026) ; muted plein 5,3:1.
+                day.isOutside && 'text-muted',
                 isToday && 'bg-accent font-extrabold text-surface',
               )}
             >

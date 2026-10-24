@@ -378,7 +378,8 @@ function BirthdayCalendarView({ birthdays, isLoading, onOpen }: BirthdayCalendar
                   key={day.iso}
                   className={cn(
                     'min-h-[54px] rounded-[10px] border border-transparent bg-bg px-2 py-2 text-xs text-ink-soft',
-                    day.isOutside && 'bg-transparent text-muted/60',
+                    // muted/60 mesurait 2,2:1 (audit du 24/10/2026) ; muted plein 5,3:1.
+                    day.isOutside && 'bg-transparent text-muted',
                     isToday && 'border-accent-strong bg-accent-soft font-extrabold',
                   )}
                 >

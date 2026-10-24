@@ -47,7 +47,7 @@ export function ShoppingItemRow({ item, readOnly = false, onToggle, onEdit, onDe
           {...listeners}
           aria-label={`Réordonner : ${item.name}`}
           title="Glisser pour réordonner"
-          className="relative grid size-6 shrink-0 cursor-grab place-items-center rounded-[8px] text-muted/70 transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing after:absolute after:-inset-2 after:content-['']"
+          className="relative grid size-6 shrink-0 cursor-grab place-items-center rounded-[8px] text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing after:absolute after:-inset-2 after:content-['']"
         >
           <Icon name="drag" size="sm" />
         </button>
@@ -65,9 +65,11 @@ export function ShoppingItemRow({ item, readOnly = false, onToggle, onEdit, onDe
       <small className="truncate text-[11px] text-muted max-[650px]:max-w-[96px]">
         {quantityLabel(item) ? `${quantityLabel(item)} · ${item.rayon}` : item.rayon}
       </small>
+      {/* 11px : état fonctionnel de l'article, pas un micro-label décoratif
+          (audit du 24/10/2026 — le 10px reste réservé au section-kicker). */}
       <span
         className={cn(
-          'text-[10px] font-semibold whitespace-nowrap max-[650px]:hidden',
+          'text-[11px] font-semibold whitespace-nowrap max-[650px]:hidden',
           item.checked ? 'text-accent-strong' : 'text-muted',
         )}
       >

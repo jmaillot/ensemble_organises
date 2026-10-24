@@ -212,10 +212,15 @@ export function PriorityTag({ priority }: { priority: 'haute' | 'normale' | 'bas
   const map = {
     haute: { label: 'Haute', className: 'bg-coral-soft text-coral-text' },
     normale: { label: 'Normale', className: 'bg-amber-soft text-amber-strong' },
-    basse: { label: 'Basse', className: 'bg-sand text-muted' },
+    // muted sur sand mesurait 4,32:1 (audit du 24/10/2026) : le contrat §3
+    // réserve accent-strong au texte posé sur un pastel — 9,2:1 ici, et la
+    // pastille reste visuellement neutre (encre, pas accent).
+    basse: { label: 'Basse', className: 'bg-sand text-accent-strong' },
   } as const;
   const entry = map[priority];
-  return <span className={cn('inline-flex min-h-[24px] items-center rounded-full px-2.5 text-[10px] font-extrabold', entry.className)}>{entry.label}</span>;
+  // 11px : le libellé « Haute » porte une information (§15 du DESIGN.md,
+  // audit du 24/10/2026) ; la pastille garde sa hauteur de 24px.
+  return <span className={cn('inline-flex min-h-[24px] items-center rounded-full px-2.5 text-[11px] font-extrabold', entry.className)}>{entry.label}</span>;
 }
 
 export function MemberBadge({ name, className }: { name: string; className?: string }) {

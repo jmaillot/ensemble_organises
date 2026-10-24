@@ -272,7 +272,10 @@ export function AppShell() {
               </span>
               <div>
                 <strong className="text-[13px]">{householdName}</strong>
-                <div className="mt-0.5 text-[10px] text-muted">
+                {/* 12px : texte fonctionnel, pas un micro-label (§15 du
+                    DESIGN.md ; audit du 24/10/2026 — le 10px reste réservé
+                    au section-kicker). */}
+                <div className="mt-0.5 text-[12px] text-muted">
                   {members.length} membre{members.length > 1 ? 's' : ''}
                 </div>
               </div>

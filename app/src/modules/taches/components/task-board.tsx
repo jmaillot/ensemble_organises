@@ -150,7 +150,7 @@ function BoardCard({ task, canWrite, onEdit, onMove }: BoardCardProps) {
             {...attributes}
             {...listeners}
             aria-label={`Déplacer : ${task.name}`}
-            className="mt-0.5 grid size-6 shrink-0 cursor-grab place-items-center rounded-[7px] text-muted/70 transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing"
+            className="mt-0.5 grid size-6 shrink-0 cursor-grab place-items-center rounded-[7px] text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing"
             // Le geste seul ne doit pas confisquer le défilement de la page.
             style={{ touchAction: 'none' }}
           >

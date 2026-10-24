@@ -53,7 +53,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
           {...attributes}
           {...listeners}
           aria-label={`Réordonner : ${task.name}`}
-          className="relative mt-[3px] grid size-5 cursor-grab place-items-center text-muted/70 transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
+          className="relative mt-[3px] grid size-5 cursor-grab place-items-center text-muted transition-colors duration-[var(--duration-quick)] hover:text-fg active:cursor-grabbing max-[650px]:hidden after:absolute after:-inset-3 after:content-['']"
         >
           <Icon name="drag" size="sm" />
         </button>

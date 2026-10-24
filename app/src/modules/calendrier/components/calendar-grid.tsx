@@ -138,14 +138,14 @@ export function CalendarGrid({
       </div>
 
       <div className="grid grid-cols-[22px_repeat(7,minmax(0,1fr))] gap-1" role="group" aria-label={`Jours de ${monthLabel}`}>
-        <div aria-hidden="true" className="grid min-h-7 place-items-center text-[9px] font-extrabold text-muted/70 uppercase">
+        <div aria-hidden="true" className="grid min-h-7 place-items-center text-[9px] font-extrabold text-muted uppercase">
           Sem<span className="sr-only">aine</span>
         </div>
         {DAY_NAMES.map((name, index) => (
           <div
             key={`${name}-${index}`}
             aria-hidden="true"
-            className="grid min-h-7 place-items-center text-[9.5px] font-extrabold tracking-wide text-muted uppercase"
+            className="grid min-h-7 place-items-center text-[10px] font-extrabold tracking-wide text-muted uppercase"
           >
             {name}
           </div>
@@ -156,7 +156,8 @@ export function CalendarGrid({
             <div
               aria-hidden="true"
               title={`Semaine ${isoWeekNumber(week[0].iso)}`}
-              className="grid min-h-[48px] place-items-center text-[10px] font-semibold text-muted/60 tabular-nums min-[651px]:min-h-[58px]"
+              // muted/60 mesurait 2,2:1 (audit du 24/10/2026) ; muted plein 5,3:1.
+              className="grid min-h-[48px] place-items-center text-[10px] font-semibold text-muted tabular-nums min-[651px]:min-h-[58px]"
             >
               {isoWeekNumber(week[0].iso)}
             </div>
@@ -180,7 +181,10 @@ export function CalendarGrid({
                   className={cn(
                     'relative min-h-[48px] rounded-[12px] px-1 py-1.5 text-left text-xs transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint min-[651px]:min-h-[58px]',
                     'focus-visible:outline-3 focus-visible:outline-offset-[2px] focus-visible:outline-accent-strong',
-                    day.isOutside && 'text-muted/45',
+                    // muted/45 mesurait 2,2:1 (audit du 24/10/2026) ; muted
+                    // plein reste 5,3:1 et la nuance avec le mois courant
+                    // (encre fg) suffit.
+                    day.isOutside && 'text-muted',
                     isSelected && 'bg-accent-faint',
                   )}
                 >
@@ -193,7 +197,7 @@ export function CalendarGrid({
                         : isSelected
                           ? 'bg-accent text-surface'
                           : day.isOutside
-                            ? 'text-muted/60'
+                            ? 'text-muted'
                             : 'text-fg',
                     )}
                   >

@@ -6,6 +6,8 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { data } from '@/lib/data';
 import { getDatabase } from '@/lib/data/dexie';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoHousehold, demoMembers } from '@/lib/data/seed';
+import { demoUser } from '@/hooks/use-auth';
+import { useSessionStore } from '@/stores/session-store';
 import type { DashboardWidgetRow, RowFilter } from '@/types';
 import DashboardPage from './dashboard-page';
 import { layoutWidgets, reorderPreferences, resetPreferences, toWidgetPreferences, toggleWidget } from './types';
@@ -49,7 +51,12 @@ describe('Accueil — preferences de widgets', () => {
 describe('Accueil — rendu', () => {
   // La météo part sur le réseau : les rendus restent hermétiques en simulant
   // un service injoignable (le widget affiche alors son état d'erreur).
+  // La session est semée explicitement : le repli du composant quand
+  // `user` est absent est désormais neutre (« Bonjour. » sans prénom codé,
+  // audit du 24/10/2026) — ces assertions visent la vraie salutation nommée,
+  // elles passent donc par la vraie session de démonstration.
   beforeEach(() => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser, householdLoaded: true });
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {

@@ -141,7 +141,7 @@ Desktop : rail (sidebar) fixe, topbar sticky translucide (`topbar-surface`, blur
 - **Tuile d'espace** (`AppTile`) : aspect 6:5, rayon 20px, aplat pastel, nom bold 16px en haut-gauche, objet en bas-droite (58px mobile / 112px PC, jamais rogné à moitié), pastille-compteur translucide bas-gauche, `select-none` sur l'objet. Compteur jamais à 0 (règle du mur de zéros). Nom accessible avec compteur : « Ouvrir Courses, 21 articles à acheter ».
 - **Barre basse mobile** : pilule flottante, hauteur ≥ 52px, actif = aplat sapin + texte surface.
 - **Champs** : hauteur ≥ 44px, rayon 11–14px, label 11px bold `muted`, focus gage global, `.check-option` avec `:has(:checked)`.
-- **Statuts** : terminé = `muted` + strikethrough · haute = chip `coral-soft` + `coral-text` · normale = `amber-soft` · basse = neutre · non lu = point corail + libellé accessible.
+- **Statuts** : terminé = `muted` + strikethrough · haute = chip `coral-soft` + `coral-text` · normale = `amber-soft` · basse = chip `sand` + `accent-strong` (l'encre, pas `muted` : 4,32:1 sous le plancher — audit du 24/10/2026) · non lu = point corail + libellé accessible.
 - **Toasts** : bas d'écran, `calc(16px + env(safe-area-inset-bottom))` mobile.
 - **Surfaces navigateur** : `::selection` accent-soft/sapin, scrollbar slim à poignée d'encre 32% sur crème — thémées ici, jamais laissées au défaut.
 
