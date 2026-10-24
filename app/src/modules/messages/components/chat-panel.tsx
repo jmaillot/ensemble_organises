@@ -82,7 +82,7 @@ function MessageBubble({
         message.isMine ? 'self-end rounded-[18px_18px_6px_18px] border-accent/25 bg-accent-soft' : 'self-start'
       }`}
     >
-      <span className="mb-1 block text-[10px] font-extrabold text-muted">{`${message.senderName} :`}</span>
+      <span className="mb-1 block text-[11px] font-extrabold text-muted">{`${message.senderName} :`}</span>
       {message.mediaUrl ? (
         <a href={message.mediaUrl} target="_blank" rel="noreferrer" aria-label={`Ouvrir l’image de ${message.senderName}`}>
           <img src={message.mediaUrl} alt="" loading="lazy" className="mb-1.5 max-h-48 w-auto rounded-[10px]" />
@@ -117,7 +117,7 @@ function MessageBubble({
       ) : (
         <span className="whitespace-pre-wrap break-words">{message.content}</span>
       )}
-      <time dateTime={message.createdAt} className="mt-1 block text-[10px] text-muted">
+      <time dateTime={message.createdAt} className="mt-1 block text-[11px] text-muted">
         {formatClock(message.createdAt)}
         {message.pending ? ' · envoi…' : ''}
       </time>
@@ -248,7 +248,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
         <MemberAvatar name={conversation.title} colorTag={conversation.colorTag} size="sm" />
         <div className="min-w-0 flex-1">
           <strong className="block truncate text-[13px]">{conversation.title}</strong>
-          <small className="block truncate text-[10px] text-muted">
+          <small className="block truncate text-[11px] text-muted">
             {readOnly ? (
               'Conversation quittée · lecture seule'
             ) : archivedForMe ? (
@@ -343,7 +343,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
       >
         {pageInfo && messages.length > 0 ? (
           <div className="flex flex-col items-center gap-1.5 pb-1">
-            <p role="status" className="m-0 text-[10px] text-muted">
+            <p role="status" className="m-0 text-[11px] text-muted">
               {pageInfo.loaded} sur {pageInfo.total} messages chargés
             </p>
             {pageInfo.hasMoreBefore && onLoadMore ? (
@@ -487,7 +487,7 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
       </form>
         </>
       )}
-      <p className="m-0 flex items-center gap-1.5 border-t border-border px-3 py-2 text-[10px] text-muted">
+      <p className="m-0 flex items-center gap-1.5 border-t border-border px-3 py-2 text-[11px] text-muted">
         <Icon name="wifi" size="sm" />
         Les messages arrivent en temps réel pour les membres du foyer.
       </p>

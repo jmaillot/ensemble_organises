@@ -96,7 +96,7 @@ Règles éditoriales : dates (`19 h 30`, `15/09`) et montants (`24,90 €`) en f
 - Icônes : SVG locaux (`components/shared/icon`, trait 1,8 px, extrémités/jointures arrondis). Tailles : 15px (en ligne), 18px (navigation), 21px (état prominent). Décoratives (`aria-hidden`), le contrôle porte le libellé. **Chaque module a son icône distincte** : `receipt` ne sert pas deux espaces, `people` non plus.
 - **Emoji proscrits** comme icône, illustration, ou objet de tuile (ilos v1 §5, désormais suivi par l'implémentation). L'« objet » d'une tuile est un dessin maison : SVG à deux tons (sapin + pastel), ou photo locale `public/assets/*` avec `object-fit`, `width`/`height` déclarés et `loading="lazy"`.
 - Brand mark : carré sapin 38px, rayon 13px, cercle accent en coin bas droit.
-- Overlays de photo (`tile-overlay`, `trip-overlay`) : dégradé encre 5%→84% avec texte clair ≥ 4,5:1 garanti.
+- Overlays de photo (`tile-overlay`, `trip-overlay`) : dégradé encre avec texte clair ≥ 4,5:1 garanti — `trip-overlay` finit à 92% d'encre depuis le 24/10/2026 (le texte secondaire `on-dark` mesurait ~3,9:1 dans le pire cas à 84%).
 
 ## 6. Espacements, rayons et relief
 
@@ -178,7 +178,7 @@ Manifest : `standalone`, thème `#f2f0ec`, icônes locales SVG + PNG (iOS ignore
 - [ ] Aucun emoji fonctionnel ou décoratif (icônes et objets SVG/photos)
 - [ ] Français pur : « réunis » pas « reunited », « enfant » pas « Kids », pas de jargon crypto en page publique
 - [ ] Icônes de rail distinctes par espace ; < 920px, reconnaissance pas uniquement par l'icône
-- [ ] Aucun texte < 12px hors micro-labels prévus (eyebrow 11px, kicker 10px, nav basse 10,5px)
+- [ ] Aucun texte < 12px hors micro-labels (micro-libellés et pastilles 11px ; exceptions documentées : eyebrow 11px, `section-kicker` 10px — le seul 10px restant —, nav basse et pastilles de péremption 10,5px ; balayage du 24/10/2026 : les 71 `text-[10px]` sont passés à 11px)
 - [ ] Tout texte sur son aplat réel ≥ 4,5:1, initiales d'avatar comprises
 - [ ] Breakpoints 1180/920/650 respectés ; aucun scroll horizontal < 650px
 - [ ] Focus visible, icônes seules étiquetées, `aria-current` sur l'actif

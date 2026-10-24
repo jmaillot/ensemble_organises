@@ -45,11 +45,11 @@ export function ConversationList({ conversations, archivedConversations = [], ac
           </span>
           <span className="flex w-9 shrink-0 flex-col items-end gap-1">
             {conversation.lastMessageAt ? (
-              <small className="text-[10px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
+              <small className="text-[11px] text-muted">{formatListTime(conversation.lastMessageAt)}</small>
             ) : null}
             {conversation.unread > 0 ? (
               <span
-                className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral-deep px-1 text-[10px] font-extrabold text-white"
+                className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral-deep px-1 text-[11px] font-extrabold text-white"
                 aria-hidden="true"
               >
                 {conversation.unread}

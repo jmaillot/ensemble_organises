@@ -302,13 +302,13 @@ export function ExpenseFormDialog({
               </p>
             ) : null}
             {shareCount > 0 ? (
-              <p className="m-0 text-[10px] text-muted">
+              <p className="m-0 text-[11px] text-muted">
                 {splitType === 'egal' && amount > 0
                   ? `${formatEuro(amount / shareCount)} par personne`
                   : 'Les parts seront définies dans les options avancées.'}
               </p>
             ) : isGuestPayerValue(paidByValue ?? '') ? (
-              <p className="m-0 text-[10px] text-muted">
+              <p className="m-0 text-[11px] text-muted">
                 Aucun membre coché : l’invité prend toute la dépense à sa charge (offert, aucun remboursement).
               </p>
             ) : null}
@@ -338,7 +338,7 @@ export function ExpenseFormDialog({
               {splitType === 'personnalise' ? (
                 <fieldset className="grid gap-2">
                   <legend className="text-[11px] font-extrabold text-muted">Montants personnalisés</legend>
-                  <p className="m-0 text-[10px] text-muted">
+                  <p className="m-0 text-[11px] text-muted">
                     La somme des parts doit égaler le montant de la dépense (au centime près).
                   </p>
                   {typeof errors.customShares?.message === 'string' ? (

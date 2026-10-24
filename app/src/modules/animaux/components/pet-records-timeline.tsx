@@ -63,13 +63,13 @@ export function PetRecordsTimeline({ records, busyId, onEdit, onDelete }: PetRec
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="text-[13px]">{record.name}</strong>
-                  <Badge tone={badgeTones[record.kind]} className="min-h-5 text-[10px]">
+                  <Badge tone={badgeTones[record.kind]} className="min-h-5 text-[11px]">
                     {petRecordTypeLabel(record.kind)}
                   </Badge>
                   {alert ? (
                     <span
                       className={cn(
-                        'inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-[10px] font-extrabold',
+                        'inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-[11px] font-extrabold',
                         alert.className,
                       )}
                     >

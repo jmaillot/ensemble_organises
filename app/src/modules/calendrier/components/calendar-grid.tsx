@@ -145,7 +145,7 @@ export function CalendarGrid({
           <div
             key={`${name}-${index}`}
             aria-hidden="true"
-            className="grid min-h-7 place-items-center text-[10px] font-extrabold tracking-wide text-muted uppercase"
+            className="grid min-h-7 place-items-center text-[11px] font-extrabold tracking-wide text-muted uppercase"
           >
             {name}
           </div>
@@ -157,7 +157,7 @@ export function CalendarGrid({
               aria-hidden="true"
               title={`Semaine ${isoWeekNumber(week[0].iso)}`}
               // muted/60 mesurait 2,2:1 (audit du 24/10/2026) ; muted plein 5,3:1.
-              className="grid min-h-[48px] place-items-center text-[10px] font-semibold text-muted tabular-nums min-[651px]:min-h-[58px]"
+              className="grid min-h-[48px] place-items-center text-[11px] font-semibold text-muted tabular-nums min-[651px]:min-h-[58px]"
             >
               {isoWeekNumber(week[0].iso)}
             </div>
@@ -246,7 +246,7 @@ export function CalendarGrid({
           Tâche
         </span>
         {onLongPress ? (
-          <span className="basis-full text-[10px] text-muted sm:basis-auto">Maintenez une date pour créer un événement.</span>
+          <span className="basis-full text-[11px] text-muted sm:basis-auto">Maintenez une date pour créer un événement.</span>
         ) : null}
       </div>
     </section>

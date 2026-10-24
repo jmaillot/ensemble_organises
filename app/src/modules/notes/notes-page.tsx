@@ -279,7 +279,7 @@ export default function NotesPage() {
                     />
                   ) : null}
 
-                  <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
+                  <div className="flex items-center justify-between gap-2 text-[11px] font-extrabold tracking-[0.08em] text-muted uppercase">
                     <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-bg px-2 py-[3px]">
                       <span
                         aria-hidden="true"
@@ -289,7 +289,7 @@ export default function NotesPage() {
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       {note.locked ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[10px] text-amber-strong">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-1.5 py-[2px] text-[11px] text-amber-strong">
                           <Icon name="lock" size="sm" className="size-3" />
                           Verrouillée
                         </span>
@@ -323,7 +323,7 @@ export default function NotesPage() {
                               </span>
                             )}
                             <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
-                            <span className="shrink-0 text-[10px] text-muted">{formatBytes(attachment.size)}</span>
+                            <span className="shrink-0 text-[11px] text-muted">{formatBytes(attachment.size)}</span>
                           </a>
                         </li>
                       ))}

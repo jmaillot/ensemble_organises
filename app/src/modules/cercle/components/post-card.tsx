@@ -197,7 +197,7 @@ function PostCardComponent({
               autoFocus
             />
             <div className="flex items-center justify-between gap-2">
-              <small className="text-[10px] text-muted">
+              <small className="text-[11px] text-muted">
                 {trimmed.length} / {POST_TEXT_MAX} caractères
                 {trimmed.length > POST_TEXT_MAX ? ' — limite dépassée' : ''}
               </small>
@@ -275,7 +275,7 @@ function PostCardComponent({
                           autoFocus
                         />
                         <div className="flex items-center justify-between gap-2">
-                          <small className="text-[10px] text-muted">
+                          <small className="text-[11px] text-muted">
                             {commentTrimmed.length} / {COMMENT_CONTENT_MAX} caractères
                             {commentTrimmed.length > COMMENT_CONTENT_MAX ? ' — limite dépassée' : ''}
                           </small>
@@ -393,7 +393,7 @@ function PostCardComponent({
           </form>
         ) : null}
         {replyOverCap || replyError ? (
-          <small role={replyError ? 'alert' : undefined} className="mb-[13px] block text-[10px] text-coral-text">
+          <small role={replyError ? 'alert' : undefined} className="mb-[13px] block text-[11px] text-coral-text">
             {replyError ?? `Le commentaire est limité à ${COMMENT_CONTENT_MAX} caractères.`}
           </small>
         ) : null}

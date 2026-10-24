@@ -57,7 +57,7 @@ export function MembersPanel() {
               <div className="min-w-0 flex-1">
                 <strong className="block text-[13px]">
                   {member.display_name}
-                  {isSelf ? <span className="ml-1.5 text-[10px] font-normal text-muted">vous</span> : null}
+                  {isSelf ? <span className="ml-1.5 text-[11px] font-normal text-muted">vous</span> : null}
                 </strong>
                 <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted">
                   <i className={`size-2 rounded-full ${memberTagClass(member.color_tag)}`} aria-hidden="true" />

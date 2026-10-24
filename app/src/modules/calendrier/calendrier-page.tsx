@@ -598,7 +598,7 @@ export default function CalendrierPage() {
                         : 'grid place-items-center gap-1 rounded-[18px] border border-border/70 bg-surface px-1 py-2.5 transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint'
                     }
                   >
-                    <span className="text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">
+                    <span className="text-[11px] font-extrabold tracking-[0.08em] text-muted uppercase">
                       {titleCase(formatLongDate(iso)).slice(0, 3)}
                     </span>
                     <span

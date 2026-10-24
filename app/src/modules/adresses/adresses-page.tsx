@@ -351,7 +351,7 @@ function CityGroupsView({ groups, onSelect }: { groups: { city: string; places: 
                   <Icon name={placeTypeIcon[place.type]} size="sm" className="text-accent-strong" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-[750]">{place.name}</span>
-                    <span className="block text-[10px] text-muted">{place.typeLabel}</span>
+                    <span className="block text-[11px] text-muted">{place.typeLabel}</span>
                   </span>
                   <span className="text-[11px] tracking-[0.1em] text-amber" aria-hidden="true">
                     {ratingStars(place.rating)}

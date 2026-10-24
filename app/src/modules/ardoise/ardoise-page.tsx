@@ -129,7 +129,9 @@ export default function ArdoisePage() {
                     type="button"
                     onClick={() => setPendingDeleteId(ardoise.id)}
                     aria-label={`Supprimer ${ardoise.name}`}
-                    className={`relative ml-2 grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] hover:border-coral hover:bg-coral-soft hover:text-coral-text ${
+                    /* Zone tactile étendue à 44px (AGENTS.md §6) autour du
+                       dessin 32px : `after` invisible, motif des poignées. */
+                    className={`relative ml-2 grid size-8 place-items-center rounded-full border transition-colors duration-[var(--duration-quick)] after:absolute after:-inset-1.5 after:content-[''] hover:border-coral hover:bg-coral-soft hover:text-coral-text ${
                       coverUrl ? 'border-white/25 text-white/85' : 'border-border/70 bg-surface text-muted'
                     }`}
                   >
@@ -299,7 +301,7 @@ function CreateArdoiseDialog({
                   </label>
                 ))}
               </div>
-              <p className="m-0 text-[10px] text-muted">
+              <p className="m-0 text-[11px] text-muted">
                 Décochez pour exclure. D’autres membres pourront être ajoutés ensuite.
               </p>
             </fieldset>

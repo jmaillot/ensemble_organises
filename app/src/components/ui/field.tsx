@@ -55,7 +55,7 @@ export function Field({ label, hint, error, optional, className, children }: Fie
           'aria-required': !optional || undefined,
         })}
         {hint ? (
-          <p id={descriptionId} className="text-[10px] text-muted">
+          <p id={descriptionId} className="text-[11px] text-muted">
             {hint}
           </p>
         ) : null}

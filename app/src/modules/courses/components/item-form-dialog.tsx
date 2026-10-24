@@ -237,7 +237,7 @@ export function ItemFormDialog({
             >
               {searchState.status === 'loading' ? 'Recherche…' : 'Rechercher photo et rayon'}
             </Button>
-            <p className="m-0 mt-1.5 text-[10px] text-muted">
+            <p className="m-0 mt-1.5 text-[11px] text-muted">
               Open Food Facts : remplit le rayon et montre la photo.
             </p>
           </div>
@@ -274,7 +274,7 @@ export function ItemFormDialog({
           {searchPhoto ? (
             <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
               <img src={searchPhoto.url} alt={`Photo ${searchPhoto.label} (Open Food Facts)`} className="max-h-44 w-full object-cover" />
-              <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
+              <figcaption className="bg-bg px-3 py-1.5 text-[11px] text-muted">
                 Illustration Open Food Facts — affichée seulement, non enregistrée.
               </figcaption>
             </figure>

@@ -137,7 +137,7 @@ export function ConversationFormDialog({
                     {errors.memberIds.message}
                   </p>
                 ) : (
-                  <p className="m-0 text-[10px] text-muted">
+                  <p className="m-0 text-[11px] text-muted">
                     {selected.length > 0
                       ? `${selected.length} personne${selected.length > 1 ? 's' : ''} sélectionnée${selected.length > 1 ? 's' : ''}, plus vous.`
                       : 'Cochez au moins une personne.'}
@@ -249,7 +249,7 @@ export function AddMembersDialog({
                     {errors.memberIds.message}
                   </p>
                 ) : selected.length > 0 ? (
-                  <p className="m-0 text-[10px] text-muted">
+                  <p className="m-0 text-[11px] text-muted">
                     {selected.length} personne{selected.length > 1 ? 's' : ''} à faire entrer.
                   </p>
                 ) : null}

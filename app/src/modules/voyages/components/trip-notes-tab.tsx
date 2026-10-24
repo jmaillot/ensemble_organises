@@ -205,7 +205,7 @@ export function TripNotesTab({ tripId, householdId, currentMemberId, readOnly = 
                   </Button>
                 ) : null}
               </div>
-              <p className="text-[10px] text-muted">Une image jointe à la note (optionnel).</p>
+              <p className="text-[11px] text-muted">Une image jointe à la note (optionnel).</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button icon="plus" disabled={saving || title.trim() === ''} onClick={() => void submit()}>

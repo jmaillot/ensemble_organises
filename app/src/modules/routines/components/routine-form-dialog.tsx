@@ -442,7 +442,7 @@ export function RoutineFormDialog({
 
           <p className="m-0 rounded-[11px] bg-accent-faint px-3 py-2 text-[11px] text-muted">
             Aperçu : <strong className="text-accent-strong">{lowercaseFirst(previewLabel)}</strong>
-            {preview ? <code className="ml-1 font-mono text-[10px]">{preview}</code> : null}
+            {preview ? <code className="ml-1 font-mono text-[11px]">{preview}</code> : null}
           </p>
 
           <Controller
@@ -472,7 +472,7 @@ export function RoutineFormDialog({
                     );
                   })}
                 </div>
-                <p className="m-0 text-[10px] text-muted">Plusieurs personnes peuvent partager un même rituel.</p>
+                <p className="m-0 text-[11px] text-muted">Plusieurs personnes peuvent partager un même rituel.</p>
               </fieldset>
             )}
           />

@@ -155,9 +155,11 @@ export function ShoppingGroupCard({
       <div className="flex items-center justify-between gap-3">
         {/* Le compteur reste hors du titre : l'étiquette du groupe doit rester
             égale au nom de la liste pour les lecteurs d'écran. */}
-        <h3 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
+        {/* h2 : le titre du module est le seul h1 (ModuleShell) — un h3 ici
+            sautait un niveau (audit du 24/10/2026). */}
+        <h2 id={`list-title-${list.id}`} className="m-0 flex items-center gap-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
           {list.name}
-        </h3>
+        </h2>
         <div className="flex items-center gap-1.5">
           <CountBadge
             value={`${list.checkedCount}/${list.items.length}`}
@@ -347,7 +349,7 @@ export function ShoppingGroupCard({
 
         {suggestions.length > 0 ? (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-extrabold tracking-[0.08em] text-muted uppercase">Habitudes</span>
+            <span className="text-[11px] font-extrabold tracking-[0.08em] text-muted uppercase">Habitudes</span>
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion.name}
@@ -387,7 +389,7 @@ export function ShoppingGroupCard({
                 >
                   {rayonVisual(section.title).emoji}
                 </span>
-                <h4 className="m-0 font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{section.title}</h4>
+                <h3 className="m-0 font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{section.title}</h3>
               </div>
             ) : null}
             {/* Le geste se fait À L'INTÉRIEUR du groupe : dans la vue « par

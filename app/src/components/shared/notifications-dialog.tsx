@@ -170,7 +170,7 @@ function NotificationRow({
           ) : null}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          <small className={cn('text-[10px] text-muted')}>{formatListTime(item.at)}</small>
+          <small className={cn('text-[11px] text-muted')}>{formatListTime(item.at)}</small>
           {item.unread ? <span aria-hidden="true" className="size-[7px] rounded-full bg-coral" /> : null}
         </span>
       </button>

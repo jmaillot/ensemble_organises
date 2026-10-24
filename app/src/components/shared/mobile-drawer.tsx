@@ -240,7 +240,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
               </span>
               <div className="min-w-0">
                 <strong className="block truncate text-[13px]">{householdName}</strong>
-                <span className="block text-[10px] text-muted">
+                <span className="block text-[11px] text-muted">
                   {memberCount} membre{memberCount > 1 ? 's' : ''}
                 </span>
               </div>

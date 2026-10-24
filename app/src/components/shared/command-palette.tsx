@@ -173,7 +173,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             spellCheck={false}
             className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-fg outline-none placeholder:text-muted"
           />
-          <kbd className="hidden shrink-0 rounded-[6px] border border-border bg-surface-2 px-1.5 py-0.5 text-[10px] font-[650] text-muted min-[400px]:block">
+          <kbd className="hidden shrink-0 rounded-[6px] border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] font-[650] text-muted min-[400px]:block">
             esc
           </kbd>
         </div>
@@ -213,7 +213,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             className="m-0 list-none p-0"
           >
             {showSpacesHeader ? (
-              <li role="presentation" className="px-3 pt-2 pb-1 text-[10px] font-[760] tracking-[0.14em] text-muted uppercase">
+              <li role="presentation" className="px-3 pt-2 pb-1 text-[11px] font-[760] tracking-[0.14em] text-muted uppercase">
                 Espaces
               </li>
             ) : null}
@@ -241,7 +241,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             })}
 
             {showRecordsHeader ? (
-              <li role="presentation" className="px-3 pt-3 pb-1 text-[10px] font-[760] tracking-[0.14em] text-muted uppercase">
+              <li role="presentation" className="px-3 pt-3 pb-1 text-[11px] font-[760] tracking-[0.14em] text-muted uppercase">
                 Dans le foyer
               </li>
             ) : null}

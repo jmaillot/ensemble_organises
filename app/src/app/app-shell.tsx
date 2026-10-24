@@ -352,7 +352,7 @@ export function AppShell() {
             >
               <Icon name="search" size="sm" />
               <span className="text-[12.5px] font-[650] max-[650px]:sr-only">Rechercher</span>
-              <kbd className="hidden rounded-[5px] border border-border bg-surface-2 px-1 py-px text-[10px] font-[650] min-[1180px]:inline">
+              <kbd className="hidden rounded-[5px] border border-border bg-surface-2 px-1 py-px text-[11px] font-[650] min-[1180px]:inline">
                 {searchShortcutLabel}
               </kbd>
             </button>

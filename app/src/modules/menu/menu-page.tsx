@@ -180,7 +180,7 @@ export default function MenuPage() {
                     <strong className={`text-[12.5px] font-[700] ${isToday ? 'text-accent-strong' : 'text-fg'}`}>
                       {formatDayLabel(date)}
                     </strong>
-                    {isToday ? <span className="rounded-full bg-accent px-1.5 py-px text-[10px] font-[700] text-surface">Auj.</span> : null}
+                    {isToday ? <span className="rounded-full bg-accent px-1.5 py-px text-[11px] font-[700] text-surface">Auj.</span> : null}
                   </div>
                   <div className="grid gap-1.5">
                     {mealSlots.map((slot) => {
@@ -188,7 +188,7 @@ export default function MenuPage() {
                       return (
                         <div key={slot} className="rounded-[14px] bg-surface p-1.5">
                           <div className="flex items-center justify-between gap-1 px-0.5">
-                            <span className="text-[10px] font-extrabold text-muted">{mealSlotLabels[slot]}</span>
+                            <span className="text-[11px] font-extrabold text-muted">{mealSlotLabels[slot]}</span>
                             {canWrite ? (
                               <button
                                 type="button"
@@ -309,7 +309,7 @@ function MealCard({
             imposer sa largeur min-content à la colonne du jour (120px) — sans
             elle, la carte déborde sous la colonne voisine et le bouton de
             retrait devient incliquable (probe e2e : slot 160px dans col 120px). */}
-        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[10px] text-muted">
+        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-muted">
           <span className="shrink-0">×{entry.servings}</span>
           {entry.memberIds.slice(0, 5).map((memberId) => (
             <MemberBadge key={memberId} name={memberNameOf.get(memberId) ?? '?'} className="scale-90" />

@@ -319,7 +319,7 @@ function GiftCodePanel({
                 onChange={(change) => setHostMessage(change.target.value)}
                 maxLength={GIFT_HOST_MESSAGE_MAX + 20}
               />
-              <span className="text-[10px] font-normal">
+              <span className="text-[11px] font-normal">
                 {`${hostMessage.trim().length}/${GIFT_HOST_MESSAGE_MAX} caractères.`}
               </span>
             </label>
@@ -520,7 +520,7 @@ export function GiftShareDialog({
               </p>
             ) : null}
             {selected.length > 0 ? (
-              <p className="m-0 text-[10px] text-muted">{`${selected.length} personne(s) sélectionnée(s).`}</p>
+              <p className="m-0 text-[11px] text-muted">{`${selected.length} personne(s) sélectionnée(s).`}</p>
             ) : null}
           </fieldset>
 

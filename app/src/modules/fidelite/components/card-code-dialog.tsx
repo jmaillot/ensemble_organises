@@ -40,7 +40,7 @@ export function CardCodeDialog({
               <p className="eyebrow mb-2 text-on-dark">Code de fidélité</p>
               <DialogTitle className="mb-1.5 text-[28px] text-surface">{card.name}</DialogTitle>
               <DialogDescription className="mb-4 flex flex-wrap items-center gap-2 text-on-dark">
-                <span className={cn('inline-flex min-h-6 items-center rounded-full px-2.5 text-[10px] font-extrabold text-surface', loyaltyBrandChip[card.brandColor ?? 'accent'])}>
+                <span className={cn('inline-flex min-h-6 items-center rounded-full px-2.5 text-[11px] font-extrabold text-surface', loyaltyBrandChip[card.brandColor ?? 'accent'])}>
                   {loyaltyBrandColors.find((option) => option.value === (card.brandColor ?? 'accent'))?.label}
                 </span>
                 <span>{loyaltyCodeTypeLabel[card.codeType]}</span>

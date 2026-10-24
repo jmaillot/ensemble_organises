@@ -95,7 +95,7 @@ export function TripMembersSection({
                 <MemberAvatar member={member} size="sm" />
                 {member.display_name}
                 {member.role === 'enfant' ? (
-                  <span className="text-[10px] font-bold text-muted">enfant · sans budget</span>
+                  <span className="text-[11px] font-bold text-muted">enfant · sans budget</span>
                 ) : null}
                 {pending ? '…' : ''}
               </label>

@@ -42,7 +42,7 @@ import { GiftShareDialog } from './components/gift-share-dialog';
 import { useOpenRecord } from '@/hooks/use-open-record';
 
 const shareButtonBase =
-  'inline-flex min-h-[33px] items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[10px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong';
+  'inline-flex min-h-[33px] items-center gap-1.5 rounded-[9px] bg-bg px-2.5 text-[11px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-soft hover:text-accent-strong';
 
 const cardAction =
   'grid size-8 shrink-0 place-items-center rounded-full bg-transparent text-muted transition-colors duration-[var(--duration-quick)] hover:bg-accent-faint hover:text-fg';

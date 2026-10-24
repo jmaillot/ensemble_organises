@@ -201,7 +201,7 @@ export function BirthdaysWidget({
         <>
           {birthdays.slice(0, 2).map(({ row }) => (
             <div key={row.id} className="mt-3 flex items-center gap-2.5 first:mt-0">
-              <span className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-fg text-[10px] font-extrabold text-surface">
+              <span className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-fg text-[11px] font-extrabold text-surface">
                 {initials(row.name)}
               </span>
               <div className="min-w-0">

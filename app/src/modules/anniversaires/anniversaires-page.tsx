@@ -171,7 +171,7 @@ export default function AnniversairesPage() {
                           <strong className="block text-[14px] font-[700]">
                             {birthday.name}{' '}
                             {birthday.twoSources ? (
-                              <span className="ml-1 inline-flex items-center rounded-full bg-accent-faint px-2 py-0.5 align-middle text-[10px] font-extrabold text-accent-strong">
+                              <span className="ml-1 inline-flex items-center rounded-full bg-accent-faint px-2 py-0.5 align-middle text-[11px] font-extrabold text-accent-strong">
                                 2 sources
                               </span>
                             ) : null}
@@ -365,7 +365,7 @@ function BirthdayCalendarView({ birthdays, isLoading, onOpen }: BirthdayCalendar
               <div
                 key={`${name}-${index}`}
                 aria-hidden="true"
-                className="grid min-h-7 place-items-center text-[10px] font-extrabold tracking-wide text-muted uppercase"
+                className="grid min-h-7 place-items-center text-[11px] font-extrabold tracking-wide text-muted uppercase"
               >
                 {name}
               </div>

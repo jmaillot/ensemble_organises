@@ -145,7 +145,7 @@ export function CommentsDialog({
                           autoFocus
                         />
                         <div className="flex items-center justify-between gap-2">
-                          <small className="text-[10px] text-muted">
+                          <small className="text-[11px] text-muted">
                             {editTrimmed.length} / {COMMENT_CONTENT_MAX} caractères
                             {editTrimmed.length > COMMENT_CONTENT_MAX ? ' — limite dépassée' : ''}
                           </small>

@@ -33,7 +33,7 @@ import { useOpenRecord } from '@/hooks/use-open-record';
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[11px] bg-bg px-[11px] py-[11px]">
-      <span className="block text-[10px] text-muted">{label}</span>
+      <span className="block text-[11px] text-muted">{label}</span>
       <strong className="mt-0.5 block text-xs">{value}</strong>
     </div>
   );
@@ -63,7 +63,7 @@ function RecordList({ records, kind }: { records: PetRecord[]; kind: PetRecord['
               {alert ? (
                 <span
                   className={cn(
-                    'inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-[10px] font-extrabold',
+                    'inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-[11px] font-extrabold',
                     alert.className,
                   )}
                 >

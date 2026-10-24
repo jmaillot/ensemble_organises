@@ -127,7 +127,7 @@ export function ProviderTypeDialog({
                   </span>
                   <div className="min-w-0 flex-1">
                     <strong className="block truncate text-[13px]">{type.name}</strong>
-                    <small className="block text-[10px] text-muted">
+                    <small className="block text-[11px] text-muted">
                       {pluralize(usageOf(type.id), 'prestataire')}
                     </small>
                   </div>

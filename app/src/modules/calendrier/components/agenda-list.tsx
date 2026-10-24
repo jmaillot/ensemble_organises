@@ -68,7 +68,7 @@ export function AgendaList({ date, items, isLoading = false, onEdit, onDelete, o
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className={cn(
-                    'inline-flex min-h-[24px] items-center gap-1 rounded-full px-2 py-[3px] text-[10px] font-extrabold',
+                    'inline-flex min-h-[24px] items-center gap-1 rounded-full px-2 py-[3px] text-[11px] font-extrabold',
                     chip.className,
                   )}
                 >

@@ -337,7 +337,7 @@ export function NotificationsPanel() {
           <div className="mt-5 border-t border-border pt-1">
             <h3 className="mt-3 mb-1 text-xs font-extrabold">Appareils enregistrés</h3>
             {isPushSupported() ? (
-              <p className="m-0 mb-1 text-[10px] text-muted">
+              <p className="m-0 mb-1 text-[11px] text-muted">
                 Service worker local :{' '}
                 {swVersion === undefined
                   ? 'vérification…'
@@ -347,7 +347,7 @@ export function NotificationsPanel() {
               </p>
             ) : null}
             {receipt ? (
-              <p className="m-0 mb-1 text-[10px] text-muted">
+              <p className="m-0 mb-1 text-[11px] text-muted">
                 Dernier push reçu : {formatReceiptDate(receipt.at)} (« {receipt.title} ») ·{' '}
                 {receipt.error ? `échec d’affichage (${receipt.error})` : receipt.shown ? 'affiché' : 'reçu'}
               </p>
@@ -395,7 +395,7 @@ export function NotificationsPanel() {
                             {label}
                           </span>
                           {isCurrent ? (
-                            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-extrabold text-accent-strong">
+                            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-extrabold text-accent-strong">
                               Cet appareil
                             </span>
                           ) : null}
@@ -424,7 +424,7 @@ export function NotificationsPanel() {
                         </span>
                       </div>
                     )}
-                    <p className="m-0 text-[10px] text-muted">
+                    <p className="m-0 text-[11px] text-muted">
                       Ajouté le {formatDeviceDate(device.created_at)}
                       {device.last_status !== null ? ` · dernier code ${device.last_status}` : ''}
                     </p>

@@ -285,14 +285,14 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
         {photoPreview ? (
           <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
             <img src={photoPreview} alt="Aperçu de la photo du produit" className="max-h-44 w-full object-cover" />
-            <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
+            <figcaption className="bg-bg px-3 py-1.5 text-[11px] text-muted">
               Photo locale — enregistrée avec le produit.
             </figcaption>
           </figure>
         ) : offProduct?.imageUrl ? (
           <figure className="m-0 overflow-hidden rounded-[14px] border border-border">
             <img src={offProduct.imageUrl} alt={`Photo ${offProduct.name} (Open Food Facts)`} className="max-h-44 w-full object-cover" />
-            <figcaption className="bg-bg px-3 py-1.5 text-[10px] text-muted">
+            <figcaption className="bg-bg px-3 py-1.5 text-[11px] text-muted">
               Photo Open Food Facts — affichage seul, non enregistrée.
             </figcaption>
           </figure>

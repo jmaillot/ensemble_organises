@@ -188,7 +188,7 @@ export function TaskFormDialog({
                     );
                   })}
                 </div>
-                <p className="m-0 text-[10px] text-muted">Plusieurs personnes peuvent partager une même tâche.</p>
+                <p className="m-0 text-[11px] text-muted">Plusieurs personnes peuvent partager une même tâche.</p>
               </fieldset>
             )}
           />

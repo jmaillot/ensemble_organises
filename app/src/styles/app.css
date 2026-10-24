@@ -205,7 +205,11 @@
 }
 
 @utility trip-overlay {
-  background: linear-gradient(180deg, transparent 22%, oklch(20% 0.02 240 / 0.84) 100%);
+  /* Fin du dégradé renforcé (0,84 → 0,92, audit du 24/10/2026) : le texte
+     secondaire on-dark posé sur la zone la plus basse mesurait ~3,9:1 dans
+     le pire cas (photo blanche sous l'overlay) ; à 0,88 effectif dans la
+     zone de texte il passe ~6:1, le titre blanc ~10:1. */
+  background: linear-gradient(180deg, transparent 25%, oklch(20% 0.02 240 / 0.92) 92%);
 }
 
 @utility coupon-ring {

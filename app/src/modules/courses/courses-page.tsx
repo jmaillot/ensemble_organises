@@ -438,7 +438,7 @@ export default function CoursesPage() {
             <strong className="block font-display text-[32px] leading-tight font-semibold tracking-[-0.03em]">
               {pluralize(lists.length, 'liste')}
             </strong>
-            <small className="text-[10px] text-on-dark">
+            <small className="text-[11px] text-on-dark">
               Tout le monde voit les changements en temps réel.
             </small>
           </div>

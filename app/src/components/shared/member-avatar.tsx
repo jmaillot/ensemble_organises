@@ -30,7 +30,7 @@ export interface MemberAvatarProps {
 
 const sizeClass = {
   sm: 'size-[23px] rounded-[8px] text-[9px]',
-  md: 'size-8 rounded-[11px] text-[10px]',
+  md: 'size-8 rounded-[11px] text-[11px]',
   lg: 'size-11 rounded-[14px] text-xs',
 } as const;
 

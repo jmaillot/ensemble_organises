@@ -124,7 +124,7 @@ export function RoutineHistory({
 
             {upcoming.length > 0 ? (
               <div className="mt-2 border-t border-border pt-3">
-                <p className="mb-1 text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">À venir</p>
+                <p className="mb-1 text-[11px] font-extrabold tracking-[0.12em] text-muted uppercase">À venir</p>
                 {upcoming.map((entry) => (
                   <div
                     key={entry.key}
@@ -133,7 +133,7 @@ export function RoutineHistory({
                   >
                     <div className="min-w-0">
                       <strong className="block truncate text-[12px]">{entry.routineName}</strong>
-                      <small className="block text-[10px] text-muted">{subtitle(entry)}</small>
+                      <small className="block text-[11px] text-muted">{subtitle(entry)}</small>
                     </div>
                     <Badge tone={occurrenceTones[entry.state]}>{occurrenceLabels[entry.state]}</Badge>
                   </div>
@@ -204,7 +204,7 @@ export function HistoryCalendar({ days, monthLabel, today, statuses, onPrevious,
           <div
             key={`${name}-${index}`}
             aria-hidden="true"
-            className="grid min-h-7 place-items-center text-[10px] font-extrabold tracking-wide text-muted uppercase"
+            className="grid min-h-7 place-items-center text-[11px] font-extrabold tracking-wide text-muted uppercase"
           >
             {name}
           </div>

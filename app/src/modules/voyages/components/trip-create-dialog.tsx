@@ -189,7 +189,7 @@ export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCre
                       key={preset.url}
                       type="button"
                       onClick={() => setValue('coverPhoto', preset.url, { shouldDirty: true })}
-                      className="min-h-11 w-20 overflow-hidden rounded-[11px] border border-border bg-bg text-[10px] font-bold text-muted"
+                      className="min-h-11 w-20 overflow-hidden rounded-[11px] border border-border bg-bg text-[11px] font-bold text-muted"
                       aria-pressed={coverPhoto === preset.url}
                       aria-label={`Choisir la photo ${preset.label}`}
                     >
