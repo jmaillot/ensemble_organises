@@ -84,10 +84,12 @@ export default function ArdoisePage() {
                 <div
                   key={ardoise.id}
                   role="listitem"
-                  className={`relative flex min-h-[68px] flex-wrap items-center gap-3 overflow-hidden rounded-[18px] border px-3 py-2.5 transition-colors duration-[var(--duration-quick)] ${
-                    coverUrl
-                      ? 'border-transparent'
-                      : 'border-border/70 bg-bg/50 hover:border-accent/30 hover:bg-accent-faint'
+                  // Carte imbriquée dans le panneau : le relief reste à la
+                  // carte extérieure — la ligne se sépare par sa teinte et
+                  // son survol, pas par une bordure concurrente (critique
+                  // du 24/10/2026 après-midi).
+                  className={`relative flex min-h-[68px] flex-wrap items-center gap-3 overflow-hidden rounded-[18px] border border-transparent px-3 py-2.5 transition-colors duration-[var(--duration-quick)] ${
+                    coverUrl ? '' : 'bg-bg/50 hover:bg-accent-faint'
                   }`}
                 >
                   {coverUrl ? (

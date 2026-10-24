@@ -325,7 +325,9 @@ export default function CoursesPage() {
         className="max-[650px]:hidden"
         items={[
           { label: 'Articles', value: itemCount, caption: 'à acheter au total' },
-          { label: 'Dans le panier', value: checkedCount, caption: 'articles cochés' },
+          // « 0 articles cochés » n'informe pas : la stat n'apparaît
+          // qu'informée (mur de zéros, critique du 24/10/2026).
+          ...(checkedCount > 0 ? [{ label: 'Dans le panier', value: checkedCount, caption: 'articles cochés' }] : []),
           {
             label: 'Prochaine course',
             value: nextCourse ? formatWeekday(nextCourse.start_at).toUpperCase() : '—',

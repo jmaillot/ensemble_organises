@@ -79,14 +79,19 @@ export default function AnniversairesPage() {
             : 'Aucun anniversaire enregistré — notez-en un pour ne plus l’oublier.'
         }
       >
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-on-dark">
-          <span>
-            <strong className="font-display text-[15px]">{rows.length}</strong> anniversaires suivis
-          </span>
-          <span>
-            <strong className="font-display text-[15px]">{thisMonth.length}</strong> à préparer ce mois-ci
-          </span>
-        </div>
+        {/* Stats portées seulement quand il y a quelque chose à compter :
+            « 0 suivis · 0 à préparer » sur un héro d'invitation est un mur
+            de zéros (critique du 24/10/2026 après-midi). */}
+        {rows.length > 0 ? (
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-on-dark">
+            <span>
+              <strong className="font-display text-[15px]">{rows.length}</strong> anniversaires suivis
+            </span>
+            <span>
+              <strong className="font-display text-[15px]">{thisMonth.length}</strong> à préparer ce mois-ci
+            </span>
+          </div>
+        ) : null}
       </HeroCard>
 
       {thisMonth.length > 0 ? (
