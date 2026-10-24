@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { CountBadge } from '@/components/shared/module-shell';
@@ -55,11 +55,28 @@ export function NotificationsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent hideClose>
+          {/* pr-0 : la croix générique étant retirée, la réserve de 36px
+              droite du DialogHeader n'a plus de raison d'être — la croix
+              en flux s'aligne sur le bord du contenu. */}
+          <DialogHeader className="pr-0">
+            {/* La croix vit DANS la rangée d'en-tête, sur l'axe de la
+                pastille : la croix générique du Dialog est absolue dans le
+                coin et se superposait à la pastille de compte avec 4px de
+                décalage vertical (constat du 24/10/2026). `hideClose` la
+                retire ; taille alignée sur les pastilles d'icônes des
+                lignes (size-9, rounded-[10px]). */}
             <div className="flex items-center justify-between gap-2.5">
-              <DialogTitle>Notifications</DialogTitle>
-              <CountBadge value={total} label="notifications" />
+              <DialogTitle className="min-w-0 truncate">Notifications</DialogTitle>
+              <div className="flex shrink-0 items-center gap-2">
+                <CountBadge value={total} label="notifications" />
+                <DialogClose
+                  aria-label="Fermer"
+                  className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-border bg-surface text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg"
+                >
+                  <Icon name="close" size="sm" />
+                </DialogClose>
+              </div>
             </div>
             <DialogDescription>
               Messages et commentaires non lus, tâches et rendez-vous à ne pas manquer.
@@ -175,13 +192,16 @@ function NotificationRow({
         </span>
       </button>
       {item.unread ? (
+        // Taille et rayon calés sur la pastille d'icône de la ligne
+        // (size-9, rounded-[10px]) : le bouton d'action ne doit pas lire
+        // « plus petit » que l'icône qu'il ferme.
         <button
           type="button"
           onClick={() => onDismiss(item)}
           aria-label={
             item.markable ? `Marquer comme lu : ${item.title}` : `Masquer jusqu'à demain : ${item.title}`
           }
-          className="mr-1 grid size-8 shrink-0 place-items-center rounded-[9px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-surface hover:text-fg"
+          className="grid size-9 shrink-0 place-items-center rounded-[10px] text-muted transition-colors duration-[var(--duration-quick)] hover:bg-surface hover:text-fg"
         >
           <Icon name={item.markable ? 'check' : 'close'} size="sm" />
         </button>
