@@ -36,12 +36,12 @@
   3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
-**Plans**: 1/7 plans executed
+**Plans**: 2/7 plans executed
 
 Plans:
 **Wave 1**
 - [x] 25-01-PLAN.md — Migration 0144 : socle schématique PAR MEMBRE (managed_modules D-05/D-06 + birth_date + deleted_at D-04) avec tests SQL
-- [ ] 25-06-PLAN.md — Correction documentaire : alignement REQUIREMENTS.md/ROADMAP.md sur D-12 (modération, critère #2) et D-06 (sélecteurs du socle, critère #3)
+- [x] 25-06-PLAN.md — Correction documentaire : alignement REQUIREMENTS.md/ROADMAP.md sur D-12 (modération, critère #2) et D-06 (sélecteurs du socle, critère #3)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 25-02-PLAN.md — Migration 0145 : conversion RPC des comptes enfants (checkpoint D-18), invariant chk_members_managed_child, fermeture des chemins 0006/0036, migrate [BLOCKING]
@@ -149,7 +149,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 1/7 | In Progress|  |
+| 25. Profils enfants gérés | 2/7 | In Progress|  |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
