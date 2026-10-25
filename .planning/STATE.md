@@ -1,16 +1,19 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.0
-milestone_name: Mise en ligne publique
+milestone_name: Mise en ligne publique (phases 25-31)
+current_phase_name: 25 — Profils enfants gérés, première phase du jalon v1.0
 status: planning — roadmap définie, en attente d'approbation puis /gsd-plan-phase 25
-last_updated: "2026-10-25T09:00:00.000Z"
-last_activity: 2026-10-25
+stopped_at: Phase 25 context gathered
+last_updated: "2026-10-25T07:47:44.669Z"
+state_head: f5c71830945ba8eae33f0cdc1600b40def3b1116
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
+last_activity: 2026-10-25
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
@@ -20,7 +23,7 @@ progress:
 Phase: Not started (25 — Profils enfants gérés, première phase du jalon v1.0)
 Plan: —
 Status: Roadmap v1.0 créée (2026-10-25), en attente d'approbation utilisateur
-Progress: 0/7 phases — █████░░░░░░░░░░░░░░░ 0 %
+Progress: [░░░░░░░░░░] 0%
 
 ## Références du jalon v1.0
 
@@ -66,6 +69,10 @@ Progress: 0/7 phases — █████░░░░░░░░░░░░░�
 `auth.users` (phase 27) ; `household_invite_tokens` (déjà durcies 0082/0083, plan 31).
 
 ## Session Continuity
+
+**Last session:** 2026-10-25T07:47:44.642Z
+**Stopped at:** Phase 25 context gathered
+**Resume file:** .planning/phases/25-profils-enfants-g-r-s-par-le-parent/25-CONTEXT.md
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
   (recherche approfondie recommandée selon research/SUMMARY.md pour 25, 26, 27, 31).
