@@ -32,8 +32,8 @@
 **Requirements**: ENF-01, ENF-02, ENF-03, ENF-04, ENF-05
 **Success Criteria** (what must be TRUE):
   1. Un admin crée, modifie et supprime un profil enfant du foyer depuis l'écran du foyer, et aucun compte d'authentification n'apparaît à la création
-  2. Un parent assigne une tâche, coche une routine et réagit dans le Cercle au nom de l'enfant, et la trace porte l'enfant comme attributaire et le parent comme acteur
-  3. Un enfant apparaît dans les sélecteurs de tâches, d'ardoise, de messagerie et de menu, comme tout autre membre du foyer
+  2. Un parent assigne une tâche et coche une routine au nom de l'enfant, et modère le Cercle (suppression/masquage de tout contenu — post, commentaire, réaction — attribué à un profil enfant du foyer, y compris l'historique issu des anciens comptes enfant ; le parent ne publie jamais au nom de l'enfant), et la trace porte l'enfant comme attributaire et le parent comme acteur
+  3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
 **Plans**: 1/7 plans executed
