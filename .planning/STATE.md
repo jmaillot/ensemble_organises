@@ -4,10 +4,10 @@ milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
-status: planning — roadmap définie, en attente d'approbation puis /gsd-plan-phase 25
-stopped_at: Phase 25 UI-SPEC approved
-last_updated: "2026-10-25T12:30:24.246Z"
-state_head: 44d12946b5c4a5a31b760d9709c1aa5ec96c0d2e
+status: executing
+stopped_at: Completed 25-01-PLAN.md
+last_updated: "2026-10-25T16:34:25.110Z"
+state_head: 9eaa64383f3e5ebef15687d42aa2ffb5b5e989ce
 progress:
   total_phases: 7
   completed_phases: 0
@@ -21,9 +21,9 @@ last_activity: 2026-10-25
 
 ## Current Position
 
-Phase: 25 (Profils enfants gérés par le parent) — READY TO EXECUTE
-Plan: —
-Status: Roadmap v1.0 créée (2026-10-25), en attente d'approbation utilisateur
+Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
 Progress: [░░░░░░░░░░] 0%
 
 ## Références du jalon v1.0
@@ -71,9 +71,9 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-**Last session:** 2026-10-25T08:12:11.007Z
-**Stopped at:** Phase 25 UI-SPEC approved
-**Resume file:** .planning/phases/25-profils-enfants-g-r-s-par-le-parent/25-UI-SPEC.md
+**Last session:** 2026-10-25T16:33:48.586Z
+**Stopped at:** Completed 25-01-PLAN.md
+**Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
   (recherche approfondie recommandée selon research/SUMMARY.md pour 25, 26, 27, 31).
@@ -85,3 +85,19 @@ Progress: [░░░░░░░░░░] 0%
 ---
 Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 (UAT utilisateur validée). Archivé dans .planning/milestones/v0.9.0-ROADMAP.md.
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 25 P01 | 23 min | 2 tasks | 3 files |
+
+## Decisions
+
+- [Phase 25]: Restriction par module portée par la ligne household_members (managed_modules text[]), pas par households — D-05 par enfant
+- [Phase 25]: CHECK de format uniquement (private.has_valid_module_keys de 0140) : la validité sémantique du catalogue reste côté client
+- [Phase 25]: Invariant enfant-⟺-sans-session volontairement ABSENT de 0144 : il rejoint en 0145 après la conversion (les lignes héritées enfant-avec-compte le violeraient)
+
+### Blockers
+
+- test 0139 : assertion de backfill non bornée au foyer (préexistant, non causé par 25-01) — échoue dès qu'un article réel existe ; consigné dans deferred-items.md et WINDOWS.md
