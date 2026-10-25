@@ -2,107 +2,78 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique
-status: planning
-last_updated: "2026-10-25T07:01:12.771Z"
+status: planning — roadmap définie, en attente d'approbation puis /gsd-plan-phase 25
+last_updated: "2026-10-25T09:00:00.000Z"
 last_activity: 2026-10-25
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
 ---
 
----
-gsd_state_version: "1.0"
-status: entre-jalons — tous les plans exécutés, UAT et jalon suivant à arbitrer
-stopped_at: "2026-10-24 : passe qualité UI complète sur la vague design melimelo. Critique Impeccable exécutée deux fois (matin 30/40 → après-midi 33/40, rapports dans .impeccable/critique/) avec corrections livrées au fil : contraste corail, mur de zéros (widgets, héros Anniversaires, stats Courses — c92cb55), titres h1→h2, glyphe Google officiel, bandeau ambre Realtime, menu mobile unifié (feuille basse animée, 05c08e4), illustrations générées des 21 objets de tuiles (9a81f01, a41df8b, docs/OBJETS-TUILES-GEN.md), notifications alignées (7838001), e2e remis au vert 147/147 (52c43a0). Prod rebuildée et validée par l'utilisateur le 24/10. Poussé sur main jusqu'à c92cb55."
-last_updated: "2026-10-24T18:15:00Z"
-
-progress:
-  # Vestige désynchronisé — la source de vérité est .planning/ROADMAP.md.
-  total_phases: 24
-  completed_phases: 24
-  percent: 100
-
-# ATTENTION — RÉÉCRITURE DU 24/10/2026 : le corps historique de ce fichier
-
-# (journal des phases 1 à 24, incident migrate 0055, récits de vérification)
-
-# a été écrasé lors d'une mise à jour maladroite ; seules les ~60 premières
-
-# lignes, capturées dans la session avant l'écrasement, ont pu être
-
-# restaurées ci-dessous. La queue du journal est PERDUE. Les récits
-
-# complets restent disponibles dans les fichiers de phase
-
-# (.planning/phases/*/ *-SUMMARY.md, *-VERIFICATION.md) et dans
-
-# docs/RETROSPECTIVE.md — relire ceux-ci plutôt que ce fichier pour
-
-# l'historique. Leçon : `.planning/` n'est pas versionné ; proposer son
-
-# versionnement (ou au minimum une sauvegarde avant réécriture).
-
-# En attente d'arbitrage utilisateur :
-
-# 1. UAT des phases récentes (21-24) + du travail design hors cycle ;
-
-# 2. clôture du jalon courant (complete-milestone + summary) ;
-
-# 3. ouverture du jalon suivant (vague 4 ?) — décisions produit ouvertes
-
-#    listées dans AGENTS.md §9.
-
-# Reste UI mineur : césures « Anniver-saires » dans la feuille mobile
-
-# (décision de feel), animations de sortie des feuilles (forceMount).
-
-# STATE
-
-Statut : Phase 2 Ardoises — TERMINÉE et testable le 2026-10-02.
-- SQL : 0055→0065 appliquées, 19/19 suites vertes (0001 + 0018), statique vert.
-- Edge : ardoise-invite (create-ardoise/create/revoke/summary/join/redeem-guest)
-  + settlement (membre + invité), validées en direct sur la stack locale.
-- Frontend : liste + rejoindre (membre/invité) + détail 3 onglets + formulaire
-  invités + partage (Copier/Partager/Régénérer/Arrêter) + couverture Storage.
-- Vérifié : typecheck vert, build vert, Vitest ardoise 25/25, e2e ardoise 2/2.
-- En cours : suite Vitest complète (fond).
-- Suivi : lecture invité complète via Edge ; INVITE_TOKEN_HMAC_SECRET absent
-  du .env local (household-invite KO en local, préexistant).
-- Commit 2b3f278 poussé sur origin/main le 2026-10-02 (phases 1/1b/2 +
-  correctifs UI + camembert shares-pie ; Vitest 347/347, SQL 19/19).
-- À faire côté test réel : restaurer app/.env.local depuis
-  /tmp/opencode/env.local.stack, `npm run dev`, comptes alice-cal/bob-cal.
-- Incident migrate distant 2026-10-03 : 0055 (backfill puis SET NOT NULL même
-  txn) rejetée `pending trigger events` — table pleine en réel, vide en
-  recette. Corrigée par découpe `commit; begin;` (issue identique), contrôle
-  statique n°8 ajouté et prouvé rouge→vert, repro mécanisme sur schéma local
-  (lignes zz_repro_*, zéro résidu). Récit : docs/RETROSPECTIVE.md §11.
-  Relance distante attendue : `sh scripts/migrate.sh` (0055 non journalée,
-  0056→0065 en attente).
-- Prochain : Phase 3 Courses scan (04-courses-scan.md).
-- Membres d'ardoise 2026-10-03 (f5af746) : sélection à la création
-  (0066 p_member_ids, Edge create-ardoise memberIds), dialogue ajout/retrait
-  via bouton Inviter (RLS admin déjà en place). Vitest ardoise 31/31,
-  test-db 20/20. Relance distante : migrate + deploy-functions +
-  recreate functions + rebuild frontend.
-- Phase 3 Courses scan PLANIFIÉE le 2026-10-05 : CONTEXT (D-01…D-09 verrouillées,
-  catalogue par foyer, pas de proxy Edge, attribution jeremymaillot@gmail.com),
-  RESEARCH (OFF v2 direct, 404 = création manuelle, 15 req/min, X-User-Agent),
-  3 plans en 3 vagues (.planning/phases/04-courses-scan/04-0{1,2,3}-PLAN.md),
-  vérification OK (0 bloquant, 2 infos). Prêt à exécuter.
-- Phase 3 EXÉCUTÉE et CLÔTURÉE le 2026-10-05 : 7 commits (tracer 0071, scan UI,
-  photos privées), vérification PASSED (D-01…D-09 livrées), revue 5 critiques
-  corrigées (0072 trigger foyer + allowlist images + off-by-one + liste
-  destinataire + écriture atomique ; WR-01/04/10/11 aussi), chaîne complète
-  [fin de la partie restaurée — la suite du journal (phases 4 à 24) est
-  perdue ; se référer aux SUMMARY/VERIFICATION de chaque phase.]
+# STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (25 — Profils enfants gérés, première phase du jalon v1.0)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-25 — Milestone v1.0 started
+Status: Roadmap v1.0 créée (2026-10-25), en attente d'approbation utilisateur
+Progress: 0/7 phases — █████░░░░░░░░░░░░░░░ 0 %
+
+## Références du jalon v1.0
+
+- ROADS : .planning/ROADMAP.md (phases 25-31, numérotation continue de v0.9.0 qui s'est arrêté à 24)
+- Requirements : .planning/REQUIREMENTS.md (33 exigences v1.0, table de traçabilité remplie)
+- Recherche : .planning/research/SUMMARY.md (confiance HIGH codebase / MEDIUM RGPD-SMTP)
+
+## Portes dures de séquence (non négociables)
+
+1. Phase 25 (identité enfants) AVANT 26-27 (RGPD) — le périmètre « sans session »
+   doit être stabilisé avant de définir qui correspond à quelle donnée.
+2. Phase 26 (export) AVANT 27 (suppression) — l'export est proposé avant l'offre.
+3. Phase 28 : l'exercice de restauration consigné (OPS-02) conditionne l'ouverture
+   publique. Cette phase peut courir en parallèle avec 26/27/29.
+4. Phase 31 (inscriptions ouvertes) = DERNIERE : porte OUV-07 = suppression vivante (27)
+   + restauration consignée (28) + preuve SMTP réelle Gmail/Outlook.
+5. Phase 29 (messagerie) bénéficie de 25 (member-picker incluant les enfants) ;
+   orthogonale autrement.
+6. Phase 30 (hygiène/dettes) placée avant la porte d'ouverture — aucun go-live public
+   sur une dette connue.
+
+## Accumulated Context
+
+- Décisions héritées v0.9.0 : tous les 20 espaces en prod, e2e 147/147, audits
+  v0.9.0 PASSED ; contrats enfants 0113-0116 (à re-diligencier en plan 25) ;
+  RPC conversations 0041 ; chaîne push `dispatch_messages`→`push-notify` existante ;
+  estampille de build à quatre canaux (phase 24).
+- Frontières tranchées par la recherche (powering plans) :
+  - Suppression J+30 purement SQL/pg_cron (jamais HTTP depuis cron — frontière non
+    testée par test-db.sh), manifest médias construit à la demande.
+  - Accusé de lecture : watermark par membre, jamais une écriture par message
+    (pitfall 7 — décision au niveau de la migration, pas un retrofit).
+  - Realtime self-hosted : `alter publication supabase_realtime` obligatoire,
+    prouvé par souscription.
+  - MTA : Stalwart v0.16.4 (pas de SaaS SMTP — contredit self-hosted/RGPD).
+  - Table `gdpr_export_jobs` + bucket `gdpr-exports` (TTL 24h URL, purge 7 j cron).
+  - Flag-deliverability : réputation IP — preuve de réception réelle exigée sur le
+    domaine cible, fallback relais SMTP dédié à prouver, pas à pré-installer.
+- Indicateurs de suivi : 925+ tests Vitest, test-db 64/64, e2e 147/147 (baseline à
+  maintenir à chaque phase).
+- Pièces pointées à investiguer pendant les plans : migrations 0113-0116 (profils
+  enfants) et RPC conversations 0041 (à relire pendant plan 25) ; audit FK vers
+`auth.users` (phase 27) ; `household_invite_tokens` (déjà durcies 0082/0083, plan 31).
+
+## Session Continuity
+
+- Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
+  (recherche approfondie recommandée selon research/SUMMARY.md pour 25, 26, 27, 31).
+- Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
+  24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
+- .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
+  recherches vivent sur le disque uniquement. Ne pas annoncer de commit de ces fichiers.
+
+---
+Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
+(UAT utilisateur validée). Archivé dans .planning/milestones/v0.9.0-ROADMAP.md.

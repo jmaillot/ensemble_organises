@@ -1,108 +1,137 @@
-# ROADMAP — plan figé 2026-10-02
+# Roadmap: Ensemble & Organisés
 
-- [x] Phase 1 — Calendrier (PHASES/01-calendrier.md) : calendriers Commun/Perso, catégories Repas/Médical/École/Sport+custom, vues Liste/Jour/Semaine/Mois, cache fériés/vacances API + zone A/B/C. (completed 2026-10-06)
-  **Plans:** 5 plans (vagues 1→3 + clôture gaps)
-  - [x] 01-01-PLAN.md — tracer Perso : gate D-01 + RLS invisibilité totale 0084 + Perso auto 0085 + calendrier explicite
-  - [x] 01-02-PLAN.md — serveur : garde catégories 0086 + Edge refresh-calendrier-ref + cron Vault 0087
-  - [x] 01-03-PLAN.md — frontend : useRefDays cache base + FilterBar/couches verrouillées + confirmation + zone scolaire
-  - [x] 01-04-PLAN.md — preuves : suite 0017 + e2e deux comptes + unitaires + chaîne 2.7
-   - [x] 01-05-PLAN.md — clôture gaps (gap_closure, vague 1) : gating enfant ModuleShell+agenda (D-06), resolver visibility-first (D-03), vacances scopées année (D-13). EXÉCUTÉ le 2026-10-06 (35c4e52, 811de4d, e96e8db + SUMMARY) : 43/43 tests calendrier, typecheck+build verts, 1 déviation Rule 1 (clause chevauchement D-13).
-- [x] Phase 1b — Dossiers (PHASES/02-dossiers.md) : task_lists/note_folders/routine_folders, Général, filtre assigné. (completed 2026-10-06)
-- [x] Phase 2 — Ardoises (PHASES/03-ardoises.md) : N ardoises + guests externes code, Edge HMAC, 3 onglets. (completed 2026-10-06)
-- [x] Phase 3 — Courses scan (PHASES/04-courses-scan.md) : products foyer + OpenFoodFacts. TERMINÉE le 2026-10-05 (contexte D-01…D-09, recherche OFF direct, 3 plans/3 vagues, exécution complète, vérification PASSED, revue 5 critiques corrigées — voir §12).
-- [x] Phase 4 — Cadeaux/Contacts (PHASES/05-cadeaux-contacts.md) : gift_ideas + invites code + contacts. (completed 2026-10-06)
-  **Plans:** 5 plans (vagues 1→3)
-  - [x] 05-01-PLAN.md — fondations SQL gift_ideas + contacts (0076/0077, tests 0024/0025-listes)
-  - [x] 05-02-PLAN.md — miroir birthdays + invites RPC + vue masquee (0078/0079/0080, tests 0025-miroir/0026)
-  - [x] 05-03-PLAN.md — Edge gift-list-invite user-only + secret + appel client
-  - [x] 05-04-PLAN.md — UI cadeaux tabs + idees + promotion + partage code
-  - [x] 05-05-PLAN.md — UI contacts + agregation anniversaires + e2e + chaine 2.7
-- [x] Phase 5 — Cadeaux invites (PHASES/06-cadeaux-invites.md) : envoi email SMTP + invité anonyme nom + réserver (override OQ-1 acté 2026-10-06). VERIFIED & CLOSED 2026-10-08 : UAT 3/3 pass (scan invité, vrai email, envoi TLS prod), 13 gaps G-06-* fermés (plans 06-04→06-14), D-04 amendée (part reservation).
-  **Plans:** 5 plans (vagues 1→5, tracer-first + 2 gap-closure UAT 2026-10-06)
-  - [x] 06-01-PLAN.md — tracer réserve anonyme : checkpoint schéma D-05 + migration 0089 + preuves 0029 + Edge guest-view/guest-reserve publishable
-  - [x] 06-02-PLAN.md — send-email : action Edge user-only fail-closed + SMTP env + gabarit testable + preuve Inbucket (D-01…D-04)
-  - [x] 06-03-PLAN.md — UI + preuves : helpers invité sessionless + page invitée + dialogue envoi + libération organisateur + Vitest/e2e/chaîne complète
-  - [x] 06-04-PLAN.md — gap G-06-1a : guest-view porte url + photoUrl éphémère signée (0092/0032), lignes invité photo + lien « Voir », masquage D-07 intact. EXÉCUTÉ le 2026-10-07 (f944f76, d9f5f15, 49855f1) : statique vert, DB 35/35, Edge redéployé, Vitest 37/37, build + e2e 8/8 verts.
-  - [x] 06-05-PLAN.md — gap G-06-1b : choix explicite connecté (rejoindre via compte inchangé OU continuer sans lier, withoutSession T-06-11) + preuves. EXÉCUTÉ le 2026-10-07 (50f07be, b2f2144) : typecheck, Vitest 40/40, build + e2e 8/8 verts. Différé explicite : fusion inter-foyers, RLS, onboarding.
-  - [x] 06-06-PLAN.md — gap G-06-1a-bis (retour UAT 2026-10-07) : lignes invité expansibles au tap (grande photo + commentaire + prix + lien Voir), réserve joignable plié/déplié, clavier/lecteur d'écran, frontend only. EXÉCUTÉ le 2026-10-07 (aaa3f5b, 60aacf9) : typecheck, Vitest 44/44, build + e2e 8/8 verts.
-  - [x] 06-07-PLAN.md — gap G-06-1b-bis (retour UAT 2026-10-07, ex-différé 06-05) : listes inter-foyers rejointes visibles avec badge origine + réserve attribuée serveur (member-reserve Edge préféré, jamais d'élargissement RLS), preuves 0033 incl. négatives. EXÉCUTÉ le 2026-10-07 (eab6aeb 0093+0094+0033+Edge, c1513ed snapshot/badge, 2fdf29c e2e 10/10) : pivot 0093→0094 (nom profil vérifié, garde 0083 restaurée) ; statique 135 fns + DB 36/36 + typecheck + Vitest 56/56 + build verts. Correctif orchestrateur ed60ad3 (flake promouvoir-idée : findBy async, 8/8 suites).
-  - [x] 06-08-PLAN.md — gap G-06-1c (demande UAT 2026-10-07, option « nom seul, liste sortie ») : bouton « Quitter cette liste » sur listes étrangères + modale (réserves-nom conservées, retour via lien) + action Edge member-leave self-only + preuves 0034 incl. négatives. EXÉCUTÉ le 2026-10-07 (429f8ff RPC 0095 + Edge + 0034, dea5f32 contrôle + modale, 6925a77 e2e) : statique 136 fns + DB 37/37 + typecheck + Vitest 72/72 + build + e2e 14/14 verts.
-  - [x] 06-09-PLAN.md — gap G-06-1d (constat UAT 2026-10-07 : couper les parts ne coupe pas le lien à code) : avertissement parts-vs-code dans le dialogue + rappel lien actif avec révocation directe à la sauvegarde zéro-part ; copy-only, frontend only. EXÉCUTÉ le 2026-10-07 (c678f63 dialogue, 3ad2f54 suite 7/7) : typecheck, build, e2e 14/14 verts.
-  - [x] 06-10-PLAN.md — gap G-06-1e (demande UAT 2026-10-07 : champ email redondant vérifié — redeem 0082 et send-email créent la part seuls) : suppression du champ « Inviter un proche » + branche submit (membres seuls), données existantes intactes, frontend only. EXÉCUTÉ le 2026-10-07 (fda1082 dialogue, 761d0dd suite) : typecheck, Vitest 73/73, build + e2e 14/14 verts.
-  - [x] 06-11-PLAN.md — gap G-06-1f (demande UAT 2026-10-07 : navigation toggles) : sélection liste en toggles (fini le déroulant), « Créer une liste » en haut comme « Noter une idée », filtre Toutes/Privées/Foyer/Partagées automatique (étrangères hors Foyer) ; présentation seule, frontend only. EXÉCUTÉ le 2026-10-07 (2c66d51 sélecteur + bouton haut, 69f223e filtre + preuves) : typecheck, Vitest 74/74, build + e2e 14/14 verts.
-  - [x] 06-12-PLAN.md — gap G-06-20 (constat UAT 2026-10-07 : décocher « Reçu » cache le badge mais l'article reste réservé côté invités) : décochage proprio sur article réservé → modale de libération existante (plus d'état silencieux), décochage sur libre → simple interrupteur, « Libérer » devient « Libérer la réserve » ; frontend only. EXÉCUTÉ le 2026-10-07 (ad74c0b délégation + libellé, f99b56e preuves) : invariant relu OK, typecheck, Vitest 77/77, build + e2e 14/14 verts.
-  - [x] 06-13-PLAN.md — gap G-06-21 (demande UAT 2026-10-07 : rangement + réservation par défaut) : barre d'outils unique Partager/Supprimer/Quitter/badge, sélecteur labellisé taille sm comme les filtres, partage = réservation seule (dialog + send-email, D-04 amendée, parts lecture existantes honorées) ; client + 1 valeur Edge. EXÉCUTÉ le 2026-10-07 (f00e87a barre + sélecteur, 186736c réservation par défaut, 614614d preuves) : typecheck, Vitest 77/77, Edge redéployé, build + e2e 14/14 verts.
-  - [x] 06-14-PLAN.md — gaps G-06-22/G-06-23/G-06-24 (retours UAT 2026-10-07) : suppression du bouton « Libérer la réserve » redondant (décochage = voie unique), libération de sa propre réserve inter-foyers côté serveur (0096 + 0035, conflit 409 propre), Quitter rouge sous le sélecteur + badge « Liste partagée » retiré. EXÉCUTÉ le 2026-10-07 (a9189f1, 54933a2, 123051e, f878a0e) : statique 136 fns + DB 38/38 + typecheck + Vitest 80/80 + Edge redéployé + build + e2e 16/16 verts.
-- [x] Phase 6 — Contacts privés (07-contacts-prives) : fuite miroir anniversaires bouchée (Famille seule + purge) + déplacement perso→Famille avec modale (OQ-2 amendée → proprio seul, admins exclus ; blind-delete accepté + différé). VERIFIED & CLOSED 2026-10-08 : UAT 3/3 pass sur ubuntu1 rebuildé (perso invisible, déplacement→miroir, admin aveugle), 0036/0037 + Vitest 88/88 + e2e 20/20 verts.
-  **Plans:** 2 plans (vague 1 : fuite + déplacement ; vague 2 : OQ-2 amendée → proprio seul, admins exclus en lecture/écriture)
-  - [x] 07-01-PLAN.md — fuite + déplacement : preuve rouge→vert, migration 0097 + suite 0036, affordance déplacement + modale, audit voies sœurs, chaîne complète.
-  - [x] 07-02-PLAN.md — resserrement proprio-only : preuve accès admin puis restriction (0098 + 0037), suppression aveugle admin conservée et documentée, re-vérification client, chaîne complète. EXÉCUTÉ le 2026-10-08 (1c90787 gates + 0037 + 0025 amendé, 5f92457 snapshot admin, fdcc8a3 e2e) : statique 136 fns + DB 40/40 + typecheck + Vitest 88/88 + build + e2e 20/20 verts. Constat : blind-delete admin inopérant sur lignes illisibles (PG exige visibilité) — accepté + différé (cascade départs prouvée).
-- [x] Phase 7 — Messages (08-messages) : bug image enfant + preuves RLS, éditer/supprimer/quitter + pagination, suppression auteur seul, tombstone + archives (figées), annonces départ/arrivée + icônes, réadhésion, périodes d'absence, archivage-pour-tous admin. VERIFIED & CLOSED 2026-10-09 : UAT 8/8 pass sur ubuntu1 rebuildé, 0 issue.
-  **Plans:** 2 plans (vague 1 : serveur + preuves ; vague 2 : client)
-  - [x] 08-01-PLAN.md — upload enfant + matrice RLS : preuve rouge, migration 0099 + suite 0038, verrou UI messages. EXÉCUTÉ le 2026-10-08 (14555b4 dépôt par appartenance au fil, 6fb6539 matrice 0038, c2d5a8d test image enfant) : 403 prouvé rouge→vert, statique 137 fns + DB 41/41 + typecheck + Vitest 9/9 + build verts.
-  - [x] 08-02-PLAN.md — affordances + pagination : éditer/supprimer/quitter avec modales, chargement par conversation + « Charger plus », preuves. EXÉCUTÉ le 2026-10-08 (013fee8 affordances, 8383f95 pagination, 2c67ec7 preuves) : typecheck, Vitest 636/636 (17/17 messages), build + e2e 20/20 verts.
-  - [x] 08-03-PLAN.md — retours re-test : suppression auteur seul (RLS + UI, thread-delete admin conservé), départ = pierre tombale + archives lecture seule + retrait perso (0099→0100 + 0039). EXÉCUTÉ le 2026-10-08 (e35d66a RLS + tombe, 987adb0 UI + archives, eabaaa6 preuves) : statique 139 fns + DB 42/42 + typecheck + Vitest 19/19 messages + build + e2e 20/20 verts.
-  - [x] 08-04-PLAN.md — retours re-test : annonce de départ figée serveur dans le fil (0101 + 0040, infalsifiable, sans push/non-lus) + actions bulle en icônes compactes sur la ligne du texte. EXÉCUTÉ le 2026-10-09 (68f1f00 trigger + 0040, 5795fa0 rendu + icônes, 0c439b1 preuves) : silence prouvé rouge, statique 140 fns + DB 43/43 + typecheck + Vitest 23/23 messages + build + e2e 20/20 verts (+1 flake pagination heure-du-jour corrigé au passage).
-  - [x] 08-05-PLAN.md — retour re-test : archives figées au départ (borne serveur left_at, 0102 + 0041, fenêtre mobile à la réadhésion) + intitulé honnête des archives. EXÉCUTÉ le 2026-10-09 (f0cbd21 borne + 0041, b750168 intitulé + preuves) : live prouvé rouge, statique 141 fns + DB 44/44 + typecheck + Vitest 25/25 messages + build + e2e 20/20 verts. 2 bugs trouvés+corrigés en cours (shadowing EXISTS admettait tout ; REVOKE verrouillait tous les lecteurs — GRANT explicite).
-  - [x] 08-06-PLAN.md — retours re-test : annonce d'arrivée figée (0103 + 0042, création silencieuse) + notice solo au compositeur (indication, envoi permis). EXÉCUTÉ le 2026-10-09 (b09a94c règle xmin + 0042, d8a3aac notice, 7af76ce preuves) : statique 142 fns + DB 45/45 + typecheck + Vitest 31/31 messages + build + e2e 20/20 verts.
-  - [x] 08-07-PLAN.md — retour re-test : réadhésion bloquée (supprimer+recréer refusé aux non-admins) → effacement left_at en un update habilité + annonce (0104 + 0043). EXÉCUTÉ le 2026-10-09 (ac34037 politique + annonce + 0043, 809380e client update) : blocage prouvé rouge (0 ligne + refus), statique 143 fns + DB 46/46 + typecheck + Vitest 37/37 messages + build + e2e 20/20 verts.
-  - [x] 08-08-PLAN.md — retour re-test (amende D-12) : périodes d'absence mémorisées par triggers, lectures bornées par couverture (0105 + 0044, trous cumulés, pré-existant documenté). EXÉCUTÉ le 2026-10-09 (92976ee périodes + 0044 + contrat 0001, 4d1ac4b preuves rendu) : RED prouvé (0 attendu, 1 obtenu), statique 147 fns + DB 47/47 + typecheck + Vitest 38/38 messages + build + e2e 20/20 verts.
-  - [x] 08-09-PLAN.md — retour re-test : suppression admin = archivage-pour-tous (RPC atomique 0106 + 0045, bornes par membre, destruction retirée) + contrôle « Archiver » avec modale honnête. EXÉCUTÉ le 2026-10-09 (8a6d0e1 RPC + 0045 + politique destroy retirée, 2bbd3d1 contrôle + modale) : destruction prouvée rouge, trou NULL-guard corrigé en 0107, statique 148 fns + DB 48/48 + typecheck + Vitest 43/43 messages + build + e2e 20/20 verts. Restauration = différé explicite.
-- [x] Phase 8 — PWA offline (09-pwa-offline) : **7 plans exécutés**. Le mode offline de données (repli lectures, file sur échec, panneau honnête, synchro) a été construit puis **RETIRÉ** sur demande UAT le 2026-10-12 (plan 09-07, D-10) — il ne reste que l'installabilité PWA, le push et la démo. VERIFIED & CLOSED 2026-10-19 : `09-UAT.md` close (4 pass, 3 sautés, 0 bloqué) et M-01/M-02 soldés — notification reçue en production le 2026-10-19, `scripts/test-dispatch-push.sh` : `delivered 3`, `consumed 1`, clés VAPID en place dans le `.env` de la stack.
-  **Plans:** 7 plans (vagues 1→2 : données offline puis shell + synchro fond ; retrait en 09-07)
-  - [x] 09-01-PLAN.md — repli lectures + file élargie + panneau honnête + tests file/synchro. EXÉCUTÉ le 2026-10-08 (e94f25b repli cache + flag périmé, 63ad7d2 file sur échec + jointures + panneau honnête) : typecheck, Vitest data+paramètres 59/59, build + e2e 20/20 verts.
-  - [x] 09-02-PLAN.md — icônes + manifeste unique + SW aligné + preuve Lighthouse, sync handler, docs/PWA.md. EXÉCUTÉ le 2026-10-08 (28760b2 installabilité + Lighthouse PWA 1.0, ae4b1f7 sync + docs) : typecheck, Vitest 85, build + e2e 20/20 verts. Reste opérateur : M-01 preuve push prod, M-02 VAPID (checklist docs/PWA.md).
-  - [x] 09-03-PLAN.md — retour re-test (premier lancement hors ligne) : état cache-vide explicite + réessai, créations en file visibles jusqu'au rejeu (tâches d'abord). EXÉCUTÉ le 2026-10-09 (42f8a0e état + rétention + confirmation en file, a77c06b preuves) : 2 baselines rouges, typecheck, suite complète 684/684, build + e2e 20/20 verts. Reste : état explicite hors tâches (09-05).
-  - [x] 09-04-PLAN.md — demande UAT : bouton « Synchroniser le foyer » + synchro périodique auto (app ouverte, en ligne) sur les chemins éprouvés. EXÉCUTÉ le 2026-10-09 (2073cfd registre 50 tables + driver file-d'abord, 178fd27 bouton + timer 15 min) : typecheck, Vitest data+paramètres 66/66, build + e2e 20/20 verts.
-  - [x] 09-05-PLAN.md — demande UAT (tout vérifier) : audit puis rollout états offline honnêtes sur tous les modules (tâches = référence), preuves par module, suite COMPLÈTE verte. EXÉCUTÉ le 2026-10-09 (24fbb80 rollout 17 pages, 19adb2d 30 preuves) : typecheck, suite complète 720/720, build + e2e 20/20 verts. Limites actées : créations Edge/RPC non enfilables (pages honnêtes), voir 09-CONTEXT.
-  - [x] 09-06-PLAN.md — retour re-test (navigation figée hors ligne) : préchargement idle des pages + garde d'erreur avec réessai par route + preuve couverture précache au build. EXÉCUTÉ le 2026-10-09 (dfb8e07 preload + LazyRoute retry, 993fa31 preuve précache 69/69 JS + 31/31 pages) : typecheck, 47/47 src/app, suite complète 730/730 après correctif flake calendrier (835aa66 findBy pastille, même classe que ed60ad3), build + e2e 20/20 verts.
-  - [x] 09-07-PLAN.md — retrait demandé UAT 2026-10-12 : suppression du mode offline données (cache/file/repli/synchro/panneau/états), PWA installable + push + démo conservés, docs à jour. EXÉCUTÉ le 2026-10-12 (4e452e8 passe directe + revert 17 pages/18 suites, ef009bb UI + SW précache+push + docs ; 59 fichiers +155/−3448) : import-proof propre, typecheck, suite 669/672 (3 flakes use-notifications heure-du-jour prouvés antérieurs sur pristine 5df6aa2), build + e2e 20/20 verts. Amendements AGENTS.md/BACKEND.md appliqués côté orchestrateur.
-- [x] Phase 9 — Notifications messages (10-notifications) : cloche affamée (diagnostic + correctif + verrou) livrée, verdict push-serveur « complet-en-attente-des-clés », puis soldé en production. VERIFIED & CLOSED 2026-10-19 : `10-UAT.md` **10/10 passés, 0 issue**. Deux alertes de l'UAT tranchées : G-10-7 n'était pas un défaut (préférence `message_notifications_enabled` coupée sur le compte admin), G-10-8 en était un — le job `eo-push-messages` échouait à chaque passage (liste de colonnes sur `jsonb_array_elements`, forme recopiée de 0019 en 0042), corrigé par `0130`, un test qui exécute le dispatch et le contrôle statique 9.
-  **Plans:** 3 plans (dont 1 sans objet — RED non reproduit)
-  - [x] 10-01-PLAN.md — diagnostic cloche + correctif + régressions + verdict push (M-01/M-02 restent opérateur). EXÉCUTÉ le 2026-10-12 (6482248 realtime shell, 306ac74 verrou + verdict) : cloche affamée prouvée rouge→vert (pas de souscription temps réel hors page Messages), typecheck, Vitest 49/49, build + e2e 20/20 verts. Verdict push : complet-en-attente-des-clés.
-  - [x] 10-02-PLAN.md — partants exclus du fan-out push (0108 + 0046, actifs intacts). SANS OBJET le 2026-10-12 : RED non reproduit — la 0100 redéfinit déjà le ventilateur en actifs seuls, prouvé par 0039/0041 ; DB 48/48 + typecheck + 49/49 verts, zéro commit (stop-and-report correct).
-  - [x] 10-03-PLAN.md — retour UAT : lignes lues auto-masquées sur tous les chemins de marquage (clic, fil ouvert, tout-marquer), réaffichage à l'activité fraîche (même store, horizon inchangé). EXÉCUTÉ le 2026-10-12 (898e84d masquage par transitions, cd7af25 régressions) : typecheck, Vitest 53, build verts.
-- [x] Phase 10 — Cercle (11-cercle) : contenu auteur-seul + suppression auteur-seul + réponses inline + plafonds base. VERIFIED & CLOSED 2026-10-12 : UAT 3/3 pass (édition auteur des deux comptes, suppression auteur seul, plafonds), 0 issue.
-  **Plans:** 2 plans (vague 1 : serveur + preuves ; vague 2 : client)
-  - [x] 11-01-PLAN.md — garde contenu + suppression auteur-ou-admin : preuve rouge, migration 0109 + suite 0047, verrou UI cercle. EXÉCUTÉ le 2026-10-12 (0821f2c garde + 0047, c2e3bee affordance suppression) : réécriture étrangère + suppression auteur refusées puis corrigées (rouge→vert), statique 149 fns + DB 49/49 + typecheck + Vitest 5/5 cercle verts.
-  - [x] 11-02-PLAN.md — affordances auteur + plafonds base : éditer/supprimer avec modales, 4000/2000, preuves. EXÉCUTÉ le 2026-10-12 (82af458 affordances, f8693e8 plafonds, b786ef5 preuves) : typecheck, Vitest 14/14 cercle, build + e2e 20/20 verts.
-  - [x] 11-03-PLAN.md — retour re-test : réponses inline sous chaque post (derniers commentaires + champ d'envoi direct, dialogue conservé pour l'historique). EXÉCUTÉ le 2026-10-12 (05c8786 inline N=2 + compositeur, dafb745 preuves) : typecheck, Vitest 17/17 cercle, build + e2e 28/28 verts.
-  - [x] 11-04-PLAN.md — demande UAT : suppression strictement auteur partout (posts/commentaires/réactions/messages, archive admin conservée comme levier gel-sans-destruction). EXÉCUTÉ le 2026-10-12 (96dbffd RLS + 0052, 7ec5c52 affordances, 15dec52 preuves — numérotés 0117/0052, 0113/0051 pris par le périmètre enfants) : statique 150 fns + DB 54/54 + typecheck + Vitest 61/61 + build + e2e 28/28 verts.
-- [x] Phase 11 — Voyages + Animaux (12-voyages-animaux) : temps réel rallumé + preuves d'isolation, suppressions admin-honnêtes, statut mort retiré, cartes honnêtes, édition suivis, colonnes résumé (fini la ligne magique). VERIFIED & CLOSED 2026-10-12 : UAT 4/4 pass (dont miniatures + persistance 12-04), 0 issue.
-  - [x] 12-03-PLAN.md — demande UAT : couverture voyage téléversable au bucket (chemin stocké, URL signée, champ URL gardé). EXÉCUTÉ le 2026-10-12 (7cd5f1c upload + signées + cleanup, 753919e preuves) : typecheck, Vitest 12/12 voyages, build + e2e 28/28 verts.
-  - [x] 12-04-PLAN.md — retour re-test : miniatures de couverture sur chaque carte voyage (même helper signé, sans-couverture inchangé). EXÉCUTÉ le 2026-10-12 (d64ae9d miniatures, c345c33 preuves) : typecheck, Vitest 13/13 voyages, build + e2e 28/28 verts.
-  **Plans:** 2 plans (vague 1 : serveur + preuves ; vague 2 : client + migration contenu)
-  - [x] 12-01-PLAN.md — publication realtime + matrice d'isolation : appends 0110 + suite 0048, réconciliation abonnés. EXÉCUTÉ le 2026-10-12 (9ac27ce publication, 5a227db matrice) : silence prouvé pré-migration, statique 149 fns + DB 50/50 verts. Observé hors scope : birthdays/contacts/event_categories/notification_reads souscrits mais non publiés — passe ultérieure.
-  - [x] 12-02-PLAN.md — honnêteté client + colonnes résumé : gates suppressions, statut retiré, cartes/garde cover, édition + realtime + colonnes (0111 + 0049), preuves. EXÉCUTÉ le 2026-10-12 (6a33fbd voyages, 0d880c0 colonnes + backfill, 6fdbd44 client animaux, 8c426d7 preuves) : statique 149 fns + DB 51/51 + typecheck + Vitest 23/23 + build + e2e 20/20 verts. Lecteur legacy documenté (lignes pré-backfill).
-- [x] Phase 12 — Hygiène données (13-hygiene-donnees) : preuves d'isolation 4 tables + garde type foyer, fichiers assainis (paths signés, cleanup, bucket photos), visited préservé, copies honnêtes. VERIFIED & CLOSED 2026-10-13 : UAT 5/5 pass (pièces prestataires, photos adresses, visité+intitulés, garde foyer, textes honnêtes), 0 issue.
-  **Plans:** 2 plans (vague 1 : serveur + preuves ; vague 2 : client)
-  - [x] 13-01-PLAN.md — garde type + matrice d'isolation : preuve rouge, migration 0112 + suite 0050, verrou UI. EXÉCUTÉ le 2026-10-12 (8248442 garde + 0050, 0 référence fantôme en base) : statique 150 fns + DB 52/52 + typecheck + Vitest 15/15 verts.
-  - [x] 13-02-PLAN.md — hygiène fichiers + honnêteté : paths signés + cleanup, bucket photos, visited, labels, sweep copies, preuves. EXÉCUTÉ le 2026-10-12 (2e57d76 paths + cleanup + bucket, e82b4be visited + labels + sweep, 99d8c8d preuves) : typecheck, Vitest 45/45 (8 fichiers), build + e2e 20/20 verts.
-- [x] Phase 13 — Périmètre enfants (14-perimetre-enfants) : ardoise/cadeaux/fidelite/prestataires/animaux fermés au rôle enfant (RLS + Edge + preuves), navigation masquée + garde non-autorisé (données enfant masquées, jamais effacées). VERIFIED & CLOSED 2026-10-12 : UAT 3/3 pass (invisibilité tuiles+tiroir, page non-autorisé, reste intact), 0 issue.
-  **Plans:** 2 plans (vague 1 : serveur + preuves ; vague 2 : client)
-  - [x] 14-01-PLAN.md — fermeture serveur : lectures refusées + écritures vérifiées + Edge rôle + audit inter-modules (0113 + 0051). EXÉCUTÉ le 2026-10-12 (0df0827 gates 0113→0116 + 0051 + 5 suites amendées, 1c343ba child-guard Edge + Vitest 9/9) : statique 150 fns + DB 53/53 (dont 0018 rouge pré-existant réparé) + smoke JWT enfant réel + Edge redéployée. Reliquat : widget activité dashboard lit expenses (0 lignes enfant — à masquer en 14-02).
-  - [x] 14-02-PLAN.md — masquage client : tuiles/tiroir/widgets + garde non-autorisé + audit agrégations, suite COMPLÈTE. EXÉCUTÉ le 2026-10-12 (cfd9ee1 masquage 5 modules + handoff dashboard, 1fe2eb2 garde + audit, bce12fb e2e enfant) : typecheck, suite complète 89 fichiers/748 tests, build + e2e 28/28 verts.
-- [x] Phase 14 — Espace voyage (15-voyage-espace) : conteneur collaboratif (création + fiche + paramètres + invités code), sous-onglets étanches, budget ardoise liée, fermeture douce. VERIFIED & CLOSED 2026-10-13 : UAT 8/8 pass (création+fiche, liste+navigation, étanchéité, membres admin, partage mémorisé, budget+camembert, contenus enrichis, cycle de vie), 0 issue. Correctifs post-plans : 0119 enfants participants, 0120 membres cochables, 0121 créateur dépense + Divers voyage (retour liste, toggles, photos).
-  **Plans:** 4 plans (vagues 1→4 strictement séquentielles)
-  - [x] 15-01-PLAN.md — socle serveur : 0118 (membres/invités/onglets/RPC/atomique) + 0053 + Edge trip-invite. EXÉCUTÉ le 2026-10-12 (aef7507 schéma + RLS, d11b620 RPC + oracle + dépenses invités, 51069e4 Edge) : statique 170 fns + DB 55/55 + Edge Healthy + smoke oracle uniforme verts. 3 vrais bugs corrigés (admin sans-membre invisible, pgcrypto non qualifié, is_closed client-moddable → garde serveur). Reste opérateur : TRIP_INVITE_HMAC_SECRET en prod, purge comptes smoke locaux.
-  - [x] 15-02-PLAN.md — coquille UI : création + fiche + paramètres + partage + invité + seeds démo. EXÉCUTÉ le 2026-10-12 (2112fde création→fiche, e1df68c Infos + Paramètres, a23d222 partage + invité + seeds) : typecheck, Vitest 45/45 voyages, suite 795/795, build verts. Écarts : actions close/reopen Edge ajoutées (manquantes), 5 lecteurs foyer re-scopés trip_id NULL, cascade-delete retirée (D-08).
-  - [x] 15-03-PLAN.md — contenu onglets : 4 forks tripId + budget ardoise tel quel. EXÉCUTÉ le 2026-10-12 (f30332a tâches, cd05631 courses/notes/adresses, 6f0573e budget wrapper) : composants prouvés intacts (fork seul côté voyages), typecheck, Vitest 76/76 voyages, suite 826/826, build verts.
-  - [x] 15-04-PLAN.md — preuve Playwright : parcours demo desktop + mobile + chaîne verte. EXÉCUTÉ le 2026-10-12 (b8f3106 parcours 12/12 desktop+mobile, 3d4a65b navigation synchrone) : bug bloquant trouvé+corrigé (transitions RR8 suspendues sur chunk paresseux = navigation figée URL à jour, 450 rendus non-commités/s ; useTransitions={false}), statique 170 fns + DB 55/55 + typecheck + Vitest 826/826 + build + e2e 97 passés/5 skips/0 échec verts.
+## Milestone: v1.0 — Mise en ligne publique (phases 25-31)
 
-Ordre d'exécution : 1 → 1b → 2 → 3 → 4. Aucun déploiement sans feu vert.
+> Jalon v1.0 : profils enfants gérés, RGPD (export + suppression de compte),
+> exploitation (sauvegardes/supervision/restauration), messagerie v2,
+> hygiène des dettes, puis inscriptions ouvertes en dernier.
+> Les phases 1-24 relèvent du jalon v0.9.0 (archivé dans
+> .planning/milestones/v0.9.0-ROADMAP.md).
+> **Portes dures de séquence :** le renversement d'identité (Phase 25) précède
+> toute mécanique de suppression (26-27) ; l'exercice de restauration consigné
+> (Phase 28) et la voie de suppression vivante (27) précèdent l'ouverture
+> publique (Phase 31 — OUV-07, dernière exigence du jalon).
+> *Constraints: phases ordered by dependency gates, not calendar.*
 
-## Jalon v0.9.0 — CLÔTURÉ le 2026-10-24
+## Phases
 
-Phases 16-24 (recettes, mode cuisine, durcissements 18-20, photos d'étapes,
-liens invités, signature média bornée, estampille de build) + la vague
-design melimelo hors cycle (23-24/10) : audit PASSED, UAT utilisateur en
-prod validée. Détail archivé dans .planning/milestones/v0.9.0-ROADMAP.md ;
-audit dans .planning/v0.9.0-MILESTONE-AUDIT.md.
+- [ ] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session
+- [ ] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée
+- [ ] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur
+- [ ] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles
+- [ ] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message
+- [ ] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles
+- [ ] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures
 
-## Jalon suivant — v1.0 (à ouvrir : /gsd-new-milestone)
+## Phase Details
 
-Décisions produit ouvertes à trancher (AGENTS.md §9) : périmètre Messages,
-comptes enfants autonomes, périmètre du token de foyer, RPO/RTO,
-conservation/suppression des données. Dettes consignées par l'audit v0.9.0 :
-Edge generate-routine-occurrences orpheline, semis démo sans photos de
-recette, panneau de version sans message d'estampille absente.
+### Phase 25: Profils enfants gérés par le parent
+**Goal**: Un enfant du foyer existe comme membre (sélecteurs, attributions, traces) sans jamais posséder de compte d'authentification : un parent agit au nom de l'enfant par des opérations serveur explicitement validées, et la filiation le parent → l'enfant reste auditable. C'est le renversement d'identité du jalon : tout ce qui change « qui peut agir » précède toute mécanique de suppression.
+**Depends on**: Rien (première phase du jalon v1.0 ; s'appuie sur les contrats 0113-0116 de v0.9.0)
+**Requirements**: ENF-01, ENF-02, ENF-03, ENF-04, ENF-05
+**Success Criteria** (what must be TRUE):
+  1. Un admin crée, modifie et supprime un profil enfant du foyer depuis l'écran du foyer, et aucun compte d'authentification n'apparaît à la création
+  2. Un parent assigne une tâche, coche une routine et réagit dans le Cercle au nom de l'enfant, et la trace porte l'enfant comme attributaire et le parent comme acteur
+  3. Un enfant apparaît dans les sélecteurs de tâches, d'ardoise, de messagerie et de menu, comme tout autre membre du foyer
+  4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 26: Export RGPD
+**Goal**: Un membre demande et obtient l'archive complète de ses données personnelles (JSON structuré + médias, ZIP) par un lien signé sur bucket privé qui expire, sans bloquer l'application et sans jamais livrer la donnée d'un autre membre — la définition de la portée multi-foyers est tranchée en SPEC produit avant toute requête SQL.
+**Depends on**: Phase 25 (le périmètre d'identité doit être stabilisé avant de définir « à qui correspond la donnée »)
+**Requirements**: RGEX-01, RGEX-02, RGEX-03, RGEX-04
+**Success Criteria** (what must be TRUE):
+  1. Un membre déclenche son export depuis l'application, voit le statut du job d'export et reçoit une notification à l'achèvement
+  2. L'archive téléchargée contient le JSON structuré et les médias du demandeur, via une URL signée sur `gdpr-exports` expirée au plus tard 24 h après l'émission
+  3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
+  4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 27: Suppression de compte RGPD
+**Goal**: La voie de suppression de compte existe et est annulable : sessions tuées immédiatement, surface publique anonymisée, réversibilité 30 j par email de confirmation, alerte à J-7, purge effective J+30 purement SQL/pg_cron — et l'Edge `household-delete` consolidée en une seule voie. L'audit des FK vers `auth.users` et les règles produit (médias co-possédés, profils enfants portés par le parent) sont tranchés en SPEC avant migration.
+**Depends on**: Phase 26 (l'export est proposé avant de offrir la suppression) ; Phase 25 (les profils enfant sautent avec le parent : RGDP-06)
+**Requirements**: RGDP-01, RGDP-02, RGDP-03, RGDP-04, RGDP-05, RGDP-06, RGDP-07
+**Success Criteria** (what must be TRUE):
+  1. Un utilisateur demande la suppression : ses sessions meurent immédiatement, sa surface publique est anonymisée, et un email de confirmation permet d'annuler la demande
+  2. La demande annulée pendant 30 jours restaure le compte selon les règles de la spec, et un email d'alerte part à J-7 avant la purge
+  3. La purge J+30 s'exécute en SQL/pg_cron depuis un manifest de médias construit à la demande — aucun envoi HTTP depuis le cron — et les données partagées au foyer sont anonymisées ou réattribuées, jamais cascadées (audit FK consigné en SPEC)
+  4. Les profils enfants portés par le compte supprimé disparaissent avec lui selon la règle produit annoncée dans la phase, et la chaîne passe par la consolidation de `household-delete` (une seule voie de suppression vivante)
+**Plans**: TBD
+
+### Phase 28: Exploitation — sauvegardes, restauration, supervision
+**Goal**: Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + restic sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, supervision Prometheus/Grafana/Loki avec alertes testées — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
+**Depends on**: Phase 25 (les migrations peuvent s'appliquer sur la pile restaurée ; orthogonale aux phases 26-27)
+**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
+**Success Criteria** (what must be TRUE):
+  1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
+  2. Un exercice de restauration est joué sur un Compose isolé (jamais la prod), le RTO est mesuré et consigné, et le runbook de restauration permet à une autre session de rejouer sans deviner
+  3. Une alerte disque, une alerte certificat, une alerte pg_cron et une alerte erreurs Edge se déclenchent et sont visibles dans la supervision déployée — chacune prouvée par un test déclenché, pas par une promesse de configuration
+  4. `check-cron-health.sh` valide les jobs pg_cron et attrape effectivement une rotation de secret ratée (prouvé rouge→vert)
+  5. RPO, RTO et politique de rétention sont arbitrés et documentés dans `docs/`
+**Plans**: TBD
+
+### Phase 29: Messagerie v2
+**Goal**: La messagerie évolue en v2 humainement utilisable : conversations directes démarrées par RPC avec garde anti-doublon, accusé de lecture par watermark par membre (aucune écriture par message — décision de migration, pas un retrofit), notifications groupées sans contenu de message réutilisant la chaîne push existante, et Realtime dont la publication self-hosted est testée par souscription avant d'être annoncée. La phase bénéficie de la Phase 25 : le member-picker rend les profils enfants correctement.
+**Depends on**: Phase 25 (sélecteur de membres incluant les enfants gérés)
+**Requirements**: MSG-01, MSG-02, MSG-03, MSG-04, MSG-05
+**Success Criteria** (what must be TRUE):
+  1. Un membre démarre une conversation directe depuis un autre membre, un second essai avec le même membre rouvre la conversation existante au lieu d'en créer un doublon
+  2. L'émetteur voit l'accusé de lecture, alimenté par un watermark par membre — aucune écriture par message dans la base
+  3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
+  4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 30: Hygiène du jalon — dettes et résidus
+**Goal**: Les dettes et résidus connus sont fermés avant le go-live public : l'Edge `generate-routine-occurrences` alimente enfin les routines au quotidien, les trois todos hors-ligne tombent (amorçage réseau, compteur, faux état hors-ligne), les semis démo portent des photos de recette, le panneau de version dit quelque chose de crédible sans estampille, et les feuilles mobiles ne césurent plus « Anniver-saires » ni ne régressent visuellement (arbitrage forceMount tranché).
+**Depends on**: Phase 29 (orthogonale ; placée avant la porte d'ouverture pour ne pas livrer un public sur une dette connue)
+**Requirements**: DET-01, DET-02, DET-03, DET-04, DET-05
+**Success Criteria** (what must be TRUE):
+  1. Chaque matin, une occurrence de routine est créée automatiquement (Edge branchée au pg_cron) et visible dans la vue du jour
+  2. L'amorçage d'état réseau fonctionne dès la première navigation, le compteur hors-ligne affiche une valeur juste, et le faux état hors-ligne « 15 » ne réapparaît plus
+  3. Les semis démo embarquent des recettes avec photos illustrant les tuiles et fiches
+  4. Sans estampille de build, le panneau de version affiche un message crédible (jamais « 0.1.0 » inventé) — complément des findings de la phase 24
+  5. Les feuilles mobiles rendent « Anniversaires » sans césure disgracieuse et avec animations de sortie cohérentes, e2e au vert (arbitrage forceMount consigné)
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 31: Inscriptions ouvertes
+**Goal**: Le serveur accueille des étrangers en sécurité et avec une voie de sortie : un MTA auto-hébergé (Stalwart) livrable au domaine (SPF/DKIM/DMARC, preuve de réception réelle sur Gmail et Outlook), confirmations email obligatoires et SMTP GoTrue durci, rate-limit Traefik sur `/auth/v1/signup|token`, invitation pré-auth traversant l'inscription, gouvernance du token de foyer (expiration 30 j défaut, max 10 utilisations, révocation), pages légales en ligne. **Dernière phase du jalon : la porte dure OUV-07 exige la voie de suppression vivante (27), l'exercice de restauration consigné (28) et la preuve SMTP.**
+**Depends on**: Phase 27 (porte : voie de suppression vivante) ; Phase 28 (porte : exercice de restauration + supervision consignés) ; Phase 30 (aucune dette connue au go-live)
+**Requirements**: OUV-01, OUV-02, OUV-03, OUV-04, OUV-05, OUV-06, OUV-07
+**Success Criteria** (what must be TRUE):
+  1. Un email de confirmation envoyé par la stack (MTA auto-hébergé, SPF/DKIM/DMARC en place) est réellement reçu et délivré en boîte de réception sur Gmail ET Outlook — preuve de réception consignée, pas supposée
+  2. Une inscription sans confirmation d'email ne parvient pas à se connecter, et le rate-limit Traefik bloque effectivement les rafales sur `/auth/v1/signup` et `/auth/v1/token` (prouvé par test)
+  3. Un étranger arrivant sur un lien d'invitation voit le pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer ; un admin peut définir l'expiration et le max d'utilisations du token, et le révoquer à tout moment
+  4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
+  5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
+**Plans**: TBD
+**UI hint**: yes
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 25. Profils enfants gérés | 0/? | Not started | - |
+| 26. Export RGPD | 0/? | Not started | - |
+| 27. Suppression de compte RGPD | 0/? | Not started | - |
+| 28. Exploitation | 0/? | Not started | - |
+| 29. Messagerie v2 | 0/? | Not started | - |
+| 30. Hygiène du jalon | 0/? | Not started | - |
+| 31. Inscriptions ouvertes | 0/? | Not started | - |
+
+## Couverture v1.0
+
+38/38 exigences v1.0 mappées (ENF 25, RGEX 26, RGDP 27, OPS 28, MSG 29, DET 30, OUV 31) — aucun orphelin, aucun doublon.
+
+## Portes de séquence (rappel)
+
+- **25 → 26/27** : le renversement d'identité (enfants sans session) précède toute mécanique de suppression.
+- **26 → 27** : l'export est proposé avant l'offre de suppression.
+- **28 → 31** : l'exercice de restauration consigné (OPS-02) conditionne l'ouverture publique.
+- **27 + 28 + 30 → 31** : la porte dure OUV-07 — suppression vivante, restauration consignée, preuve SMTP.
+- **29 ∥ 26/27/28** : la messagerie est orthogonale mais s'appuie sur la Phase 25 (member-picker).
+
+*(Le fichier `REQUIREMENTS.md` porte la table de traçabilité correspondante ; ces fichiers de planification vivent sur le disque uniquement, conformément à la politique du dépôt.)*
