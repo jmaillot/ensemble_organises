@@ -140,6 +140,7 @@ create table if not exists testkit.fx (
   row_id       text
 );
 grant select on testkit.fx to anon, authenticated;
+grant insert on testkit.fx to authenticated;
 comment on table testkit.fx is
   'Fixture de correspondance libellé → identifiants, partagée par les tests SQL.';
 
