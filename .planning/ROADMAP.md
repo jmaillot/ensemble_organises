@@ -34,7 +34,14 @@
   2. Un parent assigne une tâche, coche une routine et réagit dans le Cercle au nom de l'enfant, et la trace porte l'enfant comme attributaire et le parent comme acteur
   3. Un enfant apparaît dans les sélecteurs de tâches, d'ardoise, de messagerie et de menu, comme tout autre membre du foyer
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 25-01-PLAN.md — Migration 0144 : socle schématique (managed_modules D-06 + birth_date) avec tests SQL
+- [ ] 25-02-PLAN.md — Migration 0145 : conversion RPC des comptes enfants (checkpoint D-18), invariant chk_members_managed_child, fermeture des chemins 0006/0036, migrate [BLOCKING]
+- [ ] 25-03-PLAN.md — Migration 0146 : gardes de module (replace_*), RPC complete_routine_occurrence, Cercle DELETE modération (D-12), meal_entries trigger, push adultes (D-23), liaison adulte→enfant (D-19/D-20)
+- [ ] 25-04-PLAN.md — Frontend : useIsAdult (D-01), CRUD enfants members-panel, setManagedModules, rebranchage RPC routines (D-13), modération Cercle
+- [ ] 25-05-PLAN.md — Correction documentaire : alignement REQUIREMENTS.md/ROADMAP.md sur D-12 (modération, pas réaction)
 **UI hint**: yes
 
 ### Phase 26: Export RGPD
