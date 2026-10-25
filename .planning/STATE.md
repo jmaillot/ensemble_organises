@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
 status: executing
-stopped_at: Completed 25-06-PLAN.md
-last_updated: "2026-10-25T16:55:15.727Z"
-state_head: e5e1669823614ae162591c227ea990ba1f4b3dbf
+stopped_at: Completed 25-02-PLAN.md
+last_updated: "2026-10-25T18:05:43.297Z"
+state_head: aceaad8956a87777c27dc7aececa52bca9aa66c3
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 7
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 last_activity: 2026-10-25
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-25
 ## Current Position
 
 Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Progress: [░░░░░░░░░░] 0%
 
@@ -71,8 +71,8 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-**Last session:** 2026-10-25T16:54:53.477Z
-**Stopped at:** Completed 25-06-PLAN.md
+**Last session:** 2026-10-25T18:05:43.253Z
+**Stopped at:** Completed 25-02-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
@@ -92,6 +92,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 |------|----------|-------|-------|
 | Phase 25 P01 | 23 min | 2 tasks | 3 files |
 | Phase 25 P06 | 8 min | 1 tasks | 2 files |
+| Phase 25 P02 | 52 min | 3 tasks | 2 files |
 
 ## Decisions
 
@@ -99,6 +100,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: CHECK de format uniquement (private.has_valid_module_keys de 0140) : la validité sémantique du catalogue reste côté client
 - [Phase 25]: Invariant enfant-⟺-sans-session volontairement ABSENT de 0144 : il rejoint en 0145 après la conversion (les lignes héritées enfant-avec-compte le violeraient)
 - [Phase 25]: ENF-02 : la modération du Cercle sort du « au nom de l'enfant » — le parent n'agit jamais en son nom dans le Cercle, il modère le contenu attribué à un enfant
+- [Phase 25]: D-18 approuvée (2026-10-25) : conversion des enfants-avec-compte en profils gérés, suppression réelle des comptes auth.users (0145) ; piste produit future NOTÉE non implémentée : rôle adolescent avec compte propre
 
 ### Blockers
 
