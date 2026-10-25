@@ -1,5 +1,20 @@
 ---
 gsd_state_version: "1.0"
+milestone: v1.0
+milestone_name: Mise en ligne publique
+status: planning
+last_updated: "2026-10-25T07:01:12.771Z"
+last_activity: 2026-10-25
+progress:
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
+---
+gsd_state_version: "1.0"
 status: entre-jalons — tous les plans exécutés, UAT et jalon suivant à arbitrer
 stopped_at: "2026-10-24 : passe qualité UI complète sur la vague design melimelo. Critique Impeccable exécutée deux fois (matin 30/40 → après-midi 33/40, rapports dans .impeccable/critique/) avec corrections livrées au fil : contraste corail, mur de zéros (widgets, héros Anniversaires, stats Courses — c92cb55), titres h1→h2, glyphe Google officiel, bandeau ambre Realtime, menu mobile unifié (feuille basse animée, 05c08e4), illustrations générées des 21 objets de tuiles (9a81f01, a41df8b, docs/OBJETS-TUILES-GEN.md), notifications alignées (7838001), e2e remis au vert 147/147 (52c43a0). Prod rebuildée et validée par l'utilisateur le 24/10. Poussé sur main jusqu'à c92cb55."
 last_updated: "2026-10-24T18:15:00Z"
@@ -11,22 +26,37 @@ progress:
   percent: 100
 
 # ATTENTION — RÉÉCRITURE DU 24/10/2026 : le corps historique de ce fichier
+
 # (journal des phases 1 à 24, incident migrate 0055, récits de vérification)
+
 # a été écrasé lors d'une mise à jour maladroite ; seules les ~60 premières
+
 # lignes, capturées dans la session avant l'écrasement, ont pu être
+
 # restaurées ci-dessous. La queue du journal est PERDUE. Les récits
+
 # complets restent disponibles dans les fichiers de phase
+
 # (.planning/phases/*/ *-SUMMARY.md, *-VERIFICATION.md) et dans
+
 # docs/RETROSPECTIVE.md — relire ceux-ci plutôt que ce fichier pour
+
 # l'historique. Leçon : `.planning/` n'est pas versionné ; proposer son
+
 # versionnement (ou au minimum une sauvegarde avant réécriture).
 
 # En attente d'arbitrage utilisateur :
+
 # 1. UAT des phases récentes (21-24) + du travail design hors cycle ;
+
 # 2. clôture du jalon courant (complete-milestone + summary) ;
+
 # 3. ouverture du jalon suivant (vague 4 ?) — décisions produit ouvertes
+
 #    listées dans AGENTS.md §9.
+
 # Reste UI mineur : césures « Anniver-saires » dans la feuille mobile
+
 # (décision de feel), animations de sortie des feuilles (forceMount).
 
 # STATE
@@ -69,3 +99,10 @@ Statut : Phase 2 Ardoises — TERMINÉE et testable le 2026-10-02.
   destinataire + écriture atomique ; WR-01/04/10/11 aussi), chaîne complète
   [fin de la partie restaurée — la suite du journal (phases 4 à 24) est
   perdue ; se référer aux SUMMARY/VERIFICATION de chaque phase.]
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-25 — Milestone v1.0 started

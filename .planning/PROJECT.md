@@ -18,10 +18,51 @@ sapin/pastel, docs/OBJETS-TUILES-GEN.md), menu mobile unifié (feuille
 basse animée depuis la barre basse), notifications, contraste vérifié,
 e2e 147/147. PWA installable validée sur Android.
 
-## Objectifs du jalon suivant — v1.0 (à ouvrir)
+## Current Milestone: v1.0 — Mise en ligne publique
 
-À trancher d'abord (AGENTS.md §9) : périmètre Messages, comptes enfants
-autonomes, périmètre et durée du token de foyer, RPO/RTO et rétention des
-données. Dettes de l'audit v0.9.0 : Edge generate-routine-occurrences
-orpheline, semis démo sans photos de recette, message du panneau de
-version quand l'estampille manque.
+**Goal :** absorber dettes et hors-ligne, arbitrer les décisions produit
+restantes, outiller l'exploitation et préparer l'ouverture publique.
+
+**Target features :**
+- Comptes enfants = profils gérés par un parent (pas de compte autonome mineur)
+- Messages de foyer évolue : conversations directes, accusés de lecture, notifications
+- Dettes : Edge generate-routine-occurrences branchée, semis démo avec photos,
+  panneau de version sans estampille, UI mineures (feuilles mobiles)
+- Hors-ligne : 3 todos résorbés (état hors-ligne à tort, amorçage réseau,
+  compteur)
+- RGPD : export complet du foyer + suppression de compte (purge médias,
+  réversibilité 30 j)
+- Token de foyer : réutilisable, expiration obligatoire (défaut 30 j),
+  max d'utilisations configurable (défaut 10), révocation admin
+- Inscriptions ouvertes, confirmation email obligatoire, SMTP durci
+- Exploitation : sauvegardes exercées (restauration testée), supervision,
+  RPO/RTO documenté, mentions légales / confidentialité
+
+### Active requirements
+
+En cours de définition dans REQUIREMENTS.md (jalon v1.0).
+
+## État v0.9.0 (historique)
+
+Audit PASSED le 2026-10-24 (phases 16-24). Les 20 espaces branchés et en
+prod, e2e 147/147, PWA installable validée sur Android.
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+*Last updated: 2026-10-25 at milestone v1.0 start*
