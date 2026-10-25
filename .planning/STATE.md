@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
 status: executing
-stopped_at: Completed 25-02-PLAN.md
-last_updated: "2026-10-25T18:05:43.297Z"
-state_head: aceaad8956a87777c27dc7aececa52bca9aa66c3
+stopped_at: Completed 25-03-PLAN.md
+last_updated: "2026-10-25T19:39:23.007Z"
+state_head: f849d81363c72d18a62d931b69c1ede835df8ab6
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 7
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 last_activity: 2026-10-25
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-25
 ## Current Position
 
 Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Progress: [░░░░░░░░░░] 0%
 
@@ -71,8 +71,8 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-**Last session:** 2026-10-25T18:05:43.253Z
-**Stopped at:** Completed 25-02-PLAN.md
+**Last session:** 2026-10-25T19:39:22.964Z
+**Stopped at:** Completed 25-03-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
@@ -93,6 +93,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P01 | 23 min | 2 tasks | 3 files |
 | Phase 25 P06 | 8 min | 1 tasks | 2 files |
 | Phase 25 P02 | 52 min | 3 tasks | 2 files |
+| Phase 25 P03 | ~1h35 | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -101,6 +102,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: Invariant enfant-⟺-sans-session volontairement ABSENT de 0144 : il rejoint en 0145 après la conversion (les lignes héritées enfant-avec-compte le violeraient)
 - [Phase 25]: ENF-02 : la modération du Cercle sort du « au nom de l'enfant » — le parent n'agit jamais en son nom dans le Cercle, il modère le contenu attribué à un enfant
 - [Phase 25]: D-18 approuvée (2026-10-25) : conversion des enfants-avec-compte en profils gérés, suppression réelle des comptes auth.users (0145) ; piste produit future NOTÉE non implémentée : rôle adolescent avec compte propre
+- [Phase 25]: Gardes 0146 : modules lus depuis la ligne membre (D-05), colonnes d'acteur ENF-03 en text écrites depuis auth.uid(), refus explicites 22023/42501, Cercle 3e branche DELETE adulte modère le contenu enfant (D-12)
 
 ### Blockers
 

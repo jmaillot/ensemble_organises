@@ -36,7 +36,7 @@
   3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
-**Plans**: 3/7 plans executed
+**Plans**: 4/7 plans executed
 
 Plans:
 **Wave 1**
@@ -47,7 +47,7 @@ Plans:
 - [x] 25-02-PLAN.md — Migration 0145 : conversion RPC des comptes enfants (checkpoint D-18), invariant chk_members_managed_child, fermeture des chemins 0006/0036, migrate [BLOCKING]
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 25-03-PLAN.md — Migration 0146 (`0146_child_behavior_guards.sql`) : helpers par membre, RPC de fiche D-01 (create/update/archive deleted_at, périmètre D-06 des cinq espaces gardés), gardes de module (replace_*), colonnes d'acteur ENF-03 en text, RPC complete_routine_occurrence (refus adulte→adulte D-13), Cercle DELETE modération adulte (D-12), clauses D-06 (conversations, birthdays, meal_entries)
+- [x] 25-03-PLAN.md — Migration 0146 (`0146_child_behavior_guards.sql`) : helpers par membre, RPC de fiche D-01 (create/update/archive deleted_at, périmètre D-06 des cinq espaces gardés), gardes de module (replace_*), colonnes d'acteur ENF-03 en text, RPC complete_routine_occurrence (refus adulte→adulte D-13), Cercle DELETE modération adulte (D-12), clauses D-06 (conversations, birthdays, meal_entries)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 25-04-PLAN.md — Migrations 0147/0148 : push D-23 (redirection vers les adultes, zéro enfant) + fusion link_managed_child (D-19/D-20/D-18bis) + barrière [BLOCKING] finale test-db.sh SANS argument
@@ -149,7 +149,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 3/7 | In Progress|  |
+| 25. Profils enfants gérés | 4/7 | In Progress|  |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
