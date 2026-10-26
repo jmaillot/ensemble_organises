@@ -248,8 +248,20 @@ as $$
 declare
   v_id text := private.new_id('member');
 begin
-  insert into public.household_members (id, household_id, user_id, display_name, color_tag, role)
-  values (v_id, p_household_id, p_user_id, p_display_name, p_color_tag, p_role);
+  -- L'invariant 0145 (chk_members_managed_child : user_id is null ⟺ role
+  -- 'enfant') est un invariant du PRODUIT : une fixture qui sème un enfant
+  -- avec un compte est illégale depuis la phase 25. Le user_id passé pour un
+  -- enfant est donc silencieusement ignoré — le compte auth.users existe
+  -- toujours (les uuid du fixture restent valides pour as_user), mais la
+  -- ligne household_members de l'enfant n'a pas de compte, comme dans
+  -- l'application réelle.
+  if p_role = 'enfant' then
+    insert into public.household_members (id, household_id, user_id, display_name, color_tag, role)
+    values (v_id, p_household_id, null, p_display_name, p_color_tag, p_role);
+  else
+    insert into public.household_members (id, household_id, user_id, display_name, color_tag, role)
+    values (v_id, p_household_id, p_user_id, p_display_name, p_color_tag, p_role);
+  end if;
   return v_id;
 end;
 $$;
