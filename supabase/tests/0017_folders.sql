@@ -88,12 +88,19 @@ begin
     0::bigint, 'admin ne voit pas le dossier perso d''autrui (0134)');
   reset role;
 
-  -- 3. Enfant : lit le foyer, n'écrit ni dossier ni item.
+  -- 3. Enfant géré (0145) : l'adulte lit les dossiers foyer, l'ancien uid ne
+  --    lit plus rien ; l'écriture reste refusée pour tout acteur non écrivain.
+  perform testkit.as_user(alice, 'fold-a-alice@example.fr');
+  set local role authenticated;
+  perform testkit.eq(
+    testkit.count('select 1 from public.task_lists where household_id = ''' || home_a || ''' and visibility = ''foyer'''),
+    1::bigint, 'l''adulte lit les dossiers foyer (l''enfant est ciblé par member_id)');
+  reset role;
   perform testkit.as_user(kid, 'fold-a-kid@example.fr');
   set local role authenticated;
   perform testkit.eq(
     testkit.count('select 1 from public.task_lists where household_id = ''' || home_a || ''' and visibility = ''foyer'''),
-    1::bigint, 'enfant lit les dossiers foyer');
+    0::bigint, 'un uid sans membre résolu ne lit aucun dossier (0145)');
   perform testkit.expect_denied(format(
     'insert into public.task_lists (household_id, name, visibility, owner_member_id) values (%L, %L, %L, %L)',
     home_a, 'Kid Aaaa', 'foyer', kid_m),

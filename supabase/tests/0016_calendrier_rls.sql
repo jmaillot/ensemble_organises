@@ -87,12 +87,19 @@ begin
     1::bigint, 'owner lit son event perso');
   reset role;
 
-  -- 3. Enfant : lecture ok, écriture refusée (categories + events + calendars).
+  -- 3. Enfant géré (0145) : l'adulte lit, l'ancien uid ne lit plus rien ;
+  --    l'écriture reste refusée pour tout acteur non écrivain.
+  perform testkit.as_user(bob, 'cal-a-bob@example.fr');
+  set local role authenticated;
+  perform testkit.eq(
+    testkit.count('select 1 from public.event_categories where household_id = ''' || home_a || ''''),
+    1::bigint, 'l''adulte lit les catégories (l''enfant, sans session, est ciblé par member_id)');
+  reset role;
   perform testkit.as_user(kid, 'cal-a-kid@example.fr');
   set local role authenticated;
   perform testkit.eq(
     testkit.count('select 1 from public.event_categories where household_id = ''' || home_a || ''''),
-    1::bigint, 'enfant lit les catégories');
+    0::bigint, 'un uid sans membre résolu ne lit aucune catégorie (0145)');
   perform testkit.expect_denied(format(
     'insert into public.event_categories (id, household_id, name, color, created_by) values (%L, %L, %L, %L, %L)',
     private.new_id('event-category'), home_a, 'Kid Aaaa', '#000000', kid_m));

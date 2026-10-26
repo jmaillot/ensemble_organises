@@ -120,17 +120,28 @@ select testkit.eq(testkit.affected(format(
 reset role;
 
 -- ===========================================================================
--- Noe, role `enfant` : lecture seule
+-- Noe, ligne enfant gérée (0145) : l'adulte lit, l'ancien uid ne lit plus
+-- rien ; l'écriture reste refusée pour tout acteur non écrivain.
 -- ===========================================================================
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.products where id = %L', (select row_id from testkit.fx where key = 'prod_a'))), 1::bigint,
+  'l''adulte lit le produit du foyer (l''enfant est ciblé par member_id)');
+
+reset role;
+
 select testkit.as_user(user_id, 'enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.products'), 1::bigint,
-  'un enfant lit les produits de son foyer');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.products where id = %L', (select row_id from testkit.fx where key = 'prod_a'))), 0::bigint,
+  'un uid sans membre résolu ne lit aucun produit (0145)');
 select testkit.expect_denied(format(
   'insert into public.products (id, household_id, ean, name) values (%L, %L, %L, %L)',
   'prod_kid', (select household_id from testkit.fx where key = 'enfant'), '5000159461122', 'Bonbons'),
-  'un enfant ne cree pas de produit');
+  'un uid sans membre résolu ne cree pas de produit');
 
 reset role;
 

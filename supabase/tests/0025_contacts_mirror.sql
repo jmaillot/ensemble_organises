@@ -122,22 +122,24 @@ select testkit.eq(testkit.affected(format(
 reset role;
 
 -- ===========================================================================
--- Noé, rôle `enfant` : lecture de Famille seule, aucune écriture
+-- Noé, ligne enfant gérée (0145) : plus de compte, plus de session. Les
+-- listes se lisent par les adultes (Bob ci-dessus voit Famille et sa perso) ;
+-- l'ancien uid n'accède plus à rien.
 -- ===========================================================================
 select testkit.as_user(user_id, 'enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.contact_lists'), 1::bigint,
-  'l''enfant ne voit que Famille');
+select testkit.eq(testkit.count('select 1 from public.contact_lists'), 0::bigint,
+  'un uid sans membre résolu ne lit aucune liste de contacts (0145)');
 select testkit.expect_denied(format(
   'insert into public.contact_lists (id, household_id, name) values (%L, %L, %L)',
   'list_kid', (select household_id from testkit.fx where key = 'enfant'), 'Copains'),
-  'un enfant ne cree pas de liste de contacts');
+  'un uid sans membre résolu ne cree pas de liste de contacts');
 select testkit.expect_denied(format(
   'insert into public.contacts (list_id, household_id, name) values (%L, %L, %L)',
-  (select id from public.contact_lists where owner_member_id is null limit 1),
+  (select row_id from testkit.fx where key = 'famille_a'),
   (select household_id from testkit.fx where key = 'enfant'), 'Copain'),
-  'un enfant ne cree pas de contact');
+  'un uid sans membre résolu ne cree pas de contact');
 
 reset role;
 
