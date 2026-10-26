@@ -151,7 +151,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 5/7 | In Progress|  |
+| 25. Profils enfants gérés | 6/7 | In Progress|  |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
