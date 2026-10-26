@@ -224,7 +224,7 @@ begin
 
   -- Oracles 22023 : fiche adulte ; clés hors périmètre gardé.
   begin
-    perform public.update_managed_child_profile(v_alice_m, 'Nouveau Nom', null, null, null, null);
+    perform public.update_managed_child_profile(v_alice_m, 'Nouveau Nom', null, null, null, false, null);
     perform testkit.ok(false, 'la fiche d''un adulte n''est pas éditable par ce RPC');
   exception when others then
     perform testkit.ok(SQLSTATE = '22023',
@@ -232,7 +232,7 @@ begin
   end;
 
   begin
-    perform public.update_managed_child_profile(v_noe_m, null, null, null, null, array['ardoise']);
+    perform public.update_managed_child_profile(v_noe_m, null, null, null, null, false, array['ardoise']);
     perform testkit.ok(false, 'ardoise n''est pas activable sur une fiche enfant');
   exception when others then
     perform testkit.ok(SQLSTATE = '22023',
@@ -240,7 +240,7 @@ begin
   end;
 
   begin
-    perform public.update_managed_child_profile(v_noe_m, null, null, null, null, array['cadeaux']);
+    perform public.update_managed_child_profile(v_noe_m, null, null, null, null, false, array['cadeaux']);
     perform testkit.ok(false, 'cadeaux n''est pas activable sur une fiche enfant');
   exception when others then
     perform testkit.ok(SQLSTATE = '22023',
@@ -248,7 +248,7 @@ begin
   end;
 
   -- Activation 'messages' (succès), puis retour au socle.
-  perform public.update_managed_child_profile(v_noe_m, null, null, null, null, array['taches','messages']);
+  perform public.update_managed_child_profile(v_noe_m, null, null, null, null, false, array['taches','messages']);
   perform testkit.eq(
     (select count(*) from public.household_members
       where id = v_noe_m and managed_modules = array['taches','messages']::text[]),
@@ -258,7 +258,7 @@ begin
   -- Retour socle : le tableau null remet managed_modules inchangé — on pose
   -- le socle explicitement (le RPC refuse les clés hors périmètre, pas le
   -- socle lui-même).
-  perform public.update_managed_child_profile(v_noe_m, null, null, null, null,
+  perform public.update_managed_child_profile(v_noe_m, null, null, null, null, false,
     array['taches','routines','anniversaires','menu']);
   perform testkit.eq(
     (select count(*) from public.household_members
@@ -302,7 +302,7 @@ declare
   v_lila_m text;
 begin
   select row_id into v_lila_m from testkit.fx where key = 't146-lila_m';
-  perform public.update_managed_child_profile(v_lila_m, null, null, null, null,
+  perform public.update_managed_child_profile(v_lila_m, null, null, null, null, false,
     array['routines','anniversaires']);
   perform testkit.eq(
     (select count(*) from public.household_members
@@ -386,7 +386,7 @@ begin
 
   -- Refus routines : Lila garde encore 'routines' — on la prive d'abord
   -- (l'admin peut : fiche oblige), puis le refus est prouvé.
-  perform public.update_managed_child_profile(v_lila_m, null, null, null, null,
+  perform public.update_managed_child_profile(v_lila_m, null, null, null, null, false,
     array['anniversaires']);
   begin
     perform public.replace_routine_assignees('t146-routine', array[v_lila_m]);
@@ -590,7 +590,7 @@ declare
   v_noe_m text;
 begin
   select row_id into v_noe_m from testkit.fx where key = 't146-noe_m';
-  perform public.update_managed_child_profile(v_noe_m, null, null, null, null,
+  perform public.update_managed_child_profile(v_noe_m, null, null, null, null, false,
     array['taches','routines','messages','anniversaires','menu']);
 end;
 $t146$;

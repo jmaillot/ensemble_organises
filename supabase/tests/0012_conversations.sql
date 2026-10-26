@@ -99,7 +99,7 @@ begin
 
   perform public.update_managed_child_profile(
     (select row_id from testkit.fx where key = 'kid_m'),
-    'Noé Martin', 'amber', null, null,
+    'Noé Martin', 'amber', null, null, false,
     array['taches', 'routines', 'anniversaires', 'menu', 'messages']::text[]);
 
   insert into public.conversation_members (conversation_id, member_id)
@@ -164,7 +164,7 @@ begin
   -- Le module messages est activé sur la fiche enfant (0146) : la conversation
   -- inclut l'enfant sans autre condition.
   perform public.update_managed_child_profile(
-    kid_m, 'Noé Martin', 'amber', null, null,
+    kid_m, 'Noé Martin', 'amber', null, null, false,
     array['taches', 'routines', 'anniversaires', 'menu', 'messages']::text[]);
 
   v_out := public.create_conversation(home, 'direct', null, jsonb_build_array(alice_m, kid_m));
