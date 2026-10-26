@@ -234,11 +234,16 @@ select testkit.eq(testkit.affected(format(
 select testkit.eq(testkit.affected(
   'delete from public.recipes where id = ''recipe_bob'''), 0::bigint,
   'la suppression d''une recette est reservee aux administrateurs');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.recipes where id = %L', (select row_id from testkit.fx where key = 'recipe_a'))), 1::bigint,
+  'un membre lit les recettes de son foyer');
 
 reset role;
 
 -- ===========================================================================
--- Noe, role `enfant` — lecture seule
+-- Noe, role `enfant` — depuis 0145 l'enfant gere n'a pas de compte ni de
+-- session : son uid ne resout aucun membre du foyer, donc il ne lit plus rien
+-- (les anciennes lectures positives sont devenues adultes) et n'ecrit rien.
 -- ===========================================================================
 select testkit.as_user(user_id, 'plate-enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
@@ -253,8 +258,8 @@ select testkit.eq(testkit.count(format(
   'select 1 from public.pet_records where id = %L', (select row_id from testkit.fx where key = 'rec_a1'))), 0::bigint,
   'un enfant ne lit plus les suivis de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.recipes where id = %L', (select row_id from testkit.fx where key = 'recipe_a'))), 1::bigint,
-  'un enfant lit les recettes de son foyer');
+  'select 1 from public.recipes where id = %L', (select row_id from testkit.fx where key = 'recipe_a'))), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus les recettes');
 select testkit.eq(testkit.count(format(
   'select 1 from public.trips where id = %L', (select row_id from testkit.fx where key = 'trip_b'))), 0::bigint,
   'un enfant ne voit pas le voyage du foyer B');

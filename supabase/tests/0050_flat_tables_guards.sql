@@ -257,11 +257,16 @@ select testkit.eq(testkit.affected(format(
 select testkit.eq(testkit.affected(
   'delete from public.places where id = ''place_bob'''), 0::bigint,
   'la suppression d''un lieu est reservee aux administrateurs, meme le sien');
+select testkit.eq(testkit.count(format(
+  'select 1 from public.places where id = %L', (select row_id from testkit.fx where key = 'place_a'))), 1::bigint,
+  'un membre lit les lieux de son foyer');
 
 reset role;
 
 -- ===========================================================================
--- Noe, role `enfant` — lecture seule
+-- Noe, role `enfant` — depuis 0145 l'enfant gere n'a pas de compte ni de
+-- session : son uid ne resout aucun membre du foyer, donc il ne lit plus rien
+-- (les anciennes lectures positives sont devenues adultes) et n'ecrit rien.
 -- ===========================================================================
 select testkit.as_user(user_id, 'plate13-enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
@@ -276,8 +281,8 @@ select testkit.eq(testkit.count(format(
   'select 1 from public.loyalty_cards where id = %L', (select row_id from testkit.fx where key = 'card_a'))), 0::bigint,
   'un enfant ne lit plus les cartes de son foyer (0113, phase 14)');
 select testkit.eq(testkit.count(format(
-  'select 1 from public.places where id = %L', (select row_id from testkit.fx where key = 'place_a'))), 1::bigint,
-  'un enfant lit les lieux de son foyer');
+  'select 1 from public.places where id = %L', (select row_id from testkit.fx where key = 'place_a'))), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus les lieux');
 select testkit.eq(testkit.count(format(
   'select 1 from public.providers where id = %L', (select row_id from testkit.fx where key = 'prov_b'))), 0::bigint,
   'un enfant ne voit pas le prestataire du foyer B');
