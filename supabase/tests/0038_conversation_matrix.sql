@@ -26,12 +26,14 @@ declare
   bob uuid := testkit.auth_user('mconv-bob@example.fr', 'Bob Martin');
   kid uuid := testkit.auth_user('mconv-kid@example.fr', 'Noé Martin');
   kid_out uuid := testkit.auth_user('mconv-kid-out@example.fr', 'Léa Martin');
+  carol uuid := testkit.auth_user('mconv-carol@example.fr', 'Carol Martin');
   outsider uuid := testkit.auth_user('mconv-outsider@example.fr', 'Olivier Fantome');
   home text := testkit.household(alice, 'Foyer Messages Matrice');
   alice_m text;
   bob_m text;
   kid_m text;
   kid_out_m text;
+  carol_m text;
   conv text := private.new_id('conversation');
   conv_other text := private.new_id('conversation');
   msg_alice text := private.new_id('message');
@@ -42,15 +44,20 @@ begin
   bob_m := testkit.member(home, bob, 'Bob Martin', 'membre', 'ink');
   kid_m := testkit.member(home, kid, 'Noé Martin', 'enfant', 'amber');
   kid_out_m := testkit.member(home, kid_out, 'Léa Martin', 'enfant', 'coral');
+  -- Adulte hors fil : preuve FORTE de l'isolation au fil. (Héritage 0145 :
+  -- l'uid enfant ne résout plus aucun membre — sa cause est donc faible,
+  -- « uid inconnu », et ne prouve rien sur l'isolation au fil.)
+  carol_m := testkit.member(home, carol, 'Carol Martin', 'membre', 'violet');
   insert into testkit.fx (key, user_id) values
     ('alice', alice), ('bob', bob), ('kid', kid),
-    ('kid_out', kid_out), ('outsider', outsider);
+    ('kid_out', kid_out), ('carol', carol), ('outsider', outsider);
   insert into testkit.fx (key, household_id) values ('home', home);
   insert into testkit.fx (key, row_id) values
     ('alice_m', alice_m),
     ('bob_m', bob_m),
     ('kid_m', kid_m),
     ('kid_out_m', kid_out_m),
+    ('carol_m', carol_m),
     ('conv', conv),
     ('conv_other', conv_other),
     ('msg_alice', msg_alice),
@@ -73,45 +80,63 @@ end;
 $$;
 
 -- ===========================================================================
--- D-01 : l'enfant membre du fil dépose son image.
--- (ROUGE avant 0099 — 403 prouvé par l'échec de la première assertion sans
--- la migration ; VERT après.)
+-- D-01 : depot d'image du fil messages (0099). VERITE 0145 : la politique
+-- `household_media_insert` a deux branches : (1) can_write_household — VRAI
+-- pour tout membre adulte (admin/membre), quelle que soit la forme du
+-- chemin ; (2) can_deposit_message_media — le depôt confine au prefixe
+-- messages/ et au fil de l'auteur. La branche (2) n'est plus atteignable
+-- par AUCUN acteur de session : un enfant gere n'a plus de session (uid
+-- sans membre resolu), et tout adulte passe deja par la branche (1).
+-- Le depot positif est donc joue par alice (admin, branche 1) ; les negatifs
+-- vivants sont l'uid sans membre et l'exterieur. Les anciens negatifs
+-- « confinement prefixe » et « isolation au fil » du depot etaient des
+-- preuves PAR LA BRANCHE (2) pour un non-ecrivain membre du fil — cette
+-- classe d'acteur n'existe plus (code mort bénin, voir deferred-items).
 -- ===========================================================================
-select testkit.as_user(user_id, 'mconv-kid@example.fr') from testkit.fx where key = 'kid';
+select testkit.as_user(user_id, 'mconv-alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
--- Le chemin reproduit le dépôt client à l'octet près (api.ts
--- depositMessageImage) : `<foyer>/messages/<fil>/<média>.<ext>`.
+-- Le chemin reproduit le depôt client a l'octet pres (api.ts
+-- depositMessageImage) : `<foyer>/messages/<fil>/<media>.<ext>`.
 select testkit.eq(testkit.affected(format(
-  'insert into storage.objects (bucket_id, name, owner) values (%L, %L, %L)',
+  'insert into storage.objects (bucket_id, name) values (%L, %L)',
   'household-media',
   (select household_id from testkit.fx where key = 'home') || '/messages/'
-    || (select row_id from testkit.fx where key = 'conv') || '/photo-noe.jpg',
-  (select user_id from testkit.fx where key = 'kid'))), 1::bigint,
-  'l''enfant membre du fil depose son image messages (D-01)');
-
--- Membre du fil, mais préfixe hors messages/ : refusé — le dépôt reste
--- confiné au préfixe messages/, sans élargissement du seau.
-select testkit.expect_denied(format(
-  'insert into storage.objects (bucket_id, name, owner) values (%L, %L, %L)',
-  'household-media',
-  (select household_id from testkit.fx where key = 'home') || '/cercle/photo-noe.jpg',
-  (select user_id from testkit.fx where key = 'kid')),
-  'le depot enfant reste confine au prefixe messages/');
-
--- Membre du fil principal, autre fil du même foyer : refusé — la porte est
--- l'appartenance à CE fil, pas au foyer.
-select testkit.expect_denied(format(
-  'insert into storage.objects (bucket_id, name, owner) values (%L, %L, %L)',
-  'household-media',
-  (select household_id from testkit.fx where key = 'home') || '/messages/'
-    || (select row_id from testkit.fx where key = 'conv_other') || '/photo-noe.jpg',
-  (select user_id from testkit.fx where key = 'kid')),
-  'pas de depot dans un fil dont on n''est pas membre');
+    || (select row_id from testkit.fx where key = 'conv') || '/photo-alice.jpg')), 1::bigint,
+  'l''adulte membre du foyer depose son image messages (D-01, branche ecrivain)');
 
 reset role;
 
--- Enfant du foyer mais hors fil : refusé — même rôle, pas le même fil.
+-- L'uid enfant du fixture existe dans auth.users mais ne resout aucun
+-- membre : les deux branches rendent faux → refus (cause faible, 0145).
+select testkit.as_user(user_id, 'mconv-kid@example.fr') from testkit.fx where key = 'kid';
+set local role authenticated;
+
+select testkit.expect_denied(format(
+  'insert into storage.objects (bucket_id, name) values (%L, %L)',
+  'household-media',
+  (select household_id from testkit.fx where key = 'home') || '/messages/'
+    || (select row_id from testkit.fx where key = 'conv') || '/photo-noe.jpg'),
+  'un uid sans membre resolu (enfant gere 0145) ne depose pas dans le fil');
+
+reset role;
+
+-- Enfant hors fil (Léa) : même refus, cause faible (uid sans membre, 0145).
+select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
+set local role authenticated;
+
+select testkit.expect_denied(format(
+  'insert into storage.objects (bucket_id, name) values (%L, %L)',
+  'household-media',
+  (select household_id from testkit.fx where key = 'home') || '/messages/'
+    || (select row_id from testkit.fx where key = 'conv') || '/photo-lea.jpg',
+  (select user_id from testkit.fx where key = 'kid_out')),
+  'un uid sans membre resolu (enfant gere 0145, hors fil) ne depose pas');
+
+reset role;
+
+-- Enfant hors fil (Léa) : même refus, cause faible (uid sans membre, 0145)
+-- — conserve pour perimetre.
 select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
 set local role authenticated;
 
@@ -121,7 +146,7 @@ select testkit.expect_denied(format(
   (select household_id from testkit.fx where key = 'home') || '/messages/'
     || (select row_id from testkit.fx where key = 'conv') || '/photo-lea.jpg',
   (select user_id from testkit.fx where key = 'kid_out')),
-  'l''enfant hors fil ne depose pas dans un fil qui n''est pas le sien');
+  'un uid sans membre resolu (enfant gere 0145, hors fil) ne depose pas');
 
 reset role;
 
@@ -163,16 +188,17 @@ select testkit.eq(testkit.count(format(
 
 reset role;
 
--- Membre du foyer mais hors fil (Léa, enfant) : le fil reste invisible —
--- l'isolation est au fil, pas au foyer.
-select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
+-- Membre du foyer mais hors fil (Carol, adulte) : le fil reste invisible —
+-- l'isolation est au fil, pas au foyer (preuve forte : uid ADULTE resolu,
+-- membre PLEIN du foyer, sans appartenance a CE fil).
+select testkit.as_user(user_id, 'mconv-carol@example.fr') from testkit.fx where key = 'carol';
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.messages where household_id = %L and conversation_id = %L',
   (select household_id from testkit.fx where key = 'home'),
   (select row_id from testkit.fx where key = 'conv'))), 0::bigint,
-  'un membre hors fil ne lit pas les messages du fil');
+  'un adulte membre du foyer hors fil ne lit pas les messages du fil');
 
 reset role;
 
@@ -287,7 +313,20 @@ select testkit.eq(testkit.affected(format(
 
 reset role;
 
--- Non-membre du fil (Léa) : 0 ligne, sans erreur.
+-- Non-membres du fil : 0 ligne, sans erreur. Carol (adulte resolu, membre
+-- PLEIN du foyer) est la preuve forte ; Léa (uid sans membre, 0145) la
+-- cause faible, conservee.
+select testkit.as_user(user_id, 'mconv-carol@example.fr') from testkit.fx where key = 'carol';
+set local role authenticated;
+
+select testkit.eq(testkit.affected(format(
+  'delete from public.conversation_members where conversation_id = %L and member_id = %L',
+  (select row_id from testkit.fx where key = 'conv'),
+  (select row_id from testkit.fx where key = 'bob_m'))), 0::bigint,
+  'un membre du foyer hors fil (adulte) n''en retire personne');
+
+reset role;
+
 select testkit.as_user(user_id, 'mconv-kid-out@example.fr') from testkit.fx where key = 'kid_out';
 set local role authenticated;
 
@@ -295,7 +334,7 @@ select testkit.eq(testkit.affected(format(
   'delete from public.conversation_members where conversation_id = %L and member_id = %L',
   (select row_id from testkit.fx where key = 'conv'),
   (select row_id from testkit.fx where key = 'bob_m'))), 0::bigint,
-  'un non-membre du fil n''en retire personne');
+  'un uid sans membre resolu (enfant gere 0145) n''en retire personne');
 
 reset role;
 
@@ -311,9 +350,24 @@ select testkit.eq(testkit.affected(format(
 
 reset role;
 
--- Self-leave (Noé quitte son fil, D-08 depuis 0100 : pierre tombale par RPC,
--- preuves en 0039) : 1 ligne. En dernier : aucun test ultérieur n'en dépend.
+-- Self-leave (D-08 depuis 0100 : pierre tombale par RPC, preuves en 0039).
+-- Depuis 0145, l'uid enfant ne resout aucun membre : leave_conversation
+-- (0102) le refuse — « aucune ligne membre pour cet acteur » (42501).
+-- Le départ réel est joué par bob (membre non admin du fil), en dernier :
+-- aucun test ultérieur n'en dépend. La section notification_reads suivante
+-- est indexée par user_id seul (0046) : l'appartenance au fil n'y est pas
+-- requise, bob peut partir avant.
 select testkit.as_user(user_id, 'mconv-kid@example.fr') from testkit.fx where key = 'kid';
+set local role authenticated;
+
+select testkit.expect_denied(format(
+  'select public.leave_conversation(%L)',
+  (select row_id from testkit.fx where key = 'conv')),
+  'un uid sans membre resolu (enfant gere 0145) ne quitte pas le fil');
+
+reset role;
+
+select testkit.as_user(user_id, 'mconv-bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
 select testkit.eq(testkit.affected(format(
