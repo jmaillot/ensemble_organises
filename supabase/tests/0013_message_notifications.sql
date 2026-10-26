@@ -37,8 +37,9 @@ begin
 end;
 $$;
 
--- Destinataires : Alice et Noé (enfant compris, décision produit), pas Bob
--- l'auteur, pas l'outsider ; tag groupé par conversation.
+-- Destinataires : Alice (adulte), pas l'auteur Bob, pas l'outsider ; tag
+-- groupé par conversation. Depuis 0145, l'enfant géré n'a plus de compte :
+-- la notification push ne vise que des comptes, jamais la ligne enfant.
 select testkit.eq(
   (select count(*) from jsonb_array_elements(public.due_push_notifications('messages')) n
     where n.value ->> 'user_id' = (select user_id::text from testkit.fx where key = 'alice')),
@@ -46,7 +47,7 @@ select testkit.eq(
 select testkit.eq(
   (select count(*) from jsonb_array_elements(public.due_push_notifications('messages')) n
     where n.value ->> 'user_id' = (select user_id::text from testkit.fx where key = 'kid')),
-  1::bigint, 'Noé reçoit le message bien qu''enfant');
+  0::bigint, 'un enfant sans compte n''est jamais destinataire du push (0145)');
 select testkit.eq(
   (select count(*) from jsonb_array_elements(public.due_push_notifications('messages')) n
     where n.value ->> 'user_id' in (

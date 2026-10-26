@@ -85,6 +85,23 @@ begin
   end;
 
   -- Ajout ultérieur : un participant fait entrer un tiers (décision 3).
+  -- Pour une ligne enfant gérée (0144/0146), la politique du fil exige le
+  -- module `messages` : refusé tant que la fiche n'est pas activée, puis
+  -- l'adulte l'active par la fiche et l'ajout passe.
+  begin
+    insert into public.conversation_members (conversation_id, member_id)
+    values (v_out ->> 'id', (select row_id from testkit.fx where key = 'kid_m'));
+    perform testkit.ok(false, 'l''ajout de l''enfant exige le module messages activé');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%row-level security%',
+      'l''ajout enfant est refusé tant que le module messages n''est pas activé : ' || sqlerrm);
+  end;
+
+  perform public.update_managed_child_profile(
+    (select row_id from testkit.fx where key = 'kid_m'),
+    'Noé Martin', 'amber', null, null,
+    array['taches', 'routines', 'anniversaires', 'menu', 'messages']::text[]);
+
   insert into public.conversation_members (conversation_id, member_id)
   values (v_out ->> 'id', (select row_id from testkit.fx where key = 'kid_m'));
   perform testkit.eq(
@@ -95,7 +112,9 @@ $$;
 
 reset role;
 
--- Enfant : direct avec un membre, création comme écriture.
+-- Enfant géré : depuis 0145, l'enfant n'a plus de compte ni de session — il
+-- ne crée plus de conversation ni n'écrit de message. L'adulte crée le fil
+-- qui le concerne (l'enfant inclus par member_id) et y écrit.
 select testkit.as_user(user_id, 'conv-kid@example.fr') from testkit.fx where key = 'kid';
 set local role authenticated;
 
@@ -104,20 +123,59 @@ declare
   home text;
   alice_m text;
   kid_m text;
-  v_out jsonb;
-  v_msg text;
 begin
   select household_id into home from testkit.fx where key = 'home';
   select row_id into alice_m from testkit.fx where key = 'alice_m';
   select row_id into kid_m from testkit.fx where key = 'kid_m';
 
-  v_out := public.create_conversation(home, 'direct', null, jsonb_build_array(kid_m, alice_m));
-  perform testkit.ok((v_out ->> 'id') like 'conversation\_%', 'un enfant crée sa conversation');
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.household_members where user_id = %L',
+    (select user_id from testkit.fx where key = 'kid'))), 0::bigint,
+    'l''enfant géré n''a plus de compte : son uid ne résout aucun membre (0145)');
+
+  begin
+    perform public.create_conversation(home, 'direct', null, jsonb_build_array(kid_m, alice_m));
+    perform testkit.ok(false, 'un enfant sans session ne crée plus de conversation');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%appartenez%',
+      'le refus dit l''absence de session : ' || sqlerrm);
+  end;
+end;
+$$;
+
+reset role;
+
+-- L'adulte crée le fil incluant l'enfant et y écrit pour lui ; aucun message
+-- n'est porté par la ligne enfant.
+select testkit.as_user(user_id, 'conv-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+do $$
+declare
+  home text;
+  alice_m text;
+  kid_m text;
+  v_out jsonb;
+begin
+  select household_id into home from testkit.fx where key = 'home';
+  select row_id into alice_m from testkit.fx where key = 'alice_m';
+  select row_id into kid_m from testkit.fx where key = 'kid_m';
+
+  -- Le module messages est activé sur la fiche enfant (0146) : la conversation
+  -- inclut l'enfant sans autre condition.
+  perform public.update_managed_child_profile(
+    kid_m, 'Noé Martin', 'amber', null, null,
+    array['taches', 'routines', 'anniversaires', 'menu', 'messages']::text[]);
+
+  v_out := public.create_conversation(home, 'direct', null, jsonb_build_array(alice_m, kid_m));
+  perform testkit.ok((v_out ->> 'id') like 'conversation\_%', 'l''adulte crée un fil incluant l''enfant');
 
   insert into public.messages (id, conversation_id, household_id, sender_id, content)
-  values (private.new_id('message'), v_out ->> 'id', home, kid_m, 'On joue ?')
-  returning id into v_msg;
-  perform testkit.ok(v_msg like 'message\_%', 'un enfant écrit dans sa conversation');
+  values (private.new_id('message'), v_out ->> 'id', home, alice_m, 'On joue à quatre heures ?');
+
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.messages where sender_id = %L', kid_m)), 0::bigint,
+    'aucun message n''est porté par la ligne enfant (0145 : ciblé, jamais acteur)');
 end;
 $$;
 
