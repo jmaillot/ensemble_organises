@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
+import { useHouseholdStore } from '@/stores/household-store';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 import type { PostCommentRow, PostMediaRow, PostRow } from '@/types';
@@ -78,6 +79,18 @@ describe('Cercle', () => {
     expect(newPost.closest('article')).toBe(cards[0]);
     // Le composeur est vidé après publication.
     await waitFor(() => expect(screen.getByLabelText(/Votre commentaire/)).toHaveValue(''));
+  });
+
+  it('masque le composeur pour un enfant géré (D-12) : aucune interface de publication', async () => {
+    renderWithProviders(<CerclePage />);
+    // seedHouseholdStore (dans l'aide de rendu) remet Camille en membre
+    // courant : la bascule vers l'enfant vient APRÈS le rendu.
+    useHouseholdStore.setState({ currentMemberId: DEMO_MEMBERS.noe });
+
+    // Le fil se charge pour l'enfant ; la publication, elle, est interdite…
+    expect(await screen.findByText(/Le soleil est enfin revenu/, {}, { timeout: 5000 })).toBeInTheDocument();
+    // … côté serveur (0146), et l'écran ne montre pas un composeur mort.
+    expect(screen.queryByLabelText(/Votre commentaire/)).not.toBeInTheDocument();
   });
 
   it('fait basculer la réaction et incrémente le compteur', async () => {
