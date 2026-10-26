@@ -52,7 +52,7 @@ Plans:
 - [x] 25-03-PLAN.md — Migration 0146 (`0146_child_behavior_guards.sql`) : helpers par membre, RPC de fiche D-01 (create/update/archive deleted_at, périmètre D-06 des cinq espaces gardés), gardes de module (replace_*), colonnes d'acteur ENF-03 en text, RPC complete_routine_occurrence (refus adulte→adulte D-13), Cercle DELETE modération adulte (D-12), clauses D-06 (conversations, birthdays, meal_entries)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [~] 25-04-PLAN.md — Migrations 0147/0148+0149 : push D-23 (rouge→vert), fusion link_managed_child (D-19/D-20/D-18bis), tests verts ciblés — barrière [BLOCKING] complète = 67/83 : 16 échecs connus post-0145 reportés (décision utilisatrice, deferred-items.md 25-04 / WINDOWS.md #12 ; D-01 storage décision produite reportée)
+- [x] 25-04-PLAN.md — Migrations 0147/0148+0149 : push D-23 (rouge→vert), fusion link_managed_child (D-19/D-20/D-18bis), barrière [BLOCKING] complète clôturée le 2026-10-26 (suite entière verte ; ensuite 90/90 avec les migrations 0150–0156 de la campagne de correctifs) ; D-01 storage tranchée : le parent dépose pour l'enfant (décision utilisateur du 2026-10-26)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [x] 25-05-PLAN.md — Frontend : useIsAdult (D-01), CRUD enfants DANS la liste des membres via RPC (D-01/D-02), filtre deleted_at unique dans household-store (D-04), espaces par membre (D-05), modération Cercle (D-12), CTA « Donner accès » (D-21), tests Vitest Wave-0 + fixture Playwright
