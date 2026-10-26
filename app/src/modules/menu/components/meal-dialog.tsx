@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useMembers } from '@/stores/household-store';
 import { formatDayLabel, mealFormSchema, mealSlotLabels, mealSlots, type MealEntry, type MealFormValues, type MealSlot } from '../types';
 
@@ -30,6 +31,9 @@ export interface MealDialogProps {
  */
 export function MealDialog({ open, onOpenChange, entry, defaultDate, defaultSlot, weekDates, recipes, onSave }: MealDialogProps) {
   const members = useMembers();
+  // Garde D-06 (25-07) : « Qui mange » ne propose que les enfants dont la
+  // fiche sert le menu — absent, pas désactivé ; le serveur revalide (0146).
+  const eligibleMembers = eligibleMembersForModule(members, 'menu');
   const {
     register,
     handleSubmit,
@@ -148,7 +152,7 @@ export function MealDialog({ open, onOpenChange, entry, defaultDate, defaultSlot
           <fieldset>
             <legend className="mb-1.5 text-[11px] font-extrabold text-muted">Qui mange (optionnel)</legend>
             <div className="flex flex-wrap gap-2">
-              {members.map((member) => {
+              {eligibleMembers.map((member) => {
                 const checked = memberIds.includes(member.id);
                 return (
                   <label

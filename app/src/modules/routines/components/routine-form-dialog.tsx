@@ -8,6 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useMembers } from '@/stores/household-store';
 import { instantToLocalInput } from '@/lib/datetime';
 import {
@@ -153,6 +154,7 @@ export function RoutineFormDialog({
   onSubmit,
 }: RoutineFormDialogProps) {
   const members = useMembers();
+  const eligibleMembers = eligibleMembersForModule(members, 'routines');
   const { register, handleSubmit, reset, control, watch, setValue, formState } = useForm<RoutineFormValues>({
     resolver: zodResolver(routineSchema),
     mode: 'onSubmit',
@@ -452,7 +454,7 @@ export function RoutineFormDialog({
               <fieldset className="grid gap-1.5">
                 <legend className="text-[11px] font-extrabold text-muted">Assigner à</legend>
                 <div className="flex flex-wrap gap-2">
-                  {members.map((member) => {
+                  {eligibleMembers.map((member) => {
                     const checked = field.value.includes(member.id);
                     return (
                       <label

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { EmptyState, LoadingRows } from '@/components/ui/empty-state';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useMembers } from '@/stores/household-store';
 import { useArdoiseMembers } from '../hooks/use-ardoise';
 
@@ -28,7 +29,12 @@ export function ArdoiseMembersDialog({ ardoiseId, ardoiseName, open, onOpenChang
   const { memberIds, isLoading, isMutating, addMembers, removeMember } = useArdoiseMembers(open ? ardoiseId : null);
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
 
-  const sharers = householdMembers.filter((member) => member.role === 'admin' || member.role === 'membre');
+  // Garde D-06 (25-07) : la liste n'est plus bornée par le rôle mais par la
+  // FICHE du membre (D-05, managed_modules) — la même règle que les trois
+  // autres pickers, en un point unique. Les adultes restent éligibles ; une
+  // fiche enfant peut servir l'ardoise, le serveur 0146 revalide de toute
+  // façon (l'UI n'ouvre aucun chemin que la base n'autorise pas).
+  const sharers = eligibleMembersForModule(householdMembers, 'ardoise');
   const inArdoise = sharers.filter((member) => memberIds.includes(member.id));
   const candidates = sharers.filter((member) => !memberIds.includes(member.id));
 

@@ -8,6 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/primitives';
 import { MemberAvatar } from '@/components/shared/member-avatar';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useMembers } from '@/stores/household-store';
 import { instantToLocalInput } from '@/lib/datetime';
 import { todayIso } from '@/lib/utils';
@@ -85,6 +86,7 @@ export function TaskFormDialog({
   onSubmit,
 }: TaskFormDialogProps) {
   const members = useMembers();
+  const eligibleMembers = eligibleMembersForModule(members, 'taches');
   const { register, handleSubmit, reset, control, formState } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     mode: 'onSubmit',
@@ -168,7 +170,7 @@ export function TaskFormDialog({
               <fieldset className="grid gap-1.5">
                 <legend className="text-[11px] font-extrabold text-muted">Assigner à</legend>
                 <div className="flex flex-wrap gap-2">
-                  {members.map((member) => {
+                  {eligibleMembers.map((member) => {
                     const checked = field.value.includes(member.id);
                     return (
                       <label
