@@ -11,6 +11,7 @@ import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useToast } from '@/components/ui/toast';
 import { FolderTabs } from '@/components/shared/folder-tabs';
 import { useCalendarGrid } from '@/hooks/use-calendar';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { formatMonthLabel } from '@/lib/utils';
 import { RoutineCard } from './components/routine-card';
 import { HistoryCalendar, RoutineHistory } from './components/routine-history';
@@ -50,6 +51,7 @@ export default function RoutinesPage() {
     isMutating,
     refetch,
     toggleOccurrence,
+    toggleFor,
     saveRoutine,
     removeRoutine,
     removeOccurrence,
@@ -69,6 +71,13 @@ export default function RoutinesPage() {
 
   const monthLabel = useMemo(() => formatMonthLabel(new Date(grid.year, grid.month, 1)), [grid.month, grid.year]);
   const lateCount = useMemo(() => visibleRoutines.filter((routine) => routine.isLate).length, [visibleRoutines]);
+  // « Cocher pour » (25-07, D-08/D-11) : les enfants servis par les routines,
+  // calculés par la garde unique D-06. Les adultes cochent par la case self —
+  // ils ne sont pas dans le menu. Passe seulement pour un acteur adulte.
+  const toggleTargets = useMemo(
+    () => eligibleMembersForModule(members, 'routines').filter((member) => member.role === 'enfant'),
+    [members],
+  );
   const filteredRoutines = useMemo(
     () => (lateOnly ? visibleRoutines.filter((routine) => routine.isLate) : visibleRoutines),
     [lateOnly, visibleRoutines],
@@ -201,6 +210,16 @@ export default function RoutinesPage() {
                           report(toggleError, 'L’occurrence n’a pas pu être enregistrée.'),
                         );
                       }}
+                      onToggleFor={
+                        canWrite
+                          ? (target, memberId) => {
+                              void toggleFor(target, memberId).catch((toggleError: unknown) =>
+                                report(toggleError, 'L’occurrence n’a pas pu être enregistrée.'),
+                              );
+                            }
+                          : undefined
+                      }
+                      toggleTargets={toggleTargets}
                     />
                   ))}
                 </div>

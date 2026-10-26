@@ -1,12 +1,26 @@
+import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { cn } from '@/lib/utils';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Badge, Checkbox } from '@/components/ui/primitives';
+import type { HouseholdMemberRow } from '@/types';
 import { memberFirstName, type Routine } from '../types';
 
 export interface RoutineCardProps {
   routine: Routine;
   /** Coche ou décoche l'occurrence du jour. */
   onToggle: (routine: Routine) => void;
+  /**
+   * Coche l'occurrence du jour AU NOM d'un enfant cible (D-08/D-11) — présent
+   * seulement pour un acteur adulte ; l'acteur reste l'utilisateur connecté,
+   * le RPC 0146 le résout côté serveur (ENF-03).
+   */
+  onToggleFor?: (routine: Routine, memberId: string) => void;
+  /**
+   * Les enfants cochables, calculés par la page via `eligibleMembersForModule`
+   * filtrée aux enfants (les adultes cochent par la case self). Vide ou absent
+   * : pas de menu.
+   */
+  toggleTargets?: HouseholdMemberRow[];
   /** Affiche la série en pastille plutôt qu'en texte. */
   showStreakBadge?: boolean;
   className?: string;
@@ -18,7 +32,15 @@ export interface RoutineCardProps {
  * Carte d'une occurrence du jour, façon checklist : case à cocher, nom,
  * fréquence lisible, assignataires colorés et série en cours.
  */
-export function RoutineCard({ routine, onToggle, showStreakBadge = false, className, readOnly = false }: RoutineCardProps) {
+export function RoutineCard({
+  routine,
+  onToggle,
+  onToggleFor,
+  toggleTargets,
+  showStreakBadge = false,
+  className,
+  readOnly = false,
+}: RoutineCardProps) {
   const done = routine.isDoneToday;
   const people = routine.assignees.map((assignee) => assignee.member.display_name);
 
@@ -57,6 +79,43 @@ export function RoutineCard({ routine, onToggle, showStreakBadge = false, classN
         </div>
 
         <Badge tone={done ? 'accent' : 'muted'}>{done ? 'Fait' : 'À faire'}</Badge>
+
+        {/* « Cocher pour » (25-07, D-08/D-11) : l'adulte coche l'occurrence AU
+            NOM d'un enfant servi par les routines. Zéro cible ou acteur enfant :
+            pas de menu — l'entrée ne s'affiche que là où elle est légale ; le
+            garde adulte/éligible de toggleFor et le RPC 0146 revalident. */}
+        {!readOnly && onToggleFor && toggleTargets && toggleTargets.length > 0 ? (
+          <DropdownMenuPrimitive.Root>
+            <DropdownMenuPrimitive.Trigger asChild>
+              <button
+                type="button"
+                aria-label="Cocher pour"
+                className="inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-3 text-[12px] font-semibold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:text-fg"
+              >
+                Cocher pour
+              </button>
+            </DropdownMenuPrimitive.Trigger>
+            <DropdownMenuPrimitive.Portal>
+              <DropdownMenuPrimitive.Content
+                align="end"
+                sideOffset={6}
+                className="z-60 min-w-[210px] rounded-[14px] border border-border/70 bg-surface p-1.5 shadow-[var(--shadow-lg)]"
+              >
+                {toggleTargets.map((target) => (
+                  <DropdownMenuPrimitive.Item
+                    key={target.id}
+                    onSelect={() => onToggleFor(routine, target.id)}
+                    className="flex min-h-11 cursor-default items-center gap-2.5 rounded-[10px] px-3 text-[13.5px] outline-none select-none data-[highlighted]:bg-accent-faint data-[highlighted]:text-fg"
+                  >
+                    <MemberAvatar member={target} size="sm" />
+                    {/* A5 : un nom long tronque sans casser la rangée. */}
+                    <span className="min-w-0 max-w-[210px] truncate">{target.display_name}</span>
+                  </DropdownMenuPrimitive.Item>
+                ))}
+              </DropdownMenuPrimitive.Content>
+            </DropdownMenuPrimitive.Portal>
+          </DropdownMenuPrimitive.Root>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

@@ -26,6 +26,7 @@ vi.mock('./hooks/use-ardoise', () => ({
 
 const baseMember: HouseholdMemberRow = {
   id: '',
+  role: 'membre',
   household_id: 'h-1',
   user_id: null,
   display_name: '',

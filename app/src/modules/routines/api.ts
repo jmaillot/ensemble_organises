@@ -1,5 +1,6 @@
 import { data } from '@/lib/data';
 import { instantOfDatetimeLocal } from '@/lib/datetime';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import type { RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
 import type { RoutineAssigneeRecord, RoutineFormValues, RoutineReminderRecord } from './types';
 
@@ -125,13 +126,33 @@ export async function findCompletion(routineId: string, occurrenceDate: string):
   return rows[0] ?? null;
 }
 
-/** Coche l'occurrence du jour : mise à jour si elle existe, création sinon. */
+/**
+ * Coche l'occurrence du jour au nom de son ATTRIBUTAIRE (D-08/D-11) : l'adulte
+ * qui coche, ou l'enfant « cochée pour » par le menu « Cocher pour ».
+ *
+ * Mode Supabase : RPC `complete_routine_occurrence` (0146, SECURITY DEFINER) —
+ * l'acteur est résolu côté serveur via auth.uid() (jamais un paramètre client,
+ * ENF-03) et le garde D-13 y refuse hors-module avec 42501. Une écriture
+ * directe `routine_completions` est proscrite ici : la RLS 0007 filtrerait en
+ * silence la délégation parentale (l'adulte ne voit pas les lignes de l'enfant).
+ * Mode démo : écriture locale directe conservée, upsert (maj sinon création).
+ */
 export async function markOccurrenceDone(input: {
   routineId: string;
   householdId: string;
   occurrenceDate: string;
   completedBy: string | null;
 }): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    if (!input.completedBy) throw new Error('Aucun membre courant pour cocher cette routine.');
+    const { error } = await supabase.rpc('complete_routine_occurrence', {
+      p_routine_id: input.routineId,
+      p_occurrence_date: input.occurrenceDate,
+      p_member_id: input.completedBy,
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
   const values = {
     household_id: input.householdId,
     completed_by: input.completedBy,

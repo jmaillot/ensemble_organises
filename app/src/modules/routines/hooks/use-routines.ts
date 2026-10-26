@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
 import { queryKeys, useResource } from '@/lib/data/useResource';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useCurrentMember, useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import { addDays, todayIso } from '@/lib/utils';
 import type { HouseholdMemberRow, RoutineCompletionRow, RoutineFolderRow, RoutineRow } from '@/types';
@@ -91,6 +92,13 @@ export interface UseRoutinesResult extends RoutineMetrics {
   refetch: () => void;
   /** Coche ou décoche l'occurrence du jour. */
   toggleOccurrence: (routine: Routine) => Promise<void>;
+  /**
+   * Coche l'occurrence du jour AU NOM d'un membre ciblé (D-08/D-11) : même
+   * chemin d'écriture que le self-toggle, l'attributaire passe au RPC 0146 —
+   * l'acteur est résolu côté serveur. Réservé aux adultes ; la cible doit être
+   * servie par les routines (garde D-06, le serveur 0146 revalide).
+   */
+  toggleFor: (routine: Routine, memberId: string) => Promise<void>;
   saveRoutine: (routine: Routine | null, values: RoutineFormValues) => Promise<void>;
   removeRoutine: (routine: Routine) => Promise<void>;
   /** Retire une occurrence enregistrée de l'historique. */
@@ -212,23 +220,40 @@ export function useRoutines(): UseRoutinesResult {
     ]);
   }, [queryClient]);
 
-  const toggleOccurrence = useCallback(
-    async (routine: Routine) => {
+  const toggleFor = useCallback(
+    async (routine: Routine, memberId: string) => {
       if (!householdId) throw new Error('Aucun foyer sélectionné.');
       if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
-      if (routine.isDoneToday) {
-        await markOccurrenceMissed({ routineId: routine.id, householdId, occurrenceDate: today });
-      } else {
-        await markOccurrenceDone({
-          routineId: routine.id,
-          householdId,
-          occurrenceDate: today,
-          completedBy: currentMember?.id ?? null,
-        });
-      }
+      // Garde D-06 (25-07) : la cible doit être servie par les routines — les
+      // adultes le sont toujours, un enfant ssi sa fiche porte la clé. La garde
+      // UI précède l'appel RPC ; le serveur 0146 revalide (42501, D-13).
+      const cible = eligibleMembersForModule(members, 'routines').find((member) => member.id === memberId);
+      if (!cible) throw new Error('Ce membre n’est pas servi par les routines du foyer.');
+      await markOccurrenceDone({
+        routineId: routine.id,
+        householdId,
+        occurrenceDate: today,
+        completedBy: cible.id,
+      });
       await refresh();
     },
-    [canWrite, currentMember?.id, householdId, refresh, today],
+    [canWrite, householdId, members, refresh, today],
+  );
+
+  const toggleOccurrence = useCallback(
+    async (routine: Routine) => {
+      if (routine.isDoneToday) {
+        if (!householdId) throw new Error('Aucun foyer sélectionné.');
+        if (!canWrite) throw new Error('Votre rôle ne permet pas d’écrire ici.');
+        await markOccurrenceMissed({ routineId: routine.id, householdId, occurrenceDate: today });
+        await refresh();
+        return;
+      }
+      // Self = cas particulier de la délégation (D-08/D-11) : un seul chemin
+      // d'écriture, toggleFor résout l'attributaire et le RPC l'acteur.
+      await toggleFor(routine, currentMember?.id ?? '');
+    },
+    [canWrite, currentMember?.id, householdId, today, toggleFor],
   );
 
   const saveRoutine = useCallback(
@@ -355,6 +380,7 @@ export function useRoutines(): UseRoutinesResult {
     isMutating,
     refetch,
     toggleOccurrence,
+    toggleFor,
     saveRoutine,
     removeRoutine,
     removeOccurrence,

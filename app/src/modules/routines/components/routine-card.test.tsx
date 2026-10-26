@@ -17,7 +17,6 @@ import type { Routine } from '../types';
 import { RoutineCard } from './routine-card';
 
 const member = (overrides: Partial<HouseholdMemberRow> & Pick<HouseholdMemberRow, 'id' | 'role' | 'display_name'>): HouseholdMemberRow => ({
-  id: '',
   household_id: 'h-1',
   user_id: null,
   avatar_url: null,
