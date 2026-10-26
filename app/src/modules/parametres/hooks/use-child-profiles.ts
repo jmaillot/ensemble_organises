@@ -48,7 +48,8 @@ const childRowFromCreation = (creation: ChildProfileCreation): HouseholdMemberRo
   household_id: creation.household_id,
   user_id: null,
   display_name: creation.display_name,
-  avatar_url: null,
+  // 0154 : la création stocke l'avatar — la ligne locale le porte désormais.
+  avatar_url: creation.avatar_url,
   color_tag: creation.color_tag,
   role: 'enfant',
   birth_date: creation.birth_date,
@@ -80,7 +81,7 @@ export function useChildProfiles() {
       setMembers(
         currentMembers().map((member) =>
           member.id === memberId
-            ? { ...member, display_name: values.displayName.trim(), color_tag: values.colorTag, birth_date: values.birthDate }
+            ? { ...member, display_name: values.displayName.trim(), color_tag: values.colorTag, birth_date: values.birthDate, avatar_url: values.avatarUrl }
             : member,
         ),
       );

@@ -145,7 +145,7 @@ export const CHILD_MANAGEABLE_MODULES = ['taches', 'routines', 'messages', 'anni
 /** Le socle proposé à la création d'une fiche enfant (D-06) : sans messages. */
 export const CHILD_DEFAULT_MODULES = ['taches', 'routines', 'anniversaires', 'menu'] as const;
 
-/** Ligne retournée par `create_managed_child_profile` (jsonb, 0146). */
+/** Ligne retournée par `create_managed_child_profile` (jsonb, 0146+0154). */
 export interface ChildProfileCreation {
   id: string;
   household_id: string;
@@ -153,6 +153,7 @@ export interface ChildProfileCreation {
   color_tag: MemberColorTag;
   role: Role;
   birth_date: string | null;
+  avatar_url: string | null;
   managed_modules: string[];
 }
 
@@ -203,6 +204,7 @@ export async function saveChildProfile(householdId: string, values: ChildProfile
       color_tag: row.color_tag ?? values.colorTag,
       role: 'enfant',
       birth_date: row.birth_date ?? values.birthDate,
+      avatar_url: row.avatar_url ?? values.avatarUrl,
       managed_modules: row.managed_modules ?? [...CHILD_DEFAULT_MODULES],
     };
   }
@@ -228,6 +230,7 @@ export async function saveChildProfile(householdId: string, values: ChildProfile
     color_tag: row.color_tag,
     role: 'enfant',
     birth_date: row.birth_date,
+    avatar_url: row.avatar_url,
     managed_modules: [...row.managed_modules],
   };
 }
@@ -246,6 +249,10 @@ export async function updateChildProfile(memberId: string, values: ChildProfileI
       p_color_tag: values.colorTag,
       p_birth_date: values.birthDate,
       p_avatar_url: values.avatarUrl,
+      // 0154 : la fiche sait supprimer l'avatar — l'UI demande la suppression
+      // quand la valeur saisie est explicitement vidée (null), sinon null
+      // signifie « ne pas toucher ».
+      p_clear_avatar: values.avatarUrl === null,
       p_managed_modules: null,
     });
     if (error) throw new Error(error.message || 'Mise à jour de la fiche impossible.');

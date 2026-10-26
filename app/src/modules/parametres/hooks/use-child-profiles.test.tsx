@@ -31,6 +31,7 @@ import {
   linkChildToAccount,
   saveChildProfile,
   setManagedModules,
+  updateChildProfile,
 } from '../api';
 import { childAgeLabel } from './use-child-profiles';
 
@@ -148,6 +149,45 @@ describe('api.ts — wrappers RPC des profils enfants (D-01/0146)', () => {
   it('setManagedModules refuse une clé hors des CINQ clés gérables (22023 côté serveur, refus local ici)', async () => {
     await expect(setManagedModules('m-noe', ['cadeaux'], { birthDate: enfantBirth, avatarUrl: null })).rejects.toThrow(/cadeaux/);
     expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  // 0154 (WR-04) : l'avatar transmis à la création est stocké et rendu —
+  // avant, la colonne était absente de l'INSERT et le jsonb ne la portait pas.
+  it('saveChildProfile rend l\'avatar stocké par la création (0154)', async () => {
+    rpcMock.mockResolvedValue({
+      data: { id: 'm-jade', household_id: 'h-1', display_name: 'Jade Martin', color_tag: 'amber', role: 'enfant', birth_date: null, avatar_url: 'avatars/jade.png' },
+      error: null,
+    });
+
+    const creation = await saveChildProfile('h-1', {
+      displayName: 'Jade Martin',
+      colorTag: 'amber',
+      birthDate: null,
+      avatarUrl: 'avatars/jade.png',
+    });
+
+    expect(creation.avatar_url).toBe('avatars/jade.png');
+  });
+
+  // 0154 (WR-04) : p_clear_avatar=true exactement quand la photo saisie est
+  // vidée — avant, un avatar null ne pouvait jamais supprimer (coalesce).
+  it('updateChildProfile demande la suppression d\'avatar uniquement quand la valeur saisie est vide', async () => {
+    await updateChildProfile('m-noe', { displayName: 'Noé Martin', colorTag: 'amber', birthDate: enfantBirth, avatarUrl: null });
+    expect(rpcMock).toHaveBeenCalledWith('update_managed_child_profile', {
+      p_member_id: 'm-noe',
+      p_display_name: 'Noé Martin',
+      p_color_tag: 'amber',
+      p_birth_date: enfantBirth,
+      p_avatar_url: null,
+      p_clear_avatar: true,
+      p_managed_modules: null,
+    });
+
+    await updateChildProfile('m-noe', { displayName: 'Noé Martin', colorTag: 'amber', birthDate: enfantBirth, avatarUrl: 'avatars/noe.png' });
+    expect(rpcMock).toHaveBeenLastCalledWith('update_managed_child_profile', expect.objectContaining({
+      p_avatar_url: 'avatars/noe.png',
+      p_clear_avatar: false,
+    }));
   });
 
   it('setManagedModules passe par update_managed_child_profile avec p_managed_modules sur la LIGNE MEMBRE', async () => {
