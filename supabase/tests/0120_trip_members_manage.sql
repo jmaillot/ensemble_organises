@@ -61,7 +61,11 @@ begin
     'select 1 from public.trip_members where trip_id = %L', trip_d)), 2::bigint,
     'le rejeu idempotent ne duplique rien');
 
-  -- Ajout d'un enfant : voyageur sans budget (0119).
+  -- Ajout d'un enfant : voyageur sans budget (0119). 0157 : D-06 exige
+  -- 'voyages' dans la fiche (l'activation est faite par l'adulte, cf. 0157).
+  update public.household_members
+     set managed_modules = '{taches,routines,anniversaires,menu,voyages}'::text[]
+   where id = kim_m;
   res := public.trip_add_member(adam, trip_d, kim_m);
   perform testkit.ok(not (res ->> 'already_member')::boolean, 'l''enfant est inscrit au voyage');
   perform testkit.eq(testkit.count(format(
