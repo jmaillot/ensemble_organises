@@ -59,6 +59,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 25-07-PLAN.md — Garde UI D-06 : member-eligibility.ts (fonction pure), quatre pickers inline branchés, « Cocher pour » sur la carte de routine (D-08/D-11), rebranchage markOccurrenceDone → RPC complete_routine_occurrence
+- [x] 25-08-GAP-SUMMARY.md — Clôture d'écart (2026-10-26) : Voyages rejoint « Fermer la porte » (migration 0157 : périmètre RPC élargi + garde 42501 sur trip_add_member ; pickers via eligibleMembersForModule ; décision utilisateur) ; avertissements UI-REVIEW corrigés selon 25-UI-SPEC (couleur éditable, copie D-04, « Enfant » filtré du sélecteur de rôle, modération Cercle conditionnelle) ; chaîne §2.7 verte (1628 tests unitaires, 155 e2e, 91/91 SQL) — test-dispatch-push.sh non exécuté (pas d'appareil abonné)
 
 **UI hint**: yes
 

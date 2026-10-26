@@ -98,6 +98,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P04 | 3 sessions | 3 tasks | 17 files |
 | Phase 25 P05 | ~2h (2 sessions) | 3 tasks | 10 files |
 | Phase 25 P07 | ~35 min | 3 tasks | 17 files |
+| Phase 25 P08-GAP | 3 sessions | 2 chantiers | 10 files |
 
 ## Decisions
 
@@ -120,6 +121,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: 25-07 : la garde D-06 vit dans la fonction pure member-eligibility.ts, consommée par les quatre pickers (tâches, routines, menu, ardoise) — zéro règle locale
 - [Phase 25]: 25-07 : self-toggle = cas particulier de la délégation — toggleFor est le seul chemin de complétion, markOccurrenceDone passe par le RPC 0146 en mode Supabase
 - [Phase 25]: 25-07 : l'ardoise abandonne son filtre de rôle pour la règle fiduciaire D-05 — le serveur 0146 reste l'autorité
+- [Phase 25] (25-08-GAP) : Voyages rejoint « Fermer la porte » (décision utilisateur 2026-10-26) — 0157 élargit le périmètre RPC et garde trip_add_member (42501) ; le frontend réutilise eligibleMembersForModule, zéro règle locale
+- [Phase 25] (25-08-GAP) : UI-REVIEW warnings corrigés selon 25-UI-SPEC verbatim — couleur éditable à la modification (D-05), copie D-04 dans la confirmation, « Enfant » filtré du sélecteur de rôle, modération Cercle conditionnelle au rôle de l'auteur
 
 ### Blockers
 
