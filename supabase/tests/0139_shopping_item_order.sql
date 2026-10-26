@@ -70,8 +70,19 @@ do $$
 declare
   v_count integer;
 begin
+  -- 0139 était erroné : cette assertion portait sur la VALEUR DE RETOUR
+  -- GLOBALE de `backfill_shopping_item_positions()` (row_count sur TOUTE
+  -- `shopping_list_items`) — dès qu'un article réel existe en base, elle
+  -- dépasse les fixtures et l'assertion casse sans rien dire de notre
+  -- semis. Conformément à AGENTS.md §2.7 D, on renonce à affirmer sur le
+  -- global : la preuve est confiée aux comptages bornés qui suivent — après
+  -- le backfill, plus aucun article du test n'est sans rang.
   v_count := private.backfill_shopping_item_positions();
-  perform testkit.eq(v_count, 4::integer, 'le backfill a.numéroté les quatre articles');
+  perform testkit.eq(
+    testkit.count($q$select 1 from public.shopping_list_items
+                    where id like 'item_t139_%' and position is null$q$),
+    0::bigint,
+    'le backfill a numéroté les quatre articles du test');
 
   perform testkit.eq(
     testkit.count($q$select 1 from public.shopping_list_items
