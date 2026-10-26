@@ -14,7 +14,7 @@ import { ROLE_LABELS } from './types';
 const MAX_STACK = 3;
 
 export default function CerclePage() {
-  const { feed, members, currentMemberId, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead, canPublish } =
+  const { feed, members, currentMemberId, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canDeleteComment, canEditPost, markPostRead, canPublish } =
     useCercleFeed();
   const [focusSignal, setFocusSignal] = useState(0);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -84,6 +84,7 @@ export default function CerclePage() {
                   onSubmitComment={addComment}
                   onUpdateComment={(commentId, content) => updateComment(commentId, content)}
                   onDeleteComment={(commentId) => deleteComment(commentId)}
+                  canDeleteInline={canDeleteComment}
                   onSelect={() => setActivePostId(post.id)}
                   onToggleReaction={() => void toggleReaction(post.id)}
                   onOpenComments={() => {
@@ -158,6 +159,7 @@ export default function CerclePage() {
         onSubmit={addComment}
         onUpdateComment={(commentId, content) => updateComment(commentId, content)}
         onDeleteComment={(commentId) => deleteComment(commentId)}
+        canDeleteComment={canDeleteComment}
       />
 
       <ConfirmDialog

@@ -423,9 +423,18 @@ export function useCercleFeed(): CercleFeed {
 
   const canEditPost = useCallback((post: FeedPost) => post.mine, []);
 
+  // D-12 (symétrie WR-05) : un adulte modère aussi les COMMENTAIRES d'un
+  // enfant géré, exactement comme canDelete le fait pour les posts — la
+  // politique post_comments_delete_admin (0149) l'autorise en base, l'UI
+  // n'affichait jamais le bouton. Le rôle de l'auteur vient de la liste
+  // vivante du store, même contrat que canDelete.
   const canDeleteComment = useCallback(
-    (comment: FeedComment) => comment.authorId === currentMemberId,
-    [currentMemberId],
+    (comment: FeedComment) => {
+      if (!isAdult) return comment.authorId === currentMemberId;
+      const authorRole = members.find((member) => member.id === comment.authorId)?.role;
+      return authorRole === 'enfant' || comment.authorId === currentMemberId;
+    },
+    [isAdult, members, currentMemberId],
   );
 
   const canEditComment = useCallback(

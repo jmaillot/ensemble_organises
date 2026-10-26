@@ -116,4 +116,32 @@ describe('useCercleFeed — modération adulte des publications d’enfant (D-12
     expect(result.current.canDelete(postOf(result.current.feed, autreEnfantPostId))).toBe(false);
     expect(result.current.canDelete(postOf(result.current.feed, adultePostId))).toBe(false);
   });
+
+  // WR-05 (symétrie D-12) : la modération s'étend aux COMMENTAIRES d'un
+  // enfant géré — la politique post_comments_delete_admin (0149) l'autorisait
+  // en base, le hook n'affichait jamais le bouton côté adulte non-auteur.
+  it('un adulte modère les commentaires d’un enfant, pas ceux d’un autre adulte (WR-05)', async () => {
+    seedView(MEMBRE);
+    const { result } = await renderFeed();
+
+    const commentOfEnfant = { id: 'c-enfant', postId: 'post-x', authorId: ENFANT, content: 'moi !', createdAt: '2026-01-01T00:00:00Z', mine: false } as never;
+    const commentOfAutreAdulte = { id: 'c-adulte', postId: 'post-x', authorId: DEMO_MEMBERS.lina, content: 'bonjour', createdAt: '2026-01-01T00:00:00Z', mine: false } as never;
+    const ownComment = { id: 'c-sien', postId: 'post-x', authorId: MEMBRE, content: 'ok', createdAt: '2026-01-01T00:00:00Z', mine: true } as never;
+
+    expect(result.current.canDeleteComment(commentOfEnfant)).toBe(true);
+    // D-07 : le commentaire d'un autre adulte reste strictement l'auteur.
+    expect(result.current.canDeleteComment(commentOfAutreAdulte)).toBe(false);
+    expect(result.current.canDeleteComment(ownComment)).toBe(true);
+  });
+
+  it('un enfant ne modère aucun commentaire : les siens seulement (WR-05)', async () => {
+    seedView(ENFANT, membersAvecSecondEnfant);
+    const { result } = await renderFeed();
+
+    const commentOfSecondEnfant = { id: 'c-mini', postId: 'post-x', authorId: secondEnfant.id, content: 'coucou', createdAt: '2026-01-01T00:00:00Z', mine: false } as never;
+    const ownComment = { id: 'c-noe', postId: 'post-x', authorId: ENFANT, content: 'moi', createdAt: '2026-01-01T00:00:00Z', mine: true } as never;
+
+    expect(result.current.canDeleteComment(commentOfSecondEnfant)).toBe(false);
+    expect(result.current.canDeleteComment(ownComment)).toBe(true);
+  });
 });

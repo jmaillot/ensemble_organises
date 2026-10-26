@@ -31,6 +31,12 @@ export interface PostCardProps {
   onSubmitComment?: (input: { postId: string; content: string }) => Promise<boolean>;
   onUpdateComment?: (commentId: string, content: string) => Promise<boolean>;
   onDeleteComment?: (commentId: string) => Promise<void>;
+  /**
+   * Grille de suppression inline d'un commentaire (D-12 : un adulte modère
+   * le contenu d'un enfant géré, 0149). Absente = auteur-seul, le contrat
+   * D-07 des rendus directs en test.
+   */
+  canDeleteInline?: (comment: FeedComment) => boolean;
 }
 
 function PostCardComponent({
@@ -47,6 +53,7 @@ function PostCardComponent({
   onSubmitComment,
   onUpdateComment,
   onDeleteComment,
+  canDeleteInline,
 }: PostCardProps) {
   const authorName = post.author?.display_name ?? 'Membre du foyer';
   const [editing, setEditing] = useState(false);
@@ -62,7 +69,9 @@ function PostCardComponent({
   const replyTrimmed = reply.trim();
   const replyOverCap = replyTrimmed.length > COMMENT_CONTENT_MAX;
 
-  // Édition/suppression inline : mêmes grilles auteur-seul (D-07) que le dialogue.
+  // Édition/suppression inline : la suppression suit la grille du hook
+  // (D-12 : modération du contenu d'un enfant géré par un adulte), l'édition
+  // reste auteur-seul (D-07).
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingComment, setSavingComment] = useState(false);
@@ -120,8 +129,11 @@ function PostCardComponent({
 
   const canEditInline = (comment: FeedComment) =>
     Boolean(onUpdateComment) && comment.authorId === currentMemberId;
-  const canDeleteInline = (comment: FeedComment) =>
-    Boolean(onDeleteComment) && comment.authorId === currentMemberId;
+  // Grille déléguée au hook quand la prop est là ; auteur-seul sinon, pour
+  // que les tests qui rendent la carte toute seule gardent D-07.
+  const peutSupprimerInline = (comment: FeedComment) =>
+    Boolean(onDeleteComment) &&
+    (canDeleteInline ? canDeleteInline(comment) : comment.authorId === currentMemberId);
 
   const visibleComments = post.comments.slice(-INLINE_COMMENT_COUNT);
   const hiddenCount = post.commentCount - visibleComments.length;
@@ -309,7 +321,7 @@ function PostCardComponent({
                       Elles s'effacent tant qu'on ne survole pas (ou ne tabule
                       pas dessus) et restent visibles au tactile, où le survol
                       n'existe pas. */}
-                  {!editingComment && (canEditInline(comment) || canDeleteInline(comment)) ? (
+                  {!editingComment && (canEditInline(comment) || peutSupprimerInline(comment)) ? (
                     <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 [@media(hover:none)]:opacity-100 max-[650px]:opacity-100">
                       {canEditInline(comment) ? (
                         <button
@@ -324,7 +336,7 @@ function PostCardComponent({
                           <Icon name="edit" size="sm" />
                         </button>
                       ) : null}
-                      {canDeleteInline(comment) ? (
+                      {peutSupprimerInline(comment) ? (
                         <button
                           type="button"
                           onClick={(event) => {

@@ -32,6 +32,12 @@ export interface CommentsDialogProps {
   onSubmit: (input: { postId: string; content: string }) => Promise<boolean>;
   onUpdateComment: (commentId: string, content: string) => Promise<boolean>;
   onDeleteComment: (commentId: string) => Promise<void>;
+  /**
+   * Grille de suppression d'un commentaire (D-12 : un adulte modère le
+   * contenu d'un enfant géré, 0149). Absente = auteur-seul, le contrat D-07
+   * des rendus directs en test.
+   */
+  canDeleteComment?: (comment: FeedComment) => boolean;
 }
 
 /** Fil de discussion d'une publication, dans une modale accessible. */
@@ -43,6 +49,7 @@ export function CommentsDialog({
   onSubmit,
   onUpdateComment,
   onDeleteComment,
+  canDeleteComment,
 }: CommentsDialogProps) {
   const {
     register,
@@ -92,9 +99,10 @@ export function CommentsDialog({
     if (done) cancelEdit();
   };
 
-  // D-07 : suppression strictement auteur — aucune branche admin.
-  const canDeleteComment = (comment: FeedComment) =>
-    comment.authorId === currentMemberId;
+  // Grille déléguée au hook quand la prop est là ; auteur-seul sinon, pour
+  // que les tests qui rendent le dialogue tout seul gardent D-07.
+  const peutSupprimer = (comment: FeedComment) =>
+    canDeleteComment ? canDeleteComment(comment) : comment.authorId === currentMemberId;
 
   return (
     <>
@@ -166,7 +174,7 @@ export function CommentsDialog({
                   {/* Même règle que dans le fil : les commandes tiennent la
                       ligne du commentaire, à droite, et ne s'affichent qu'au
                       survol ou au focus — toujours visibles au tactile. */}
-                  {!editing && (mine || canDeleteComment(comment)) ? (
+                  {!editing && (mine || peutSupprimer(comment)) ? (
                     <div className="-mr-1 flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity duration-[var(--duration-quick)] group-hover/comment:opacity-100 group-focus-within/comment:opacity-100 [@media(hover:none)]:opacity-100 max-[650px]:opacity-100">
                       {mine ? (
                         <button

@@ -405,6 +405,75 @@ describe('Cercle', () => {
     expect(within(row).queryByRole('button', { name: 'Supprimer ce commentaire' })).not.toBeInTheDocument();
   });
 
+  it('l’adulte voit la suppression sur le commentaire d’un enfant géré quand la grille du hook est passée (D-12/WR-05)', () => {
+    const camille = demoMembers.find((member) => member.id === DEMO_MEMBERS.camille) ?? null;
+    const noe = demoMembers.find((member) => member.id === DEMO_MEMBERS.noe) ?? null;
+    const now = new Date().toISOString();
+    const noop = () => {};
+    // Grille du hook (useCercleFeed.canDeleteComment) : un adulte modère le
+    // contenu d'un enfant — les deux composants la reçoivent en prop.
+    const grilleAdulte = (authorId: string) =>
+      authorId === DEMO_MEMBERS.noe || authorId === DEMO_MEMBERS.camille;
+    const postEnfant = {
+      id: 'post-z',
+      authorId: DEMO_MEMBERS.camille,
+      author: camille,
+      text: 'Fil avec une réplique d’enfant.',
+      createdAt: now,
+      createdLabel: 'À l’instant',
+      media: [],
+      comments: [
+        { id: 'c-10', postId: 'post-z', authorId: DEMO_MEMBERS.noe, author: noe, content: 'Réplique d’enfant.', createdAt: now },
+      ],
+      commentCount: 1,
+      reactionCount: 0,
+      liked: false,
+      unreadComments: 0,
+      mine: true,
+      isNew: false,
+    } as FeedPost;
+
+    // Carte : le bouton inline apparaît sur le commentaire de l'enfant…
+    renderWithProviders(
+      <PostCard
+        post={postEnfant}
+        active={false}
+        canDelete
+        canEdit
+        currentMemberId={DEMO_MEMBERS.camille}
+        canDeleteInline={(comment) => grilleAdulte(comment.authorId)}
+        onSelect={noop}
+        onToggleReaction={noop}
+        onOpenComments={noop}
+        onRequestDelete={noop}
+        onSaveEdit={async () => true}
+        onSubmitComment={async () => true}
+        onUpdateComment={async () => true}
+        onDeleteComment={async () => {}}
+      />,
+    );
+    const ligneInline = screen.getByText('Réplique d’enfant.').closest('li') as HTMLElement;
+    expect(within(ligneInline).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+    // …mais pas l'édition, qui reste auteur-seul (D-07).
+    expect(within(ligneInline).queryByRole('button', { name: 'Modifier ce commentaire' })).not.toBeInTheDocument();
+
+    // Dialogue : même grille, même bouton sur le commentaire de l'enfant.
+    renderWithProviders(
+      <CommentsDialog
+        post={postEnfant}
+        open
+        currentMemberId={DEMO_MEMBERS.camille}
+        canDeleteComment={(comment) => grilleAdulte(comment.authorId)}
+        onOpenChange={noop}
+        onSubmit={async () => true}
+        onUpdateComment={async () => true}
+        onDeleteComment={async () => {}}
+      />,
+    );
+    const ligneDialogue = within(screen.getByRole('dialog')).getByText('Réplique d’enfant.').closest('li') as HTMLElement;
+    expect(within(ligneDialogue).getByRole('button', { name: 'Supprimer ce commentaire' })).toBeInTheDocument();
+  });
+
   it('l’admin ne voit aucune suppression sur le contenu d’autrui, la sienne reste (D-07)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CerclePage />);
