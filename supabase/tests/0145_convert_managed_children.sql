@@ -153,6 +153,11 @@ begin
   kid := testkit.auth_user('t145-noe@example.fr', 'Noé Cent Quarante Cinq');
   kid_m := testkit.member(home_a, kid, 'Noé CQA', 'enfant', 'amber');
 
+  -- Le testkit ignore le user_id des enfants (l'invariant produit). Le
+  -- scénario décrit l'état HÉRITÉ d'avant 0145 — un enfant porteur d'un
+  -- compte — semé ici à la main pendant que l'invariant est retiré.
+  update public.household_members set user_id = kid where id = kid_m;
+
   with ins as (
     insert into public.tasks (household_id, name, created_by)
     values (home_a, 'Ranger la chambre t145', alice_m)
@@ -262,6 +267,11 @@ begin
   kid2 := testkit.auth_user('t145-lila@example.fr', 'Lila Cent Quarante Cinq');
   kid2_a := testkit.member(home_b, kid2, 'Lila adulte CQB', 'membre', 'ink');
   kid2_e := testkit.member(home_a, kid2, 'Lila enfant CQA', 'enfant', 'amber');
+
+  -- Même état hérité qu'en (b) : la ligne enfant porte le compte, semé à la
+  -- main pendant que l'invariant est retiré — c'est lui que la conversion
+  -- doit IGNOREN (le compte est partagé par la ligne adulte d'un autre foyer).
+  update public.household_members set user_id = kid2 where id = kid2_e;
 
   insert into testkit.fx (key, user_id) values ('t145-kid2', kid2);
   insert into testkit.fx (key, row_id) values

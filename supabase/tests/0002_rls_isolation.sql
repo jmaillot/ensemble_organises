@@ -385,29 +385,41 @@ select testkit.ok(
 reset role;
 
 -- ===========================================================================
--- Noé, rôle `enfant` — lecture seule
+-- Noé, ligne enfant gérée (0145) : plus de compte, plus de session. L'adulte
+-- lit le contenu du foyer ; l'enfant est ciblé par member_id, jamais acteur ;
+-- l'ancien uid n'accède plus à rien.
 -- ===========================================================================
+select testkit.as_user(user_id, 'bob@example.fr') from testkit.fx where key = 'bob';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 1::bigint,
+  'l''adulte du foyer lit la tâche du foyer');
+
+reset role;
+
 select testkit.as_user(user_id, 'enfant@example.fr') from testkit.fx where key = 'enfant';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.tasks'), 1::bigint,
-  'un enfant lit les tâches de son foyer');
+select testkit.eq(testkit.count('select 1 from public.tasks'), 0::bigint,
+  'un uid sans membre résolu ne lit aucune tâche du foyer (0145)');
 select testkit.expect_denied(format(
   'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
-  'task_kid', (select household_id from testkit.fx where key = 'alice'), 'Tâche d''enfant'));
+  'task_kid', (select household_id from testkit.fx where key = 'alice'), 'Tâche d''enfant'),
+  'un uid sans membre résolu n''écrit pas de tâche');
 select testkit.eq(testkit.affected(format(
   'update public.notes set title = %L where title = %L', 'Piraté', 'Note de Bob')), 0::bigint,
-  'un enfant ne modifie pas les notes du foyer');
+  'un uid sans membre résolu ne modifie pas les notes du foyer');
 select testkit.eq(testkit.affected(format(
   'delete from public.tasks where id = %L', (select row_id from testkit.fx where key = 'task_a'))), 0::bigint,
-  'un enfant ne supprime pas les tâches du foyer');
+  'un uid sans membre résolu ne supprime pas les tâches du foyer');
 select testkit.expect_denied(format(
   'insert into public.expenses (id, household_id, title, amount, paid_by, expense_date) values (%L, %L, %L, 10, %L, current_date)',
   'expense_kid', (select household_id from testkit.fx where key = 'alice'), 'Goûter', (select row_id from testkit.fx where key = 'alice')),
-  'un enfant ne crée pas de dépense');
+  'un uid sans membre résolu ne crée pas de dépense');
 select testkit.eq(testkit.affected(format(
   'delete from public.expense_participants where id = %L', (select row_id from testkit.fx where key = 'ep_a'))), 0::bigint,
-  'un enfant ne supprime pas les parts de dépense');
+  'un uid sans membre résolu ne supprime pas les parts de dépense');
 
 reset role;
 
@@ -459,8 +471,8 @@ reset role;
 select testkit.as_user(user_id, 'alice@example.fr') from testkit.fx where key = 'alice';
 set local role authenticated;
 
-select testkit.eq(testkit.count('select 1 from public.profiles'), 3::bigint,
-  'Alice voit son profil et ceux de son foyer uniquement');
+select testkit.eq(testkit.count('select 1 from public.profiles'), 2::bigint,
+  'Alice voit son profil et celui de Bob (l''enfant géré n''a plus de profil)');
 select testkit.eq(testkit.affected(format(
   'update public.profiles set display_name = %L where email = %L', 'Détournée', 'carol@example.fr')), 0::bigint,
   'on ne peut pas modifier le profil d''un foyer tiers');
