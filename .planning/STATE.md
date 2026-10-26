@@ -48,7 +48,8 @@ Progress: [█░░░░░░░░░] 14% (6/7 plans)
 
 ## Accumulated Context
 
-- Décisions héritées v0.9.0 : tous les 20 espaces en prod, e2e 147/147, audits
+- Décisions héritées v0.9.0 : tous les 20 espaces en prod, e2e 147/147 à la clôture
+  v0.9.0 (baseline courante : 155, cf. ROADMAP 25-08), audits
   v0.9.0 PASSED ; contrats enfants 0113-0116 (à re-diligencier en plan 25) ;
   RPC conversations 0041 ; chaîne push `dispatch_messages`→`push-notify` existante ;
   estampille de build à quatre canaux (phase 24).
@@ -63,8 +64,8 @@ Progress: [█░░░░░░░░░] 14% (6/7 plans)
   - Table `gdpr_export_jobs` + bucket `gdpr-exports` (TTL 24h URL, purge 7 j cron).
   - Flag-deliverability : réputation IP — preuve de réception réelle exigée sur le
     domaine cible, fallback relais SMTP dédié à prouver, pas à pré-installer.
-- Indicateurs de suivi : 925+ tests Vitest, test-db 64/64, e2e 147/147 (baseline à
-  maintenir à chaque phase).
+- Indicateurs de suivi : 1628 tests Vitest, test-db 91/91, e2e 155/155 (baseline
+  autoritaire ROADMAP 25-08, clôture 2026-10-26 — à maintenir à chaque phase).
 - Pièces pointées à investiguer pendant les plans : migrations 0113-0116 (profils
   enfants) et RPC conversations 0041 (à relire pendant plan 25) ; audit FK vers
 `auth.users` (phase 27) ; `household_invite_tokens` (déjà durcies 0082/0083, plan 31).
