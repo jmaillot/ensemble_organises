@@ -15,7 +15,7 @@
 
 ## Phases
 
-- [ ] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session
+- [x] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session (completed 2026-10-26)
 - [ ] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée
 - [ ] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur
 - [ ] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles
@@ -36,7 +36,7 @@
   3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
-**Plans**: 7/7 plans executed
+**Plans**: 8/7 plans complete
 
 Plans:
 - [x] 25-04-PLAN.md
@@ -152,7 +152,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 7/7 | In Progress|  |
+| 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |

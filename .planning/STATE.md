@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 25
-current_phase_name: Profils enfants gérés par le parent
-status: verifying
-stopped_at: Completed 25-07-PLAN.md
-last_updated: "2026-10-26T12:15:02.605Z"
-state_head: 01855d44fde511e802a57b123212cd4d608d0a18
+current_phase: 26
+current_phase_name: Export RGPD
+status: planning
+stopped_at: Phase 25 complete, ready to plan Phase 26
+last_updated: "2026-10-26T20:21:59.555Z"
+state_head: ac39db591d8126a2dfe9b4f80fd3bdc7ea9dfe7d
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 7
   completed_plans: 7
-  percent: 0
+  percent: 14
 last_activity: 2026-10-25
 ---
 
@@ -21,10 +21,10 @@ last_activity: 2026-10-25
 
 ## Current Position
 
-Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
-Plan: 7 of 7
-Status: Phase complete — ready for verification
-Progress: [░░░░░░░░░░] 0% (6/7 plans)
+Phase: 26 — Export RGPD
+Plan: Not started
+Status: Ready to plan
+Progress: [█░░░░░░░░░] 14% (6/7 plans)
 
 ## Références du jalon v1.0
 
@@ -72,7 +72,7 @@ Progress: [░░░░░░░░░░] 0% (6/7 plans)
 ## Session Continuity
 
 **Last session:** 2026-10-26T12:15:02.565Z
-**Stopped at:** Completed 25-07-PLAN.md
+**Stopped at:** Phase 25 complete, ready to plan Phase 26
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
