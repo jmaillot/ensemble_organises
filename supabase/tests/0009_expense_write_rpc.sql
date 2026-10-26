@@ -147,24 +147,36 @@ begin
 end;
 $$;
 
--- Enfant du foyer : lecture seule, y compris par RPC (0037).
+-- Enfant du foyer : depuis 0145, l'enfant géré n'a plus de compte ni de
+-- session — son uid ne résout aucun membre et ne peut porter aucun appel
+-- RPC. On prouve le refus tel que la voie RPC le rend (un acteur sans membre
+-- résolu est refusé pour appartenance, comme un extérieur), puis le refus du
+-- garde écrivain lui-même (0037), en contexte serveur — ce garde est appelé
+-- par create_expense et update_expense après le contrôle d'appartenance.
 select testkit.as_user(user_id, 'rpc-kid@example.fr') from testkit.fx where key = 'kid';
 
 do $$
 declare
   home text;
   alice_m text;
+  kid uuid;
 begin
   select household_id into home from testkit.fx where key = 'home';
   select row_id into alice_m from testkit.fx where key = 'alice_m';
+  select user_id into kid from testkit.fx where key = 'kid';
+
+  perform testkit.eq(testkit.count(format(
+    'select 1 from public.household_members where user_id = %L', kid)), 0::bigint,
+    'l''enfant géré n''a plus de compte : son uid ne résout aucun membre (0145)');
 
   begin
     perform public.create_expense(home, 'ardoise_rpc', 'Goûter', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
         jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
-    perform testkit.ok(false, 'un enfant ne crée pas de dépense par RPC');
+    perform testkit.ok(false, 'un uid enfant ne crée pas de dépense par RPC');
   exception when others then
-    perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%appartenez%',
+      'un uid sans membre résolu est refusé pour appartenance : ' || sqlerrm);
   end;
 
   begin
@@ -173,9 +185,10 @@ begin
       'Goûter détourné', 10.00, alice_m, null, current_date, 'egal',
       jsonb_build_array(
         jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
-    perform testkit.ok(false, 'un enfant ne modifie pas de dépense par RPC');
+    perform testkit.ok(false, 'un uid enfant ne modifie pas de dépense par RPC');
   exception when others then
-    perform testkit.ok(sqlerrm like '%rôle insuffisant%', 'le refus dit le rôle : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%appartenez%',
+      'un uid sans membre résolu est refusé pour appartenance : ' || sqlerrm);
   end;
 end;
 $$;

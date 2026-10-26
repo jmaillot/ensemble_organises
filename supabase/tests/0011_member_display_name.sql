@@ -61,18 +61,39 @@ $$;
 
 reset role;
 
--- Enfant : sa ligne lui appartient aussi.
+-- Enfant géré : depuis 0145, l'enfant n'a plus de compte ni de session — il
+-- ne renomme pas sa ligne lui-même (l'uid ne résout aucun membre : « autre
+-- que vous »). Le seul chemin enfant est la fiche tenue par un adulte.
 select testkit.as_user(user_id, 'nom-kid@example.fr') from testkit.fx where key = 'kid';
 set local role authenticated;
 
 do $$
 declare
   kid_m text;
-  v_out jsonb;
 begin
   select row_id into kid_m from testkit.fx where key = 'kid_m';
-  v_out := public.rename_own_member_name(kid_m, 'Noé Moderne');
-  perform testkit.eq(v_out ->> 'display_name', 'Noé Moderne', 'un enfant renomme sa propre ligne');
+  begin
+    perform public.rename_own_member_name(kid_m, 'Noé Moderne');
+    perform testkit.ok(false, 'un enfant sans session ne renomme pas sa ligne');
+  exception when others then
+    perform testkit.ok(sqlerrm like '%autre que vous%', 'le refus dit la propriété : ' || sqlerrm);
+  end;
+end;
+$$;
+
+reset role;
+
+-- Le seul chemin : un adulte du foyer met à jour la fiche (0146).
+select testkit.as_user(user_id, 'nom-alice@example.fr') from testkit.fx where key = 'alice';
+set local role authenticated;
+
+do $$
+declare
+  kid_m text;
+begin
+  select row_id into kid_m from testkit.fx where key = 'kid_m';
+  perform public.update_managed_child_profile(kid_m, 'Noé Moderne', 'amber', null, null, null);
+  perform testkit.ok(true, 'l''adulte met à jour la fiche enfant par le RPC dédié');
 end;
 $$;
 
@@ -103,5 +124,11 @@ select testkit.eq(
   (select display_name from public.household_members where id = (select row_id from testkit.fx where key = 'bob_m')),
   'Bobby Martin',
   'la ligne membre porte le nouveau nom');
+
+-- La ligne enfant aussi : le nom vient de la fiche tenue par l'adulte.
+select testkit.eq(
+  (select display_name from public.household_members where id = (select row_id from testkit.fx where key = 'kid_m')),
+  'Noé Moderne',
+  'la ligne enfant porte le nom donné par la fiche adulte');
 
 rollback;
