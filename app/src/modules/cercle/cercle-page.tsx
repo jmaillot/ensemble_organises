@@ -14,7 +14,7 @@ import { ROLE_LABELS } from './types';
 const MAX_STACK = 3;
 
 export default function CerclePage() {
-  const { feed, members, currentMemberId, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead } =
+  const { feed, members, currentMemberId, unreadTotal, reactionTotal, isLoading, isError, error, refetch, publish, addComment, toggleReaction, updatePost, updateComment, deletePost, deleteComment, canDelete, canEditPost, markPostRead, canPublish } =
     useCercleFeed();
   const [focusSignal, setFocusSignal] = useState(0);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -56,7 +56,8 @@ export default function CerclePage() {
             stackOnMobile
           />
 
-          <PostComposer onPublish={publish} focusSignal={focusSignal} />
+          {/* D-12 : un enfant géré ne publie pas — pas d'UI morte à l'écran. */}
+          {canPublish ? <PostComposer onPublish={publish} focusSignal={focusSignal} /> : null}
 
           {isError ? (
             <ErrorState message={error?.message ?? 'Le fil n’a pas pu être chargé.'} onRetry={refetch} />
@@ -66,9 +67,9 @@ export default function CerclePage() {
             <EmptyState
               icon="people"
               title="Le fil est encore vide"
-              description="Soyez la première personne à publier un moment."
-              actionLabel="Publier un moment"
-              onAction={() => setFocusSignal((value) => value + 1)}
+              description={canPublish ? 'Soyez la première personne à publier un moment.' : 'Les adultes du foyer y publieront les moments à venir.'}
+              actionLabel={canPublish ? 'Publier un moment' : undefined}
+              onAction={canPublish ? () => setFocusSignal((value) => value + 1) : undefined}
             />
           ) : (
             <div aria-live="polite">

@@ -1153,6 +1153,16 @@ export const demoPosts: PostRow[] = [
     text: 'J’ai retrouvé le numéro de la bibliothèque pour vous. Je le garde dans Prestataires.',
     created_at: `${new Date(Date.now() - 26 * 3_600_000).toISOString()}`,
   },
+  {
+    // 25-05 (D-12) : une publication d'enfant géré dans le fil — le socle de
+    // la modération adulte (l'e2e `child-profiles.spec.ts` l'exerce) et d'une
+    // démo crédible où l'enfant apparaît comme tout le monde.
+    id: 'post-3',
+    household_id: DEMO_HOUSEHOLD_ID,
+    author_id: DEMO_MEMBERS.noe,
+    text: 'J’ai fini mon dessin de l’école, regardez !',
+    created_at: `${new Date(Date.now() - 50 * 60_000).toISOString()}`,
+  },
 ];
 
 export const demoPostMedia: PostMediaRow[] = [

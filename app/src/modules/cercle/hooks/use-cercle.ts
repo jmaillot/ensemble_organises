@@ -61,6 +61,8 @@ export interface CercleFeed {
   canEditPost: (post: FeedPost) => boolean;
   canDeleteComment: (comment: FeedComment) => boolean;
   canEditComment: (comment: FeedComment) => boolean;
+  /** D-12 : faux pour un enfant géré — l'écran masque alors le composeur. */
+  canPublish: boolean;
   /** Marque les commentaires d'une publication comme lus, sur tous les appareils. */
   markPostRead: (postId: string) => void;
 }
@@ -398,8 +400,26 @@ export function useCercleFeed(): CercleFeed {
     [householdId, invalidate, toast],
   );
 
-  // D-07 : suppression unitaire strictement auteur — plus de branche admin.
-  const canDelete = useCallback((post: FeedPost) => post.mine, []);
+  // D-07 : suppression unitaire strictement auteur pour le contenu adulte —
+  // D-12 : les adultes (admin OU membre, useIsAdult) modèrent en plus le
+  // contenu d'un enfant géré. Le rôle de l'auteur vient de la liste vivante
+  // du store ; une ligne archivée n'y est plus, la règle retombe sur l'auteur
+  // — les gardes réelles restent en base (0146), l'UI ne fait qu'afficher.
+  const currentRole = members.find((member) => member.id === currentMemberId)?.role;
+  const isAdult = currentRole === 'admin' || currentRole === 'membre';
+  const canDelete = useCallback(
+    (post: FeedPost) => {
+      if (!isAdult) return post.mine;
+      const authorRole = members.find((member) => member.id === post.authorId)?.role;
+      return authorRole === 'enfant' || post.mine;
+    },
+    [isAdult, members],
+  );
+
+  // D-12 : un enfant géré ne publie pas — l'écran n'affiche donc aucun
+  // composeur. La prohibition réelle est l'absence de politique INSERT côté
+  // serveur (0146) ; ce drapeau n'ôte qu'une UI morte.
+  const canPublish = isAdult;
 
   const canEditPost = useCallback((post: FeedPost) => post.mine, []);
 
@@ -440,5 +460,6 @@ export function useCercleFeed(): CercleFeed {
     canDeleteComment,
     canEditComment,
     markPostRead,
+    canPublish,
   };
 }

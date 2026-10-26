@@ -215,7 +215,7 @@ export function MembersPanel() {
                   </Button>
                 </div>
               ) : null}
-              {isAdult ? (
+              {isAdult && !isManagedChild ? (
                 <div className="flex items-center gap-1.5">
                   <Button
                     variant="secondary"

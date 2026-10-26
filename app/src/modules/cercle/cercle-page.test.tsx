@@ -117,8 +117,8 @@ describe('Cercle', () => {
       expect(within(card).getByRole('button', { name: 'Réagir à cette publication' })).toHaveTextContent('1 réaction'),
     );
 
-    // Le fil garde ses deux publications d’origine, le compteur global suit.
-    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(2);
+    // Le fil garde ses publications d’origine (dont celle de Noé, 25-05), le compteur global suit.
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
   });
 
   it('ajoute un commentaire depuis la modale et le montre dans la carte', async () => {
@@ -193,8 +193,8 @@ describe('Cercle', () => {
       expect(screen.queryByText('Pique-nique annulé, pluie annoncée.')).not.toBeInTheDocument(),
     );
     expect(await screen.findByText('Publication supprimée.')).toBeInTheDocument();
-    // Les deux publications d’origine survivent : la suppression ne déborde pas.
-    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(2);
+    // Les publications d’origine survivent : la suppression ne déborde pas.
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
   });
 
   it('modifie sa propre publication en ligne et l’annonce', async () => {
@@ -446,13 +446,13 @@ describe('Cercle', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Publier' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Publier' }));
     await screen.findByText(withinDb);
-    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(4);
 
     // 4001 caractères : la validation client reflète le CHECK et rien ne part.
     fireEvent.change(screen.getByLabelText(/Votre commentaire/), { target: { value: `b`.repeat(4001) } });
     await user.click(screen.getByRole('button', { name: 'Publier' }));
     expect(await screen.findByText('Le message est limité à 4000 caractères.')).toBeInTheDocument();
-    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(3);
+    expect(container.querySelectorAll('article[data-post-id]')).toHaveLength(4);
   });
 
   it('publie un commentaire long sous le plafond base et refuse au-delà', async () => {
