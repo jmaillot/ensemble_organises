@@ -24,17 +24,15 @@ const baseMember = {
 } as const;
 
 const memberRow = (
-  overrides: Record<string, unknown> & Pick<HouseholdMemberRow, 'id' | 'role'>,
-): HouseholdMemberRow =>
-  ({
-    ...baseMember,
-    display_name: 'Membre test',
-    ...overrides,
-    // Assertion tolérante : certains cas portent des colonnes pas encore
-    // déclarées sur HouseholdMemberRow (birth_date, deleted_at,
-    // managed_modules) — leur ARRIVÉE dans le type est justement l'objet de
-    // la tâche ; à la fin du plan, les lignes ci-dessous compilent sans cast.
-  }) as HouseholdMemberRow;
+  overrides: Partial<HouseholdMemberRow> & Pick<HouseholdMemberRow, 'id' | 'role'>,
+): HouseholdMemberRow => ({
+  ...baseMember,
+  display_name: 'Membre test',
+  birth_date: null,
+  managed_modules: [],
+  deleted_at: null,
+  ...overrides,
+});
 
 const householdRow = {
   id: 'h-1',
