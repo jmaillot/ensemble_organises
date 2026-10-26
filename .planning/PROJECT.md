@@ -40,7 +40,9 @@ restantes, outiller l'exploitation et préparer l'ouverture publique.
 
 ### Active requirements
 
-En cours de définition dans REQUIREMENTS.md (jalon v1.0).
+ENF-01 → ENF-05 validés par la phase 25 (2026-10-26) : profils enfants gérés
+par le parent, sans compte d'authentification, redirection push vers les
+adultes. Reste du jalon dans REQUIREMENTS.md (jalon v1.0).
 
 ## État v0.9.0 (historique)
 
@@ -65,4 +67,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-25 at milestone v1.0 start*
+*Last updated: 2026-10-26 après transition phase 25 → 26*
