@@ -49,8 +49,8 @@ describe('Paramètres du foyer', () => {
     useHouseholdStore.setState({
       currentMemberId: DEMO_MEMBERS.lina,
       members: [
-        { id: DEMO_MEMBERS.camille, household_id: 'household-martin', user_id: null, display_name: 'Camille Martin', avatar_url: null, color_tag: 'accent', role: 'admin', created_at: new Date().toISOString() },
-        { id: DEMO_MEMBERS.lina, household_id: 'household-martin', user_id: null, display_name: 'Lina Martin', avatar_url: null, color_tag: 'coral', role: 'membre', created_at: new Date().toISOString() },
+        { id: DEMO_MEMBERS.camille, household_id: 'household-martin', user_id: null, display_name: 'Camille Martin', avatar_url: null, color_tag: 'accent', role: 'admin', birth_date: null, managed_modules: [], deleted_at: null, created_at: new Date().toISOString() },
+        { id: DEMO_MEMBERS.lina, household_id: 'household-martin', user_id: null, display_name: 'Lina Martin', avatar_url: null, color_tag: 'coral', role: 'membre', birth_date: null, managed_modules: [], deleted_at: null, created_at: new Date().toISOString() },
       ],
     });
 

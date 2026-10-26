@@ -8,7 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { Badge } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
-import { useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
+import { useHouseholdStore, useIsAdult, useMembers } from '@/stores/household-store';
 import type { HouseholdMemberRow } from '@/types';
 import { removeMember, renameMember, setMemberRole } from '../api';
 import { roleLabels, roleOrder } from '../types';
@@ -18,7 +18,9 @@ const roleChangeNotice = 'Seul un administrateur change un rôle, via une opéra
 
 export function MembersPanel() {
   const toast = useToast();
-  const isAdmin = useIsAdmin();
+  // D-01 : administrateur ET membre gèrent les profils enfants — les actions
+  // de gestion des membres suivent useIsAdult, pas useIsAdmin.
+  const isAdult = useIsAdult();
   const members = useMembers();
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
   const setMembers = useHouseholdStore((state) => state.setMembers);
@@ -67,7 +69,7 @@ export function MembersPanel() {
               <Badge tone={member.role === 'admin' ? 'accent' : member.role === 'enfant' ? 'amber' : 'muted'}>
                 {roleLabels[member.role]}
               </Badge>
-              {isAdmin ? (
+              {isAdult ? (
                 <div className="flex items-center gap-1.5">
                   <Button
                     variant="secondary"
@@ -113,7 +115,7 @@ export function MembersPanel() {
           );
         })}
       </ul>
-      {isAdmin ? (
+      {isAdult ? (
         <p id="role-change-notice" className="mt-4 mb-0 rounded-[14px] bg-bg p-3 text-[12px] text-muted">
           {roleChangeNotice}
         </p>

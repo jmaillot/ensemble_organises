@@ -37,6 +37,17 @@ const initialState = {
   city: 'Lyon',
 };
 
+/**
+ * D-04 : les lignes `household_members` archivées (enfant retiré du foyer,
+ * `deleted_at` non null) restent en base — leurs traces aussi — mais ne
+ * doivent plus apparaître nulle part dans l'application. Le filtre vit ICI,
+ * une seule fois : chaque ingestion de membres passe par `setHousehold` ou
+ * `setMembers`, donc tous les consommateurs (`useMembers`, `useCurrentMember`,
+ * les sélecteurs inline du panneau comme des modules) voient la liste vivante,
+ * sans qu'aucun composant n'ait à refiltrer.
+ */
+const vivantes = (members: HouseholdMemberRow[]): HouseholdMemberRow[] => members.filter((member) => member.deleted_at == null);
+
 export const useHouseholdStore = create<HouseholdState>()(
   persist(
     (set) => ({
@@ -46,7 +57,8 @@ export const useHouseholdStore = create<HouseholdState>()(
           householdId: household.id,
           householdName: household.name,
           householdColor: household.avatar_color,
-          members,
+          // D-04 : ingestion filtrée des membres — voir `vivantes`.
+          members: vivantes(members),
           currentMemberId: currentMemberId ?? members[0]?.id ?? '',
           // `?? []` : une ligne démo ou un cache ancien peut ne pas porter la
           // colonne ; l'absence de configuration veut dire tout activé.
@@ -54,7 +66,8 @@ export const useHouseholdStore = create<HouseholdState>()(
         }),
       setDisabledModules: (disabledModules) => set({ disabledModules }),
       switchHousehold: (householdId, householdName) => set({ householdId, householdName }),
-      setMembers: (members) => set({ members }),
+      // D-04 : ingestion filtrée des membres — voir `vivantes`.
+      setMembers: (members) => set({ members: vivantes(members) }),
       setCity: (city) => set({ city }),
       reset: () => set({ ...initialState }),
     }),
@@ -94,6 +107,17 @@ export function useMembers(): HouseholdMemberRow[] {
 
 export function useIsAdmin(): boolean {
   return useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role === 'admin');
+}
+
+/**
+ * D-01 : les adultes — administrateur ET membre — gèrent les profils enfants
+ * (création, édition, archivage, choix des espaces, modération du Cercle).
+ * L'enfant, lui, n'administre rien. `useIsAdmin` garde sa sémantique stricte :
+ * les dossiers perso notes/routines restent réservés à l'administrateur.
+ */
+export function useIsAdult(): boolean {
+  const role = useHouseholdStore((state) => state.members.find((member) => member.id === state.currentMemberId)?.role);
+  return role === 'admin' || role === 'membre';
 }
 
 export function useMemberName(): string {

@@ -32,6 +32,9 @@ const withAssignee = (memberId: string) => ({
     avatar_url: null,
     color_tag: 'accent' as const,
     role: 'membre' as const,
+    birth_date: null,
+    managed_modules: [],
+    deleted_at: null,
     created_at: '2026-10-02T10:00:00.000Z',
   },
 });

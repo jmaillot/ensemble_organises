@@ -172,6 +172,11 @@ export const demoMembers: HouseholdMemberRow[] = [
     avatar_url: null,
     color_tag: 'accent',
     role: 'admin',
+    // Les colonnes 0144 ne portent que les enfants : un adulte a une date
+    // nulle (aucun âge affiché) et aucun périmètre d'espaces.
+    birth_date: null,
+    managed_modules: [],
+    deleted_at: null,
     created_at: now(),
   },
   {
@@ -182,6 +187,9 @@ export const demoMembers: HouseholdMemberRow[] = [
     avatar_url: null,
     color_tag: 'ink',
     role: 'membre',
+    birth_date: null,
+    managed_modules: [],
+    deleted_at: null,
     created_at: now(),
   },
   {
@@ -192,6 +200,9 @@ export const demoMembers: HouseholdMemberRow[] = [
     avatar_url: null,
     color_tag: 'coral',
     role: 'membre',
+    birth_date: null,
+    managed_modules: [],
+    deleted_at: null,
     created_at: now(),
   },
   {
@@ -202,6 +213,11 @@ export const demoMembers: HouseholdMemberRow[] = [
     avatar_url: null,
     color_tag: 'amber',
     role: 'enfant',
+    // Migration 0144 : date de naissance (âge affiché, D-05) et espaces servis
+    // à l'enfant (socle D-06 : pas de messages).
+    birth_date: '2016-09-29',
+    managed_modules: ['taches', 'routines', 'anniversaires', 'menu'],
+    deleted_at: null,
     created_at: now(),
   },
   {
@@ -212,6 +228,9 @@ export const demoMembers: HouseholdMemberRow[] = [
     avatar_url: null,
     color_tag: 'violet',
     role: 'membre',
+    birth_date: null,
+    managed_modules: [],
+    deleted_at: null,
     created_at: now(),
   },
 ];

@@ -90,6 +90,17 @@ export interface HouseholdMemberRow {
   avatar_url: string | null;
   color_tag: MemberColorTag;
   role: Role;
+  /** Date de naissance (migration 0144) : sert à l'âge affiché sur la fiche (D-05). */
+  birth_date: IsoDate | null;
+  /**
+   * Espaces servis à CE membre enfant (migration 0144, D-05) : colonne par
+   * membre, jamais `households`. Le socle D-06 est
+   * `['taches','routines','anniversaires','menu']` ; la base n'accepte que les
+   * cinq clés servables de 0146.
+   */
+  managed_modules: string[];
+  /** Archivage doux (migration 0146, D-04) : non null = enfant retiré du foyer. */
+  deleted_at: IsoDateTime | null;
   created_at: IsoDateTime;
 }
 
