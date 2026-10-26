@@ -33,6 +33,7 @@ const taskSchema = z.object({
 function defaultValues(
   task: Task | null,
   currentMemberId: string,
+  eligibleIds: Set<string>,
   initialDueDate: string | null = null,
   initialFolderId: string | null = null,
 ): TaskFormValues {
@@ -52,7 +53,14 @@ function defaultValues(
     dueDate: task.dueDate ?? todayIso(),
     description: task.description ?? '',
     priority: task.priority,
-    assigneeIds: task.assignees.map((assignee) => assignee.memberId),
+    // WR-06 : un assigné devenu inéligible (l'adulte a retiré « Tâches » de sa
+    // fiche entre deux ouvertures) reste dans l'historique mais n'a plus de case
+    // — le pré-remplissage l'écarte pour que la sauvegarde ne re-soumette pas un
+    // identifiant que le serveur refuserait (42501). L'assignation explicite de
+    // l'utilisateur courant reste gardée, même hors module.
+    assigneeIds: task.assignees
+      .map((assignee) => assignee.memberId)
+      .filter((id) => eligibleIds.has(id) || id === currentMemberId),
     folderId: task.folderId ?? '',
     reminderAt: instantToLocalInput(task.reminderAt),
   };
@@ -87,6 +95,7 @@ export function TaskFormDialog({
 }: TaskFormDialogProps) {
   const members = useMembers();
   const eligibleMembers = eligibleMembersForModule(members, 'taches');
+  const eligibleIds = new Set(eligibleMembers.map((member) => member.id));
   const { register, handleSubmit, reset, control, formState } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     mode: 'onSubmit',
@@ -95,10 +104,13 @@ export function TaskFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(task, currentMemberId, initialDueDate, initialFolderId));
+    reset(defaultValues(task, currentMemberId, eligibleIds, initialDueDate, initialFolderId));
     // `task` — objet recréé par la page à chaque rendu — identifie une ouverture
     // par son `task?.id` stable : le formulaire n'est pas réinitialisé à chaque
-    // frappe, et `reset` (react-hook-form) est stable.
+    // frappe, et `reset` (react-hook-form) est stable. `eligibleIds` n'y figure
+    // pas : identité nouvelle à chaque rendu, il re-déclencherait le reset en
+    // boucle ; la grille de pré-remplissage se fige à l'ouverture, la liste
+    // rendue, elle, reste vivante.
   }, [open, task?.id, currentMemberId, initialDueDate, initialFolderId]);
 
   return (

@@ -5,12 +5,14 @@
  * absent des options, l'enfant au socle et les adultes restent. Source unique
  * : eligibleMembersForModule — aucune règle locale dans le dialogue.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HouseholdMemberRow } from '@/types';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { RoutineFormDialog } from './routine-form-dialog';
+import type { Routine, RoutineFormValues } from '../types';
 
 const baseMember: HouseholdMemberRow = {
   id: '',
@@ -73,5 +75,64 @@ describe('RoutineFormDialog — garde D-06 du picker d’assignataires', () => {
     expect(screen.queryByRole('checkbox', { name: 'Assigner à Maé Martin' })).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Assigner à Noé Martin' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Assigner à Camille Martin' })).toBeInTheDocument();
+  });
+
+  // WR-06 : même garde de pré-remplissage que le formulaire de tâches — un
+  // assigné rendu inéligible n'a plus de case ; s'il restait dans le state,
+  // chaque sauvegarde le re-soumettrait et le serveur refuserait (42501).
+  it('écarte du pré-remplissage l’assigné devenu hors-module, la sauvegarde ne le resoumet pas', async () => {
+    const user = userEvent.setup();
+    useHouseholdStore.setState({
+      householdId: 'h-1',
+      householdName: 'Foyer Martin',
+      householdColor: 'accent',
+      members: [admin, enfantSocle, enfantHorsModule],
+      currentMemberId: admin.id,
+      disabledModules: [],
+    });
+    const routine: Routine = {
+      id: 'routine-wr06',
+      name: 'Arrosage du jardin',
+      description: null,
+      recurrenceRule: 'FREQ=DAILY',
+      folderId: null,
+      frequencyLabel: 'Chaque jour',
+      preset: 'quotidien',
+      // Historique : Maé était assignée avant le retrait du module sur sa fiche.
+      assignees: [
+        { memberId: enfantHorsModule.id, member: enfantHorsModule },
+        { memberId: admin.id, member: admin },
+      ],
+      reminderAt: null,
+      reminderLabel: null,
+      reminders: [],
+      isLate: false,
+      lateCount: 0,
+      lateLabel: null,
+      createdBy: admin.id,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      isDueToday: false,
+      isDoneToday: false,
+      streak: 0,
+      streakLabel: '',
+      missedDates: [],
+      nextDate: null,
+      nextLabel: '',
+    };
+    const onSubmit = vi.fn(async (_values: RoutineFormValues) => {});
+    renderWithProviders(
+      <RoutineFormDialog
+        open
+        onOpenChange={() => {}}
+        routine={routine}
+        currentMemberId={admin.id}
+        onSubmit={onSubmit}
+      />,
+      { withHousehold: false },
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Enregistrer les modifications' }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].assigneeIds).toEqual([admin.id]);
   });
 });

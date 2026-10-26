@@ -78,7 +78,12 @@ const routineSchema = z
   });
 
 /* Relecture d'un rappel : conversion locale par `@/lib/datetime` (D-05, WR-07). */
-function defaultValues(routine: Routine | null, currentMemberId: string, initialFolderId: string | null = null): RoutineFormValues {
+function defaultValues(
+  routine: Routine | null,
+  currentMemberId: string,
+  eligibleIds: Set<string>,
+  initialFolderId: string | null = null,
+): RoutineFormValues {
   const base = defaultRecurrenceSelection();
   if (!routine) {
     return {
@@ -119,7 +124,13 @@ function defaultValues(routine: Routine | null, currentMemberId: string, initial
     yearlyNthRank: selection.yearlyNthRank,
     yearlyNthWeekday: selection.yearlyNthWeekday as RoutineFormValues['yearlyNthWeekday'],
     description: routine.description ?? '',
-    assigneeIds: routine.assignees.map((assignee) => assignee.memberId),
+    // WR-06 : même garde que le formulaire de tâches — un assigné rendu
+    // inéligible (module retiré de sa fiche) est écarté du pré-remplissage
+    // pour que la sauvegarde ne re-soumette pas un identifiant refusé en 42501.
+    // L'assignation explicite de l'utilisateur courant reste gardée.
+    assigneeIds: routine.assignees
+      .map((assignee) => assignee.memberId)
+      .filter((id) => eligibleIds.has(id) || id === currentMemberId),
     folderId: routine.folderId ?? '',
     reminders,
     autoMinus1: false,
@@ -155,6 +166,7 @@ export function RoutineFormDialog({
 }: RoutineFormDialogProps) {
   const members = useMembers();
   const eligibleMembers = eligibleMembersForModule(members, 'routines');
+  const eligibleIds = new Set(eligibleMembers.map((member) => member.id));
   const { register, handleSubmit, reset, control, watch, setValue, formState } = useForm<RoutineFormValues>({
     resolver: zodResolver(routineSchema),
     mode: 'onSubmit',
@@ -225,10 +237,13 @@ export function RoutineFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset(defaultValues(routine, currentMemberId, initialFolderId));
+    reset(defaultValues(routine, currentMemberId, eligibleIds, initialFolderId));
     // `routine` — objet recréé par la page à chaque rendu — identifie une
     // ouverture par son `routine?.id` stable : le formulaire n'est pas
     // réinitialisé à chaque frappe, et `reset` (react-hook-form) est stable.
+    // `eligibleIds` n'y figure pas : identité nouvelle à chaque rendu, il
+    // re-déclencherait le reset en boucle ; la grille de pré-remplissage se
+    // fige à l'ouverture, la liste rendue, elle, reste vivante.
   }, [open, routine?.id, currentMemberId, initialFolderId]);
 
   return (
