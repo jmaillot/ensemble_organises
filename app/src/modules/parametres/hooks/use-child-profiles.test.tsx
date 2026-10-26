@@ -18,7 +18,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatISO, subYears } from 'date-fns';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
@@ -331,6 +331,31 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
     });
   });
 
+  it('permet de changer la couleur à l’édition et l’envoie au RPC (D-05 : la fiche enrichie n’est pas tronquée)', async () => {
+    const user = userEvent.setup();
+    seedStore(adulte, enfant);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
+
+    await user.click(screen.getByRole('button', { name: `Modifier la fiche de ${PETITE}` }));
+    expect(
+      await screen.findByRole('heading', { name: `Modifier la fiche de ${PETITE}` }),
+    ).toBeInTheDocument();
+    // La couleur n'est plus figée sur la valeur d'origine : elle s'édite comme à la création.
+    const editDialog = await screen.findByRole('dialog', { name: `Modifier la fiche de ${PETITE}` });
+    await user.selectOptions(within(editDialog).getByLabelText(/^Couleur/), 'coral');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(rpcMock).toHaveBeenCalledWith(
+        'update_managed_child_profile',
+        expect.objectContaining({ p_member_id: 'm-noe', p_color_tag: 'coral' }),
+      );
+    });
+    await waitFor(() => {
+      expect(useHouseholdStore.getState().members.find((member) => member.id === 'm-noe')?.color_tag).toBe('coral');
+    });
+  });
+
   it('archive la fiche APRÈS confirmation explicite, et l’enfant disparaît de la liste rendue (D-04, preuve UI)', async () => {
     const user = userEvent.setup();
     seedStore(adulte, enfant);
@@ -339,6 +364,13 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
     await user.click(screen.getByRole('button', { name: `Supprimer la fiche de ${PETITE}` }));
     // La modale exige une confirmation : aucun appel réseau avant elle.
     expect(screen.getByText(`Supprimer la fiche de ${PETITE} ?`)).toBeInTheDocument();
+    // D-04 (COPY contract) : la fiche DISPARAÎT des listes, l'historique RESTE —
+    // l'ancienne phrase disait le contraire des deux.
+    expect(
+      screen.getByText(
+        `La fiche disparaît des listes et des sélecteurs. Les tâches passées et les complétions restent dans l'historique, attribuées à ${PETITE}.`,
+      ),
+    ).toBeInTheDocument();
     expect(rpcMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Supprimer la fiche' }));
@@ -382,6 +414,33 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
 
     seedStore(adulte, enfant);
     renderWithProviders(<MembersPanel />, { withHousehold: false });
-    expect(screen.getByText(/n’a pas de compte : un adulte agit pour elle/)).toBeInTheDocument();
+    expect(screen.getByText(/n’a pas de compte : un adulte agit pour lui, ici et dans les listes/)).toBeInTheDocument();
+  });
+
+  // Copywriting Contract du UI-SPEC : l'état vide annonce le principe D-01
+  // (pas de compte requis) et pointe vers la création.
+  it('déclare l’état vide « Aucun profil enfant » avec la copie du contrat', () => {
+    seedStore(adulte);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
+    expect(screen.getByText(/Aucun profil enfant/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Les enfants du foyer apparaissent dans les listes sans avoir besoin de compte. Créez une fiche pour chacun.',
+      ),
+    ).toBeInTheDocument();
+    // Le bouton porte l’icône `people` (un membre du foyer), pas un « + » générique.
+    expect(screen.getByRole('button', { name: 'Ajouter un enfant' })).toBeInTheDocument();
+  });
+
+  it('ne propose pas le rôle « Enfant » dans le sélecteur de rôle (toujours refusé 22023)', async () => {
+    const user = userEvent.setup();
+    seedStore(adulte);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
+
+    await user.click(screen.getByRole('button', { name: 'Changer le rôle de Camille Martin' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByDisplayValue('Membre')).toBeInTheDocument();
+    // « Enfant » n'est pas une option : la fiche enfant passe par « Ajouter un enfant ».
+    expect(within(dialog).queryByText('Enfant')).not.toBeInTheDocument();
   });
 });

@@ -38,7 +38,7 @@ async function createFicheJade(page: Page) {
   // « adulte agit pour elle ».
   await expect(page.getByText('Jade Martin')).toBeVisible();
   await expect(page.getByText('7 ans')).toBeVisible();
-  await expect(page.getByText(/Jade n’a pas de compte : un adulte agit pour elle/)).toBeVisible();
+  await expect(page.getByText(/Jade n’a pas de compte : un adulte agit pour lui, ici et dans les listes/)).toBeVisible();
 }
 
 test('le parent crée une fiche enfant depuis la liste des membres', async ({ page }) => {
