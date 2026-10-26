@@ -658,15 +658,24 @@ begin
     'l''echange invite rend un ticket une seule fois');
   begin perform public.redeem_trip_invite(v_h4, null, 'Autre'); exception when others then m_exhausted := sqlerrm; end;
 
-  -- 0119 : enfant sur code VALIDE — il rejoint le voyage (sans ardoise),
-  -- oracle inchangé pour inconnu/malformé/expiré/révoqué/épuisé.
+  -- 0145 : l'uid enfant ne resout plus aucun membre (le membre seme par le
+  -- fixture porte user_id NULL). L'echange ne trouve pas de membre pour cet
+  -- acteur et tombe dans la branche invitee externe, qui exige un pseudo :
+  -- l'oracle est donc « pseudonyme invalide » (22023). Aucune inscription,
+  -- ni au voyage ni a l'ardoise.
   perform public.create_trip_invite(v_henri, v_trip_c, v_h5);
-  v_out := public.redeem_trip_invite(v_h5, v_kid, null);
-  perform testkit.ok(not (v_out ->> 'already_member')::boolean, 'enfant inscrit au voyage');
+  begin
+    perform public.redeem_trip_invite(v_h5, v_kid, null);
+    perform testkit.ok(false, 'un enfant ne rejoint plus le voyage par code (0145)');
+  exception when others then
+    m_enfant := sqlerrm;
+  end;
+  perform testkit.ok(m_enfant like '%pseudonyme invalid%',
+    'l''echange enfant rend l''oracle invite sans pseudo : ' || coalesce(m_enfant, 'aucun'));
   perform testkit.eq(testkit.count(format(
     'select 1 from public.trip_members where trip_id = %L and member_id = (select row_id from testkit.fx where key = %L)',
-    v_trip_c, 'kid_m')), 1::bigint,
-    'l''enfant est participant du voyage');
+    v_trip_c, 'kid_m')), 0::bigint,
+    'l''enfant n''est jamais inscrit au voyage');
   perform testkit.eq(testkit.count(format(
     'select 1 from public.ardoise_members where member_id = (select row_id from testkit.fx where key = %L)',
     'kid_m')), 0::bigint,
