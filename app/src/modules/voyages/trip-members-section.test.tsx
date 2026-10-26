@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders, seedHouseholdStore } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
-import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
+import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 import TripDetailPage from './trip-detail-page';
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -184,7 +184,9 @@ describe('TripMembersSection — rubrique Membres (0120)', () => {
     expect(screen.getByRole('checkbox', { name: 'Retirer Thomas Martin' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Ajouter Lina Martin' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Ajouter Maya Martin' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Ajouter Noé Martin (enfant, sans budget)' })).not.toBeChecked();
+    // D-06 : Noé (enfant géré, « voyages » fermé sur sa fiche) n'est pas
+    // proposé du tout — pas seulement décoché.
+    expect(screen.queryByRole('checkbox', { name: /Noé Martin/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Invités : Mamie/)).toBeInTheDocument();
   });
 
@@ -208,12 +210,22 @@ describe('TripMembersSection — rubrique Membres (0120)', () => {
     }
   });
 
-  it('cocher un enfant l’inscrit au voyage SANS l’ardoise', async () => {
+  it('cocher un enfant dont la fiche ouvre Voyages l’inscrit au voyage SANS l’ardoise (D-06)', async () => {
     const user = userEvent.setup();
     stubEdge();
+    // D-06 : on ouvre « voyages » sur la fiche de Noé avant rendu — le
+    // composant ne propose alors l'enfant que par cette ouverture explicite.
+    seedHouseholdStore();
+    useHouseholdStore.setState({
+      members: demoMembers.map((entry) =>
+        entry.id === DEMO_MEMBERS.noe
+          ? { ...entry, managed_modules: [...entry.managed_modules, 'voyages'] }
+          : entry,
+      ),
+    });
     await createScratchTrip([DEMO_MEMBERS.camille]);
     try {
-      renderDetail('/voyages/trip-scratch-membres');
+      renderDetail('/voyages/trip-scratch-membres', false);
       await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
       await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
       await screen.findByText('Membres du voyage');
@@ -224,6 +236,24 @@ describe('TripMembersSection — rubrique Membres (0120)', () => {
       );
       expect(await scratchMembers()).toContain(DEMO_MEMBERS.noe);
       expect(await scratchArdoiseMembers()).not.toContain(DEMO_MEMBERS.noe);
+    } finally {
+      await cleanupScratchTrip();
+    }
+  });
+
+  it('un enfant géré sans « voyages » reste absent de la liste (D-06, 0157 serveur)', async () => {
+    const user = userEvent.setup();
+    stubEdge();
+    await createScratchTrip([DEMO_MEMBERS.camille]);
+    try {
+      renderDetail('/voyages/trip-scratch-membres');
+      await screen.findByRole('heading', { level: 2, name: 'Lisbonne' });
+      await user.click(screen.getByRole('tab', { name: 'Paramètres' }));
+      await screen.findByText('Membres du voyage');
+
+      expect(screen.queryByRole('checkbox', { name: /Noé Martin/ })).not.toBeInTheDocument();
+      // Description D-06 : la règle est annoncée dans le panneau.
+      expect(screen.getByText(/un enfant géré n’apparaît que si sa fiche ouvre/)).toBeInTheDocument();
     } finally {
       await cleanupScratchTrip();
     }

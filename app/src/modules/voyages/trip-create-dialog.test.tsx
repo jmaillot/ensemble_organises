@@ -63,30 +63,31 @@ async function fillInfos(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Retour/), '2027-09-16');
 }
 
-describe('TripCreateDialog — participants et rubriques (0119)', () => {
-  it('propose toute la famille, enfants compris (T-15-06 révisé)', async () => {
+describe('TripCreateDialog — participants et rubriques (0119 → D-06 phase 25)', () => {
+  it('propose les adultes et exclut l’enfant sans « voyages » (D-06)', async () => {
     renderWithProviders(
       <TripCreateDialog open onOpenChange={() => {}} onSubmit={async () => null} />,
     );
 
     const dialog = await screen.findByRole('dialog');
+    // Les adultes sont toujours proposés.
     expect(within(dialog).getByText('Camille Martin')).toBeInTheDocument();
     expect(within(dialog).getByText('Thomas Martin')).toBeInTheDocument();
     expect(within(dialog).getByText('Lina Martin')).toBeInTheDocument();
     expect(within(dialog).getByText('Maya Martin')).toBeInTheDocument();
-    // 0119 : Noé (enfant) voyage aussi — budget seul reste aux adultes.
-    expect(within(dialog).getByText('Noé Martin')).toBeInTheDocument();
+    // D-06 : Noé (enfant, sans « voyages » dans la fiche) n'apparaît pas.
+    expect(within(dialog).queryByText('Noé Martin')).not.toBeInTheDocument();
   });
 
-  it('coche par défaut tous les éligibles et toutes les rubriques', async () => {
+  it('coche par défaut tous les éligibles (adultes) et toutes les rubriques', async () => {
     renderWithProviders(
       <TripCreateDialog open onOpenChange={() => {}} onSubmit={async () => null} />,
     );
 
     const dialog = await screen.findByRole('dialog');
     const boxes = within(dialog).getAllByRole('checkbox', { checked: true });
-    // 5 participants (enfant compris) + 5 rubriques basculables.
-    expect(boxes).toHaveLength(10);
+    // 4 participants (adultes, enfant exclu D-06) + 5 rubriques basculables.
+    expect(boxes).toHaveLength(9);
   });
 
   it('soumet les participants et rubriques choisis, puis se ferme sur l’id', async () => {
@@ -115,7 +116,7 @@ describe('TripCreateDialog — participants et rubriques (0119)', () => {
     await waitFor(() => expect(submitted).toHaveLength(1));
     const values = submitted[0]!;
     expect(values.name).toBe('Séjour à Copenhague');
-    expect(values.participantIds).toHaveLength(4);
+    expect(values.participantIds).toHaveLength(3);
     expect(values.participantIds).not.toContain('member-lina');
     expect(values.enabledTabs).toEqual(['courses', 'notes', 'taches', 'adresses', 'budget']);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -127,7 +128,7 @@ describe('TripCreateDialog — participants et rubriques (0119)', () => {
     renderWithProviders(<TripCreateDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
     await fillInfos(user);
-    for (const name of ['Camille Martin', 'Thomas Martin', 'Lina Martin', 'Maya Martin', 'Noé Martin']) {
+    for (const name of ['Camille Martin', 'Thomas Martin', 'Lina Martin', 'Maya Martin']) {
       await user.click(screen.getByText(name));
     }
     await user.click(screen.getByRole('button', { name: 'Créer le voyage' }));
