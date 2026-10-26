@@ -23,18 +23,16 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { useHouseholdStore } from '@/stores/household-store';
 import { rememberInviteToken } from '@/lib/invites';
-import type { HouseholdMemberRow, HouseholdRow, InviteTokenSummary } from '@/types';
+import type { HouseholdMemberRow, InviteTokenSummary } from '@/types';
 import { MembersPanel } from '../components/members-panel';
 import {
   archiveChildProfile,
-  CHILD_DEFAULT_MODULES,
-  CHILD_MANAGEABLE_MODULES,
   giveChildAccess,
   linkChildToAccount,
   saveChildProfile,
   setManagedModules,
 } from '../api';
-import { childAgeLabel, useChildProfiles } from './use-child-profiles';
+import { childAgeLabel } from './use-child-profiles';
 
 const { rpcMock, summaryMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
@@ -55,7 +53,10 @@ vi.mock('@/lib/invites', async (importOriginal) => {
   return { ...actual, getInviteTokenSummary: summaryMock };
 });
 
-const baseMember = {
+const baseMember: HouseholdMemberRow = {
+  id: '',
+  role: 'membre',
+  display_name: '',
   household_id: 'h-1',
   user_id: null,
   avatar_url: null,
@@ -64,7 +65,7 @@ const baseMember = {
   managed_modules: [],
   deleted_at: null,
   created_at: '2026-01-01T00:00:00Z',
-} as const;
+};
 
 const memberRow = (
   overrides: Partial<HouseholdMemberRow> & Pick<HouseholdMemberRow, 'id' | 'role' | 'display_name'>,
@@ -82,17 +83,6 @@ const enfant = memberRow({
   birth_date: enfantBirth,
   managed_modules: ['taches', 'routines', 'anniversaires', 'menu'],
 });
-
-const householdRow = {
-  id: 'h-1',
-  name: 'Foyer Test',
-  avatar_color: 'accent',
-  school_zone: null,
-  created_by: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  disabled_modules: [],
-} as HouseholdRow;
 
 const seedStore = (...rows: HouseholdMemberRow[]) => {
   useHouseholdStore.setState({
@@ -224,11 +214,13 @@ describe('childAgeLabel — âge affiché (D-05)', () => {
 });
 
 describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => {
-  it('affiche l’âge de l’enfant et les actions adultes de la fiche', () => {
-    renderWithProviders(<MembersPanel />);
+  it('affiche l’âge de l’enfant et les actions adultes de la fiche', async () => {
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
     seedStore(adulte, enfant);
     // L'âge court sur la ligne (D-05) ; l'adulte sans date n'affiche rien.
-    expect(screen.getByText('8 ans')).toBeInTheDocument();
+    // seedStore a lieu après le rendu, hors act() : l'ingestion du store est
+    // attendue (findBy), l'assertion d'âge reste exacte.
+    expect(await screen.findByText('8 ans')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: `Modifier la fiche de ${PETITE}` })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: `Espaces de ${PETITE}` })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: `Donner accès à ${PETITE}` })).toBeInTheDocument();
@@ -237,7 +229,7 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
   it('tronque un nom de 120 caractères sans casser la ligne (A5, backstop)', () => {
     const longNom = `Z${'e'.repeat(118)}n`;
     seedStore(adulte, memberRow({ id: 'm-long', role: 'enfant', display_name: longNom, birth_date: null }));
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
     const nameEl = screen.getByText(longNom);
     expect(nameEl.className).toContain('truncate');
   });
@@ -249,10 +241,10 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
       data: { id: 'm-jade', household_id: 'h-1', display_name: 'Jade Martin', color_tag: 'amber', role: 'enfant', birth_date: null },
       error: null,
     });
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
 
     await user.click(screen.getByRole('button', { name: 'Ajouter un enfant' }));
-    await user.type(screen.getByLabelText('Prénom de l’enfant'), 'Jade Martin');
+    await user.type(screen.getByLabelText(/Prénom de l’enfant/), 'Jade Martin');
     await user.click(screen.getByRole('button', { name: 'Ajouter la fiche' }));
 
     await waitFor(() => {
@@ -276,7 +268,7 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
   it('enregistre les espaces PAR MEMBRE et met le store à jour (D-05)', async () => {
     const user = userEvent.setup();
     seedStore(adulte, enfant);
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
 
     await user.click(screen.getByRole('button', { name: `Espaces de ${PETITE}` }));
     expect(screen.getByRole('heading', { name: `Espaces de ${PETITE}` })).toBeInTheDocument();
@@ -302,7 +294,7 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
   it('archive la fiche APRÈS confirmation explicite, et l’enfant disparaît de la liste rendue (D-04, preuve UI)', async () => {
     const user = userEvent.setup();
     seedStore(adulte, enfant);
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
 
     await user.click(screen.getByRole('button', { name: `Supprimer la fiche de ${PETITE}` }));
     // La modale exige une confirmation : aucun appel réseau avant elle.
@@ -325,11 +317,11 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
   it('propose la liaison irréversible depuis le dialogue « Donner accès » (D-19/D-21)', async () => {
     const user = userEvent.setup();
     seedStore(adulte, autreAdulte, enfant);
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
 
     await user.click(screen.getByRole('button', { name: `Donner accès à ${PETITE}` }));
     expect(await screen.findByText(/lien d’invitation/)).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Compte à relier'), 'm-lior');
+    await user.selectOptions(screen.getByLabelText(/Compte à relier/), 'm-lior');
     await user.click(screen.getByRole('button', { name: 'Lier le compte' }));
     expect(screen.getByText('Irréversible : tout l’historique suivra le compte.')).toBeInTheDocument();
 
@@ -344,12 +336,12 @@ describe('MembersPanel — CRUD enfant DANS la liste des membres (D-02)', () => 
 
   it('annonce le statut sans compte et l’état vide « Aucun profil enfant »', () => {
     seedStore(adulte);
-    const { unmount } = renderWithProviders(<MembersPanel />);
+    const { unmount } = renderWithProviders(<MembersPanel />, { withHousehold: false });
     expect(screen.getByText(/Aucun profil enfant/)).toBeInTheDocument();
     unmount();
 
     seedStore(adulte, enfant);
-    renderWithProviders(<MembersPanel />);
+    renderWithProviders(<MembersPanel />, { withHousehold: false });
     expect(screen.getByText(/n’a pas de compte : un adulte agit pour elle/)).toBeInTheDocument();
   });
 });

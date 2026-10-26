@@ -1,7 +1,8 @@
 import { data } from '@/lib/data';
+import { getInviteTokenSummary, isRecallValid, recallInviteToken } from '@/lib/invites';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
-import type { DashboardWidgetRow, HouseholdRow, ProfileRow, Role } from '@/types';
+import type { DashboardWidgetRow, HouseholdMemberRow, HouseholdRow, MemberColorTag, ProfileRow, Role } from '@/types';
 import type { HouseholdColor } from './types';
 
 /**
@@ -128,6 +129,208 @@ export async function saveDisabledModules(householdId: string, disabledModules: 
 /** Retire un membre du foyer : action réservée à l'administrateur. */
 export async function removeMember(memberId: string): Promise<void> {
   await data.remove('household_members', memberId);
+}
+
+/**
+ * Profils enfants gérés par le parent (phase 25, migrations 0146/0148). En
+ * mode connecté, TOUT passe par les RPC serveur — les gardes (adulte requis,
+ * nom 2-120, périmètre D-06 des cinq modules, archivage sans suppression,
+ * fusion D-19) vivent en base. Jamais d'écriture directe sur
+ * `household_members` côté Supabase : la ligne membre porte l'historique.
+ */
+
+/** Les cinq espaces qu'un adulte peut ouvrir à un enfant (0146, D-06). */
+export const CHILD_MANAGEABLE_MODULES = ['taches', 'routines', 'messages', 'anniversaires', 'menu'] as const;
+
+/** Le socle proposé à la création d'une fiche enfant (D-06) : sans messages. */
+export const CHILD_DEFAULT_MODULES = ['taches', 'routines', 'anniversaires', 'menu'] as const;
+
+/** Ligne retournée par `create_managed_child_profile` (jsonb, 0146). */
+export interface ChildProfileCreation {
+  id: string;
+  household_id: string;
+  display_name: string;
+  color_tag: MemberColorTag;
+  role: Role;
+  birth_date: string | null;
+  managed_modules: string[];
+}
+
+export interface ChildProfileInput {
+  displayName: string;
+  colorTag: MemberColorTag;
+  birthDate: string | null;
+  avatarUrl: string | null;
+}
+
+const assertChildName = (displayName: string): string => {
+  const name = displayName.trim();
+  if (name.length < 2) throw new Error('Indiquez au moins deux caractères.');
+  if (name.length > 120) throw new Error('120 caractères maximum.');
+  return name;
+};
+
+const rejectIfChildModulesOutOfRange = (modules: string[]): void => {
+  const unknown = modules.filter((key) => !(CHILD_MANAGEABLE_MODULES as readonly string[]).includes(key));
+  if (unknown.length > 0) {
+    // 22023 côté serveur : la clé morte ne part jamais sur le réseau.
+    throw new Error(`Espaces d'enfant : clé hors du périmètre 0146 (refusée : ${unknown.join(', ')}).`);
+  }
+};
+
+/**
+ * Crée une fiche enfant sans compte : le serveur pose le socle D-06 et rend
+ * la jsonb de la ligne créée. Le nom est borné localement pour ne pas partir
+ * en réseau pour un refus prévisible.
+ */
+export async function saveChildProfile(householdId: string, values: ChildProfileInput): Promise<ChildProfileCreation> {
+  const displayName = assertChildName(values.displayName);
+  if (isSupabaseConfigured && supabase) {
+    const { data: creation, error } = await supabase.rpc('create_managed_child_profile', {
+      p_household_id: householdId,
+      p_display_name: displayName,
+      p_color_tag: values.colorTag,
+      p_birth_date: values.birthDate,
+      p_avatar_url: values.avatarUrl,
+    });
+    if (error) throw new Error(error.message || 'Création de la fiche enfant impossible.');
+    const row = (creation ?? {}) as Partial<ChildProfileCreation>;
+    // Le socle D-06 est posé en base ; le repli ici couvre un jsonb ancien.
+    return {
+      id: row.id ?? '',
+      household_id: row.household_id ?? householdId,
+      display_name: row.display_name ?? displayName,
+      color_tag: row.color_tag ?? values.colorTag,
+      role: 'enfant',
+      birth_date: row.birth_date ?? values.birthDate,
+      managed_modules: row.managed_modules ?? [...CHILD_DEFAULT_MODULES],
+    };
+  }
+  const row: HouseholdMemberRow = {
+    id: randomId('member'),
+    household_id: householdId,
+    user_id: null,
+    display_name: displayName,
+    avatar_url: values.avatarUrl,
+    color_tag: values.colorTag,
+    role: 'enfant',
+    birth_date: values.birthDate,
+    // Démo : le socle est posé ici, comme la base le fait en connecté.
+    managed_modules: [...CHILD_DEFAULT_MODULES],
+    deleted_at: null,
+    created_at: new Date().toISOString(),
+  };
+  await data.create<HouseholdMemberRow>('household_members', row);
+  return {
+    id: row.id,
+    household_id: row.household_id,
+    display_name: row.display_name,
+    color_tag: row.color_tag,
+    role: 'enfant',
+    birth_date: row.birth_date,
+    managed_modules: [...row.managed_modules],
+  };
+}
+
+/**
+ * Met à jour la fiche : nom, couleur, date de naissance. La base écrase
+ * `birth_date` SANS coalesce — l'appelant renvoie donc TOUJOURS la valeur
+ * courante, modifiée ou non (voir 0146, `update_managed_child_profile`).
+ */
+export async function updateChildProfile(memberId: string, values: ChildProfileInput): Promise<void> {
+  const displayName = assertChildName(values.displayName);
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('update_managed_child_profile', {
+      p_member_id: memberId,
+      p_display_name: displayName,
+      p_color_tag: values.colorTag,
+      p_birth_date: values.birthDate,
+      p_avatar_url: values.avatarUrl,
+      p_managed_modules: null,
+    });
+    if (error) throw new Error(error.message || 'Mise à jour de la fiche impossible.');
+    return;
+  }
+  await data.update<HouseholdMemberRow>('household_members', memberId, {
+    display_name: displayName,
+    color_tag: values.colorTag,
+    birth_date: values.birthDate,
+    avatar_url: values.avatarUrl,
+  });
+}
+
+/**
+ * Choisit les espaces servis à CET enfant. Le choix est borné localement aux
+ * CINQ clés de 0146 : une clé hors périmètre échoue ici, jamais sur le réseau.
+ * L'écriture porte la LIGNE MEMBRE (`p_managed_modules`) — jamais `households`
+ * (D-05) — et renvoie la date de naissance et la photo courantes car la base
+ * réécrit ces colonnes sans coalesce.
+ */
+export async function setManagedModules(
+  memberId: string,
+  modules: string[],
+  current: { birthDate: string | null; avatarUrl: string | null },
+): Promise<void> {
+  rejectIfChildModulesOutOfRange(modules);
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('update_managed_child_profile', {
+      p_member_id: memberId,
+      // Nom et couleur inchangés : la base garde la valeur courante (coalesce).
+      p_display_name: null,
+      p_color_tag: null,
+      p_birth_date: current.birthDate,
+      p_avatar_url: current.avatarUrl,
+      p_managed_modules: modules,
+    });
+    if (error) throw new Error(error.message || 'Enregistrement des espaces impossible.');
+    return;
+  }
+  await data.update<HouseholdMemberRow>('household_members', memberId, { managed_modules: modules });
+}
+
+/**
+ * Archive la fiche (deleted_at) : D-04, jamais un delete — les cascades 0003
+ * purgeraient l'historique. Le serveur (0146) revérifie adulte + enfant géré.
+ */
+export async function archiveChildProfile(memberId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('archive_managed_child_profile', { p_member_id: memberId });
+    if (error) throw new Error(error.message || 'Suppression de la fiche impossible.');
+    return;
+  }
+  await data.update<HouseholdMemberRow>('household_members', memberId, {
+    deleted_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Fusionne la fiche enfant dans le compte adulte du même foyer (0148, D-19) :
+ * réattribution de tout l'historique puis suppression de la ligne enfant.
+ * Irréversible — l'appelant affiche une confirmation explicite avant l'appel.
+ */
+export async function linkChildToAccount(childMemberId: string, accountMemberId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour relier une fiche à un compte.');
+  }
+  const { error } = await supabase.rpc('link_managed_child', {
+    p_child_member_id: childMemberId,
+    p_account_member_id: accountMemberId,
+  });
+  if (error) throw new Error(error.message || 'Liaison du compte impossible.');
+}
+
+/**
+ * D-21 : donner accès à un enfant = lui créer un compte réel via le lien
+ * d'invitation du foyer. Le brut n'est relu que s'il est encore rappelable
+ * (même foyer, même token actif) ; sinon null — la fiche renvoie vers la
+ * section Inviter plutôt que de deviner un token.
+ */
+export async function giveChildAccess(householdId: string): Promise<string | null> {
+  const saved = recallInviteToken();
+  if (!saved || saved.householdId !== householdId) return null;
+  const summary = await getInviteTokenSummary();
+  if (!isRecallValid(saved, summary)) return null;
+  return `${window.location.origin}/foyer/rejoindre?token=${encodeURIComponent(saved.token)}`;
 }
 
 /**
