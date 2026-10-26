@@ -67,6 +67,9 @@ export function MembersPanel() {
   const [editingChild, setEditingChild] = useState<HouseholdMemberRow | null>(null);
   const [childDraftName, setChildDraftName] = useState('');
   const [childDraftBirth, setChildDraftBirth] = useState('');
+  // D-05 : la couleur fait partie de la fiche enrichie — éditable comme au
+  // moment de la création, jamais figée sur la valeur d'origine.
+  const [childEditColor, setChildEditColor] = useState<MemberColorTag>('amber');
   const [childEditError, setChildEditError] = useState<string | null>(null);
   const [childEditPending, setChildEditPending] = useState(false);
   const [modulesTarget, setModulesTarget] = useState<HouseholdMemberRow | null>(null);
@@ -175,6 +178,7 @@ export function MembersPanel() {
                       setEditingChild(member);
                       setChildDraftName(member.display_name);
                       setChildDraftBirth(member.birth_date ?? '');
+                      setChildEditColor(member.color_tag);
                       setChildEditError(null);
                     }}
                   >
@@ -202,7 +206,7 @@ export function MembersPanel() {
                       setAccessLinkDraft('');
                     }}
                   >
-                    Accès
+                    Donner accès
                   </Button>
                   <Button
                     variant="ghost"
@@ -266,7 +270,7 @@ export function MembersPanel() {
         <EmptyState
           icon="users"
           title="Aucun profil enfant"
-          description="Créez une fiche : un adulte du foyer agira pour l’enfant dans les espaces que vous choisirez."
+          description="Les enfants du foyer apparaissent dans les listes sans avoir besoin de compte. Créez une fiche pour chacun."
           className="min-h-0 py-6 text-left"
         />
       ) : null}
@@ -277,7 +281,8 @@ export function MembersPanel() {
       ))}
       {isAdult ? (
         <div className="mt-4">
-          <Button icon="plus" onClick={openChildCreation}>
+          {/* Icône `people` : la fiche crée un membre du foyer, pas un ajout générique. */}
+          <Button icon="people" onClick={openChildCreation}>
             Ajouter un enfant
           </Button>
         </div>
@@ -394,11 +399,16 @@ export function MembersPanel() {
             <Field label="Rôle" error={roleError ?? undefined}>
               {(props) => (
                 <Select {...props} value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)}>
-                  {(Object.keys(roleLabels) as Role[]).map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabels[role]}
-                    </option>
-                  ))}
+                  {/* « Enfant » exclu : une fiche enfant se crée par « Ajouter un
+                      enfant » (0146), jamais par le rôle — la base refuse 22023,
+                      proposer l'option ne ferait qu'offrir une erreure morte. */}
+                  {(Object.keys(roleLabels) as Role[])
+                    .filter((role) => role !== 'enfant')
+                    .map((role) => (
+                      <option key={role} value={role}>
+                        {roleLabels[role]}
+                      </option>
+                    ))}
                 </Select>
               )}
             </Field>
@@ -441,7 +451,7 @@ export function MembersPanel() {
                   avatarUrl: null,
                 });
                 setCreatingChild(false);
-                toast('Fiche enfant créée : un adulte agira pour elle.');
+                toast(`La fiche de ${childName.trim().split(/\s+/)[0]} est créée.`);
               } catch (createError) {
                 setChildError(createError instanceof Error ? createError.message : 'Création impossible.');
               } finally {
@@ -502,7 +512,7 @@ export function MembersPanel() {
               try {
                 await updateChild(editingChild.id, {
                   displayName: childDraftName,
-                  colorTag: editingChild.color_tag,
+                  colorTag: childEditColor,
                   birthDate: childDraftBirth || null,
                   avatarUrl: editingChild.avatar_url,
                 });
@@ -523,6 +533,17 @@ export function MembersPanel() {
             <Field label="Date de naissance (optionnelle)">
               {(props) => (
                 <Input {...props} type="date" value={childDraftBirth} onChange={(event) => setChildDraftBirth(event.target.value)} />
+              )}
+            </Field>
+            <Field label="Couleur">
+              {(props) => (
+                <Select {...props} value={childEditColor} onChange={(event) => setChildEditColor(event.target.value as MemberColorTag)}>
+                  {memberColors.map((color) => (
+                    <option key={color} value={color}>
+                      {memberColorLabels[color]}
+                    </option>
+                  ))}
+                </Select>
               )}
             </Field>
             <DialogActions>
@@ -572,11 +593,13 @@ export function MembersPanel() {
             }}
           >
             <fieldset className="m-0 grid gap-2 border-0 p-0">
+              {/* D-06 : la fiche décide où l'enfant peut figurer — le libellé
+                  parle d'apparition dans l'espace, jamais de vision técnica. */}
               <legend className="mb-1 text-[12px] text-muted">
-                Ce que {modulesTarget?.display_name} voit dans l’application :
+                Espaces où {modulesTarget?.display_name} peut figurer&nbsp;:
               </legend>
               {CHILD_MANAGEABLE_MODULES.map((moduleKey) => (
-                <label key={moduleKey} className="flex items-center gap-2.5 text-[13px]">
+                <label key={moduleKey} className="flex items-center gap-2 text-[13px]">
                   <input
                     type="checkbox"
                     className="size-4 accent-[var(--color-accent)]"
@@ -664,11 +687,14 @@ export function MembersPanel() {
         onConfirm={async () => {
           if (!accessTarget || !accessLinkDraft) return;
           setLinkPending(true);
+          // Prénom capturé avant le reset des deux modales : le toast suit la
+          // fermeture sans perdre le sujet de la phrase.
+          const linkedName = accessTarget.display_name;
           try {
             await link(accessTarget.id, accessLinkDraft);
             setAccessTarget(null);
             setPendingLinkConfirm(false);
-            toast('Fiche reliée au compte : toute la trace suit le compte.');
+            toast(`${linkedName} a désormais son propre accès. Tout son historique suit.`);
           } catch (linkError) {
             toast(linkError instanceof Error ? linkError.message : 'Liaison impossible.', 'error');
           } finally {
@@ -685,14 +711,17 @@ export function MembersPanel() {
           if (!open) setPendingArchive(null);
         }}
         title={pendingArchive ? `Supprimer la fiche de ${pendingArchive.display_name} ?` : 'Supprimer cette fiche ?'}
-        description="La fiche et son historique restent conservés dans le foyer ; rien ne s’affiche plus pour elle."
+        description={`La fiche disparaît des listes et des sélecteurs. Les tâches passées et les complétions restent dans l'historique, attribuées à ${pendingArchive?.display_name ?? 'l’enfant'}.`}
         confirmLabel="Supprimer la fiche"
         onConfirm={async () => {
           if (!pendingArchive) return;
+          // Le prénom est capturé AVANT le reset : le toast l'annonce, la
+          // modale s'efface sans emporter la phrase.
+          const archivedName = pendingArchive.display_name;
           try {
             await archiveChild(pendingArchive.id);
             setPendingArchive(null);
-            toast('Fiche supprimée : son historique est conservé.');
+            toast(`La fiche de ${archivedName} est supprimée. Ses traces restent dans l’historique.`);
           } catch (archiveError) {
             toast(archiveError instanceof Error ? archiveError.message : 'Suppression impossible.', 'error');
           }

@@ -56,7 +56,7 @@ export function RoutineCard({
         className,
       )}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
         <Checkbox
           checked={done}
           onCheckedChange={() => onToggle(routine)}
@@ -90,7 +90,7 @@ export function RoutineCard({
               <button
                 type="button"
                 aria-label="Cocher pour"
-                className="inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-3 text-[12px] font-semibold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:text-fg"
+                className="inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-3 text-[12px] font-extrabold text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:text-fg"
               >
                 Cocher pour
               </button>
@@ -105,11 +105,13 @@ export function RoutineCard({
                   <DropdownMenuPrimitive.Item
                     key={target.id}
                     onSelect={() => onToggleFor(routine, target.id)}
-                    className="flex min-h-11 cursor-default items-center gap-2.5 rounded-[10px] px-3 text-[13.5px] outline-none select-none data-[highlighted]:bg-accent-faint data-[highlighted]:text-fg"
+                    className="flex min-h-11 cursor-default items-center gap-2 rounded-[10px] px-3 text-[13px] outline-none select-none data-[highlighted]:bg-accent-faint data-[highlighted]:text-fg"
                   >
                     <MemberAvatar member={target} size="sm" />
-                    {/* A5 : un nom long tronque sans casser la rangée. */}
-                    <span className="min-w-0 max-w-[210px] truncate">{target.display_name}</span>
+                    {/* A5 : un nom long tronque dans la largeur du menu, sans
+                        casser la rangée — pas de plafond inventé : c'est la
+                        min-w du menu (gabarit `header-menu`) qui borne. */}
+                    <span className="min-w-0 flex-1 truncate">{target.display_name}</span>
                   </DropdownMenuPrimitive.Item>
                 ))}
               </DropdownMenuPrimitive.Content>

@@ -23,7 +23,7 @@ import {
 export function childGuardianNotice(displayName: string): string {
   // D-16 : le prénom seul suffit — la fiche est courte, pas un dossier.
   const firstName = displayName.trim().split(/\s+/)[0] ?? displayName;
-  return `${firstName} n’a pas de compte : un adulte agit pour elle.`;
+  return `${firstName} n’a pas de compte : un adulte agit pour lui, ici et dans les listes.`;
 }
 
 /**

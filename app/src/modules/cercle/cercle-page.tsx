@@ -24,6 +24,13 @@ export default function CerclePage() {
   const commentsPost = feed.find((post) => post.id === commentsPostId) ?? null;
   const pendingDeletePost = feed.find((post) => post.id === pendingDeleteId) ?? null;
 
+  // D-12 : la modération du contenu d'un enfant géré nomme l'enfant — le
+  // libellé de la modale dépend du rôle de l'auteur, pas de celui qui clique.
+  const pendingDeleteAuthorRole = pendingDeletePost
+    ? members.find((member) => member.id === pendingDeletePost.authorId)?.role
+    : undefined;
+  const pendingDeleteAuthorName = pendingDeletePost?.author?.display_name?.trim().split(/\s+/)[0];
+
   return (
     <ModuleShell
       module="cercle"
@@ -167,8 +174,16 @@ export default function CerclePage() {
         onOpenChange={(open) => {
           if (!open) setPendingDeleteId(null);
         }}
-        title="Supprimer cette publication ?"
-        description="Le message, la photo, les commentaires et les réactions associés seront retirés du fil."
+        title={
+          pendingDeleteAuthorRole === 'enfant' && pendingDeleteAuthorName
+            ? `Supprimer ce contenu de ${pendingDeleteAuthorName} ?`
+            : 'Supprimer cette publication ?'
+        }
+        description={
+          pendingDeleteAuthorRole === 'enfant'
+            ? 'Ce contenu ne sera plus visible dans le Cercle.'
+            : 'Le message, la photo, les commentaires et les réactions associés seront retirés du fil.'
+        }
         confirmLabel="Supprimer"
         onConfirm={() => {
           if (pendingDeletePost) {
