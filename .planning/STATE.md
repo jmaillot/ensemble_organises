@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
-status: executing
-stopped_at: Completed 25-05-PLAN.md
-last_updated: "2026-10-26T11:05:00.000Z"
-state_head: b904cafd35f8725b6b0929a9431e8c0ed27b7b29
+status: verifying
+stopped_at: Completed 25-07-PLAN.md
+last_updated: "2026-10-26T12:15:02.605Z"
+state_head: 01855d44fde511e802a57b123212cd4d608d0a18
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 0
 last_activity: 2026-10-25
 ---
 
@@ -22,9 +22,9 @@ last_activity: 2026-10-25
 ## Current Position
 
 Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
-Plan: 6 of 7
-Status: Ready to execute
-Progress: [██████████░] 86% (6/7 plans)
+Plan: 7 of 7
+Status: Phase complete — ready for verification
+Progress: [░░░░░░░░░░] 0% (6/7 plans)
 
 ## Références du jalon v1.0
 
@@ -71,8 +71,8 @@ Progress: [██████████░] 86% (6/7 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-10-26T11:03:00.000Z
-**Stopped at:** Completed 25-05-PLAN.md (CRUD enfant panneau + modération D-12 + useIsAdult, 7 commits, e2e 155/155)
+**Last session:** 2026-10-26T12:15:02.565Z
+**Stopped at:** Completed 25-07-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
@@ -97,6 +97,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P04 | ~2 sessions | 3 tasks | 7 files |
 | Phase 25 P04 | 3 sessions | 3 tasks | 17 files |
 | Phase 25 P05 | ~2h (2 sessions) | 3 tasks | 10 files |
+| Phase 25 P07 | ~35 min | 3 tasks | 17 files |
 
 ## Decisions
 
@@ -116,6 +117,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25] (25-05) : upload photo/avatar enfant DIFFÉRÉ à un plan futur — la RPC porte p_avatar_url de bout en bout mais aucune chaîne chemin-bucket→URL lisible membre n'existe ; précédent du dépôt : jamais une URL signée stockée
 - [Phase 25] (25-05) : D-12 en UI — les adultes (admin OU membre) suppriment les posts d'enfant du Cercle ; les enfants ne voient que leurs propres publications ; les lignes enfant archivées tombent sur mine-only (limitation commentée dans use-cercle.ts)
 - [Phase 25] (25-05) : « Compte à relier » liste TOUS les adults (y compris user_id null de la démo) — le serveur 0148 reste la frontière, le filtre client serait un doublon fragile
+- [Phase 25]: 25-07 : la garde D-06 vit dans la fonction pure member-eligibility.ts, consommée par les quatre pickers (tâches, routines, menu, ardoise) — zéro règle locale
+- [Phase 25]: 25-07 : self-toggle = cas particulier de la délégation — toggleFor est le seul chemin de complétion, markOccurrenceDone passe par le RPC 0146 en mode Supabase
+- [Phase 25]: 25-07 : l'ardoise abandonne son filtre de rôle pour la règle fiduciaire D-05 — le serveur 0146 reste l'autorité
 
 ### Blockers
 

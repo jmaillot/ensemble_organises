@@ -36,7 +36,7 @@
   3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
-**Plans**: 5/7 plans executed
+**Plans**: 7/7 plans executed
 
 Plans:
 - [x] 25-04-PLAN.md
@@ -55,10 +55,10 @@ Plans:
 - [~] 25-04-PLAN.md — Migrations 0147/0148+0149 : push D-23 (rouge→vert), fusion link_managed_child (D-19/D-20/D-18bis), tests verts ciblés — barrière [BLOCKING] complète = 67/83 : 16 échecs connus post-0145 reportés (décision utilisatrice, deferred-items.md 25-04 / WINDOWS.md #12 ; D-01 storage décision produite reportée)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 25-05-PLAN.md — Frontend : useIsAdult (D-01), CRUD enfants DANS la liste des membres via RPC (D-01/D-02), filtre deleted_at unique dans household-store (D-04), espaces par membre (D-05), modération Cercle (D-12), CTA « Donner accès » (D-21), tests Vitest Wave-0 + fixture Playwright
+- [x] 25-05-PLAN.md — Frontend : useIsAdult (D-01), CRUD enfants DANS la liste des membres via RPC (D-01/D-02), filtre deleted_at unique dans household-store (D-04), espaces par membre (D-05), modération Cercle (D-12), CTA « Donner accès » (D-21), tests Vitest Wave-0 + fixture Playwright
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 25-07-PLAN.md — Garde UI D-06 : member-eligibility.ts (fonction pure), quatre pickers inline branchés, « Cocher pour » sur la carte de routine (D-08/D-11), rebranchage markOccurrenceDone → RPC complete_routine_occurrence
+- [x] 25-07-PLAN.md — Garde UI D-06 : member-eligibility.ts (fonction pure), quatre pickers inline branchés, « Cocher pour » sur la carte de routine (D-08/D-11), rebranchage markOccurrenceDone → RPC complete_routine_occurrence
 
 **UI hint**: yes
 
@@ -151,7 +151,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 6/7 | In Progress|  |
+| 25. Profils enfants gérés | 7/7 | In Progress|  |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
