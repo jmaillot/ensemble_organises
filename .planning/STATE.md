@@ -5,9 +5,9 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: planning
-stopped_at: Phase 25 complete, ready to plan Phase 26
-last_updated: "2026-10-26T20:21:59.555Z"
-state_head: ac39db591d8126a2dfe9b4f80fd3bdc7ea9dfe7d
+stopped_at: Phase 26 context gathered
+last_updated: "2026-10-26T21:33:21.030Z"
+state_head: f404bdce25eaadca97471ff82fac47dcf324c090
 progress:
   total_phases: 7
   completed_phases: 1
@@ -71,9 +71,9 @@ Progress: [█░░░░░░░░░] 14% (6/7 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-10-26T12:15:02.565Z
-**Stopped at:** Phase 25 complete, ready to plan Phase 26
-**Resume file:** None
+**Last session:** 2026-10-26T21:33:20.957Z
+**Stopped at:** Phase 26 context gathered
+**Resume file:** .planning/phases/26-export-rgpd/26-CONTEXT.md
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
   (recherche approfondie recommandée selon research/SUMMARY.md pour 25, 26, 27, 31).
