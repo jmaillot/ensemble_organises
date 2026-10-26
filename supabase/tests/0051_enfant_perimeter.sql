@@ -276,6 +276,15 @@ $$;
 
 reset role;
 
+-- Preuve 0145 : l'uid du fixture enfant ne resout AUCUN membre du foyer —
+-- c'est la cause racine de tous les refus ci-dessous (assertion en role postgres,
+-- avant toute session de test ; sans elle, le reste de la section serait un
+-- refus de cause faible, un uid inconnu, et non une isolation par role).
+select testkit.eq(testkit.count('select 1 from public.household_members where household_id = ''' ||
+  (select household_id::text from testkit.fx where key = 'e14-enfant') || ''' and user_id = ''' ||
+  (select user_id::text from testkit.fx where key = 'e14-enfant') || ''''), 0::bigint,
+  'l''uid enfant du fixture ne resout aucun membre du foyer (0145)');
+
 -- ===========================================================================
 -- Noe, role `enfant` — rien des 5 modules, ni en lecture ni en ecriture
 -- (D-01/D-02 : apres 0113, chaque comptage vaut 0 et chaque ecriture echoue)
@@ -380,8 +389,8 @@ begin
         jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un enfant ne cree pas de depense par RPC');
   exception when others then
-    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%rôle insuffisant%',
-      'le refus RPC dit le role : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%appartenez%',
+      'le refus RPC dit l''appartenance : ' || sqlerrm);
   end;
 
   begin
@@ -390,8 +399,8 @@ begin
         jsonb_build_object('participant_type', 'membre', 'member_id', alice_m, 'share_amount', 10)));
     perform testkit.ok(false, 'un enfant ne modifie pas de depense par RPC');
   exception when others then
-    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%rôle insuffisant%',
-      'le refus RPC dit le role : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%appartenez%',
+      'le refus RPC dit l''appartenance : ' || sqlerrm);
   end;
 end;
 $$;
@@ -596,17 +605,25 @@ begin
     perform testkit.ok(SQLSTATE = '42501', 'les soldes refusent l''enfant inscrit : ' || SQLSTATE);
   end;
 
-  -- Echange : membre inscrit rejoue (intact), enfant membre refuse sous
-  -- oracle (0113), sans inscription ni part a zero.
+  -- Echange : membre inscrit rejoue (intact). Depuis 0145, l'uid enfant ne
+  -- resout plus aucun membre : la branche « enfant membre » de 0113 est
+  -- inatteignable, l'echange chute dans la branche invitee externe et rend
+  -- son oracle `pseudonyme invalide` — sans inscription ni part a zero.
   v_out := public.redeem_ardoise_invite(repeat('a', 64), bob, null);
   perform testkit.ok((v_out ->> 'already_member')::boolean is true, 'un membre rejoue son inscription');
   begin
     perform public.redeem_ardoise_invite(repeat('a', 64), kid, null);
-    perform testkit.ok(false, 'un enfant membre ne rejoint plus par code (0113)');
+    perform testkit.ok(false, 'un enfant ne rejoint plus par code (0113, via uid sans membre 0145)');
   exception when others then
-    perform testkit.ok(SQLSTATE = 'P0002' and sqlerrm like '%code invalide%',
-      'l''echange enfant rend l''oracle, rien de plus : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '22023' and sqlerrm like '%pseudonyme invalid%',
+      'l''echange enfant chute dans la branche invitee sans pseudonyme : ' || sqlerrm);
   end;
+  -- Le fixture a semé 3 inscriptions (alice, bob, enfant) et 1 invite sur
+  -- `a` : un total inchangé prouve que l'échange refusé n'a rien ajouté.
+  perform testkit.eq(testkit.count('select 1 from public.ardoise_members where ardoise_id = ''e14-ardoise-a'''), 3::bigint,
+    'l''echange refuse n''ajoute aucune inscription (les 3 semées restent)');
+  perform testkit.eq(testkit.count('select 1 from public.ardoise_guests where ardoise_id = ''e14-ardoise-a'''), 1::bigint,
+    'l''echange refuse n''ajoute aucun invite (le seul reste celui semé)');
 end;
 $$;
 
@@ -626,8 +643,8 @@ begin
     perform public.expense_settlement(kid, home);
     perform testkit.ok(false, 'un enfant ne lit plus les soldes du foyer (0115)');
   exception when others then
-    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%rôle insuffisant%',
-      'les soldes foyer disent le role : ' || sqlerrm);
+    perform testkit.ok(SQLSTATE = '42501' and sqlerrm like '%appartenez%',
+      'les soldes foyer disent l''appartenance : ' || sqlerrm);
   end;
 end;
 $$;
@@ -662,29 +679,47 @@ $$;
 -- Tache 3 : audit inter-modules — rien des 5 modules ne fuit par un autre
 -- chemin (D-07). L'enfant garde contacts, anniversaires et widgets.
 -- ===========================================================================
-select testkit.as_user(user_id, 'e14-kid@example.fr') from testkit.fx where key = 'e14-enfant';
+-- Lecture positive : alice (adulte) voit toujours les espaces hors
+-- perimetre 5 modules — contacts, anniversaires, widgets.
+select testkit.as_user(user_id, 'e14-alice@example.fr') from testkit.fx where key = 'e14-alice';
 set local role authenticated;
 
 select testkit.eq(testkit.count('select 1 from public.contacts where id = ''e14-contact-tante'''), 1::bigint,
-  'un enfant lit les contacts (hors perimetre, intact)');
+  'un adulte lit les contacts (hors perimetre, intact)');
 select testkit.eq(testkit.count('select 1 from public.contact_lists where id = ''e14-cl-fam'''), 1::bigint,
-  'un enfant lit la liste famille (hors perimetre, intacte)');
+  'un adulte lit la liste famille (hors perimetre, intacte)');
 select testkit.eq(testkit.count('select 1 from public.birthdays where id = ''e14-bd-a'''), 1::bigint,
-  'un enfant lit les anniversaires (hors perimetre, intacts)');
-select testkit.eq(testkit.count('select 1 from public.dashboard_widgets where id = ''e14-w-kid'''), 1::bigint,
-  'un enfant lit son propre widget (hors perimetre, intact)');
--- Creation de widget exige le role ecrivain (0007, intact — pas du 0113) :
--- l'enfant regle ses widgets existants, il n'en cree pas.
+  'un adulte lit les anniversaires (hors perimetre, intacts)');
+select testkit.eq(testkit.count('select 1 from public.dashboard_widgets where id = ''e14-w-alice'''), 1::bigint,
+  'un adulte lit son propre widget (hors perimetre, intact)');
+
+-- Depuis 0145, l'uid enfant ne resout plus aucun membre : ces lectures
+-- passent toutes par l'appartenance au foyer (contacts/anniversaires) ou
+-- par current_member_id (widgets) et rendent donc 0 — l'enfant sans
+-- compte ne lit plus rien, meme ce qui etait « son propre » widget.
+select testkit.as_user(user_id, 'e14-kid@example.fr') from testkit.fx where key = 'e14-enfant';
+
+select testkit.eq(testkit.count('select 1 from public.contacts where id = ''e14-contact-tante'''), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus les contacts');
+select testkit.eq(testkit.count('select 1 from public.contact_lists where id = ''e14-cl-fam'''), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus la liste famille');
+select testkit.eq(testkit.count('select 1 from public.birthdays where id = ''e14-bd-a'''), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus les anniversaires');
+select testkit.eq(testkit.count('select 1 from public.dashboard_widgets where id = ''e14-w-kid'''), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus son propre widget');
+-- Ecriture widget : can_write_household faux pour un uid sans membre (0007).
+-- Un enfant gere n'a de toute facon pas de session ; ces attentes negatives
+-- prouvent qu'un uid orphelin ne peut pas creer ni regler un widget.
 select testkit.expect_denied(format(
   'insert into public.dashboard_widgets (id, member_id, household_id, widget_type) values (%L, %L, %L, %L)',
   'e14-w-kid-2', (select row_id from testkit.fx where key = 'e14-enfant'),
   (select household_id from testkit.fx where key = 'e14-enfant'), 'meteo'),
-  'un enfant ne cree pas de widget (0007 intact)');
+  'un uid sans membre resolu ne cree pas de widget');
 select testkit.eq(testkit.affected(
-  'update public.dashboard_widgets set position_x = 2 where id = ''e14-w-kid'''), 1::bigint,
-  'un enfant regle son propre widget (hors perimetre, intact)');
+  'update public.dashboard_widgets set position_x = 2 where id = ''e14-w-kid'''), 0::bigint,
+  'un uid sans membre resolu ne regle plus le widget seme pour lui');
 select testkit.eq(testkit.count('select 1 from public.dashboard_widgets where id = ''e14-w-alice'''), 0::bigint,
-  'un enfant ne lit pas le widget d''autrui (intact)');
+  'un uid sans membre resolu ne lit pas le widget d''autrui');
 
 reset role;
 
