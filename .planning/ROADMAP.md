@@ -36,9 +36,11 @@
   3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
   4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
 
-**Plans**: 4/7 plans executed
+**Plans**: 5/7 plans executed
 
 Plans:
+- [x] 25-04-PLAN.md
+
 **Wave 1**
 - [x] 25-01-PLAN.md — Migration 0144 : socle schématique PAR MEMBRE (managed_modules D-05/D-06 + birth_date + deleted_at D-04) avec tests SQL
 - [x] 25-06-PLAN.md — Correction documentaire : alignement REQUIREMENTS.md/ROADMAP.md sur D-12 (modération, critère #2) et D-06 (sélecteurs du socle, critère #3)
@@ -149,7 +151,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 5/7 | In Progress| 25-04 partial (67/83 tests, 16 échecs journalisés) |
+| 25. Profils enfants gérés | 5/7 | In Progress|  |
 | 26. Export RGPD | 0/? | Not started | - |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |

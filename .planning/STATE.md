@@ -5,9 +5,9 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
 status: executing
-stopped_at: Completed 25-04-PLAN.md (partial — suite 67/83, 16 échecs connus journalisés)
-last_updated: "2026-10-26T07:00:00.000Z"
-state_head: 0911a63
+stopped_at: Completed 25-04-PLAN.md (barriere 83/83)
+last_updated: "2026-10-26T09:08:29.255Z"
+state_head: b904cafd35f8725b6b0929a9431e8c0ed27b7b29
 progress:
   total_phases: 7
   completed_phases: 0
@@ -22,7 +22,7 @@ last_activity: 2026-10-25
 ## Current Position
 
 Phase: 25 (Profils enfants gérés par le parent) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Progress: [░░░░░░░░░░] 0%
 
@@ -71,8 +71,8 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-**Last session:** 2026-10-26T07:00:00.000Z
-**Stopped at:** Completed 25-04-PLAN.md (partial — summary écrit, 16 échecs connus journalisés)
+**Last session:** 2026-10-26T09:08:10.859Z
+**Stopped at:** Completed 25-04-PLAN.md (barriere 83/83)
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
@@ -95,6 +95,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P02 | 52 min | 3 tasks | 2 files |
 | Phase 25 P03 | ~1h35 | 2 tasks | 4 files |
 | Phase 25 P04 | ~2 sessions | 3 tasks | 7 files |
+| Phase 25 P04 | 3 sessions | 3 tasks | 17 files |
 
 ## Decisions
 
@@ -107,6 +108,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: 0149 (25-04) : corrections vers l'avant de 0148 et 0146 — les dédups A6 suppriment SEULEMENT les conflits de clé (les deletes inconditionnels de 0148 perdaient les traces de l'enfant) ; D-07 rétabli sur posts/post_comments/post_reactions (0146 avait recopié la forme 0109)
 - [Phase 25]: testkit.member ignore le user_id des enfants (invariant 0145) ; 0139 débocalisé par comptage borné (§2.7 D)
 - [Phase 25]: Suite test-db complète : 67/83 verts ; 16 échecs connus post-0145 (famille A « enfant lit X », famille B sessions enfant, 0038 D-01 storage, 0053) reportés sur décision utilisatrice — plan futur ; D-01 storage (qui dépose l'image de l'enfant ?) décision REPORTÉE
+- [Phase 25]: D-01 storage : le parent depose pour l'enfant — l'adulte du foyer est l'acteur de session du depot (0038 reecrit, 83/83 verts)
+- [Phase 25]: 0053 : pas de bug produit — redeem_trip_invite resout le membre par user_id ; l'uid enfant suit l'oracle invite 'pseudonyme invalide' (22023)
+- [Phase 25]: Branche can_deposit_message_media de 0099 = code mort benin depuis 0145 — suppression eventuelle dans un plan futur, jamais une correction en place
 
 ### Blockers
 
