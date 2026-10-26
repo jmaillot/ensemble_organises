@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 25
 current_phase_name: Profils enfants gérés par le parent
 status: executing
-stopped_at: Completed 25-03-PLAN.md
-last_updated: "2026-10-25T19:39:23.007Z"
-state_head: f849d81363c72d18a62d931b69c1ede835df8ab6
+stopped_at: Completed 25-04-PLAN.md (partial — suite 67/83, 16 échecs connus journalisés)
+last_updated: "2026-10-26T07:00:00.000Z"
+state_head: 0911a63
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 last_activity: 2026-10-25
 ---
@@ -71,8 +71,8 @@ Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
-**Last session:** 2026-10-25T19:39:22.964Z
-**Stopped at:** Completed 25-03-PLAN.md
+**Last session:** 2026-10-26T07:00:00.000Z
+**Stopped at:** Completed 25-04-PLAN.md (partial — summary écrit, 16 échecs connus journalisés)
 **Resume file:** None
 
 - Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
@@ -94,6 +94,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P06 | 8 min | 1 tasks | 2 files |
 | Phase 25 P02 | 52 min | 3 tasks | 2 files |
 | Phase 25 P03 | ~1h35 | 2 tasks | 4 files |
+| Phase 25 P04 | ~2 sessions | 3 tasks | 7 files |
 
 ## Decisions
 
@@ -103,7 +104,11 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: ENF-02 : la modération du Cercle sort du « au nom de l'enfant » — le parent n'agit jamais en son nom dans le Cercle, il modère le contenu attribué à un enfant
 - [Phase 25]: D-18 approuvée (2026-10-25) : conversion des enfants-avec-compte en profils gérés, suppression réelle des comptes auth.users (0145) ; piste produit future NOTÉE non implémentée : rôle adolescent avec compte propre
 - [Phase 25]: Gardes 0146 : modules lus depuis la ligne membre (D-05), colonnes d'acteur ENF-03 en text écrites depuis auth.uid(), refus explicites 22023/42501, Cercle 3e branche DELETE adulte modère le contenu enfant (D-12)
+- [Phase 25]: 0149 (25-04) : corrections vers l'avant de 0148 et 0146 — les dédups A6 suppriment SEULEMENT les conflits de clé (les deletes inconditionnels de 0148 perdaient les traces de l'enfant) ; D-07 rétabli sur posts/post_comments/post_reactions (0146 avait recopié la forme 0109)
+- [Phase 25]: testkit.member ignore le user_id des enfants (invariant 0145) ; 0139 débocalisé par comptage borné (§2.7 D)
+- [Phase 25]: Suite test-db complète : 67/83 verts ; 16 échecs connus post-0145 (famille A « enfant lit X », famille B sessions enfant, 0038 D-01 storage, 0053) reportés sur décision utilisatrice — plan futur ; D-01 storage (qui dépose l'image de l'enfant ?) décision REPORTÉE
 
 ### Blockers
 
-- test 0139 : assertion de backfill non bornée au foyer (préexistant, non causé par 25-01) — échoue dès qu'un article réel existe ; consigné dans deferred-items.md et WINDOWS.md
+- 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12.
+- test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : absent de cette campagne — AGENTS.md §2.7 exige qu'il soit mené AVANT de considérer le SQL push validé.
