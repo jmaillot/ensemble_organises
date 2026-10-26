@@ -192,20 +192,37 @@ select testkit.eq(testkit.count(format(
   'Sel sans nombre (NULL, au gout) s''enregistre');
 
 -- ===========================================================================
--- 5. Enfant : lecture OK, toute ecriture directe refusee (R10, T-16-02).
+-- 5. Lecture des recettes : adulte OK ; depuis 0145 l'enfant gere n'a plus de
+--    compte (ni session) : l'uid enfant ne resout aucun membre et ne lit plus
+--    rien ; toute ecriture directe refusee (R10, T-16-02).
 -- ===========================================================================
-select testkit.as_user(user_id, 'r16-nina@example.fr') from testkit.fx where key = 'nina';
+select testkit.as_user(user_id, 'r16-bob@example.fr') from testkit.fx where key = 'bob';
 set local role authenticated;
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.recipes where household_id = %L',
   (select household_id from testkit.fx where key = 'home_a'))), 2::bigint,
-  'un enfant lit les recettes de son foyer');
+  'un adulte du foyer lit les recettes de son foyer');
 
 select testkit.eq(testkit.count(format(
   'select 1 from public.recipe_ingredients where household_id = %L',
   (select household_id from testkit.fx where key = 'home_a'))), 2::bigint,
-  'un enfant lit les ingredients');
+  'un adulte du foyer lit les ingredients');
+
+reset role;
+
+select testkit.as_user(user_id, 'r16-nina@example.fr') from testkit.fx where key = 'nina';
+set local role authenticated;
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.recipes where household_id = %L',
+  (select household_id from testkit.fx where key = 'home_a'))), 0::bigint,
+  'un uid sans membre resolu (enfant gere 0145) ne lit plus les recettes');
+
+select testkit.eq(testkit.count(format(
+  'select 1 from public.recipe_ingredients where household_id = %L',
+  (select household_id from testkit.fx where key = 'home_a'))), 0::bigint,
+  'un uid sans membre resolu ne lit plus les ingredients');
 
 select testkit.expect_denied(format(
   'insert into public.recipes (household_id, title) values (%L, %L)',
