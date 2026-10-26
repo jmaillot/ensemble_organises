@@ -18,13 +18,14 @@ import type { Role } from '@/types';
 
 const roleChangeNotice = 'Seul un administrateur change un rôle, via une opération serveur qui protège le dernier administrateur du foyer.';
 
-/** Libellés des espaces servables à un enfant (clés 0146, libellés D-05). */
+/** Libellés des espaces servables à un enfant (clés 0146+0157, libellés D-05). */
 const childModuleLabels: Record<(typeof CHILD_MANAGEABLE_MODULES)[number], string> = {
   taches: 'Espace Tâches',
   routines: 'Espace Routines',
   messages: 'Espace Messages',
   anniversaires: 'Espace Anniversaires',
   menu: 'Espace Menu',
+  voyages: 'Espace Voyages',
 };
 
 const memberColorLabels: Record<MemberColorTag, string> = {

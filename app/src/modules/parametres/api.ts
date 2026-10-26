@@ -139,8 +139,8 @@ export async function removeMember(memberId: string): Promise<void> {
  * `household_members` côté Supabase : la ligne membre porte l'historique.
  */
 
-/** Les cinq espaces qu'un adulte peut ouvrir à un enfant (0146, D-06). */
-export const CHILD_MANAGEABLE_MODULES = ['taches', 'routines', 'messages', 'anniversaires', 'menu'] as const;
+/** Les six espaces qu'un adulte peut ouvrir à un enfant (0146+0157, D-06). */
+export const CHILD_MANAGEABLE_MODULES = ['taches', 'routines', 'messages', 'anniversaires', 'menu', 'voyages'] as const;
 
 /** Le socle proposé à la création d'une fiche enfant (D-06) : sans messages. */
 export const CHILD_DEFAULT_MODULES = ['taches', 'routines', 'anniversaires', 'menu'] as const;

@@ -14,6 +14,7 @@ import { MemberAvatar } from '@/components/shared/member-avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useMembers } from '@/stores/household-store';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import type { TripGuestRow } from '@/types';
 import { addTripMember, removeTripMember } from '../api';
 
@@ -40,7 +41,10 @@ export function TripMembersSection({
   onChanged,
 }: TripMembersSectionProps) {
   const toast = useToast();
-  const members = useMembers();
+  const allMembers = useMembers();
+  // D-06 : adultes toujours proposés ; un enfant géré exige 'voyages' dans sa
+  // fiche (la base refuse 42501 sinon, 0157). Le budget reste aux adultes.
+  const members = useMemo(() => eligibleMembersForModule(allMembers, 'voyages'), [allMembers]);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const participants = useMemo(() => new Set(participantIds), [participantIds]);
 
@@ -64,7 +68,7 @@ export function TripMembersSection({
       title="Membres du voyage"
       description={
         canManage
-          ? 'Cochez les voyageurs : membres du foyer et enfants — le budget reste aux adultes.'
+          ? 'Cochez les voyageurs : adultes toujours proposés, un enfant géré n’apparaît que si sa fiche ouvre l’espace Voyages. Le budget reste aux adultes.'
           : 'Voyageurs du foyer et invités. Seuls les administrateurs du foyer peuvent modifier la liste.'
       }
     >

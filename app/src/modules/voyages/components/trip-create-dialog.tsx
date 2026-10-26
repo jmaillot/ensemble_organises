@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from '@/components/ui/toast';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { useMembers } from '@/stores/household-store';
+import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import {
   EMPTY_TRIP_INPUT,
   TRIP_COVER_PRESETS,
@@ -56,17 +57,19 @@ export interface TripCreateDialogProps {
 }
 
 /**
- * Création d'un voyage (phase 15, D-01 révisé 0119) : infos (mêmes champs que
- * le formulaire historique), composants activés et participants. Tous les
- * membres du foyer sont proposés, enfants compris — ils voyagent mais ne
- * touchent pas au budget (l'onglet Budget les filtre, comme l'ardoise).
+ * Création d'un voyage (phase 15, D-01 révisé 0119 → D-06 phase 25) : infos
+ * (mêmes champs que le formulaire historique), composants activés et
+ * participants. Les adultes sont toujours proposés ; un enfant géré n'apparaît
+ * que si sa fiche sert l'espace Voyages (managed_modules, migration 0144+0157).
+ * Le budget reste aux adultes (l'onglet Budget les filtre, comme l'ardoise).
  * Le serveur ré-valide (Edge + RPC, T-15-06).
  */
 export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCreateDialogProps) {
   const toast = useToast();
   const members = useMembers();
-  // 0119 : toute la famille voyage — enfants inclus (budget seul les exclut).
-  const eligible = useMemo(() => members, [members]);
+  // D-06 : adultes toujours proposés ; un enfant géré exige 'voyages' dans sa
+  // fiche (la base refuse 42501 sinon, 0157). Le budget reste aux adultes.
+  const eligible = useMemo(() => eligibleMembersForModule(members, 'voyages'), [members]);
   const eligibleIds = useMemo(() => eligible.map((member) => member.id), [eligible]);
   const tabLabels = useMemo(() => new Map(TRIP_TABS.map((tab) => [tab.key, tab.label])), []);
 
@@ -228,8 +231,8 @@ export function TripCreateDialog({ open, onOpenChange, onSubmit, busy }: TripCre
           <fieldset className="grid gap-2">
             <legend className="text-[11px] font-extrabold text-muted">Participants du voyage</legend>
             <p className="m-0 text-[11px] text-muted">
-              Toute la famille voyage, enfants compris — les invités externes
-              rejoignent ensuite par code (le budget reste aux adultes).
+              Les adultes sont toujours proposés ; un enfant géré n'apparaît
+              que si sa fiche ouvre l'espace Voyages. Le budget reste aux adultes.
             </p>
             {eligible.map((member) => {
               const checked = selectedParticipants.includes(member.id);
