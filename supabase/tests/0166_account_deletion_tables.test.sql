@@ -53,6 +53,7 @@ begin
   perform testkit.ok(v_request_id is not null, 'la demande renvoie son identifiant');
 end;
 $$;
+reset role;
 
 do $$
 declare
@@ -124,6 +125,7 @@ begin
   perform public.request_account_deletion(alice);
 end;
 $$;
+reset role;
 
 do $$
 declare
@@ -154,6 +156,7 @@ begin
   perform public.cancel_account_deletion(alice);
 end;
 $$;
+reset role;
 
 do $$
 declare
@@ -181,6 +184,7 @@ begin
   perform public.request_account_deletion(alice);
 end;
 $$;
+reset role;
 
 do $$
 declare
@@ -227,6 +231,7 @@ begin
     'sans session, la demande est refusée (28000)');
 end;
 $$;
+reset role;
 
 -- La tentative d'autrui n'a rien écrit.
 do $$
@@ -236,8 +241,8 @@ begin
   perform testkit.eq(
     testkit.count(format(
       'select 1 from public.account_deletion_requests q where q.user_id = %L', alice)),
-    2::bigint,
-    'les tentatives d''autrui n''ont rien écrit (2 demandes légitimes : remplacée + reposée)');
+    3::bigint,
+    'les tentatives d''autrui n''ont rien écrit (3 demandes légitimes d''alice : initiale + remplacée + reposée)');
 end;
 $$;
 
