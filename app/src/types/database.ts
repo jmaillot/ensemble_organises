@@ -102,9 +102,13 @@ export interface HouseholdMemberRow {
   /** Archivage doux (migration 0146, D-04) : non null = enfant retiré du foyer. */
   deleted_at: IsoDateTime | null;
   /**
-   * État « ancien membre » (migration 0166, phase 27 D-03) : non null = compte
-   * supprimé, la ligne reste en base déshumanisée. Les sélecteurs excluent les
-   * lignes où account_deleted_at ou deleted_at est posé.
+   * État « ancien membre » (migration 0166, phase 27 D-03 ; vérité rétablie
+   * en 0170) : non null = compte supprimé, la ligne reste en base
+   * déshumanisée. deleted_at (0144) est le marqueur enfant géré, filtré là où
+   * les sélecteurs d'enfants le font ; en revanche AUCUN sélecteur ne filtre
+   * account_deleted_at aujourd'hui — c'est un marqueur d'audit et l'ancrage
+   * de la restauration D-05, pas un filtre. Ne pas supposer qu'une ligne
+   * « ancien membre » disparaît des listes, ni inventer un filtrage.
    */
   account_deleted_at?: IsoDateTime | null;
   created_at: IsoDateTime;

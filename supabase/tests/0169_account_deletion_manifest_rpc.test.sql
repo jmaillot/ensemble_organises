@@ -25,11 +25,11 @@ begin
   insert into testkit.fx (key, household_id) values ('hh169', v_hh);
 
   insert into private.account_deletion_media_manifest
-    (household_id, storage_path, purged, created_at)
+    (household_id, storage_path, bucket_id, purged, created_at)
   values
-    (v_hh, v_hh || '/notes/deja-purge.png', true, now() - interval '3 hours'),
-    (v_hh, v_hh || '/notes/a-purger.png', false, now() - interval '2 hours'),
-    (v_hh, v_hh || '/avatars/aussi-a-purger.png', false, now() - interval '1 hour');
+    (v_hh, v_hh || '/notes/deja-purge.png', 'household-media', true, now() - interval '3 hours'),
+    (v_hh, v_hh || '/notes/a-purger.png', 'household-media', false, now() - interval '2 hours'),
+    (v_hh, v_hh || '/avatars/aussi-a-purger.png', 'household-media', false, now() - interval '1 hour');
 end;
 $$;
 
