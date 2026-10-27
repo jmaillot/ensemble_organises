@@ -5,15 +5,15 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 01 complete — portée RGPD tranchée, spike A1/A2/A3 OK"
-last_updated: "2026-10-27T08:05:00Z"
-state_head: 9524e51b9b3e9f08de72a626db4b1a020d72175e
+stopped_at: "Phase 26 Plan 02 complete — socle SQL RGPD (bucket, jobs, RPC, cron)"
+last_updated: "2026-10-27T07:46:42Z"
+state_head: b7f47aa
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 8
-  percent: 15
+  completed_plans: 9
+  percent: 21
 last_activity: 2026-10-27
 ---
 
@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 2 of 7
-Status: Executing Phase 26 — plan 26-01 terminé
-Progress: [█░░░░░░░░░] 15% (8/14 plans)
+Plan: 3 of 7
+Status: Executing Phase 26 — plan 26-02 terminé
+Progress: [██░░░░░░░░] 21% (9/14 plans)
 
 ## Références du jalon v1.0
 
@@ -129,8 +129,11 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-01) : 22 modules exportables listés mot pour mot dans 26-SPEC-DECISION.md ; household_invite_tokens et gdpr_export_jobs exclus
 - [Phase 26] (26-01) : Limite bucket gdpr-exports : 1 Go (1073741824 octets)
 - [Phase 26] (26-01) : Verdicts A1 (upload flux ReadableStream), A2 (fflate Deno streaming), A3 (cross-bucket copy destinationBucket) établis OK avec replis nommés sur base documentaire (doc officielle + motifs in-repo)
+- [Phase 26] (26-02) : Squelette gdpr_export_extract_batch — signature et contrat figés (user_id, module, rows, cursor_module, cursor_offset, done, media_paths), corps réservé au plan 26-03 Task 1 (extraction par module + liste médias)
+- [Phase 26] (26-02) : Wrappers sans paramètre pour conformité test 0004 — dispatch_gdpr_export_run/purge délèguent à post_gdpr_export_http('run'/'purge'), jobs cron n'appellent QUE private.*() sans paramètre (garantie aucune valeur dans cron.job.command)
+- [Phase 26] (26-02) : gdpr_export_purge_log — RLS activée ZÉRO politique client, exemption explicite test 0001 (audit RGEX-04 lisible par base/opérateur, jamais navigateur)
 
 ### Blockers
 
-- 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12.
+- 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12. [OBSOLETE : suite verte après 26-02, 92 fichiers tous verts]
 - test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : absent de cette campagne — AGENTS.md §2.7 exige qu'il soit mené AVANT de considérer le SQL push validé.
