@@ -5,15 +5,15 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 02 complete — socle SQL RGPD (bucket, jobs, RPC, cron)"
-last_updated: "2026-10-27T07:46:42Z"
-state_head: b7f47aa
+stopped_at: "Phase 26 Plan 05 complete — panneau RGPD Paramètres (déclencheur, 3 états, historique, lien signé au clic)"
+last_updated: "2026-10-27T09:57:49Z"
+state_head: 5873249
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
-  percent: 21
+  completed_plans: 11
+  percent: 25
 last_activity: 2026-10-27
 ---
 
@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 4 of 7
-Status: Executing Phase 26 — plan 26-03 terminé
-Progress: [██░░░░░░░░] 21% (9/14 plans)
+Plan: 6 of 7
+Status: Executing Phase 26 — plan 26-05 terminé
+Progress: [██▌░░░░░░░] 25% (11/14 plans)
 
 ## Références du jalon v1.0
 
@@ -72,11 +72,11 @@ Progress: [██░░░░░░░░] 21% (9/14 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T08:05:00Z
-**Stopped at:** Phase 26 Plan 01 complete — portée tranchée + spike A1/A2/A3 terminé
-**Resume file:** .planning/phases/26-export-rgpd/26-01-SUMMARY.md
+**Last session:** 2026-10-27T09:57:49Z
+**Stopped at:** Phase 26 Plan 05 complete — panneau RGPD Paramètres monté, 8 tests verts, e2e baseline tenue
+**Resume file:** .planning/phases/26-export-rgpd/26-05-SUMMARY.md
 
-- Prochaine étape : plan 26-04 (fonction Edge gdpr-export-purge + branche push « export »).
+- Prochaine étape : plan 26-06 (notification push d'achèvement — branche « export » de due_push_notifications), puis 26-07 (UAT).
 - Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
   24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
 - .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
@@ -100,6 +100,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P07 | ~35 min | 3 tasks | 17 files |
 | Phase 25 P08-GAP | 3 sessions | 2 chantiers | 10 files |
 | Phase 26 P01 | ~40 min | 2 tasks | 2 files |
+| Phase 26 P05 | ~15 min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -136,6 +137,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-03) : Assemblage ZIP from-scratch idempotent — un central-directory ZIP exige un unique écrivain séquentiel, reprendre en cours recréerait le problème mémoire évité
 - [Phase 26] (26-03) : Wrapper public.gdpr_export_extract_batch (0163) — PostgREST n'expose que public/graphql_public, la logique reste en private, wrapper SECURITY DEFINER réservé service_role (motif delete_household/0160)
 - [Phase 26] (26-03) : Clé du déclencheur HTTP dans l'en-tête apikey, jamais Authorization: Bearer — motif 0025, 0162 corrige la régression de 0158
+- [Phase 26] (26-05) : Déviation de tier assumée — createSignedUrl côté navigateur au clic (TTL 86400 max) ; l'autorisation reste évaluée par la storage-api contre gdpr_exports_read (0158) à la signature ; un seul endroit où vit le lien (D-04), aucune persistance (T-26-15)
+- [Phase 26] (26-05) : Aucun garde admin sur le panneau RGPD (D-08) — le droit d'export est personnel ; la borne est la RLS gdpr_export_jobs côté base, test 5 verrouille l'absence de garde
 
 ### Blockers
 

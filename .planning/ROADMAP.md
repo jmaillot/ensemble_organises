@@ -74,18 +74,18 @@ Plans:
   3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
   4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
 
-**Plans**: 1/7 plans executed
+**Plans**: 3/7 plans executed
 
 Plans:
 **Wave 1**
 - [x] 26-01-PLAN.md — Portée multi-foyers tranchée en SPEC (checkpoint produit) + spike Deno streaming (A1/A2/A3)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 26-02-PLAN.md — Migration 0158 : bucket gdpr-exports, table gdpr_export_jobs (D-06 index partiel), RPC acteur + extraction bornée, cron run/purge + tests SQL négatifs [BLOCKING]
+- [x] 26-02-PLAN.md — Migration 0158 : bucket gdpr-exports, table gdpr_export_jobs (D-06 index partiel), RPC acteur + extraction bornée, cron run/purge + tests SQL négatifs [BLOCKING]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 26-03-PLAN.md — Edge gdpr-export-run : job multipasse (extraction via RPC bornée, médias cross-bucket, ZIP streaming fflate), crash/reprise prouvés
-- [ ] 26-05-PLAN.md — Panneau « Mes données (RGPD) » : déclencheur, 3 états + durée (D-03), historique (D-07), téléchargement signé ≤ 24 h (D-04)
+- [x] 26-05-PLAN.md — Panneau « Mes données (RGPD) » : déclencheur, 3 états + durée (D-03), historique (D-07), téléchargement signé ≤ 24 h (D-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 26-04-PLAN.md — Edge gdpr-export-purge : purge 7 j via API Storage + audit en base (RGEX-04), preuve en base
@@ -174,7 +174,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
-| 26. Export RGPD | 1/7 | In Progress|  |
+| 26. Export RGPD | 3/7 | In Progress|  |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |
