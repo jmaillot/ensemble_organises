@@ -191,7 +191,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods', 'gdpr_export_purge_log')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -234,6 +234,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''conversation_membership_periods'''),
     0::bigint,
     'conversation_membership_periods reste sans politique : historique serveur uniquement'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''gdpr_export_purge_log'''),
+    0::bigint,
+    'gdpr_export_purge_log reste sans politique : audit serveur uniquement (preuve RGEX-04)'
   );
 end;
 $$;
