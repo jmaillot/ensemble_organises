@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ModuleHeader } from '@/components/shared/module-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { AppsPanel } from './components/apps-panel';
+import { GdprDeletePanel } from './components/gdpr-delete-panel';
 import { GdprExportPanel } from './components/gdpr-export-panel';
 import { HouseholdDeletePanel } from './components/household-delete-panel';
 import { HouseholdForm } from './components/household-form';
@@ -52,6 +53,7 @@ export default function ParametresPage() {
             <HouseholdForm />
             <MembersPanel />
             <GdprExportPanel />
+            <GdprDeletePanel />
             <HouseholdDeletePanel />
           </div>
         </TabsContent>

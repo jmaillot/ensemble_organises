@@ -75,6 +75,7 @@ export const routeChunkLoaders = {
   messages: () => import('@/modules/messages/messages-page'),
   messagesGuide: () => import('@/modules/messages/messages-guide-page'),
   parametres: () => import('@/modules/parametres/parametres-page'),
+  parametresDonnees: () => import('@/modules/parametres/gdpr-cancel-page'),
   notFound: () => import('./not-found-page'),
 } satisfies Record<string, RouteChunkLoader>;
 

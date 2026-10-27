@@ -566,6 +566,12 @@ export function AppRoutes() {
             <LazyRoute load={routeChunkLoaders.parametres} />
           }
         />
+        <Route
+          path="/parametres/donnees"
+          element={
+            <LazyRoute load={routeChunkLoaders.parametresDonnees} />
+          }
+        />
       </Route>
       <Route
         path="*"

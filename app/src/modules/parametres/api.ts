@@ -10,7 +10,7 @@ import type {
   ProfileRow,
   Role,
 } from '@/types';
-import type { GdprExportJobRow, HouseholdColor } from './types';
+import type { AccountDeletionRequestRow, GdprExportJobRow, HouseholdColor } from './types';
 
 /**
  * Préférences : profil, foyer, membres. Tout passe par l'adaptateur de données,
@@ -463,4 +463,97 @@ export async function signGdprExportDownload(storagePath: string): Promise<strin
   const { data, error } = await supabase.storage.from('gdpr-exports').createSignedUrl(storagePath, 86400);
   if (error || !data?.signedUrl) throw new Error('Lien de téléchargement indisponible pour le moment.');
   return data.signedUrl;
+}
+
+/**
+ * Suppression de compte RGPD (phase 27, migrations 0166/0167). Toute écriture
+ * passe par les RPC serveur — la base fait foi (instantané D-04,
+ * déshumanisation D-01/02/03, demande D-06) — AUCUNE écriture directe des
+ * tables `account_deletion_*`. L'orchestration rpc → Edge vit ICI, dans CET
+ * ordre, et signale honnêtement une erreur si l'étape Edge échoue (D-02,
+ * jamais d'échec silencieux) : la demande est alors déjà enregistrée, seule
+ * la coupure des sessions / l'e-mail ont manqué.
+ */
+export interface AccountDeletionResult {
+  request_id: string;
+  sessions_revoked: boolean;
+  email_sent: boolean;
+  email_error?: string;
+}
+
+export async function requestAccountDeletion(): Promise<AccountDeletionResult> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour demander la suppression de votre compte.');
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Hors ligne : reconnectez-vous pour demander la suppression.');
+  }
+  // 1. Le RPC 0167 enregistre la demande (et déshumanise la surface publique).
+  //    Le paramètre `p_user_id` est posé en texte : la base refuse tout acteur
+  //    autre que `auth.uid()` (42501), jamais cru.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Connectez-vous pour demander la suppression de votre compte.');
+  const { data: requestId, error: rpcError } = await supabase.rpc('request_account_deletion', {
+    p_user_id: user.id,
+  });
+  if (rpcError) throw new Error(rpcError.message || 'Demande de suppression impossible.');
+  if (typeof requestId !== 'string' || requestId === '') {
+    throw new Error('Demande de suppression impossible.');
+  }
+
+  // 2. L'Edge unifiée mode 'compte' : kill global des sessions + e-mail de
+  //    confirmation avec lien d'annulation. Si elle échoue, la demande reste
+  //    enregistrée — l'erreur le dit, sans mentir sur le premier pas.
+  try {
+    const { data: body, error, response } = await supabase.functions.invoke('household-delete', {
+      body: { mode: 'compte' },
+    });
+    if (error) {
+      throw new Error(await readFunctionError(response, 'Coupure des sessions impossible pour le moment.'));
+    }
+    const result = (body ?? {}) as Partial<AccountDeletionResult>;
+    return {
+      request_id: requestId,
+      sessions_revoked: result.sessions_revoked === true,
+      email_sent: result.email_sent === true,
+      ...(typeof result.email_error === 'string' ? { email_error: result.email_error } : {}),
+    };
+  } catch (edgeError) {
+    throw new Error(
+      edgeError instanceof Error
+        ? `Demande enregistrée, mais l'e-mail et la coupure des sessions ont échoué : ${edgeError.message}`
+        : 'Demande enregistrée, mais l’e-mail et la coupure des sessions ont échoué.',
+    );
+  }
+}
+
+/** Annule la demande (restauration D-05 côté base) : RPC pur. */
+export async function cancelAccountDeletion(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour annuler la demande.');
+  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Connectez-vous pour annuler la demande.');
+  const { error } = await supabase.rpc('cancel_account_deletion', { p_user_id: user.id });
+  if (error) throw new Error(error.message || 'Annulation de la demande impossible.');
+}
+
+/**
+ * Demande active du membre : lecture RLS `account_deletion_requests_select_own`
+ * (0166) — la base ne rend que les siennes. La plus récente d'abord.
+ */
+export async function fetchAccountDeletionRequests(): Promise<AccountDeletionRequestRow[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour consulter votre demande.');
+  }
+  const { data, error } = await supabase
+    .from('account_deletion_requests')
+    .select('id,status,created_at,purge_due_at,rappel_envoye')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message || 'Demande de suppression indisponible.');
+  return (data ?? []) as AccountDeletionRequestRow[];
 }

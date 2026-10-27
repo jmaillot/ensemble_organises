@@ -56,6 +56,28 @@ export interface GdprExportJobRow {
   updated_at: string;
 }
 
+/**
+ * Statuts de la demande de suppression de compte (migration 0166). Libellés
+ * français : jamais de valeur SQL dans l'interface.
+ */
+export type StatutDemandeSuppression = 'demandee' | 'rappellee' | 'annulee' | 'purgee';
+
+export const statutDemandeSuppressionLabels: Record<StatutDemandeSuppression, string> = {
+  demandee: 'Demande enregistrée',
+  rappellee: 'Rappel envoyé — suppression imminente',
+  annulee: 'Demande annulée',
+  purgee: 'Compte supprimé',
+};
+
+/** Ligne de demande lue par le panneau — la RLS 0166 ne rend que les siennes. */
+export interface AccountDeletionRequestRow {
+  id: string;
+  status: StatutDemandeSuppression;
+  created_at: string;
+  purge_due_at: string;
+  rappel_envoye: boolean;
+}
+
 /** Libellés français des rôles : jamais de valeur SQL dans l'interface. */
 export const roleLabels: Record<Role, string> = {
   admin: 'Administrateur',
