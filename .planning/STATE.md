@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 27
 current_phase_name: Suppression de compte RGPD
 status: executing
-stopped_at: Phase 27 context gathered
-last_updated: "2026-10-27T14:22:07.767Z"
-state_head: 5441edccd08631c3eb4bce59cebdf81c2336ef89
+stopped_at: Completed 27-02-PLAN.md
+last_updated: "2026-10-27T15:30:25.518Z"
+state_head: b89e1c9066a40bd9fb1535a381eac3d433750270
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 16
   percent: 29
 last_activity: 2026-10-27
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 27 (Suppression de compte RGPD) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Plan 27-01 terminé, plan 27-02 à exécuter
 Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
@@ -72,9 +72,9 @@ Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T13:34:32.183Z
-**Stopped at:** Phase 27 context gathered
-**Resume file:** .planning/phases/27-suppression-de-compte-rgpd/27-CONTEXT.md
+**Last session:** 2026-10-27T15:30:08.535Z
+**Stopped at:** Completed 27-02-PLAN.md
+**Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -105,6 +105,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 26 P06 | ~35 min | 3 tasks | 3 files |
 | Phase 26 P07 | ~45 min | 3 tasks (2 auto + 1 checkpoint) | 0 code files (barrière) |
 | Phase 27 P01 | ~40 min | 3 tasks | 5 files |
+| Phase 27 P02 | 19 min | 3 tasks | 2 files |
 
 ## Decisions
 
@@ -151,6 +152,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-07) : Barrière clôturée côté exécution — chaîne §2.7 verte complète (94 tests SQL, typecheck, 1636 unitaires / 202 fichiers, build, e2e 155/155 + 7 skips viewport conditionnels) ; export e2e réel prouvé (job 3bf17b27, ZIP conforme, exclusion cross-membre prouvée, média PNG valide, lien signé 86400 s) ; purge prouvée (2 jobs, 24 objets, partial:false, audit removed=t) ; push = ABSENCE DÉCLARÉE (0 abonnement réel, reprise 31)
 - [Phase 26] (26-07) : Convention note_attachments.file_url confirmée = chemin d'objet SANS préfixe bucket (26-03) ; un fixture mal préfixé produit un chemin doublé dans le manifeste (fixture corrigé, produit inchangé) — à re-diligencer en 27 si d'autres colonnes média sont exportées
 - [Phase 26] (26-07) : Barrière APPROUVÉE par l'utilisateur (« approved » 2026-10-27) — export conforme à la portée A (22 modules, exclusion cross-membre prouvée) et purge avec audit acceptées ; l'absence de preuve push (0 abonnement réel) acceptée comme absence déclarée, reprise phase 31 (porte OUV-07)
+- [Phase 27]: 27-02: cron jobs sans paramètres — deux dispatches délégants (reminder/purge-medias) respectent le contrat 0004 (^select private\.[a-z_]+\(\)$) plutôt que des commandes littérales dans cron.job
+- [Phase 27]: 27-02: purge de foyer orphelin — réutilise public.delete_household (0074) si l'utilisateur purgé était admin, sinon suppression inline (dépenses puis foyer), assert_household_admin leverait 42501
+- [Phase 27]: 27-02: demande marquee 'purgee' avant delete from auth.users — la ligne meurt avec le compte via le cascade 0166, preuve RGPD assertée dans les tests
 
 ### Blockers
 
