@@ -31,6 +31,31 @@ export const householdColorClass: Record<HouseholdColor, string> = {
   ink: 'bg-fg',
 };
 
+/**
+ * Statuts du job d'export RGPD (migration 0158, table `gdpr_export_jobs`).
+ * Machine à états : en_attente → en_cours → pret | echec. Les libellés
+ * français suivent la convention `roleLabels` — jamais de valeur SQL dans
+ * l'interface.
+ */
+export type StatutJobExport = 'en_attente' | 'en_cours' | 'pret' | 'echec';
+
+export const statutJobExportLabels: Record<StatutJobExport, string> = {
+  en_attente: 'En attente',
+  en_cours: 'En cours',
+  pret: 'Prêt',
+  echec: 'Échec',
+};
+
+/** Ligne de job lue par le panneau — la RLS 0158 ne rend que les siennes. */
+export interface GdprExportJobRow {
+  id: string;
+  status: StatutJobExport;
+  storage_path: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Libellés français des rôles : jamais de valeur SQL dans l'interface. */
 export const roleLabels: Record<Role, string> = {
   admin: 'Administrateur',

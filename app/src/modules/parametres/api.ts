@@ -2,8 +2,15 @@ import { data } from '@/lib/data';
 import { getInviteTokenSummary, isRecallValid, recallInviteToken } from '@/lib/invites';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
-import type { DashboardWidgetRow, HouseholdMemberRow, HouseholdRow, MemberColorTag, ProfileRow, Role } from '@/types';
-import type { HouseholdColor } from './types';
+import type {
+  DashboardWidgetRow,
+  HouseholdMemberRow,
+  HouseholdRow,
+  MemberColorTag,
+  ProfileRow,
+  Role,
+} from '@/types';
+import type { GdprExportJobRow, HouseholdColor } from './types';
 
 /**
  * Préférences : profil, foyer, membres. Tout passe par l'adaptateur de données,
@@ -409,4 +416,51 @@ async function readFunctionError(response: Response | undefined, fallback: strin
     }
   }
   return fallback;
+}
+
+/**
+ * Export RGPD (phase 26, migration 0158). Le déclencheur passe par le RPC
+ * serveur `request_gdpr_export` : l'acteur est résolu en base via `auth.uid()`
+ * (jamais un paramètre du client) et l'unicité d'un job actif (D-06) est
+ * tenue par l'index unique partiel. AUCUN repli démo : le job vit côté
+ * serveur uniquement, comme `linkChildToAccount`.
+ */
+export async function requestGdprExport(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour demander votre export.');
+  }
+  const { error } = await supabase.rpc('request_gdpr_export');
+  if (error) throw new Error(error.message || 'Demande d’export impossible.');
+}
+
+/**
+ * Historique des exports du membre : lecture RLS de `gdpr_export_jobs`
+ * (politique `gdpr_export_jobs_select_own`, 0158) — la base ne rend que les
+ * lignes du demandeur, le tri « plus récent d'abord » est demandé ici (D-07).
+ */
+export async function fetchGdprExports(): Promise<GdprExportJobRow[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour consulter vos exports.');
+  }
+  const { data, error } = await supabase
+    .from('gdpr_export_jobs')
+    .select('id,status,storage_path,error,created_at,updated_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message || 'Historique des exports indisponible.');
+  return (data ?? []) as GdprExportJobRow[];
+}
+
+/**
+ * Lien signé de téléchargement, calculé AU CLIC uniquement (D-04/RGEX-01) :
+ * TTL de 86 400 s (24 h maximum — jamais la valeur 30 j de l'ardoise),
+ * politique Storage `gdpr_exports_read` (0158) évaluée côté storage-api à la
+ * signature. La valeur n'est ni persistée ni envoyée hors de l'écran export.
+ */
+export async function signGdprExportDownload(storagePath: string): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Connectez-vous pour télécharger votre export.');
+  }
+  const { data, error } = await supabase.storage.from('gdpr-exports').createSignedUrl(storagePath, 86400);
+  if (error || !data?.signedUrl) throw new Error('Lien de téléchargement indisponible pour le moment.');
+  return data.signedUrl;
 }
