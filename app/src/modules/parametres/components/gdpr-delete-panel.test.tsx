@@ -114,6 +114,58 @@ describe('GdprDeletePanel', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
+  it('annonce les sessions coupées SEULEMENT quand sessions_revoked est true (WR-04)', async () => {
+    const user = userEvent.setup();
+    mockDemandes([]);
+    mockRpc.mockResolvedValue({ data: 'demande-1', error: null });
+    mockInvoke.mockResolvedValue({
+      data: { mode: 'compte', request_id: 'demande-1', sessions_revoked: true, email_sent: true },
+      error: null,
+    });
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Demander la suppression de mon compte' }));
+    await user.click(screen.getByRole('button', { name: 'Oui, supprimer mon compte' }));
+
+    expect(await screen.findByText(/vos sessions ont été coupées/i)).toBeInTheDocument();
+  });
+
+  it('invite à la déconnexion manuelle quand sessions_revoked est false, sans erreur brute (WR-04, T-27-18)', async () => {
+    const user = userEvent.setup();
+    mockDemandes([]);
+    mockRpc.mockResolvedValue({ data: 'demande-1', error: null });
+    mockInvoke.mockResolvedValue({
+      data: {
+        mode: 'compte',
+        request_id: 'demande-1',
+        sessions_revoked: false,
+        email_sent: false,
+        email_error: 'relais SMTP refusé: 550 details',
+      },
+      error: null,
+    });
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Demander la suppression de mon compte' }));
+    await user.click(screen.getByRole('button', { name: 'Oui, supprimer mon compte' }));
+
+    expect(await screen.findByText(/déconnectez-vous manuellement/i)).toBeInTheDocument();
+    // Plus jamais le succès mensonger : le panneau ne dit PAS que les
+    // sessions ont été coupées quand l'Edge a répondu sessions_revoked:false.
+    expect(screen.queryByText(/sessions ont été coupées/i)).not.toBeInTheDocument();
+    // T-27-18 : l'erreur serveur brute (email_error) n'atteint jamais le DOM.
+    expect(screen.queryByText(/relais SMTP refusé/i)).not.toBeInTheDocument();
+  });
+
+  it('ne promet jamais la restauration des sessions à l’annulation (IN-02)', async () => {
+    mockDemandes([demande({})]);
+    renderPanel();
+
+    await screen.findByText(/suppression programmée le/i);
+    // L'annulation restaure nom et photo ; la reconnexion est à l'utilisateur.
+    expect(screen.queryByText(/restaure votre nom, votre photo et vos sessions/i)).not.toBeInTheDocument();
+  });
+
   it('annule la demande active par le RPC de restauration D-05', async () => {
     const user = userEvent.setup();
     mockDemandes([demande({})]);
