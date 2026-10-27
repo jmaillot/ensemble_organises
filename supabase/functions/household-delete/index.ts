@@ -234,8 +234,8 @@ async function handleFoyer(admin: AdminClient, userId: string, body: FoyerBody) 
   // Objets recensés AVANT la suppression DB (lecture seule), effacés après :
   // un échec ici laisse des orphelins invisibles, jamais des lignes cassées.
   const pathsByBucket = new Map<string, string[]>();
-  for (const bucket of HOUSEHOLD_BUCKETS) {
-    pathsByBucket.set(bucket, await listHouseholdObjects(admin, bucket, body.householdId));
+  for (const bucketName of HOUSEHOLD_BUCKETS) {
+    pathsByBucket.set(bucketName, await listHouseholdObjects(admin, bucketName, body.householdId));
   }
   let storageObjects = 0;
   let partial = false;
@@ -363,7 +363,7 @@ function readBearerJwt(request: Request): string {
   return match[1].trim();
 }
 
-async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient; userId: string; email?: string }) {
+async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient; userId: string }) {
   const admin = ctx.supabaseAdmin;
 
   // 1. Le RPC 0167 fait tout (instantané D-04 + déshumanisation D-01/02/03 +
@@ -395,7 +395,15 @@ async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient;
   try {
     const config = readSmtp();
     const origin = readAppOrigin();
-    const recipient = ctx.email?.trim();
+    // IN-01 : le destinataire est relu EN BASE (profiles.email) et non pris
+    // dans les claims du JWT — potentiellement périmé — pour que confirmation
+    // et rappel J-7 lisent LA MÊME source (T-27-20).
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('email')
+      .eq('id', ctx.userId)
+      .maybeSingle();
+    const recipient = (profile as { email?: string } | null)?.email?.trim();
     if (!recipient) {
       throw new HouseholdDeleteError(500, 'Envoi d’e-mail indisponible : adresse du compte introuvable.');
     }
@@ -474,7 +482,7 @@ async function handleReminder(admin: AdminClient): Promise<Response> {
         to: email,
         subject: 'Suppression définitive de votre compte dans 7 jours',
         text: [
-          'Sa demande de suppression de compte sera exécutée définitivement le ' +
+          'Votre demande de suppression de compte sera exécutée définitivement le ' +
             dueDate(row.purge_due_at) + '.',
           'Vous avez encore 7 jours pour changer d’avis : reconnectez-vous puis ouvrez la page',
           '« Mes données (RGPD) » de l’application pour annuler la demande.',
@@ -496,36 +504,37 @@ async function handleReminder(admin: AdminClient): Promise<Response> {
  * Instruction de suppression Storage (D-07/F6) : l'Edge ne supprime QUE les
  * chemins présents au manifest (public.deletion_media_claim — wrapper
  * PostgREST du manifest privé 0168), les marque `purged = true` au fur et à
- * mesure, et répond le contrat honnête 'ok' | 'partial'. Le manifest ne
- * porte pas de bucket : le chemin est essayé dans chaque bucket privé du
- * foyer (un objet vit dans exactement l'un des deux).
+ * mesure, et répond le contrat honnête 'ok' | 'partial'. Depuis la migration
+ * 0170, le manifest porte `bucket_id` : chaque chemin est supprimé dans SON
+ * bucket exact — l'ancien essai en cascade dans les deux buckets privés
+ * permettait à un homonyme cross-bucket d'être « purgé une fois pour deux ».
  */
 async function handlePurgeMedias(admin: AdminClient): Promise<Response> {
   const { data: claim, error: claimError } = await admin.rpc('deletion_media_claim', {
     p_limit: PAGE_SIZE * 10,
   });
   if (claimError) throw translateRpcError(claimError);
-  const rows = ((claim as { rows?: { id: string; storage_path: string }[] } ?? {}).rows ?? [])
-    .filter((row) => typeof row?.id === 'string' && typeof row?.storage_path === 'string' && row.storage_path !== '');
+  const rows = ((claim as { rows?: { id: string; storage_path: string; bucket_id: string }[] } ?? {}).rows ?? [])
+    .filter((row) =>
+      typeof row?.id === 'string' &&
+      typeof row?.storage_path === 'string' && row.storage_path !== '' &&
+      typeof row?.bucket_id === 'string' && row.bucket_id !== ''
+    );
 
   let deleted = 0;
   let failed = 0;
   const purgedIds: string[] = [];
   for (const row of rows) {
-    let removed = false;
-    for (const bucket of HOUSEHOLD_BUCKETS) {
-      const { error: removeError } = await admin.storage.from(bucket).remove([row.storage_path]);
-      if (!removeError) {
-        removed = true;
-        break;
-      }
-    }
-    if (removed) {
+    const { error: removeError } = await admin.storage.from(row.bucket_id).remove([row.storage_path]);
+    if (!removeError) {
       purgedIds.push(row.id);
       deleted += 1;
     } else {
       failed += 1;
-      console.error('household-delete: chemin du manifest non supprimé', { path: row.storage_path });
+      console.error('household-delete: chemin du manifest non supprimé', {
+        bucket: row.bucket_id,
+        path: row.storage_path,
+      });
     }
   }
   if (purgedIds.length > 0) {
@@ -587,7 +596,6 @@ Deno.serve(
         return await handleCompte(request, {
           supabaseAdmin: ctx.supabaseAdmin,
           userId,
-          email: ctx.userClaims?.email,
         });
       }
       return await handleFoyer(ctx.supabaseAdmin, userId, body);
