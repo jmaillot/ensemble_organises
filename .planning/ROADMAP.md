@@ -91,7 +91,7 @@ Plans:
 - [x] 26-04-PLAN.md — Edge gdpr-export-purge : purge 7 j via API Storage + audit en base (RGEX-04), preuve en base
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 26-06-PLAN.md — Migration 0159 + push-notify scope « export » : notification push à l'achèvement, échec notifié comme le succès (D-01/D-02)
+- [x] 26-06-PLAN.md — Notification push à l'achèvement (0164, patron 0147/0042) : succès comme échec (D-01/D-02), push-notify scope « export », notified_push après distribution — preuve réseau déclarée absente (0 appareil abonné, refaire phase 31)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 26-07-PLAN.md — Barrière [BLOCKING] : chaîne §2.7 complète verte + preuves réseau observées (contenu ZIP, purge, push)

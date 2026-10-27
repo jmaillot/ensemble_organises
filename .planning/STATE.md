@@ -5,15 +5,15 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 04 complete — Edge gdpr-export-purge : purge 7 j des octets via API Storage, auditée (RGEX-04), preuve réseau prouvée"
-last_updated: "2026-10-27T10:15:00Z"
-state_head: 5873249
+stopped_at: "Phase 26 Plan 06 complete — notification push d'achèvement export (0164, patron 0147/0042), notified_push après distribution, preuve réseau déclarée absente (0 appareil abonné)"
+last_updated: "2026-10-27T10:25:00Z"
+state_head: 7652663
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
-  percent: 26
+  completed_plans: 13
+  percent: 28
 last_activity: 2026-10-27
 ---
 
@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 5 of 7 (26-04 terminé en Wave 4 ; 26-06 est le prochain plan exécutable — Wave 5)
-Status: Executing Phase 26 — plans 26-02/26-03/26-04/26-05 terminés, reste 26-06 (push) et 26-07 (barrière)
-Progress: [██▌░░░░░░░] 26% (12/14 plans)
+Plan: 6 of 7 (26-06 terminé ; reste 26-07 — UAT/barrière finale)
+Status: Executing Phase 26 — plans 26-02 à 26-06 terminés, reste 26-07
+Progress: [██▌░░░░░░░] 28% (13/14 plans)
 
 ## Références du jalon v1.0
 
@@ -72,11 +72,11 @@ Progress: [██▌░░░░░░░] 26% (12/14 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T09:57:49Z
-**Stopped at:** Phase 26 Plan 05 complete — panneau RGPD Paramètres monté, 8 tests verts, e2e baseline tenue
-**Resume file:** .planning/phases/26-export-rgpd/26-05-SUMMARY.md
+**Last session:** 2026-10-27T10:25:00Z
+**Stopped at:** Phase 26 Plan 06 complete — branche push « export » (0164), push-notify scope 'export', notified_push après distribution, suite SQL 94/94 verte
+**Resume file:** .planning/phases/26-export-rgpd/26-06-SUMMARY.md
 
-- Prochaine étape : plan 26-06 (notification push d'achèvement — branche « export » de due_push_notifications), puis 26-07 (UAT).
+- Prochaine étape : plan 26-07 (UAT / barrière finale de la phase 26).
 - Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
   24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
 - .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
@@ -101,6 +101,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P08-GAP | 3 sessions | 2 chantiers | 10 files |
 | Phase 26 P01 | ~40 min | 2 tasks | 2 files |
 | Phase 26 P05 | ~15 min | 3 tasks | 5 files |
+| Phase 26 P06 | ~35 min | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -139,8 +140,11 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-03) : Clé du déclencheur HTTP dans l'en-tête apikey, jamais Authorization: Bearer — motif 0025, 0162 corrige la régression de 0158
 - [Phase 26] (26-05) : Déviation de tier assumée — createSignedUrl côté navigateur au clic (TTL 86400 max) ; l'autorisation reste évaluée par la storage-api contre gdpr_exports_read (0158) à la signature ; un seul endroit où vit le lien (D-04), aucune persistance (T-26-15)
 - [Phase 26] (26-05) : Aucun garde admin sur le panneau RGPD (D-08) — le droit d'export est personnel ; la borne est la RLS gdpr_export_jobs côté base, test 5 verrouille l'absence de garde
+- [Phase 26] (26-06) : Marquage notified_push DANS public.consume_push_reminders (branche kind 'export') — le mécanisme de consommation après distribution 0042/0147 est étendu, pas une nouvelle fonction ; push-notify n'appelle la consommation qu'après un envoi réellement reçu (A5)
+- [Phase 26] (26-06) : preference null pour la branche export (motif anniversaires 0019) — l'achèvement d'un export demandé n'a pas d'interrupteur ; D-04 : titre générique + url '/parametres', jamais le lien signé ni storage_path (prouvé par assertion SQL)
+- [Phase 26] (26-06) : Dispatch dédié dispatch_export_notifications + cron eo-push-exports (*/5, motif 0042) — la chaîne eo-push-messages ne distribue que le scope 'messages' ; reminderKind doit reconnaître export-<job_id> sans quoi notified_push ne basculerait jamais
 
 ### Blockers
 
 - 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12. [OBSOLETE : suite verte après 26-02, 92 fichiers tous verts]
-- test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : absent de cette campagne — AGENTS.md §2.7 exige qu'il soit mené AVANT de considérer le SQL push validé.
+- test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : **absence déclarée à 26-06** (0 abonnement réel sur l'instance, le script refuse lui-même un endpoint factice) — à mener avec un appareil abonné, à la phase 31 (preuve SMTP/push de la porte OUV-07).
