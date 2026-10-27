@@ -41,9 +41,20 @@
  *   Un chemin déjà présent dans `gdpr_export_purge_log` avec `removed=true`
  *   est SAUTÉ au passage suivant (et non re-loggé) : les reprises ne doublent
  *   pas l'audit. La ligne existante EST la preuve — la redire n'apporte rien
- *   et fausserait les comptages. Un job déjà entièrement purgé réapparaît
- *   comme candidat avec zéro chemin à supprimer : le passage ne fait que
- *   constater, sans écriture.
+ *   et fausserait les comptages. Un job entièrement purgé est CLÔTURÉ : sa
+ *   ligne `gdpr_export_jobs` est supprimée (voir CLÔTURE DU JOB ci-dessous),
+ *   l'audit reste en base (job_id libéré par `on delete set null`, 0158) —
+ *   la preuve RGEX-04 survit à la ligne de job.
+ *
+ * CLÔTURE DU JOB (CR-01)
+ *   Sans suppression de la ligne, un job déjà purgé réapparaît à chaque
+ *   passage en tête de la liste de candidats (tri ascendant) et consomme à
+ *   vie une place du plafond de 50 : au 51ᵉ export expiré, la purge cesse
+ *   définitivement de fonctionner (RGEX-04 violée en silence). Le passage
+ *   supprime donc la ligne dès qu'il ne reste AUCUN chemin à traiter pour le
+ *   job — rien trouvé en Storage, tout déjà loggé `removed=true`, ou
+ *   suppression intégralement réussie dans CE passage. Un échec partiel
+ *   garde la ligne : la reprise du lendemain finit le travail puis clôture.
  *
  * ÉCHEC PARTIEL (contrat 'partial' de household-delete)
  *   L'échec d'un lot de suppression ne stoppe pas la boucle : les chemins du
@@ -54,6 +65,7 @@
  *
  * CONTRAT DE RÉPONSE
  *   -> 200 { purged_jobs, removed_count, partial: boolean }
+ *      `purged_jobs` compte les jobs CLÔTURÉS (ligne supprimée — CR-01).
  *   -> 500 { error } — Storage injoignable, le cron retente demain
  *
  * Note d'exécution : `withSupabase` renvoie un gestionnaire `fetch` ; on le
@@ -223,21 +235,36 @@ async function handlePurge(admin: AdminClient): Promise<Response> {
   }
 
   // Étape 3 : suppression par lots + audit, job par job. L'échec d'un lot ne
-  // stoppe pas la boucle (partial), l'échec d'audit est fatal (§2.7F).
+  // stoppe pas la boucle (partial), l'échec d'audit est fatal (§2.7F). Un job
+  // dont TOUS les chemins sont traités est clôturé : sa ligne est supprimée
+  // (CR-01 — sinon elle réoccupe à vie une place du plafond de 50 candidats).
   let removedCount = 0;
   let partial = false;
+  let purgedJobs = 0;
   for (const { job, paths } of targets) {
-    if (paths.length === 0) continue;
-    for (let at = 0; at < paths.length; at += PAGE_SIZE) {
-      const { audit, removed } = await removeBatch(admin, job.id, paths.slice(at, at + PAGE_SIZE));
-      await writeAudit(admin, audit);
-      removedCount += removed;
-      if (removed < audit.length) partial = true;
+    if (paths.length > 0) {
+      let jobPartial = false;
+      for (let at = 0; at < paths.length; at += PAGE_SIZE) {
+        const { audit, removed } = await removeBatch(admin, job.id, paths.slice(at, at + PAGE_SIZE));
+        await writeAudit(admin, audit);
+        removedCount += removed;
+        if (removed < audit.length) {
+          jobPartial = true;
+          partial = true;
+        }
+      }
+      if (jobPartial) continue;
     }
+    // Aucun chemin restant (déjà purgé, jamais écrit, ou suppression
+    // intégralement réussie ci-dessus) : la ligne est supprimée. L'audit
+    // survit (`on delete set null` sur job_id, 0158).
+    const { error } = await admin.from('gdpr_export_jobs').delete().eq('id', job.id);
+    if (error) throw new GdprPurgeError(`clôture du job purgé impossible : ${error.message}`);
+    purgedJobs += 1;
   }
 
   return json({
-    purged_jobs: targets.filter((t) => t.paths.length > 0).length,
+    purged_jobs: purgedJobs,
     removed_count: removedCount,
     partial,
   });
