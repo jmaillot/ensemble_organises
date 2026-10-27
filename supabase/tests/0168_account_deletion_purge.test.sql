@@ -230,4 +230,150 @@ begin
 end;
 $$;
 
-commit;
+-- ---------------------------------------------------------------
+-- 5. Le wrapper HTTP (task 2) : J-7 — le flag ne bouge que derrière un POST
+--    partant, et une demande déjà rappelée ne repart jamais (T-27-06).
+--    Sur une stack sans secrets Vault, le wrapper refuse de partir AVANT de
+--    marquer : le test le nomme honnêtement au lieu de le simuler.
+-- ---------------------------------------------------------------
+do $$
+declare
+  noa uuid := testkit.auth_user('t168-noa@example.fr', 'Noa 168');
+  hh3 text := testkit.household(noa, 'Foyer 168 C');
+  v_posted boolean;
+  v_posted2 boolean;
+begin
+  insert into testkit.fx (key, user_id, household_id, row_id)
+    values ('noa', noa, hh3, testkit.member(hh3, noa, 'Membre Noa 168', 'admin'));
+  update public.profiles set display_name = 'Ancien membre', avatar_url = null where id = noa;
+  update public.household_members
+     set account_deleted_at = now(), display_name = 'Ancien membre', avatar_url = null
+   where user_id = noa;
+  -- Alerte J-7 due dans 3 jours (fenêtre 7 jours), pas encore envoyée.
+  insert into public.account_deletion_requests (user_id, purge_due_at)
+    values (noa, now() + interval '3 days');
+end;
+$$;
+
+do $$
+declare
+  v_noa uuid := (select user_id from testkit.fx where key = 'noa');
+  v_posted boolean;
+  v_posted2 boolean;
+  v_was_flagged boolean;
+begin
+  -- La sélection bornée du wrapper : exactement la demande de Noa est due.
+  perform testkit.eq((
+    select count(*) from public.account_deletion_requests
+     where status in ('demandee', 'rappellee')
+       and rappel_envoye = false
+       and purge_due_at - now() <= interval '7 days'
+       and user_id = v_noa), 1::bigint,
+    'la demande J-7 est dans la fenêtre, non rappelée');
+
+  select private.post_account_deletion_http('reminder') into v_posted;
+  v_was_flagged := exists (
+    select 1 from public.account_deletion_requests
+     where user_id = v_noa and rappel_envoye = true);
+
+  -- T-27-06 : le flag ne bouge QUE si un POST est parti — posé dans la
+  -- transaction AVANT l'appel HTTP, jamais sans envoi possible.
+  perform testkit.ok(v_posted = v_was_flagged,
+    'le flag rappel_envoye ne bouge que derrière un POST partant (T-27-06)');
+
+  if v_posted then
+    -- Idempotence : la seconde exécution ne POSTe plus (aucun doublon).
+    select private.post_account_deletion_http('reminder') into v_posted2;
+    perform testkit.ok(v_posted2 = false,
+      'la seconde exécution du rappel J-7 ne reposte pas (T-27-06)');
+  else
+    raise notice 'Stack sans secrets Vault : la pose du flag n''est pas observée, le refus l''est.';
+    perform testkit.ok(v_was_flagged = false,
+      'sans envoi possible, la demande n''est pas marquée rappelée');
+  end if;
+end;
+$$;
+
+-- Purge-medias : sans ligne non purgée au manifest, rien ne part.
+do $$
+declare
+  v_h1 text := (select household_id from testkit.fx where key = 'dave');
+  v_posted boolean;
+begin
+  update private.account_deletion_media_manifest set purged = true
+   where household_id <> v_h1;
+
+  select private.post_account_deletion_http('purge-medias') into v_posted;
+  perform testkit.ok(v_posted = false,
+    'purge-medias sans chemin non purgé ne poste pas');
+
+  update private.account_deletion_media_manifest set purged = false
+   where household_id <> v_h1;
+end;
+$$;
+
+-- ---------------------------------------------------------------
+-- 6. Jobs cron : trois jobs, commands réduits à des appels private.*() sans
+--    secret (contrat test 0004), alerte J-7 AVANT la purge du même matin.
+-- ---------------------------------------------------------------
+do $$
+begin
+  perform testkit.ok(
+    exists (select 1 from cron.job
+             where jobname = 'eo-account-deletion-reminder'
+               and command = 'select private.dispatch_account_deletion_reminder()'),
+    'le job J-7 appelle un dispatch privé sans paramètre (contrat test 0004)');
+  perform testkit.ok(
+    exists (select 1 from cron.job
+             where jobname = 'eo-account-deletion-purge'
+               and command = 'select private.purge_expired_account_deletions()'),
+    'le job J+30 appelle la purge SQL pure, jamais de HTTP (RGDP-04)');
+  perform testkit.ok(
+    exists (select 1 from cron.job
+             where jobname = 'eo-account-deletion-purge-medias'
+               and command = 'select private.dispatch_account_deletion_purge_medias()'),
+    'le job purge-medias appelle un dispatch privé sans paramètre');
+
+  -- Les deux dispatch délèguent au wrapper avec l'action DANS LE CODE.
+  perform testkit.ok(
+    pg_get_functiondef('private.dispatch_account_deletion_reminder()'::regprocedure)
+      like '%post_account_deletion_http(''reminder'')%',
+    'le dispatch J-7 délègue au wrapper avec l''action reminder');
+  perform testkit.ok(
+    pg_get_functiondef('private.dispatch_account_deletion_purge_medias()'::regprocedure)
+      like '%post_account_deletion_http(''purge-medias'')%',
+    'le dispatch purge-medias délègue au wrapper avec l''action purge-medias');
+
+  perform testkit.ok(
+    (select split_part(schedule, ' ', 1)::int from cron.job where jobname = 'eo-account-deletion-reminder')
+      < (select split_part(schedule, ' ', 1)::int from cron.job where jobname = 'eo-account-deletion-purge'),
+    'l''alerte J-7 part avant la purge J+30 du même matin');
+end;
+$$;
+
+-- Aucun secret dans les commands des trois jobs (lecture vérifiée).
+select testkit.ok(
+  (select count(*) from cron.job
+    where jobname in ('eo-account-deletion-reminder',
+                      'eo-account-deletion-purge',
+                      'eo-account-deletion-purge-medias')
+      and (command like '%key%' or command like '%secret%')) = 0,
+  'aucun secret dans cron.job.command');
+
+-- La lecture des secrets est centralisée dans le wrapper, comme le dispatch push.
+select testkit.ok(
+  pg_get_functiondef('private.post_account_deletion_http(text)'::regprocedure) like '%vault.decrypted_secrets%',
+  'le wrapper lit ses secrets dans Vault au moment de l''exécution');
+select testkit.ok(
+  pg_get_functiondef('private.post_account_deletion_http(text)'::regprocedure) like '%''apikey'', v_key%'
+  and pg_get_functiondef('private.post_account_deletion_http(text)'::regprocedure) not like '%''authorization''%',
+  'le wrapper envoie la clé secrète dans l''en-tête apikey, pas comme un Bearer');
+
+-- Le purge-medias lit bien le manifest ; le corps ne porte qu'un nom d'action.
+select testkit.ok(
+  pg_get_functiondef('private.post_account_deletion_http(text)'::regprocedure)
+    like '%account_deletion_media_manifest%',
+  'le wrapper purge-medias interroge le manifest de médias');
+
+-- PAS de commit : la transaction reste ouverte, la sortie du session psql
+-- l'annule (motif 0166 — les fixtures ne doivent rien laisser en base).

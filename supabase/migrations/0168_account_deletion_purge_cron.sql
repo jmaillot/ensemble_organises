@@ -224,4 +224,209 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- 4. Wrapper HTTP (task 2) — éveil de l'Edge unifiée `household-delete`
+--    (motif exact 0158:340-405 / 0025) : secrets lus dans Vault, clé secrète
+--    dans l'en-tête `apikey` (JAMAIS Bearer — mode `secret` du framework),
+--    corps `{action}` — aucune donnée utilisateur ne traverse la frontière
+--    cron→Edge (RGDP-04, T-27-05).
+--
+--    Actions :
+--      'reminder'    — alerte J-7 (RGDP-03) : ne POSTe que s'il existe des
+--                      demandes actives dont `purge_due_at - now()` tombe
+--                      sous 7 jours avec `rappel_envoye = false`. Le flag —
+--                      et le statut `rappellee` de la machine à états 0166 —
+--                      sont posés DANS la transaction AVANT l'appel HTTP
+--                      (motif notified_push 0164, T-27-06) : le redrive du
+--                      cron EST le retry, jamais un double email.
+--      'purge-medias'— instruction de suppression Storage (F6) : ne POSTe
+--                      que s'il reste des chemins non purgés au manifest.
+--                      L'Edge ne supprime QUE les chemins présents.
+-- ---------------------------------------------------------------------------
+create or replace function private.post_account_deletion_http(p_action text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_url text;
+  v_key text;
+  v_due_count integer;
+begin
+  -- Comptage conditionnel d'abord (forme 0158/0019) : ne rien faire ni
+  -- marquer tant qu'il n'y a rien à traiter.
+  if p_action = 'reminder' then
+    select count(*)::integer into v_due_count
+      from public.account_deletion_requests
+     where status in ('demandee', 'rappellee')
+       and rappel_envoye = false
+       and purge_due_at - now() <= interval '7 days';
+
+    if v_due_count = 0 then
+      return false;
+    end if;
+  elsif p_action = 'purge-medias' then
+    select count(*)::integer into v_due_count
+      from private.account_deletion_media_manifest
+     where purged = false;
+
+    if v_due_count = 0 then
+      return false;
+    end if;
+  else
+    raise warning 'Action inconnue : %', p_action;
+    return false;
+  end if;
+
+  -- Gardes (motif 0025) : une FONCTION se demande avec to_regproc, la VUE
+  -- Vault avec to_regclass. Le flag n'est posé qu'APRÈS les gardes : un
+  -- flag posé sans envoi possible serait un rappel perdu, jamais renvoyé.
+  if to_regproc('net.http_post') is null then
+    raise warning 'pg_net absent (net.http_post introuvable) : aucun envoi ne partira.';
+    return false;
+  end if;
+  if to_regclass('vault.decrypted_secrets') is null then
+    raise warning 'Vault absent (vault.decrypted_secrets introuvable) : aucun envoi ne partira.';
+    return false;
+  end if;
+
+  select decrypted_secret into v_url
+    from vault.decrypted_secrets where name = 'project_url';
+  select decrypted_secret into v_key
+    from vault.decrypted_secrets where name = 'service_role_key';
+
+  if v_url is null or v_key is null then
+    raise warning 'Secrets Vault project_url / service_role_key absents : envoi ignoré.';
+    return false;
+  end if;
+
+  -- RGDP-03 / T-27-06 : le flag est posé DANS la transaction AVANT l'appel
+  -- HTTP — le redrive du cron est le retry, jamais un doublon. Le statut
+  -- passe à `rappellee` dans la même écriture (machine à états 0166).
+  if p_action = 'reminder' then
+    update public.account_deletion_requests
+       set rappel_envoye = true,
+           status = 'rappellee',
+           updated_at = now()
+     where status in ('demandee', 'rappellee')
+       and rappel_envoye = false
+       and purge_due_at - now() <= interval '7 days';
+  end if;
+
+  perform net.http_post(
+    url := rtrim(v_url, '/') || '/functions/v1/household-delete',
+    headers := jsonb_build_object(
+      'content-type', 'application/json',
+      'apikey', v_key
+    ),
+    body := jsonb_build_object('action', p_action),
+    timeout_milliseconds := 30000
+  );
+
+  return true;
+end;
+$$;
+
+comment on function private.post_account_deletion_http(text) is
+  'POST /functions/v1/household-delete (Edge unifiée du plan 03), clé secrète lue dans Vault, en-tête apikey. reminder : flag rappel_envoye posé dans la transaction AVANT le POST (jamais de doublon, RGDP-03) ; purge-medias : POSTe seulement s''il reste des chemins non purgés au manifest. Aucune donnée utilisateur dans le corps (RGDP-04).';
+
+revoke all on function private.post_account_deletion_http(text)
+  from public, anon, authenticated;
+grant execute on function private.post_account_deletion_http(text)
+  to service_role;
+
+-- Deux dispatch sans paramètre (motif 0011/0158 : le job cron n'appelle que
+-- des fonctions privées sans paramètre — contrat test 0004) : la valeur de
+-- l'action vit dans le code, jamais recopiée dans cron.job.command.
+create or replace function private.dispatch_account_deletion_reminder()
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return private.post_account_deletion_http('reminder');
+end;
+$$;
+
+create or replace function private.dispatch_account_deletion_purge_medias()
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return private.post_account_deletion_http('purge-medias');
+end;
+$$;
+
+comment on function private.dispatch_account_deletion_reminder() is
+  'Point d''entrée cron de l''alerte J-7 : délègue à post_account_deletion_http(''reminder''). Sans paramètre — aucune valeur recopiée dans cron.job.command.';
+comment on function private.dispatch_account_deletion_purge_medias() is
+  'Point d''entrée cron de la purge de médias : délègue à post_account_deletion_http(''purge-medias''). Sans paramètre.';
+
+revoke all on function private.dispatch_account_deletion_reminder()
+  from public, anon, authenticated;
+grant execute on function private.dispatch_account_deletion_reminder()
+  to service_role;
+revoke all on function private.dispatch_account_deletion_purge_medias()
+  from public, anon, authenticated;
+grant execute on function private.dispatch_account_deletion_purge_medias()
+  to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5. Jobs pg_cron (motif 0158:409-430) — trois jobs quotidiens, fenêtres
+--    Europe/Paris disjointes des jobs existants (birthday 40 6, gdpr purge
+--    27 4, prune 20 6) et ordonnées pour que l'alerte J-7 parte AVANT la
+--    purge du même matin : reminder 05:07 < purge 05:17. Aucun secret dans
+--    cron.job.command : les commands sont des appels private.*() sans
+--    paramètre de secret (motif 0158/0162).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_jobs text[][] := array[
+    array['eo-account-deletion-purge-medias', '57 4 * * *',
+          'select private.dispatch_account_deletion_purge_medias()'],
+    array['eo-account-deletion-reminder', '7 5 * * *',
+          'select private.dispatch_account_deletion_reminder()'],
+    array['eo-account-deletion-purge', '17 5 * * *',
+          'select private.purge_expired_account_deletions()']
+  ];
+  v_job text[];
+begin
+  if to_regclass('cron.job') is null then
+    raise notice 'pg_cron absent : jobs de suppression de compte non installés.';
+    return;
+  end if;
+
+  foreach v_job slice 1 in array v_jobs loop
+    if exists (select 1 from cron.job where jobname = v_job[1]) then
+      perform cron.unschedule(v_job[1]);
+    end if;
+    perform cron.schedule_in_database(
+      v_job[1],
+      v_job[2],
+      v_job[3],
+      current_database()
+    );
+  end loop;
+end;
+$$;
+
+-- Preuve des privilèges du wrapper (motif 0074).
+do $$
+begin
+  if has_function_privilege('anon', 'private.post_account_deletion_http(text)', 'EXECUTE') then
+    raise exception 'anon ne doit pas pouvoir déclencher les appels HTTP de suppression';
+  end if;
+  if has_function_privilege('authenticated', 'private.post_account_deletion_http(text)', 'EXECUTE') then
+    raise exception 'authenticated ne doit pas pouvoir déclencher les appels HTTP de suppression';
+  end if;
+  if not has_function_privilege('service_role', 'private.post_account_deletion_http(text)', 'EXECUTE') then
+    raise exception 'service_role doit pouvoir exécuter le wrapper HTTP (cron)';
+  end if;
+end;
+$$;
+
 commit;
