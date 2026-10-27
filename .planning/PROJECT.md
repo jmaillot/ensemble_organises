@@ -42,7 +42,13 @@ restantes, outiller l'exploitation et préparer l'ouverture publique.
 
 ENF-01 → ENF-05 validés par la phase 25 (2026-10-26) : profils enfants gérés
 par le parent, sans compte d'authentification, redirection push vers les
-adultes. Reste du jalon dans REQUIREMENTS.md (jalon v1.0).
+adultes. RGEX-01 → RGEX-04 validés par la phase 26 (2026-10-27) : export RGPD
+asynchrone borné au demandeur (portée A « ce qui me concerne », fusion
+multi-foyers, 22 modules), lien signé ≤ 24 h, purge 7 jours auditée en base.
+Reste du jalon dans REQUIREMENTS.md (jalon v1.0). Différé nommé : livraison
+push réelle à la phase 31 (OUV-07, 0 abonnement sur l'instance) ; backlog
+review phase 26 dans 26-REVIEW-DISPOSITION.md (dont HR-01 double dispatch
+push `export`).
 
 ## État v0.9.0 (historique)
 
@@ -67,4 +73,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-26 après transition phase 25 → 26*
+*Last updated: 2026-10-27 après transition phase 26 → 27*
