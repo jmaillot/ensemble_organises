@@ -67,12 +67,21 @@ export function GdprDeletePanel() {
       // il est vidé AVANT la redirection. Le message est rendu AVANT le
       // départ — l'utilisateur n'est jamais éjecté sans explication.
       queryClient.clear();
+      // WR-04 : le message suit le verdict réel de l'Edge. sessions_revoked
+      // false = la déconnexion automatique a échoué : on le dit et on invite
+      // à la déconnexion manuelle, jamais le succès mensonger. L'erreur
+      // serveur brute (email_error) n'atteint JAMAIS le DOM (T-27-18) :
+      // l'échec d'e-mail reste un message générique sans détail technique.
       setNotice(
-        result.email_sent
-          ? 'Demande enregistrée. Vos sessions ont été coupées et un e-mail de confirmation vous a été envoyé.'
-          : 'Demande enregistrée. Vos sessions ont été coupées, mais l’e-mail de confirmation n’a pas pu partir.',
+        result.sessions_revoked
+          ? result.email_sent
+            ? 'Demande enregistrée. Vos sessions ont été coupées et un e-mail de confirmation vous a été envoyé.'
+            : 'Demande enregistrée. Vos sessions ont été coupées, mais l’e-mail de confirmation n’a pas pu partir.'
+          : result.email_sent
+            ? 'Demande enregistrée, mais la déconnexion automatique a échoué : déconnectez-vous manuellement.'
+            : 'Demande enregistrée, mais la déconnexion automatique a échoué : déconnectez-vous manuellement. L’e-mail de confirmation n’a pas pu partir.',
       );
-      toast('Demande de suppression enregistrée. Vous êtes déconnecté(e).');
+      toast('Demande de suppression enregistrée.');
       window.setTimeout(() => navigate('/connexion', { replace: true }), 2500);
     },
     onError: (requestError) => {
@@ -123,7 +132,8 @@ export function GdprDeletePanel() {
             <span>suppression programmée le {dateFormatter.format(new Date(active.purge_due_at))}</span>
           </p>
           <p className="m-0 text-[12px] text-muted">
-            Vous pouvez encore changer d’avis : l’annulation restaure votre nom, votre photo et vos sessions.
+            Vous pouvez encore changer d’avis : l’annulation restaure votre nom et votre photo, puis vous vous
+            reconnectez normalement.
           </p>
           <div className="mt-1 flex flex-wrap justify-end gap-2">
             <Button

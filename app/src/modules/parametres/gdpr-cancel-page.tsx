@@ -88,7 +88,7 @@ export default function GdprCancelPage() {
               open={confirmOpen}
               onOpenChange={setConfirmOpen}
               title="Annuler la suppression de votre compte ?"
-              description="Votre nom, votre photo et vos accès seront restaurés immédiatement, comme avant la demande."
+              description="Votre nom et votre photo seront restaurés immédiatement, comme avant la demande. Vous vous reconnectez ensuite avec vos identifiants habituels."
               confirmLabel={pending ? 'Annulation…' : 'Oui, tout restaurer'}
               onConfirm={() => {
                 if (!pending) void onConfirm();
