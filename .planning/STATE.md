@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 27
 current_phase_name: Suppression de compte RGPD
-status: planning
+status: executing
 stopped_at: Phase 27 context gathered
-last_updated: "2026-10-27T13:34:32.262Z"
-state_head: fc221b1832aff61f5d85651395432f308fdf06bf
+last_updated: "2026-10-27T14:22:07.767Z"
+state_head: 5441edccd08631c3eb4bce59cebdf81c2336ef89
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 14
+  total_plans: 17
   completed_plans: 14
   percent: 29
 last_activity: 2026-10-27
@@ -21,9 +21,9 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 27 — Suppression de compte RGPD
-Plan: Not started
-Status: Ready to plan
+Phase: 27 (Suppression de compte RGPD) — EXECUTING
+Plan: 2 of 3
+Status: Plan 27-01 terminé, plan 27-02 à exécuter
 Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
@@ -104,6 +104,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 26 P05 | ~15 min | 3 tasks | 5 files |
 | Phase 26 P06 | ~35 min | 3 tasks | 3 files |
 | Phase 26 P07 | ~45 min | 3 tasks (2 auto + 1 checkpoint) | 0 code files (barrière) |
+| Phase 27 P01 | ~40 min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -133,6 +134,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-01) : 22 modules exportables listés mot pour mot dans 26-SPEC-DECISION.md ; household_invite_tokens et gdpr_export_jobs exclus
 - [Phase 26] (26-01) : Limite bucket gdpr-exports : 1 Go (1073741824 octets)
 - [Phase 26] (26-01) : Verdicts A1 (upload flux ReadableStream), A2 (fflate Deno streaming), A3 (cross-bucket copy destinationBucket) établis OK avec replis nommés sur base documentaire (doc officielle + motifs in-repo)
+- [Phase 27] (27-01) : D-06 en base — index unique partiel « une seule demande active » ; demande reposée après annulation = pas de re-snapshot (l'instantané garde les valeurs d'origine) MAIS déshumanisation rejouée (D-05 l'avait restaurée, défaut attrapé par le test §5 purge)
+- [Phase 27] (27-01) : FK auditées — données partagées du foyer survivent à la purge (set null sur ligne membre survivante, account_deleted_at), données personnelles meurent avec le compte (cascade) ; chk_members_managed_child assoupli vers l'avant pour l'état « ancien membre »
 - [Phase 26] (26-02) : Squelette gdpr_export_extract_batch — signature et contrat figés (user_id, module, rows, cursor_module, cursor_offset, done, media_paths), corps réservé au plan 26-03 Task 1 (extraction par module + liste médias)
 - [Phase 26] (26-02) : Wrappers sans paramètre pour conformité test 0004 — dispatch_gdpr_export_run/purge délèguent à post_gdpr_export_http('run'/'purge'), jobs cron n'appellent QUE private.*() sans paramètre (garantie aucune valeur dans cron.job.command)
 - [Phase 26] (26-02) : gdpr_export_purge_log — RLS activée ZÉRO politique client, exemption explicite test 0001 (audit RGEX-04 lisible par base/opérateur, jamais navigateur)

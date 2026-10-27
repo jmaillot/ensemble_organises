@@ -180,7 +180,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
-| 27. Suppression de compte RGPD | 0/? | Not started | - |
+| 27. Suppression de compte RGPD | 1/3 | In progress | - |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |
 | 30. Hygiène du jalon | 0/? | Not started | - |
