@@ -5,9 +5,9 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 27
 current_phase_name: Suppression de compte RGPD
 status: planning
-stopped_at: Phase 26 complete, ready to plan Phase 27
-last_updated: "2026-10-27T12:00:06.884Z"
-state_head: e9be126c89c68a4f716e85ad967a4a62b0cb9700
+stopped_at: Phase 27 context gathered
+last_updated: "2026-10-27T13:34:28.894Z"
+state_head: 15464a36cc05f3d74dd4d1e60029d846ccdf1196
 progress:
   total_phases: 7
   completed_phases: 2
@@ -72,9 +72,9 @@ Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T12:00:00Z
-**Stopped at:** Phase 26 complete, ready to plan Phase 27
-**Resume file:** .planning/phases/26-export-rgpd/26-07-SUMMARY.md
+**Last session:** 2026-10-27T13:34:28.814Z
+**Stopped at:** Phase 27 context gathered
+**Resume file:** .planning/phases/27-suppression-de-compte-rgpd/27-CONTEXT.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
