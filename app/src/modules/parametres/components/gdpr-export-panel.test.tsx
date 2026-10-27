@@ -146,4 +146,31 @@ describe('GdprExportPanel', () => {
     expect(rows[1].textContent).toContain('Échec');
     expect(rows[2].textContent).toContain('Prêt');
   });
+
+  it('n’affiche pas de bouton mort : au-delà de 24 h, « Lien expiré » + voie de regénération', async () => {
+    const user = userEvent.setup();
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    mockJobs([job({ status: 'pret', storage_path: 'uid-1/vieux-job.zip', created_at: twoDaysAgo })]);
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    renderPanel();
+
+    await screen.findByText('Historique des exports');
+    expect(screen.getByText('Lien expiré')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Télécharger' })).not.toBeInTheDocument();
+
+    // La voie de regénération relance un cycle complet (D-02/D-06).
+    await user.click(screen.getByRole('button', { name: 'Régénérer un export' }));
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('request_gdpr_export');
+    });
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('n’affiche pas de téléchargement sur un job prêt sans storage_path', async () => {
+    mockJobs([job({ status: 'pret', storage_path: null })]);
+    renderPanel();
+
+    await screen.findByText('Historique des exports');
+    expect(screen.queryByRole('button', { name: 'Télécharger' })).not.toBeInTheDocument();
+  });
 });
