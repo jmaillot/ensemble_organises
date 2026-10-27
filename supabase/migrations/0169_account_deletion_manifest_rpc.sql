@@ -29,15 +29,22 @@ as $$
 begin
   return jsonb_build_object(
     'rows', coalesce((
+      -- La borne s'applique AUX LIGNES, pas à l'agrégat : un LIMIT posé
+      -- autour du jsonb_agg tronquerait le résultat déjà agrégé (une ligne
+      -- scalaire), jamais l'entrée — preuve 0169 test « borné à p_limit ».
       select jsonb_agg(
                jsonb_build_object(
-                 'id', m.id,
-                 'household_id', m.household_id,
-                 'storage_path', m.storage_path
-               ) order by m.created_at asc, m.id asc)
-        from private.account_deletion_media_manifest m
-       where m.purged = false
-       limit greatest(p_limit, 1)
+                 'id', r.id,
+                 'household_id', r.household_id,
+                 'storage_path', r.storage_path
+               ) order by r.created_at asc, r.id asc)
+        from (
+          select m.id, m.household_id, m.storage_path, m.created_at
+            from private.account_deletion_media_manifest m
+           where m.purged = false
+           order by m.created_at asc, m.id asc
+           limit greatest(p_limit, 1)
+        ) r
     ), '[]'::jsonb)
   );
 end;

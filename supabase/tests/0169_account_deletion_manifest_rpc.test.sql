@@ -25,11 +25,11 @@ begin
   insert into testkit.fx (key, household_id) values ('hh169', v_hh);
 
   insert into private.account_deletion_media_manifest
-    (household_id, storage_path, purged)
+    (household_id, storage_path, purged, created_at)
   values
-    (v_hh, v_hh || '/notes/deja-purge.png', true),
-    (v_hh, v_hh || '/notes/a-purger.png', false),
-    (v_hh, v_hh || '/avatars/aussi-a-purger.png', false);
+    (v_hh, v_hh || '/notes/deja-purge.png', true, now() - interval '3 hours'),
+    (v_hh, v_hh || '/notes/a-purger.png', false, now() - interval '2 hours'),
+    (v_hh, v_hh || '/avatars/aussi-a-purger.png', false, now() - interval '1 hour');
 end;
 $$;
 
@@ -46,7 +46,7 @@ begin
   perform testkit.eq((v_claim -> 'rows' -> 0 ->> 'storage_path'),
     v_hh || '/notes/a-purger.png',
     'claim rend le premier chemin non purgé');
-  perform testkit.eq(jsonb_array_length(v_claim -> 'rows'), 2::jsonb,
+  perform testkit.eq(jsonb_array_length(v_claim -> 'rows'), 2::integer,
     'claim ne rend que les deux chemins non purgés');
   perform testkit.ok(
     not exists (
@@ -62,7 +62,7 @@ begin
 
   -- Borne p_limit : un lot de 1 ne rend qu'un chemin.
   select public.deletion_media_claim(1) into v_claim;
-  perform testkit.eq(jsonb_array_length(v_claim -> 'rows'), 1::jsonb,
+  perform testkit.eq(jsonb_array_length(v_claim -> 'rows'), 1::integer,
     'claim est borné à p_limit');
 end;
 $$;

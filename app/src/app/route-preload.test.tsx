@@ -147,8 +147,8 @@ describe('preloadRouteChunks — préchargement idle', () => {
     // couverture précache (`scripts/check-precache-coverage.sh`) compare
     // la table au build. Le nombre se met à jour ICI, à l'ajout d'une
     // route — jamais dans le silence.
-    // 59 morceaux depuis le mode d'emploi de Documents (23/10).
-    expect(ROUTE_CHUNK_COUNT).toBe(59);
+    // 60 morceaux depuis la page d'annulation RGPD 27-03 (27/10).
+    expect(ROUTE_CHUNK_COUNT).toBe(60);
   });
 
   it("ne télécharge rien avant l'idle, puis chaque morceau en ligne", async () => {
