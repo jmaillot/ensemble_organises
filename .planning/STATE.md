@@ -3,15 +3,15 @@ gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 27
-current_phase_name: Suppression de compte RGPD
+current_phase_name: suppression-de-compte-rgpd
 status: executing
 stopped_at: Completed 27-03-PLAN.md
-last_updated: "2026-10-27T16:09:22.702Z"
-state_head: 5be4d184893b0d0e6b96731190891dd16609b0bf
+last_updated: "2026-10-27T16:34:01.508Z"
+state_head: 888793be525b30b916b30f646303a443bedbed24
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 17
+  total_plans: 19
   completed_plans: 17
   percent: 29
 last_activity: 2026-10-27
@@ -21,7 +21,7 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 27 (Suppression de compte RGPD) — EXECUTING
+Phase: 27 (suppression-de-compte-rgpd) — READY TO EXECUTE
 Plan: 3 of 3
 Status: Plan 27-01 terminé, plan 27-02 à exécuter
 Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phase approuvée et clôturée)
