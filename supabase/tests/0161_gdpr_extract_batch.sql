@@ -12,6 +12,8 @@
 --   3. Médias — les chemins de pièce jointe ressortent préfixés de leur
 --      bucket (`household-media/…`), les valeurs héritées (http) sont exclues.
 --   4. Job introuvable — P0002 lisible (D-02).
+--   5. batch_start_offset (0165, HR-02) — un module paginé rend des lots
+--      dont l'offset de DÉBUT avance de la limite (nommage/tri des fragments).
 --
 -- Semis en postgres via testkit ; rollback final.
 
@@ -167,6 +169,62 @@ begin
   end;
   perform testkit.ok(v_state = 'P0002',
     'job introuvable : P0002 attendu, obtenu ' || v_state);
+end;
+$$;
+
+-- ---------------------------------------------------------------
+-- 5. batch_start_offset (0165, HR-02) : l'offset de DÉBUT du lot est rendu,
+--    croissant par pas de la limite — l'Edge en dérive un nom de fragment
+--    ET un ordre de concaténation corrects pour tout module paginé.
+--    Preuve sur un module qui déborde : 4 tâches de Bob, p_limit = 2 →
+--    lots d'offsets de début 0 puis 2 (avant la correction, le RPC ne
+--    rendait que l'offset post-avance, et le tri lexical de l'Edge
+--    inversait les fragments au-delà de 999 lignes).
+-- ---------------------------------------------------------------
+do $$
+declare
+  bob uuid := (select user_id from testkit.fx where key = 'bob');
+  home_a text := (select household_id from testkit.fx where key = 'home_a');
+  bob_m text;
+  bob_job uuid;
+  res jsonb;
+  v_done boolean := false;
+  v_passes integer := 0;
+  v_tasks_starts int[] := array[]::int[];
+  v_tasks_rows int[] := array[]::int[];
+begin
+  select id into bob_m from public.household_members
+   where user_id = bob and household_id = home_a;
+
+  insert into public.tasks (household_id, name, status, created_by)
+  values (home_a, 'Tâche Bob extra 1', 'a_faire', bob_m),
+         (home_a, 'Tâche Bob extra 2', 'a_faire', bob_m),
+         (home_a, 'Tâche Bob extra 3', 'a_faire', bob_m);
+
+  insert into public.gdpr_export_jobs (user_id) values (bob)
+  returning id into bob_job;
+
+  while not v_done and v_passes < 30 loop
+    res := private.gdpr_export_extract_batch(bob_job, 2);
+    v_done := (res ->> 'done')::boolean;
+    v_passes := v_passes + 1;
+    if res ->> 'module' = 'tasks' then
+      v_tasks_starts := v_tasks_starts || (res ->> 'batch_start_offset')::int;
+      v_tasks_rows := v_tasks_rows
+        || coalesce(jsonb_array_length(res -> 'rows' -> 'tasks'), 0);
+    end if;
+  end loop;
+
+  perform testkit.ok(v_done,
+    'extraction de Bob terminée (done=true) en ' || v_passes || ' lot(s)');
+  perform testkit.eq(cardinality(v_tasks_starts), 2,
+    'le module tasks de Bob (4 lignes, limite 2) est remis en DEUX lots');
+  perform testkit.eq(v_tasks_starts[1], 0,
+    'premier lot tasks : batch_start_offset = 0 (début du module)');
+  perform testkit.eq(v_tasks_starts[2], 2,
+    'second lot tasks : batch_start_offset = 2 (offset de DÉBUT, pas post-avance)');
+  perform testkit.eq(v_tasks_rows[1], 2,
+    'chaque lot tasks porte exactement la limite demandée');
 end;
 $$;
 

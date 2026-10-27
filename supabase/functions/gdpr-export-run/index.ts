@@ -34,8 +34,9 @@
  *       staging et recopie ce qui manque : une passe tuée entre le RPC
  *       (curseur déjà avancé) et les copies ne perd donc aucun média.
  *     * fragments JSON : chaque lot est posé dans
- *       `<uid>/<job>/parts/<module>-<offset>.json` — nom déterministe, un
- *       crash relance le même upload (upsert), jamais de doublon.
+ *       `<uid>/<job>/parts/<module>-<batch_start_offset>.json` — offset de
+ *       DÉBUT du lot (0165, HR-02), nom déterministe, un crash relance le
+ *       même upload (upsert), jamais de doublon.
  *     * assemblage (staging_ready=true) : lister le staging, écrire
  *       `donnees-rgpd.json` (DEFLATE, fragments concaténés) puis chaque média
  *       (STORE — déjà compressés) dans UN flux fflate `Zip`, poussé
@@ -131,6 +132,8 @@ type ExtractBatch = {
   rows: Record<string, unknown[]>;
   cursor_module: string | null;
   cursor_offset: number;
+  /** Offset de DÉBUT du lot (0165) — nommage et tri déterministes. */
+  batch_start_offset: number;
   done: boolean;
   media_paths: string[];
 };
@@ -313,7 +316,12 @@ async function runExtractionPass(
     const b = batch as ExtractBatch;
 
     const hasRows = Object.values(b.rows ?? {}).some((arr) => Array.isArray(arr) && arr.length > 0);
-    const partName = `${b.module}-${b.cursor_offset}`;
+    // Nommé par l'offset de DÉBUT du lot (0165) — l'offset post-avance
+    // (`cursor_offset`) produisait des noms dont le tri lexical inversait les
+    // fragments dès qu'un module dépasse 999 lignes (HR-02). Repli défensif
+    // sur cursor_offset si un RPC antérieur à 0165 répondait sans la clé.
+    const batchStart = typeof b.batch_start_offset === 'number' ? b.batch_start_offset : b.cursor_offset;
+    const partName = `${b.module}-${batchStart}`;
 
     if (hasRows) {
       await uploadStagingText(
@@ -438,7 +446,17 @@ async function runAssemblyPass(
   for (const [index, moduleName] of MODULES.entries()) {
     if (index > 0) jsonEntry.push(encoder.encode(','), false);
     jsonEntry.push(encoder.encode(`${JSON.stringify(moduleName)}:`), false);
-    const moduleParts = (partsByModule.get(moduleName) ?? []).sort();
+    // Tri sur l'ENTIER de l'offset de début (HR-02) : le tri lexical mettrait
+    // 'tasks-1000' avant 'tasks-500'. Les noms sont `<module>-<start>` posés
+    // par l'extraction ; un suffixe non numérique irait en fin de liste.
+    const moduleParts = (partsByModule.get(moduleName) ?? []).sort((a, b) => {
+      const off = (p: string) => {
+        const suffix = p.slice(p.lastIndexOf('-') + 1).replace(/\.json$/, '');
+        const n = parseInt(suffix, 10);
+        return Number.isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
+      };
+      return off(a) - off(b);
+    });
     if (moduleParts.length === 0) {
       jsonEntry.push(encoder.encode('{}'), false);
       continue;
