@@ -109,12 +109,14 @@ Plans:
   3. La purge J+30 s'exécute en SQL/pg_cron depuis un manifest de médias construit à la demande — aucun envoi HTTP depuis le cron — et les données partagées au foyer sont anonymisées ou réattribuées, jamais cascadées (audit FK consigné en SPEC)
   4. Les profils enfants portés par le compte supprimé disparaissent avec lui selon la règle produit annoncée dans la phase, et la chaîne passe par la consolidation de `household-delete` (une seule voie de suppression vivante)
 
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans executed, +2 gap-closure plans (27-04, 27-05) from 27-VERIFICATION.md
 
 Plans:
 - [x] 27-01-PLAN.md — Socle SQL : tables demande/instantané, audit FK vers auth.users (RGDP-05), RPC demande/annulation + tests SQL
 - [x] 27-02-PLAN.md — Purge J+30 SQL, enfants/foyer orphelin (D-08/D-09), cron J-7/J+30 idempotents + tests SQL
 - [x] 27-03-PLAN.md — Edge unifiée household-delete (modes foyer/compte), signOut global, emails nodemailer, panneau RGPD + chaîne §2.7
+- [ ] 27-04-PLAN.md — Gap closure : CR-02 instantané par ligne membre (multi-foyer), manifest bucket_id (WR-02), commentaires véridiques (WR-01/WR-03)
+- [ ] 27-05-PLAN.md — Gap closure : CR-01 signOut scope chaîne + test, purge par bucket côté Edge (WR-02), panneau honnête (WR-04/IN-02), e-mails (IN-01/IN-03)
 
 ### Phase 28: Exploitation — sauvegardes, restauration, supervision
 
