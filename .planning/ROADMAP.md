@@ -84,7 +84,7 @@ Plans:
 - [ ] 26-02-PLAN.md — Migration 0158 : bucket gdpr-exports, table gdpr_export_jobs (D-06 index partiel), RPC acteur + extraction bornée, cron run/purge + tests SQL négatifs [BLOCKING]
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 26-03-PLAN.md — Edge gdpr-export-run : job multipasse (extraction via RPC bornée, médias cross-bucket, ZIP streaming fflate), crash/reprise prouvés
+- [x] 26-03-PLAN.md — Edge gdpr-export-run : job multipasse (extraction via RPC bornée, médias cross-bucket, ZIP streaming fflate), crash/reprise prouvés
 - [ ] 26-05-PLAN.md — Panneau « Mes données (RGPD) » : déclencheur, 3 états + durée (D-03), historique (D-07), téléchargement signé ≤ 24 h (D-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*

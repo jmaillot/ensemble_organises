@@ -22,8 +22,8 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 3 of 7
-Status: Executing Phase 26 — plan 26-02 terminé
+Plan: 4 of 7
+Status: Executing Phase 26 — plan 26-03 terminé
 Progress: [██░░░░░░░░] 21% (9/14 plans)
 
 ## Références du jalon v1.0
@@ -76,7 +76,7 @@ Progress: [██░░░░░░░░] 21% (9/14 plans)
 **Stopped at:** Phase 26 Plan 01 complete — portée tranchée + spike A1/A2/A3 terminé
 **Resume file:** .planning/phases/26-export-rgpd/26-01-SUMMARY.md
 
-- Prochaine étape : plan 26-02 (SQL d'extraction contre portée tranchée dans 26-SPEC-DECISION.md).
+- Prochaine étape : plan 26-04 (fonction Edge gdpr-export-purge + branche push « export »).
 - Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
   24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
 - .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
@@ -132,6 +132,10 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-02) : Squelette gdpr_export_extract_batch — signature et contrat figés (user_id, module, rows, cursor_module, cursor_offset, done, media_paths), corps réservé au plan 26-03 Task 1 (extraction par module + liste médias)
 - [Phase 26] (26-02) : Wrappers sans paramètre pour conformité test 0004 — dispatch_gdpr_export_run/purge délèguent à post_gdpr_export_http('run'/'purge'), jobs cron n'appellent QUE private.*() sans paramètre (garantie aucune valeur dans cron.job.command)
 - [Phase 26] (26-02) : gdpr_export_purge_log — RLS activée ZÉRO politique client, exemption explicite test 0001 (audit RGEX-04 lisible par base/opérateur, jamais navigateur)
+- [Phase 26] (26-03) : PASS_CAP=60 (et non ~10) — 22 modules + lots 500 + médias + assemblage dépassent honnêtement 10 passes ; 60 ≈ 1 h max, boucle bornée (T-26-10)
+- [Phase 26] (26-03) : Assemblage ZIP from-scratch idempotent — un central-directory ZIP exige un unique écrivain séquentiel, reprendre en cours recréerait le problème mémoire évité
+- [Phase 26] (26-03) : Wrapper public.gdpr_export_extract_batch (0163) — PostgREST n'expose que public/graphql_public, la logique reste en private, wrapper SECURITY DEFINER réservé service_role (motif delete_household/0160)
+- [Phase 26] (26-03) : Clé du déclencheur HTTP dans l'en-tête apikey, jamais Authorization: Bearer — motif 0025, 0162 corrige la régression de 0158
 
 ### Blockers
 
