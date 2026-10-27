@@ -24,7 +24,7 @@ begin
     select * from (values
           ('profiles', ARRAY['id', 'email', 'display_name', 'avatar_url', 'provider', 'city', 'reminder_frequency', 'task_reminders_enabled', 'event_reminders_enabled', 'routine_reminders_enabled', 'message_notifications_enabled', 'created_at', 'updated_at', 'age_attested_at']::text[]),
           ('households', ARRAY['id', 'name', 'avatar_color', 'school_zone', 'created_by', 'created_at', 'updated_at', 'disabled_modules']::text[]),
-          ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at', 'managed_modules', 'birth_date', 'deleted_at']::text[]),
+          ('household_members', ARRAY['id', 'household_id', 'user_id', 'display_name', 'avatar_url', 'color_tag', 'role', 'created_at', 'managed_modules', 'birth_date', 'deleted_at', 'account_deleted_at']::text[]),
           ('household_invite_tokens', ARRAY['id', 'household_id', 'token_hash', 'created_by', 'expires_at', 'max_uses', 'use_count', 'is_active', 'created_at']::text[]),
           ('invitations', ARRAY['id', 'household_id', 'email', 'phone', 'role', 'status', 'created_at']::text[]),
           ('shopping_lists', ARRAY['id', 'household_id', 'name', 'created_by', 'created_at', 'trip_id']::text[]),
@@ -191,7 +191,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'r'
-     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods', 'gdpr_export_purge_log')
+     and c.relname not in ('household_invite_tokens', 'gift_list_invites', 'trip_invites', 'recipe_shares', 'push_subscriptions', 'schema_migrations', 'message_notifications', 'conversation_membership_periods', 'gdpr_export_purge_log', 'account_deletion_restorations')
      and not exists (
        select 1 from pg_policies p
         where p.schemaname = 'public'
@@ -239,6 +239,11 @@ begin
     testkit.count('select 1 from pg_policies where tablename = ''gdpr_export_purge_log'''),
     0::bigint,
     'gdpr_export_purge_log reste sans politique : audit serveur uniquement (preuve RGEX-04)'
+  );
+  perform testkit.eq(
+    testkit.count('select 1 from pg_policies where tablename = ''account_deletion_restorations'''),
+    0::bigint,
+    'account_deletion_restorations reste sans politique : instantané D-04 serveur uniquement (T-27-04), via RPC 0167'
   );
 end;
 $$;

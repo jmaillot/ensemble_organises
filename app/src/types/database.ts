@@ -101,6 +101,12 @@ export interface HouseholdMemberRow {
   managed_modules: string[];
   /** Archivage doux (migration 0146, D-04) : non null = enfant retiré du foyer. */
   deleted_at: IsoDateTime | null;
+  /**
+   * État « ancien membre » (migration 0166, phase 27 D-03) : non null = compte
+   * supprimé, la ligne reste en base déshumanisée. Les sélecteurs excluent les
+   * lignes où account_deleted_at ou deleted_at est posé.
+   */
+  account_deleted_at?: IsoDateTime | null;
   created_at: IsoDateTime;
 }
 
