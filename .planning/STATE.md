@@ -5,15 +5,15 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 05 complete — panneau RGPD Paramètres (déclencheur, 3 états, historique, lien signé au clic)"
-last_updated: "2026-10-27T09:57:49Z"
+stopped_at: "Phase 26 Plan 04 complete — Edge gdpr-export-purge : purge 7 j des octets via API Storage, auditée (RGEX-04), preuve réseau prouvée"
+last_updated: "2026-10-27T10:15:00Z"
 state_head: 5873249
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 11
-  percent: 25
+  completed_plans: 12
+  percent: 26
 last_activity: 2026-10-27
 ---
 
@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 6 of 7
-Status: Executing Phase 26 — plan 26-05 terminé
-Progress: [██▌░░░░░░░] 25% (11/14 plans)
+Plan: 5 of 7 (26-04 terminé en Wave 4 ; 26-06 est le prochain plan exécutable — Wave 5)
+Status: Executing Phase 26 — plans 26-02/26-03/26-04/26-05 terminés, reste 26-06 (push) et 26-07 (barrière)
+Progress: [██▌░░░░░░░] 26% (12/14 plans)
 
 ## Références du jalon v1.0
 

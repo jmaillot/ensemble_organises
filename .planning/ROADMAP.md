@@ -74,7 +74,7 @@ Plans:
   3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
   4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
 
-**Plans**: 3/7 plans executed
+**Plans**: 4/7 plans executed
 
 Plans:
 **Wave 1**
@@ -88,7 +88,7 @@ Plans:
 - [x] 26-05-PLAN.md — Panneau « Mes données (RGPD) » : déclencheur, 3 états + durée (D-03), historique (D-07), téléchargement signé ≤ 24 h (D-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 26-04-PLAN.md — Edge gdpr-export-purge : purge 7 j via API Storage + audit en base (RGEX-04), preuve en base
+- [x] 26-04-PLAN.md — Edge gdpr-export-purge : purge 7 j via API Storage + audit en base (RGEX-04), preuve en base
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 26-06-PLAN.md — Migration 0159 + push-notify scope « export » : notification push à l'achèvement, échec notifié comme le succès (D-01/D-02)
