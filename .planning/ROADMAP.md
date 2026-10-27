@@ -109,12 +109,12 @@ Plans:
   3. La purge J+30 s'exécute en SQL/pg_cron depuis un manifest de médias construit à la demande — aucun envoi HTTP depuis le cron — et les données partagées au foyer sont anonymisées ou réattribuées, jamais cascadées (audit FK consigné en SPEC)
   4. Les profils enfants portés par le compte supprimé disparaissent avec lui selon la règle produit annoncée dans la phase, et la chaîne passe par la consolidation de `household-delete` (une seule voie de suppression vivante)
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 - [x] 27-01-PLAN.md — Socle SQL : tables demande/instantané, audit FK vers auth.users (RGDP-05), RPC demande/annulation + tests SQL
 - [x] 27-02-PLAN.md — Purge J+30 SQL, enfants/foyer orphelin (D-08/D-09), cron J-7/J+30 idempotents + tests SQL
-- [ ] 27-03-PLAN.md — Edge unifiée household-delete (modes foyer/compte), signOut global, emails nodemailer, panneau RGPD + chaîne §2.7
+- [x] 27-03-PLAN.md — Edge unifiée household-delete (modes foyer/compte), signOut global, emails nodemailer, panneau RGPD + chaîne §2.7
 
 ### Phase 28: Exploitation — sauvegardes, restauration, supervision
 
@@ -180,7 +180,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
-| 27. Suppression de compte RGPD | 2/3 | In Progress|  |
+| 27. Suppression de compte RGPD | 3/3 | In Progress|  |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |
 | 30. Hygiène du jalon | 0/? | Not started | - |

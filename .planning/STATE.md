@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 27
 current_phase_name: Suppression de compte RGPD
 status: executing
-stopped_at: Completed 27-02-PLAN.md
-last_updated: "2026-10-27T15:30:25.518Z"
-state_head: b89e1c9066a40bd9fb1535a381eac3d433750270
+stopped_at: Completed 27-03-PLAN.md
+last_updated: "2026-10-27T16:09:22.702Z"
+state_head: 5be4d184893b0d0e6b96731190891dd16609b0bf
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 17
-  completed_plans: 16
+  completed_plans: 17
   percent: 29
 last_activity: 2026-10-27
 ---
@@ -72,8 +72,8 @@ Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T15:30:08.535Z
-**Stopped at:** Completed 27-02-PLAN.md
+**Last session:** 2026-10-27T16:09:11.195Z
+**Stopped at:** Completed 27-03-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -106,6 +106,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 26 P07 | ~45 min | 3 tasks (2 auto + 1 checkpoint) | 0 code files (barrière) |
 | Phase 27 P01 | ~40 min | 3 tasks | 5 files |
 | Phase 27 P02 | 19 min | 3 tasks | 2 files |
+| Phase 27 P03 | 90min | 3 tasks | 12 files |
 
 ## Decisions
 
@@ -155,6 +156,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 27]: 27-02: cron jobs sans paramètres — deux dispatches délégants (reminder/purge-medias) respectent le contrat 0004 (^select private\.[a-z_]+\(\)$) plutôt que des commandes littérales dans cron.job
 - [Phase 27]: 27-02: purge de foyer orphelin — réutilise public.delete_household (0074) si l'utilisateur purgé était admin, sinon suppression inline (dépenses puis foyer), assert_household_admin leverait 42501
 - [Phase 27]: 27-02: demande marquee 'purgee' avant delete from auth.users — la ligne meurt avec le compte via le cascade 0166, preuve RGPD assertée dans les tests
+- [Phase 27]: Edge unifiée household-delete : mode foyer (défaut sans discriminant) + mode compte (rpc 0167 puis signOut global via Bearer header, F1) + actions cron reminder/purge-medias en secret ; manifest privé exposé par wrappers public 0169 (motif 0163)
+- [Phase 27]: Échec d'e-mail après RPC réussi : réponse honnête email_sent:false (jamais un 500 mensonger) ; lien d'annulation vers /parametres/donnees, jamais /auth/v1/* (D-05)
 
 ### Blockers
 
