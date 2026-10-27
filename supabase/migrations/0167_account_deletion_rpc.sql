@@ -78,10 +78,12 @@ begin
   ) into v_had_active;
 
   if v_had_active then
-    -- Remplacement D-06 : la surface est déjà déshumanisée et l'instantané
-    -- porte déjà les valeurs D'ORIGINE — ne pas re-snapshotter (on y
-    -- recopierait « Ancien membre ») ni re-déshumaniser. Seule l'horloge
-    -- est rejouée par la nouvelle demande, insérée plus bas.
+    -- Remplacement D-06 : la surface est déjà déshumanisée OU a été restaurée
+    -- par cancel_account_deletion (D-05 remet display_name/avatar d'origine et
+    -- dépose le marqueur). L'instantané porte déjà les valeurs D'ORIGINE — ne
+    -- pas re-snapshotter (on y recopierait « Ancien membre »). La
+    -- déshumanisation, en revanche, DOIT être rejouée dans tous les cas : elle
+    -- est faite plus bas, hors du if (les updates sont idempotents).
     null;
   else
     -- La ligne membre d'ancrage : la plus ancienne ligne vivante de l'acteur.
@@ -112,21 +114,25 @@ begin
           former_member_avatar_url = excluded.former_member_avatar_url,
           household_id = excluded.household_id,
           created_at = now();
-
-    -- 2. Déshumanisation D-01/D-02, puis l'état « ancien membre » D-03.
-    --    La ligne membre reste en base : seul le marqueur est posé.
-    update public.profiles
-       set display_name = 'Ancien membre',
-           avatar_url = null,
-           updated_at = now()
-     where id = v_actor;
-    update public.household_members
-       set account_deleted_at = now(),
-           display_name = 'Ancien membre',
-           avatar_url = null
-     where user_id = v_actor
-       and account_deleted_at is null;
   end if;
+
+  -- 2. Déshumanisation D-01/D-02, puis l'état « ancien membre » D-03.
+  --    La ligne membre reste en base : seul le marqueur est posé. Exécutée
+  --    pour toute demande, y compris une demande reposée après annulation
+  --    (D-05 a restauré les noms ; sans cette reprise, la purge J+30
+  --    échouerait sur chk_members_managed_child : user_id NULL d'une ligne
+  --    adulte vivante, preuve 0166 §5).
+  update public.profiles
+     set display_name = 'Ancien membre',
+         avatar_url = null,
+         updated_at = now()
+   where id = v_actor;
+  update public.household_members
+     set account_deleted_at = now(),
+         display_name = 'Ancien membre',
+         avatar_url = null
+   where user_id = v_actor
+     and account_deleted_at is null;
 
   -- 3. La demande, avec l'horloge J+30 rejouée à chaque demande.
   insert into public.account_deletion_requests (user_id)

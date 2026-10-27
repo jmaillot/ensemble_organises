@@ -246,4 +246,76 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------
+-- 5. Audit RGDP-05 : la purge du compte NE CASCADE plus aucune donnée
+--    partagée du foyer. C'est la preuve que les ALTER de 0166 étaient
+--    nécessaires : SANS eux, `delete from auth.users` aurait supprimé la
+--    ligne membre (FK cascade 0002:47 — pitfall 2), les tokens d'invitation
+--    (0002:71) et les partages (recipe_shares, omission du research).
+--    Précédent 0145:143. Les recettes référencent household_members (set
+--    null, 0002/0122 convertis) et la ligne membre SURVIT — elles survivent
+--    avec leur created_by intact (commentaire 0166 §4.f).
+-- ---------------------------------------------------------------
+do $$
+declare
+  alice uuid := (select user_id from testkit.fx where key = 'alice');
+  v_member text := (select row_id from testkit.fx where key = 'alice');
+  v_household text := (select household_id from testkit.fx where key = 'alice');
+  v_recipe text := private.new_id('recipe');
+begin
+  -- Semis des données partagées du foyer portées par le compte d'alice.
+  insert into public.recipes (id, household_id, title, created_by)
+  values (v_recipe, v_household, 'Recette 166', v_member);
+  insert into public.recipe_shares (recipe_id, household_id, share_hash, created_by)
+  values (v_recipe, v_household, repeat('a', 64), alice);
+  insert into public.household_invite_tokens (household_id, token_hash, created_by)
+  values (v_household, repeat('b', 64), alice);
+
+  -- La demande d'alice est active (reposée au bloc 4) : purge effective.
+  perform testkit.eq(
+    testkit.count(format(
+      'select 1 from public.account_deletion_requests q where q.user_id = %L and q.status = ''demandee''', alice)),
+    1::bigint,
+    'purge : la demande d''alice est bien active avant la purge');
+
+  -- PURGE (précédent 0145:143) : exécutée en postgres, comme le fera le cron.
+  delete from auth.users where id = alice;
+
+  -- D-03 : la ligne membre SURVIT, user_id NULL, marqueur posé.
+  perform testkit.ok(exists (
+      select 1 from public.household_members m where m.id = v_member
+        and m.user_id is null
+        and m.account_deleted_at is not null
+        and m.display_name = 'Ancien membre'),
+    'purge : la ligne membre survit (user_id NULL, « ancien membre ») — D-03');
+
+  -- D-01 : la recette du foyer survit, rattachée à la ligne membre survivante.
+  perform testkit.ok(exists (
+      select 1 from public.recipes r where r.id = v_recipe
+        and r.created_by = v_member),
+    'purge : la recette du foyer survit (created_by inchangé, réf. ligne membre) — D-01');
+
+  -- F5 : le partage survit, créateur NULL.
+  perform testkit.eq(
+    testkit.count(format(
+      'select 1 from public.recipe_shares s where s.recipe_id = %L and s.created_by is null', v_recipe)),
+    1::bigint,
+    'purge : le partage de recette survit (created_by NULL) — F5');
+
+  -- F5 : le token d'invitation survit, créateur NULL.
+  perform testkit.eq(
+    testkit.count(format(
+      'select 1 from public.household_invite_tokens t where t.household_id = %L and t.created_by is null', v_household)),
+    1::bigint,
+    'purge : le token d''invitation survit (created_by NULL) — F5');
+
+  -- L'instantané et les demandes meurent avec le compte (cascade voulue).
+  perform testkit.eq(
+    testkit.count(format(
+      'select 1 from public.account_deletion_requests q where q.user_id = %L', alice)),
+    0::bigint,
+    'purge : les demandes et l''instantané meurent avec le compte (cascade voulue)');
+end;
+$$;
+
 rollback;
