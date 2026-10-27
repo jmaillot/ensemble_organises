@@ -5,8 +5,8 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 06 complete — notification push d'achèvement export (0164, patron 0147/0042), notified_push après distribution, preuve réseau déclarée absente (0 appareil abonné)"
-last_updated: "2026-10-27T10:25:00Z"
+stopped_at: "Phase 26 Plan 07 (barrière [BLOCKING]) : chaîne §2.7 entièrement verte (SQL 94/94, typecheck, 1636 unitaires, build, e2e 155/155+7 skips viewport) ; preuves réseau (1) et (2) produites sur la stack, push déclarée absente (0 abonnement, reprise 31) — checkpoint:human-verify retourné pour l'acceptation RGPD finale"
+last_updated: "2026-10-27T11:10:00Z"
 state_head: 7652663
 progress:
   total_phases: 7
@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 26 (Export RGPD) — EXECUTING
-Plan: 6 of 7 (26-06 terminé ; reste 26-07 — UAT/barrière finale)
-Status: Executing Phase 26 — plans 26-02 à 26-06 terminés, reste 26-07
-Progress: [██▌░░░░░░░] 28% (13/14 plans)
+Plan: 7 of 7 (26-07 exécuté : chaîne verte + preuves réseau ; CHECKPOINT humain en attente — acceptation RGPD)
+Status: Executing Phase 26 — plans 26-02 à 26-07 exécutés, checkpoint:human-verify en attente (tâche 3)
+Progress: [█████░░░░░] 43% (14/14 plans, phase 26 clôture après acceptation)
 
 ## Références du jalon v1.0
 
@@ -102,6 +102,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 26 P01 | ~40 min | 2 tasks | 2 files |
 | Phase 26 P05 | ~15 min | 3 tasks | 5 files |
 | Phase 26 P06 | ~35 min | 3 tasks | 3 files |
+| Phase 26 P07 | ~45 min | 3 tasks (2 auto + 1 checkpoint) | 0 code files (barrière) |
 
 ## Decisions
 
@@ -143,8 +144,11 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-06) : Marquage notified_push DANS public.consume_push_reminders (branche kind 'export') — le mécanisme de consommation après distribution 0042/0147 est étendu, pas une nouvelle fonction ; push-notify n'appelle la consommation qu'après un envoi réellement reçu (A5)
 - [Phase 26] (26-06) : preference null pour la branche export (motif anniversaires 0019) — l'achèvement d'un export demandé n'a pas d'interrupteur ; D-04 : titre générique + url '/parametres', jamais le lien signé ni storage_path (prouvé par assertion SQL)
 - [Phase 26] (26-06) : Dispatch dédié dispatch_export_notifications + cron eo-push-exports (*/5, motif 0042) — la chaîne eo-push-messages ne distribue que le scope 'messages' ; reminderKind doit reconnaître export-<job_id> sans quoi notified_push ne basculerait jamais
+- [Phase 26] (26-07) : Barrière clôturée côté exécution — chaîne §2.7 verte complète (94 tests SQL, typecheck, 1636 unitaires / 202 fichiers, build, e2e 155/155 + 7 skips viewport conditionnels) ; export e2e réel prouvé (job 3bf17b27, ZIP conforme, exclusion cross-membre prouvée, média PNG valide, lien signé 86400 s) ; purge prouvée (2 jobs, 24 objets, partial:false, audit removed=t) ; push = ABSENCE DÉCLARÉE (0 abonnement réel, reprise 31)
+- [Phase 26] (26-07) : Convention note_attachments.file_url confirmée = chemin d'objet SANS préfixe bucket (26-03) ; un fixture mal préfixé produit un chemin doublé dans le manifeste (fixture corrigé, produit inchangé) — à re-diligencer en 27 si d'autres colonnes média sont exportées
 
 ### Blockers
 
 - 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12. [OBSOLETE : suite verte après 26-02, 92 fichiers tous verts]
-- test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : **absence déclarée à 26-06** (0 abonnement réel sur l'instance, le script refuse lui-même un endpoint factice) — à mener avec un appareil abonné, à la phase 31 (preuve SMTP/push de la porte OUV-07).
+- test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : **absence déclarée à 26-06 ET re-déclarée à 26-07** (0 abonnement réel sur l'instance, le script refuse lui-même un endpoint factice) — à mener avec un appareil abonné, à la phase 31 (preuve SMTP/push de la porte OUV-07).
+- Observation 26-07 : un premier dispatch_gdpr_export_purge a répondu dispatched:true sans que la requête n'atteigne la Edge (aucun log serving, aucune _http_response) ; le second dispatch a servi la purge normalement (200, 24 objets supprimés). Cohérent avec la philosophie cron-retry ; à surveiller en 27/28.

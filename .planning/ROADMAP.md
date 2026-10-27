@@ -16,7 +16,7 @@
 ## Phases
 
 - [x] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session (completed 2026-10-26)
-- [ ] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée
+- [x] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée (completed 2026-10-27)
 - [ ] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur
 - [ ] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles
 - [ ] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message
@@ -74,7 +74,7 @@ Plans:
   3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
   4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
 
-**Plans**: 4/7 plans executed
+**Plans**: 7/7 plans executed
 
 Plans:
 **Wave 1**
@@ -94,7 +94,7 @@ Plans:
 - [x] 26-06-PLAN.md — Notification push à l'achèvement (0164, patron 0147/0042) : succès comme échec (D-01/D-02), push-notify scope « export », notified_push après distribution — preuve réseau déclarée absente (0 appareil abonné, refaire phase 31)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 26-07-PLAN.md — Barrière [BLOCKING] : chaîne §2.7 complète verte + preuves réseau observées (contenu ZIP, purge, push)
+- [x] 26-07-PLAN.md — Barrière [BLOCKING] : chaîne §2.7 complète verte + preuves réseau observées (contenu ZIP, purge, push)
 
 **UI hint**: yes
 
