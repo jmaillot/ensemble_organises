@@ -1,18 +1,23 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Kill global des sessions GoTrue (RGDP-01) — état de départ du plan 27-05,
- * reproduisant FIDÈLEMENT le bloc fautif de `index.ts` (CR-01) : le scope est
- * passé en OBJET, forme que `GoTrueAdminApi.signOut` refuse avant toute
- * requête HTTP. Le test `revoke-sessions.test.ts` échoue sur cette forme :
- * c'est la rougeur attendue avant la correction.
+ * Kill global des sessions GoTrue (RGDP-01, correction CR-01).
+ *
+ * `GoTrueAdminApi.signOut` valide son scope AVANT toute requête HTTP :
+ * `SIGN_OUT_SCOPES.indexOf(scope) < 0` → throw. L'ancien appel passait un
+ * objet `{ scope: 'global' }`, forme absente de la liste `['global','local',
+ * 'others']` : le kill ne partait JAMAIS, le catch avalait l'erreur et la
+ * réponse restait 200 (succès mensonger). Le scope est donc transmis en
+ * CHAÎNE, et tout échec — erreur résolue ou throw — est consigné et rendu
+ * honnêtement `{ revoked: false }` : le client ne voit jamais un succès
+ * inventé.
  */
 export async function revokeGlobalSessions(
   admin: SupabaseClient,
   jwt: string,
 ): Promise<{ revoked: boolean }> {
   try {
-    const { error } = await admin.auth.signOut(jwt, { scope: 'global' });
+    const { error } = await admin.auth.signOut(jwt, 'global');
     if (error) {
       console.error('household-delete: signOut global refusé', { message: error.message });
       return { revoked: false };

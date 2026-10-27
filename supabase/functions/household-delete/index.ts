@@ -34,12 +34,13 @@
  *   jwtClaims, authMode }` — il NE expose PAS le JWT utilisateur brut.
  *   Choix retenu : extraire le Bearer du header `Authorization` de la requête
  *   (le JWT y est, c'est la session de l'appelant) puis appeler
- *   `supabaseAdmin.auth.signOut(jwt, { scope: 'global' })` — le client GoTrue
- *   sous-jacent poste `/auth/v1/logout?scope=global` avec ce JWT (le kill est
- *   donc celui de LA session propriétaire du token, exactement RGDP-01).
- *   Le fallback `POST /auth/v1/admin/logout?scope=global` + service key
- *   n'est pas nécessaire : l'API `signOut(jwt, { scope })` de supabase-js v2
- *   couvre le même chemin sans reconstruire un appel HTTP à la main.
+ *   `revokeGlobalSessions(supabaseAdmin, jwt)` (plan 05, correction CR-01) :
+ *   le helper passe le scope en CHAÎNE — `signOut(jwt, 'global')` poste
+ *   `/auth/v1/logout?scope=global` avec ce JWT. La forme objet à deux clés
+ *   qu'il remplace était refusée par auth-js AVANT toute requête HTTP
+ *   (`SIGN_OUT_SCOPES.indexOf` sur un objet vaut -1) : le kill ne partait
+ *   jamais et le 200 restait mensonger. Le helper absorbe tout échec et rend
+ *   un verdict booléen testé par `revoke-sessions.test.ts`.
  *
  * CONTRAT DE RÉPONSE
  *   foyer        -> { household_id, expenses, storage_objects, storage_cleanup: 'ok' | 'partial' }
@@ -58,6 +59,9 @@ import { z } from 'npm:zod@4.6.5';
 // `send-email-smtp`, déjà éprouvé dans `gift-list-invite` (phase 06). Version
 // exacte épinglée, jamais de plage flottante (AGENTS.md §2.1).
 import nodemailer from 'npm:nodemailer@10.0.15';
+// Kill global des sessions (RGDP-01) : le helper porte la correction CR-01
+// (scope en chaîne) et son contrat booléen testé par revoke-sessions.test.ts.
+import { revokeGlobalSessions } from './revoke-sessions.ts';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -373,20 +377,13 @@ async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient;
     throw new HouseholdDeleteError(500, 'Opération impossible.');
   }
 
-  // 2. Kill IMMÉDIAT des sessions (RGDP-01) — voir doc-comment SONDE F1.
-  //    Un échec ici n'annule pas la demande (déjà commitée) : il est
-  //    consigné honnêtement dans la réponse, jamais muet.
-  let sessionsRevoked = false;
-  try {
-    const jwt = readBearerJwt(request);
-    const { error: signOutError } = await admin.auth.signOut(jwt, { scope: 'global' });
-    if (!signOutError) sessionsRevoked = true;
-    else console.error('household-delete: signOut global refusé', { message: signOutError.message });
-  } catch (signOutUnknown) {
-    console.error('household-delete: signOut global impossible', {
-      message: signOutUnknown instanceof Error ? signOutUnknown.message : String(signOutUnknown),
-    });
-  }
+  // 2. Kill IMMÉDIAT des sessions (RGDP-01) — le helper `revokeGlobalSessions`
+  //    transmet le scope en CHAÎNE ('global') : la forme objet qu'il remplace
+  //    était refusée par auth-js avant toute requête HTTP (CR-01). Un échec
+  //    ici n'annule pas la demande (déjà commitée) : le verdict honnête
+  //    `sessions_revoked: false` porte dans la réponse, jamais muet.
+  const jwt = readBearerJwt(request);
+  const { revoked: sessionsRevoked } = await revokeGlobalSessions(admin, jwt);
 
   // 3. E-mail de confirmation avec lien d'annulation vers une page de l'APP
   //    (D-05 : le lien ne crée jamais de session — /parametres/donnees est
