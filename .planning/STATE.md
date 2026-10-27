@@ -5,15 +5,15 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: "Phase 26 Plan 07 (barrière [BLOCKING]) : chaîne §2.7 entièrement verte (SQL 94/94, typecheck, 1636 unitaires, build, e2e 155/155+7 skips viewport) ; preuves réseau (1) et (2) produites sur la stack, push déclarée absente (0 abonnement, reprise 31) — checkpoint:human-verify retourné pour l'acceptation RGPD finale"
-last_updated: "2026-10-27T11:10:00Z"
+stopped_at: "Phase 26 (Export RGPD) CLÔTURÉE — 7/7 plans dont barrière 26-07 : chaîne §2.7 verte (SQL 94/94, 1636 unitaires, e2e 155/155) + preuves réseau export/purge approuvées par l'utilisateur (« approved » 2026-10-27) ; push déclarée absente (reprise 31)"
+last_updated: "2026-10-27T12:00:00Z"
 state_head: 7652663
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 13
-  percent: 28
+  completed_plans: 14
+  percent: 30
 last_activity: 2026-10-27
 ---
 
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 26 (Export RGPD) — EXECUTING
-Plan: 7 of 7 (26-07 exécuté : chaîne verte + preuves réseau ; CHECKPOINT humain en attente — acceptation RGPD)
-Status: Executing Phase 26 — plans 26-02 à 26-07 exécutés, checkpoint:human-verify en attente (tâche 3)
-Progress: [█████░░░░░] 43% (14/14 plans, phase 26 clôture après acceptation)
+Phase: 26 (Export RGPD) — CLÔTURÉE (validation humaine « approved » 2026-10-27)
+Plan: 7 of 7 (26-07 clôturé : chaîne verte + preuves réseau approuvées)
+Status: Phase 26 terminée — prochain étape : phase 27 (suppression RGPD)
+Progress: [██████░░░░] 30% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
 
@@ -72,11 +72,12 @@ Progress: [█████░░░░░] 43% (14/14 plans, phase 26 clôture a
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T10:25:00Z
-**Stopped at:** Phase 26 Plan 06 complete — branche push « export » (0164), push-notify scope 'export', notified_push après distribution, suite SQL 94/94 verte
-**Resume file:** .planning/phases/26-export-rgpd/26-06-SUMMARY.md
+**Last session:** 2026-10-27T12:00:00Z
+**Stopped at:** Phase 26 complete — barrière 26-07 approuvée (« approved »), 7/7 plans, phase clôturée
+**Resume file:** .planning/phases/26-export-rgpd/26-07-SUMMARY.md
 
-- Prochaine étape : plan 26-07 (UAT / barrière finale de la phase 26).
+- Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
+- Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
 - Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
   24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
 - .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
@@ -146,6 +147,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 26] (26-06) : Dispatch dédié dispatch_export_notifications + cron eo-push-exports (*/5, motif 0042) — la chaîne eo-push-messages ne distribue que le scope 'messages' ; reminderKind doit reconnaître export-<job_id> sans quoi notified_push ne basculerait jamais
 - [Phase 26] (26-07) : Barrière clôturée côté exécution — chaîne §2.7 verte complète (94 tests SQL, typecheck, 1636 unitaires / 202 fichiers, build, e2e 155/155 + 7 skips viewport conditionnels) ; export e2e réel prouvé (job 3bf17b27, ZIP conforme, exclusion cross-membre prouvée, média PNG valide, lien signé 86400 s) ; purge prouvée (2 jobs, 24 objets, partial:false, audit removed=t) ; push = ABSENCE DÉCLARÉE (0 abonnement réel, reprise 31)
 - [Phase 26] (26-07) : Convention note_attachments.file_url confirmée = chemin d'objet SANS préfixe bucket (26-03) ; un fixture mal préfixé produit un chemin doublé dans le manifeste (fixture corrigé, produit inchangé) — à re-diligencer en 27 si d'autres colonnes média sont exportées
+- [Phase 26] (26-07) : Barrière APPROUVÉE par l'utilisateur (« approved » 2026-10-27) — export conforme à la portée A (22 modules, exclusion cross-membre prouvée) et purge avec audit acceptées ; l'absence de preuve push (0 abonnement réel) acceptée comme absence déclarée, reprise phase 31 (porte OUV-07)
 
 ### Blockers
 
