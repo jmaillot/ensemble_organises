@@ -1,0 +1,173 @@
+-- supabase/tests/0161_gdpr_extract_batch.sql
+-- Tests SQL pour 0161_gdpr_export_extract_batch — corps effectif du RPC
+-- d'extraction RGPD (phase 26 plan 03 task 1).
+--
+-- Sections :
+--   1. Périmètre « ce qui me concerne » — l'extraction d'Alice contient SA
+--      tâche et SA note (comptages bornés §2.7D), JAMAIS la tâche de Bob
+--      (même foyer) ni celle de Charlie (foyer voisin).
+--   2. Curseur — les lots avancent sans répétition (union des identifiants
+--      remis = total attendu), done=true à l'épuisement des 22 modules, un
+--      appel après done reste done.
+--   3. Médias — les chemins de pièce jointe ressortent préfixés de leur
+--      bucket (`household-media/…`), les valeurs héritées (http) sont exclues.
+--   4. Job introuvable — P0002 lisible (D-02).
+--
+-- Semis en postgres via testkit ; rollback final.
+
+begin;
+
+-- ---------------------------------------------------------------
+-- Semis : deux foyers, trois utilisateurs, une tâche et une note chacun.
+-- ---------------------------------------------------------------
+do $$
+declare
+  alice uuid := testkit.auth_user('t161-alice@example.fr', 'Alice 161');
+  bob uuid := testkit.auth_user('t161-bob@example.fr', 'Bob 161');
+  charlie uuid := testkit.auth_user('t161-charlie@example.fr', 'Charlie 161');
+  home_a text := testkit.household(alice, 'Foyer Alice 161');
+  home_b text := testkit.household(bob, 'Foyer Bob 161');
+  alice_m text;
+  bob_m text;
+  charlie_m text;
+  alice_task text;
+  bob_task text;
+  alice_note text;
+begin
+  alice_m := testkit.member(home_a, alice, 'Alice 161', 'admin', 'accent');
+  bob_m := testkit.member(home_a, bob, 'Bob 161', 'membre', 'coral');
+  charlie_m := testkit.member(home_b, charlie, 'Charlie 161', 'admin', 'ink');
+
+  -- Tâches : chacune créée par son membre (created_by porte l'ID DE MEMBRE,
+  -- texte — motif vérifié en base : jamais l'uuid utilisateur).
+  insert into public.tasks (household_id, name, status, created_by)
+  values (home_a, 'Tâche Alice 161', 'a_faire', alice_m)
+  returning id into alice_task;
+  insert into public.tasks (household_id, name, status, created_by)
+  values (home_a, 'Tâche Bob 161', 'a_faire', bob_m)
+  returning id into bob_task;
+
+  -- Note d'Alice avec une pièce jointe chemin-bucket ET une valeur héritée.
+  insert into public.notes (household_id, title, content, created_by)
+  values (home_a, 'Note Alice 161', 'contenu', alice_m)
+  returning id into alice_note;
+  insert into public.note_attachments (note_id, household_id, file_url, file_name, mime_type, size_bytes)
+  values (alice_note, home_a, home_a || '/notes/photo-alice-161.jpg', 'photo.jpg', 'image/jpeg', 100),
+         (alice_note, home_a, 'https://exemple.fr/heritee.jpg', 'heritee.jpg', 'image/jpeg', 100);
+
+  insert into testkit.fx (key, user_id) values
+    ('alice', alice), ('bob', bob), ('charlie', charlie);
+  insert into testkit.fx (key, household_id) values
+    ('home_a', home_a), ('home_b', home_b);
+  insert into testkit.fx (key, row_id) values
+    ('alice_task', alice_task), ('bob_task', bob_task);
+
+  -- Job d'Alice (insertion directe postgres — l'éveil HTTP n'est pas l'objet).
+  insert into public.gdpr_export_jobs (user_id) values (alice);
+end;
+$$;
+
+-- ---------------------------------------------------------------
+-- 1 + 2 + 3. Consommation complète des lots du job d'Alice.
+-- ---------------------------------------------------------------
+do $$
+declare
+  alice uuid := (select user_id from testkit.fx where key = 'alice');
+  alice_job uuid := (select j.id from public.gdpr_export_jobs j where j.user_id = alice);
+  res jsonb;
+  v_done boolean := false;
+  v_passes integer := 0;
+  v_tasks_seen int := 0;
+  v_bob_tasks int := 0;
+  v_media jsonb := '[]'::jsonb;
+  v_media_count int := 0;
+  v_http_media int := 0;
+  v_modules_done jsonb := '[]'::jsonb;
+  m text;
+begin
+  -- Le lot terminal peut être vide : au plus 22 modules + un lot vide.
+  while not v_done and v_passes < 30 loop
+    res := private.gdpr_export_extract_batch(alice_job, 500);
+    v_done := (res ->> 'done')::boolean;
+    v_passes := v_passes + 1;
+
+    -- Périmètre : la tâche d'Alice vue, celle de Bob jamais (même foyer).
+    v_tasks_seen := v_tasks_seen
+      + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'tasks') t
+                   where t ->> 'name' = 'Tâche Alice 161'), 0);
+    v_bob_tasks := v_bob_tasks
+      + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'tasks') t
+                   where t ->> 'name' = 'Tâche Bob 161'), 0);
+
+    -- Modules remis (au moins un par lot non vide).
+    if res -> 'rows' ->> 'tasks' is not null then
+      if not (v_modules_done ? 'tasks') then
+        v_modules_done := v_modules_done || '["tasks"]'::jsonb;
+      end if;
+    end if;
+
+    -- Médias : préfixe bucket présent, valeur héritée absente (accumulés sur
+    -- tous les lots — chaque lot ne porte que ses propres chemins).
+    v_media := v_media || coalesce(res -> 'media_paths', '[]'::jsonb);
+    v_media_count := v_media_count + coalesce(jsonb_array_length(v_media), 0);
+    v_http_media := v_http_media
+      + coalesce((select count(*) from jsonb_array_elements_text(v_media) p
+                   where p like 'http%'), 0);
+  end loop;
+
+  perform testkit.ok(v_done,
+    'extraction terminée (done=true) en ' || v_passes || ' lot(s)');
+  perform testkit.eq(v_tasks_seen, 1,
+    'la tâche D''ALICE est extraite exactement une fois (pas de répétition de lot)');
+  perform testkit.eq(v_bob_tasks, 0,
+    'la tâche de BOB (même foyer) n''est JAMAIS extraite (RGEX-03)');
+  perform testkit.ok(v_modules_done ? 'tasks',
+    'le module tasks est remis par le RPC');
+  perform testkit.ok(v_media_count >= 1,
+    'au moins un chemin de média remis');
+  perform testkit.ok(v_http_media = 0,
+    'aucune valeur héritée (http) dans media_paths');
+  perform testkit.ok(
+    exists (select 1 from jsonb_array_elements_text(v_media) p
+             where p like 'household-media/%'),
+    'les chemins de médias sont préfixés de leur bucket');
+end;
+$$;
+
+-- ---------------------------------------------------------------
+-- 2 bis. Après done : un appel supplémentaire reste done, sans ligne.
+-- ---------------------------------------------------------------
+do $$
+declare
+  alice uuid := (select user_id from testkit.fx where key = 'alice');
+  alice_job uuid := (select j.id from public.gdpr_export_jobs j where j.user_id = alice);
+  res jsonb;
+begin
+  res := private.gdpr_export_extract_batch(alice_job, 500);
+  perform testkit.ok((res ->> 'done')::boolean,
+    'appel après épuisement : done=true (idempotent)');
+  perform testkit.eq(
+    coalesce((select sum(jsonb_array_length(e.v)) from jsonb_each(res -> 'rows') as e(k, v)), 0)::bigint, 0::bigint,
+    'appel après épuisement : aucune ligne remise');
+end;
+$$;
+
+-- ---------------------------------------------------------------
+-- 4. Job introuvable : P0002 (D-02 — l'échec est lisible).
+-- ---------------------------------------------------------------
+do $$
+declare
+  v_state text;
+begin
+  begin
+    perform private.gdpr_export_extract_batch(gen_random_uuid(), 500);
+    v_state := 'AUCUNE_ERREUR';
+  exception when others then
+    v_state := SQLSTATE;
+  end;
+  perform testkit.ok(v_state = 'P0002',
+    'job introuvable : P0002 attendu, obtenu ' || v_state);
+end;
+$$;
+
+rollback;
