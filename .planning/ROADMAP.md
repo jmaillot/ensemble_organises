@@ -74,11 +74,11 @@ Plans:
   3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
   4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
 
-**Plans**: 7 plans
+**Plans**: 1/7 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 26-01-PLAN.md — Portée multi-foyers tranchée en SPEC (checkpoint produit) + spike Deno streaming (A1/A2/A3)
+- [x] 26-01-PLAN.md — Portée multi-foyers tranchée en SPEC (checkpoint produit) + spike Deno streaming (A1/A2/A3)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 26-02-PLAN.md — Migration 0158 : bucket gdpr-exports, table gdpr_export_jobs (D-06 index partiel), RPC acteur + extraction bornée, cron run/purge + tests SQL négatifs [BLOCKING]
@@ -174,7 +174,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
-| 26. Export RGPD | 0/? | Not started | - |
+| 26. Export RGPD | 1/7 | In Progress|  |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |

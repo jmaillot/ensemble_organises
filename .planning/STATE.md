@@ -5,26 +5,26 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 26
 current_phase_name: Export RGPD
 status: executing
-stopped_at: Phase 26 context gathered
-last_updated: "2026-10-26T22:54:41.192Z"
-state_head: 33e0833e495cb35daa24d0f308c61dcdaa6d80ef
+stopped_at: "Phase 26 Plan 01 complete — portée RGPD tranchée, spike A1/A2/A3 OK"
+last_updated: "2026-10-27T08:05:00Z"
+state_head: 9524e51b9b3e9f08de72a626db4b1a020d72175e
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 14
-  completed_plans: 7
-  percent: 14
-last_activity: 2026-10-25
+  completed_plans: 8
+  percent: 15
+last_activity: 2026-10-27
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: 26 (Export RGPD) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Progress: [█░░░░░░░░░] 14% (6/7 plans)
+Phase: 26 (Export RGPD) — EXECUTING
+Plan: 2 of 7
+Status: Executing Phase 26 — plan 26-01 terminé
+Progress: [█░░░░░░░░░] 15% (8/14 plans)
 
 ## Références du jalon v1.0
 
@@ -72,12 +72,11 @@ Progress: [█░░░░░░░░░] 14% (6/7 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-10-26T21:33:20.957Z
-**Stopped at:** Phase 26 context gathered
-**Resume file:** .planning/phases/26-export-rgpd/26-CONTEXT.md
+**Last session:** 2026-10-27T08:05:00Z
+**Stopped at:** Phase 26 Plan 01 complete — portée tranchée + spike A1/A2/A3 terminé
+**Resume file:** .planning/phases/26-export-rgpd/26-01-SUMMARY.md
 
-- Prochaine étape : approbation de la roadmap par l'utilisateur, puis `/gsd-plan-phase 25`
-  (recherche approfondie recommandée selon research/SUMMARY.md pour 25, 26, 27, 31).
+- Prochaine étape : plan 26-02 (SQL d'extraction contre portée tranchée dans 26-SPEC-DECISION.md).
 - Le corps historique du journal (phases 1-24) reste perdu (cf. note de réécriture du
   24/10) ; les récits vivent dans .planning/phases/*/ et docs/RETROSPECTIVE.md.
 - .planning est partiellement gitignoré : ROADMAP.md/STATE.md/REQUIREMENTS.md et
@@ -100,6 +99,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 25 P05 | ~2h (2 sessions) | 3 tasks | 10 files |
 | Phase 25 P07 | ~35 min | 3 tasks | 17 files |
 | Phase 25 P08-GAP | 3 sessions | 2 chantiers | 10 files |
+| Phase 26 P01 | ~40 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -124,6 +124,11 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 25]: 25-07 : l'ardoise abandonne son filtre de rôle pour la règle fiduciaire D-05 — le serveur 0146 reste l'autorité
 - [Phase 25] (25-08-GAP) : Voyages rejoint « Fermer la porte » (décision utilisateur 2026-10-26) — 0157 élargit le périmètre RPC et garde trip_add_member (42501) ; le frontend réutilise eligibleMembersForModule, zéro règle locale
 - [Phase 25] (25-08-GAP) : UI-REVIEW warnings corrigés selon 25-UI-SPEC verbatim — couleur éditable à la modification (D-05), copie D-04 dans la confirmation, « Enfant » filtré du sélecteur de rôle, modération Cercle conditionnelle au rôle de l'auteur
+- [Phase 26] (26-01) : Portée RGPD Option A « Ce qui me concerne » — profil + créations (created_by, paid_by, author_id) + attributions (task_assignees, routine_assignees) + participations ardoise (expense_participants) + médias personnels ; jamais le contenu créé par un autre membre
+- [Phase 26] (26-01) : Multi-foyers fusion — une seule archive ZIP, un JSON par module, données de tous les foyers confondus ; l'identité du sujet RGPD prime sur la frontière du foyer
+- [Phase 26] (26-01) : 22 modules exportables listés mot pour mot dans 26-SPEC-DECISION.md ; household_invite_tokens et gdpr_export_jobs exclus
+- [Phase 26] (26-01) : Limite bucket gdpr-exports : 1 Go (1073741824 octets)
+- [Phase 26] (26-01) : Verdicts A1 (upload flux ReadableStream), A2 (fflate Deno streaming), A3 (cross-bucket copy destinationBucket) établis OK avec replis nommés sur base documentaire (doc officielle + motifs in-repo)
 
 ### Blockers
 
