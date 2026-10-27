@@ -2,7 +2,7 @@
  * Edge Function `push-notify`.
  *
  * Point d'entrée : `POST /functions/v1/push-notify`
- * Corps : `{ scope: 'rappels' | 'anniversaires' | 'messages' | 'test' }`
+ * Corps : `{ scope: 'rappels' | 'anniversaires' | 'messages' | 'export' | 'test' }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['secret', 'user']`
@@ -20,6 +20,13 @@
  *   fonction n'a donc aucun pouvoir qu'elle ne tiendrait pas déjà de la clé
  *   secrète — et c'est bien pourquoi le mode `user` se limite à ses propres
  *   lignes.
+ *
+ *   Le scope `export` (0164) notifie l'achèvement d'un export RGPD, succès
+ *   comme échec. Le message traverse un service tiers : il porte un titre
+ *   générique et l'URL interne '/parametres' — JAMAIS le lien signé ni le
+ *   chemin Storage de l'archive (D-04). La consommation des lignes
+ *   `export-<job_id>` bascule `notified_push` après distribution, comme les
+ *   autres kinds.
  *
  * ENVOI
  *   Chaque couple (notification, abonnement) est chiffré séparément, avec une
@@ -74,7 +81,7 @@ class PushError extends Error {
 }
 
 const requestSchema = z.object({
-  scope: z.enum(['rappels', 'anniversaires', 'messages', 'test']),
+  scope: z.enum(['rappels', 'anniversaires', 'messages', 'export', 'test']),
 });
 
 async function parseBody(request: Request): Promise<z.infer<typeof requestSchema>> {
@@ -138,11 +145,15 @@ interface DueNotification {
 }
 
 /** Type de rappel, pour la consommation : l'anniversaire n'a aucune ligne. */
-function reminderKind(tag: string): 'tache' | 'evenement' | 'routine' | 'message' | null {
+function reminderKind(tag: string): 'tache' | 'evenement' | 'routine' | 'message' | 'export' | null {
   if (tag.startsWith('tache-')) return 'tache';
   if (tag.startsWith('evenement-')) return 'evenement';
   if (tag.startsWith('routine-')) return 'routine';
   if (tag.startsWith('message-')) return 'message';
+  // 0164 : l'export ne supprime pas une ligne, il bascule `notified_push` —
+  // la consommation après distribution reste la même (jamais un marquage
+  // anticipé qui perdrait la notification en cas d'échec d'envoi).
+  if (tag.startsWith('export-')) return 'export';
   return null;
 }
 
