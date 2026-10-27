@@ -68,10 +68,15 @@
  *   `en_cours`, le lease expire, le cron reprend. Un crash process est couvert
  *   par le lease. Aucun job fantôme, aucune boucle muette.
  *
- * ZIP-SLIP (T-26-09)
- *   Les noms d'entrée du ZIP sont construits uniquement depuis des identifiants
- *   serveur (uid, job id, noms de modules en dur, chemins de bucket) — jamais
- *   depuis une chaîne saisie par un utilisateur.
+ * ZIP-SLIP (T-26-09, corrigé MR-01)
+ *   Les noms d'entrée du ZIP dérivent d'identifiants serveur (uid, job id,
+ *   noms de modules en dur) SAUF les chemins de médias : `file_url`,
+ *   `photo_url`… sont des colonnes alimentées par le client au moment de
+ *   l'upload — un client malveillant contrôle sa clé d'objet. Tout chemin de
+ *   média est donc VALIDÉ avant usage (`safeMediaPath` : bucket connu, aucun
+ *   segment vide / '.' / '..') ; une valeur invalide est ignorée (logguée,
+ *   jamais copiée, jamais nommée dans le ZIP). Le filtre SQL 0161 reste la
+ *   première barrière, celle-ci est la défense en profondeur côté Edge.
  *
  * CONTRAT DE RÉPONSE
  *   -> 200 { processed: false }                    — rien à faire, le cron rappellera
@@ -103,6 +108,21 @@ const bodySchema = z.object({ action: z.literal('run') });
 /** Buckets sources de médias (0010) — toute copie vers le staging vient d'ici. */
 const SOURCE_BUCKETS = ['household-media', 'household-avatars'] as const;
 const EXPORT_BUCKET = 'gdpr-exports';
+
+/**
+ * Valide un chemin de média stocké (MR-01) : `bucket/chemin`, bucket connu,
+ * AUCUN segment vide / '.' / '..'. Renvoie le chemin normalisé, ou null —
+ * une valeur refusée est journalisée puis ignorée par l'appelant (jamais
+ * copiée vers le staging, jamais nommée dans le ZIP).
+ */
+function safeMediaPath(source: string): string | null {
+  const slash = source.indexOf('/');
+  const bucket = slash === -1 ? '' : source.slice(0, slash);
+  const path = slash === -1 ? '' : source.slice(slash + 1);
+  if (!(SOURCE_BUCKETS as readonly string[]).includes(bucket) || path === '') return null;
+  if (path.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')) return null;
+  return `${bucket}/${path}`;
+}
 
 /** Taille d'un lot d'extraction (RPC) et de pagination Storage. */
 const BATCH_LIMIT = 500;
@@ -201,10 +221,14 @@ async function copyMediaToStaging(
   const slash = source.indexOf('/');
   const bucket = slash === -1 ? '' : source.slice(0, slash);
   const path = slash === -1 ? source : source.slice(slash + 1);
-  if (!(SOURCE_BUCKETS as readonly string[]).includes(bucket) || path === '') {
-    // Ni bucket connu ni chemin : valeur héritée qui a franchi le filtre SQL —
-    // signalée, jamais propagée dans l'archive (T-26-09).
-    console.warn('gdpr-export-run: chemin de média hors buckets connus, ignoré', { source });
+  if (
+    !(SOURCE_BUCKETS as readonly string[]).includes(bucket) || path === '' ||
+    path.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')
+  ) {
+    // Ni bucket connu, ni chemin, ni traversée de préfixe (`..`) : valeur qui
+    // a franchi le filtre SQL — signalée, jamais propagée dans l'archive
+    // (T-26-09, défense MR-01).
+    console.warn('gdpr-export-run: chemin de média invalide, ignoré', { source });
     return 'missing';
   }
   const { error } = await admin.storage
@@ -339,9 +363,16 @@ async function runExtractionPass(
       // Copies immédiates, non fatales : le manifeste garantit la complétude
       // à l'assemblage (une passe tuée ici est réparée, pas perdue).
       for (const source of b.media_paths) {
-        const slash = source.indexOf('/');
-        const staging = `${job.user_id}/${job.id}/medias/${source.slice(0, slash)}/${source.slice(slash + 1)}`;
-        const result = await copyMediaToStaging(admin, source, staging);
+        const safe = safeMediaPath(source);
+        if (safe === null) {
+          // Chemin contrôlé par le client refusé (MR-01) : compté manquant,
+          // jamais copié — l'écart est visible dans le résumé de passe.
+          console.warn('gdpr-export-run: chemin de média refusé, ignoré', { source });
+          mediaSkipped += 1;
+          continue;
+        }
+        const staging = `${job.user_id}/${job.id}/medias/${safe}`;
+        const result = await copyMediaToStaging(admin, safe, staging);
         if (result === 'copied') mediaCopied += 1;
         else mediaSkipped += 1;
       }
@@ -396,12 +427,18 @@ async function runAssemblyPass(
     for (const line of content.split('\n')) {
       const source = line.trim();
       if (source === '') continue;
-      expected.add(source);
-      if (stagedMedia.has(source)) continue;
+      const safe = safeMediaPath(source);
+      if (safe === null) {
+        // Chemin refusé (MR-01) : ni attendu ni copié — consigné, jamais muet.
+        console.warn('gdpr-export-run: chemin de manifeste refusé, ignoré', { source });
+        continue;
+      }
+      expected.add(safe);
+      if (stagedMedia.has(safe)) continue;
       if (Date.now() > deadline) return { mediaCopied, mediaSkipped: 0 };
-      const result = await copyMediaToStaging(admin, source, `${root}/medias/${source}`);
+      const result = await copyMediaToStaging(admin, safe, `${root}/medias/${safe}`);
       if (result === 'copied') {
-        stagedMedia.add(source);
+        stagedMedia.add(safe);
         mediaCopied += 1;
       }
     }
@@ -488,7 +525,15 @@ async function runAssemblyPass(
       zip.end();
       return { mediaCopied, mediaSkipped };
     }
-    const entry = new ZipPassThrough(`medias/${mediaPath.slice(`${root}/medias/`.length)}`);
+    const entryName = `medias/${mediaPath.slice(`${root}/medias/`.length)}`;
+    if (entryName.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')) {
+      // Défense finale (MR-01) : un nom d'entrée ZIP ne traverse jamais un
+      // préfixe — un staging intègre ne peut pas en produire, on refuse avant
+      // d'écrire le central-directory plutôt que de le supposer.
+      console.warn('gdpr-export-run: nom d entrée ZIP refusé, ignoré', { entryName });
+      continue;
+    }
+    const entry = new ZipPassThrough(entryName);
     zip.add(entry);
     const stream = await downloadStagingStream(admin, mediaPath);
     for await (const chunk of stream) {
