@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 26
-current_phase_name: Export RGPD
-status: executing
-stopped_at: "Phase 26 (Export RGPD) CLÔTURÉE — 7/7 plans dont barrière 26-07 : chaîne §2.7 verte (SQL 94/94, 1636 unitaires, e2e 155/155) + preuves réseau export/purge approuvées par l'utilisateur (« approved » 2026-10-27) ; push déclarée absente (reprise 31)"
-last_updated: "2026-10-27T12:00:00Z"
-state_head: 7652663
+current_phase: 27
+current_phase_name: Suppression de compte RGPD
+status: planning
+stopped_at: Phase 26 complete, ready to plan Phase 27
+last_updated: "2026-10-27T12:00:06.884Z"
+state_head: e9be126c89c68a4f716e85ad967a4a62b0cb9700
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 14
   completed_plans: 14
-  percent: 30
+  percent: 29
 last_activity: 2026-10-27
 ---
 
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 26 (Export RGPD) — CLÔTURÉE (validation humaine « approved » 2026-10-27)
-Plan: 7 of 7 (26-07 clôturé : chaîne verte + preuves réseau approuvées)
-Status: Phase 26 terminée — prochain étape : phase 27 (suppression RGPD)
-Progress: [██████░░░░] 30% (14/14 plans de la phase 26, phase approuvée et clôturée)
+Phase: 27 — Suppression de compte RGPD
+Plan: Not started
+Status: Ready to plan
+Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
 
@@ -73,7 +73,7 @@ Progress: [██████░░░░] 30% (14/14 plans de la phase 26, phas
 ## Session Continuity
 
 **Last session:** 2026-10-27T12:00:00Z
-**Stopped at:** Phase 26 complete — barrière 26-07 approuvée (« approved »), 7/7 plans, phase clôturée
+**Stopped at:** Phase 26 complete, ready to plan Phase 27
 **Resume file:** .planning/phases/26-export-rgpd/26-07-SUMMARY.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).

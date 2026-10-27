@@ -74,7 +74,7 @@ Plans:
   3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
   4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
 
-**Plans**: 7/7 plans executed
+**Plans**: 7/7 plans complete
 
 Plans:
 **Wave 1**
@@ -174,7 +174,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
-| 26. Export RGPD | 3/7 | In Progress|  |
+| 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 0/? | Not started | - |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |
