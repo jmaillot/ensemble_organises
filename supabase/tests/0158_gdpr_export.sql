@@ -216,24 +216,12 @@ reset request.jwt.claims;
 reset request.jwt.claim.role;
 reset request.jwt.claim.email;
 
--- 3d. `expect_denied` : Bob ne peut pas appeler gdpr_export_extract_batch sur
--- le job d'Alice (même en postgres avec service_role, le RPC vérifie user_id).
-do $$
-declare
-  alice_job_id uuid := (select row_id from testkit.fx where key = 'alice_job')::uuid;
-begin
-  -- En postgres (service_role implicite), appeler le RPC avec le job d'Alice :
-  -- l'isolation RGEX-03 est dans le SQL lui-même, pas dans la RLS. Le RPC lit
-  -- `user_id` de la ligne de job et extrait UNIQUEMENT la donnée de cet
-  -- utilisateur. Ici, le test vérifie que le RPC ne renvoie rien pour Bob
-  -- (pas de données de Bob dans le job d'Alice).
-  --
-  -- Note : le squelette 0158 ne contient pas encore la logique d'extraction
-  -- (plan 26-03 Task 1) — cette assertion vérifie le contrat : user_id du job
-  -- borné, pas de débordement inter-foyers.
-  perform testkit.ok(true, 'squelette extraction : vérification reportée au plan 26-03');
-end;
-$$;
+-- 3d. Renvoi : l'isolement RGEX-03 du RPC `gdpr_export_extract_batch` est
+-- prouvé comportementalement dans `supabase/tests/0161_gdpr_extract_batch.sql`
+-- (sections 1 et 5) — périmètre du demandeur, tâche assignée mais non créée,
+-- tâche d'un foyer voisin jamais extraite. Le bloc qui occupait cette place
+-- était une assertion tautologique `testkit.ok(true, …)` (proscrite par
+-- AGENTS.md §2.7D) : supprimé, le renvoi suffit.
 
 -- 3e. Politique bucket scellée : Bob ne voit pas le préfixe d'Alice.
 select testkit.as_user((select user_id from testkit.fx where key = 'bob'), 't158-bob@example.fr');

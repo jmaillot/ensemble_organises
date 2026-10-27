@@ -34,6 +34,8 @@ declare
   charlie_m text;
   alice_task text;
   bob_task text;
+  charlie_task text;
+  shared_task text;
   alice_note text;
 begin
   alice_m := testkit.member(home_a, alice, 'Alice 161', 'admin', 'accent');
@@ -48,6 +50,16 @@ begin
   insert into public.tasks (household_id, name, status, created_by)
   values (home_a, 'Tâche Bob 161', 'a_faire', bob_m)
   returning id into bob_task;
+  insert into public.tasks (household_id, name, status, created_by)
+  values (home_b, 'Tâche Charlie 161', 'a_faire', charlie_m)
+  returning id into charlie_task;
+
+  -- Tâche créée par BOB mais ASSIGNÉE à ALICE (MR-02) : elle concerne Alice
+  -- par le chemin `task_assignees`, pas par `created_by`.
+  insert into public.tasks (household_id, name, status, created_by)
+  values (home_a, 'Tâche partagée Bob→Alice 161', 'a_faire', bob_m)
+  returning id into shared_task;
+  insert into public.task_assignees (task_id, member_id) values (shared_task, alice_m);
 
   -- Note d'Alice avec une pièce jointe chemin-bucket ET une valeur héritée.
   insert into public.notes (household_id, title, content, created_by)
@@ -76,17 +88,24 @@ do $$
 declare
   alice uuid := (select user_id from testkit.fx where key = 'alice');
   alice_job uuid := (select j.id from public.gdpr_export_jobs j where j.user_id = alice);
+  alice_m text;
   res jsonb;
   v_done boolean := false;
   v_passes integer := 0;
   v_tasks_seen int := 0;
   v_bob_tasks int := 0;
+  v_charlie_tasks int := 0;
+  v_shared_seen int := 0;
+  v_shared_assignees int := 0;
   v_media jsonb := '[]'::jsonb;
   v_media_count int := 0;
   v_http_media int := 0;
   v_modules_done jsonb := '[]'::jsonb;
   m text;
 begin
+  select id into alice_m from public.household_members
+   where user_id = alice and household_id = (select household_id from testkit.fx where key = 'home_a');
+
   -- Le lot terminal peut être vide : au plus 22 modules + un lot vide.
   while not v_done and v_passes < 30 loop
     res := private.gdpr_export_extract_batch(alice_job, 500);
@@ -100,6 +119,18 @@ begin
     v_bob_tasks := v_bob_tasks
       + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'tasks') t
                    where t ->> 'name' = 'Tâche Bob 161'), 0);
+    v_charlie_tasks := v_charlie_tasks
+      + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'tasks') t
+                   where t ->> 'name' = 'Tâche Charlie 161'), 0);
+    v_shared_seen := v_shared_seen
+      + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'tasks') t
+                   where t ->> 'name' = 'Tâche partagée Bob→Alice 161'), 0);
+    v_shared_assignees := v_shared_assignees
+      + coalesce((select count(*) from jsonb_array_elements(res -> 'rows' -> 'task_assignees') a
+                   join jsonb_array_elements(res -> 'rows' -> 'tasks') t
+                     on t ->> 'id' = a ->> 'task_id'
+                   where t ->> 'name' = 'Tâche partagée Bob→Alice 161'
+                     and a ->> 'member_id' = alice_m), 0);
 
     -- Modules remis (au moins un par lot non vide).
     if res -> 'rows' ->> 'tasks' is not null then
@@ -123,6 +154,12 @@ begin
     'la tâche D''ALICE est extraite exactement une fois (pas de répétition de lot)');
   perform testkit.eq(v_bob_tasks, 0,
     'la tâche de BOB (même foyer) n''est JAMAIS extraite (RGEX-03)');
+  perform testkit.eq(v_charlie_tasks, 0,
+    'la tâche de CHARLIE (foyer voisin) n''est JAMAIS extraite (RGEX-03, MR-02)');
+  perform testkit.eq(v_shared_seen, 1,
+    'la tâche créée par BOB mais ASSIGNÉE à ALICE est extraite (chemin task_assignees, MR-02)');
+  perform testkit.eq(v_shared_assignees, 1,
+    'l''assignation de la tâche partagée à ALICE est extraite avec la tâche');
   perform testkit.ok(v_modules_done ? 'tasks',
     'le module tasks est remis par le RPC');
   perform testkit.ok(v_media_count >= 1,
@@ -217,12 +254,16 @@ begin
 
   perform testkit.ok(v_done,
     'extraction de Bob terminée (done=true) en ' || v_passes || ' lot(s)');
-  perform testkit.eq(cardinality(v_tasks_starts), 2,
-    'le module tasks de Bob (4 lignes, limite 2) est remis en DEUX lots');
+  -- 5 lignes créées par Bob (la sienne, la partagée Bob→Alice, 3 extras) :
+  -- limite 2 → TROIS lots d'offsets de début 0, 2, 4.
+  perform testkit.eq(cardinality(v_tasks_starts), 3,
+    'le module tasks de Bob (5 lignes, limite 2) est remis en TROIS lots');
   perform testkit.eq(v_tasks_starts[1], 0,
     'premier lot tasks : batch_start_offset = 0 (début du module)');
   perform testkit.eq(v_tasks_starts[2], 2,
     'second lot tasks : batch_start_offset = 2 (offset de DÉBUT, pas post-avance)');
+  perform testkit.eq(v_tasks_starts[3], 4,
+    'troisième lot tasks : batch_start_offset = 4 (suite croissante)');
   perform testkit.eq(v_tasks_rows[1], 2,
     'chaque lot tasks porte exactement la limite demandée');
 end;
