@@ -112,33 +112,31 @@ class HouseholdDeleteError extends Error {
 type AdminClient = SupabaseClient;
 
 /**
- * Appel PostgREST direct en tant que service (UAT G-27-4, 2026-10-28).
+ * Appel PostgREST interne portant un JWT de session UTILISATEUR (UAT G-27-4,
+ * 2026-10-28, dernière itération).
  *
- * POURQUOI PAS supabase-js NI la gateway :
- *  1. `ctx.supabaseAdmin` porte la clé secrète OPAQUE (`sb_secret_*`) en
- *     `Authorization: Bearer` — PostgREST du snapshot exige un JWT vérifiable
- *     contre `PGRST_JWT_SECRET` (JWKS) et répond 401 « Unauthorized ».
- *  2. La gateway api-gw (Envoy) rejette en 401 TOUT JWT service sur /rest
- *     (HS256 legacy ET ES256 pré-signé) ; preuve : wget api-gw = 401 pour les
- *     deux, wget direct rest:3000 = 403 (garde SQL attendue, JWT accepté).
- *  3. supabase-js pointé sur `http://rest:3000` construit `/rest/v1/rpc/…`
- *     alors que PostgREST interne écoute à la racine → `PGRST125 Invalid
- *     path`. Un fetch direct sur `http://rest:3000/rpc/…` est le chemin
- *     nominal du snapshot (le storage vise déjà `POSTGREST_URL`).
- *
- * Le JWT asymétrique PRÉ-SIGNÉ (`SERVICE_ROLE_KEY_ASYMMETRIC`, injecté par
- * l'override traefik) porte `role: service_role` : le RPC (0167) vérifie
- * l'acteur par `p_user_id` explicite, jamais `auth.uid()`.
+ * POURQUOI CETTE FORME, ÉTAPE PAR ÉTAPE :
+ *  1. Le RPC 0167 exige `auth.uid() = p_user_id` (« session requise »,
+ *     42501 sinon) : un JWT service (sans `sub`) est CONDAMNÉ — « session
+ *     requise » à chaque appel. L'acteur doit être l'utilisateur, avec SON
+ *     JWT de session (le ctx ne l'expose pas, le header `Authorization` le
+ *     porte — SONDE F1).
+ *  2. La gateway api-gw (Envoy) rejette en 401 ce JWT sur /rest (preuve :
+ *     wget api-gw = 401, wget direct rest:3000 = 403 garde SQL attendue) —
+ *     donc PostgREST EN INTERNE, `http://rest:3000/rpc/…` (chemin nominal du
+ *     snapshot : le storage vise déjà `POSTGREST_URL`).
+ *  3. supabase-js pointé sur rest:3000 construit `/rest/v1/rpc/…` → PGRST125
+ *     Invalid path : fetch direct, pas de client.
  *
  * Rend le message d'erreur PostgREST brut (`{ message, code }`) pour
- * `translateRpcError` ; lève `HouseholdDeleteError` si la clé manque.
+ * `translateRpcError` ; lève `HouseholdDeleteError` si le JWT manque.
  */
-async function rpcAsService(
+async function rpcAsUser(
+  jwt: string,
   rpcName: string,
   payload: Record<string, string>,
 ): Promise<{ ok: boolean; status: number; message: string; code?: string }> {
-  const jwt = Deno.env.get('SERVICE_ROLE_KEY_ASYMMETRIC') ?? '';
-  if (jwt === '') throw new HouseholdDeleteError(500, 'Opération impossible.');
+  if (jwt === '') throw new HouseholdDeleteError(401, 'Connectez-vous pour continuer.');
   const response = await fetch(`http://rest:3000/rpc/${rpcName}`, {
     method: 'POST',
     headers: {
@@ -422,15 +420,14 @@ function readBearerJwt(request: Request): string {
 }
 
 async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient; userId: string }) {
-  // Le RPC exige un JWT service_role vérifiable : appel PostgREST direct en
-  // interne (voir rpcAsService — la clé opaque de supabaseAdmin est refusée
-  // par PostgREST 401, et la gateway rejette tout JWT service sur /rest,
-  // UAT G-27-4).
+  // Le RPC 0167 exige auth.uid() = p_user_id : c'est le JWT de session de
+  // l'appelant qui porte l'acteur (voir rpcAsUser, étapes 1-3, UAT G-27-4).
+  const jwt = readBearerJwt(request);
 
   // 1. Le RPC 0167 fait tout (instantané D-04 + déshumanisation D-01/02/03 +
   //    demande D-06) DANS UNE SEULE transaction, et ne laisse agir que le
   //    propriétaire du compte (42501). La base fait foi.
-  const rpc = await rpcAsService('request_account_deletion', {
+  const rpc = await rpcAsUser(jwt, 'request_account_deletion', {
     p_user_id: ctx.userId,
   });
   if (!rpc.ok) throw translateRpcError({ code: rpc.code, message: rpc.message });
@@ -446,7 +443,6 @@ async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient;
   //    était refusée par auth-js avant toute requête HTTP (CR-01). Un échec
   //    ici n'annule pas la demande (déjà commitée) : le verdict honnête
   //    `sessions_revoked: false` porte dans la réponse, jamais muet.
-  const jwt = readBearerJwt(request);
   // Kill global des sessions GoTrue (RGDP-01, correction CR-01).
   //
   // Piège runtime du snapshot (2026-10-28, UAT G-27-4) : l'import du type DOIT
@@ -458,8 +454,6 @@ async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient;
   //
   // Le kill lui-même ne passe PAS par PostgREST : il poste /auth/v1/logout
   // (GoTrue), qui accepte la clé secrète opaque — supabaseAdmin convient ici.
-  // Le kill ne passe PAS par PostgREST : il poste /auth/v1/logout (GoTrue),
-  // qui accepte la clé secrète opaque — supabaseAdmin convient ici.
   const { revoked: sessionsRevoked } = await revokeGlobalSessions(ctx.supabaseAdmin, jwt);
 
   // 3. E-mail de confirmation avec lien d'annulation vers une page de l'APP
