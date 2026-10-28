@@ -125,7 +125,7 @@ Plans:
 
 ### Phase 28: Exploitation — sauvegardes, restauration, supervision
 
-**Goal**: Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + restic sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, supervision Prometheus/Grafana/Loki avec alertes testées — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
+**Goal**: Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + restic sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, alertes par mail (disque/certificats/pg_cron/erreurs Edge) chacune prouvée par un déclenchement réel — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
 **Depends on**: Phase 25 (les migrations peuvent s'appliquer sur la pile restaurée ; orthogonale aux phases 26-27)
 **Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
 **Tests UAT hérités de la phase 27** (reportés le 2026-10-28, à passer pendant cette phase — le SMTP réel du serveur docker est le lieu d'exécution) :
@@ -136,7 +136,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
   2. Un exercice de restauration est joué sur un Compose isolé (jamais la prod), le RTO est mesuré et consigné, et le runbook de restauration permet à une autre session de rejouer sans deviner
-  3. Une alerte disque, une alerte certificat, une alerte pg_cron et une alerte erreurs Edge se déclenchent et sont visibles dans la supervision déployée — chacune prouvée par un test déclenché, pas par une promesse de configuration
+  3. Une alerte disque, une alerte certificat, une alerte pg_cron et une alerte erreurs Edge se déclenchent et arrivent par mail — chacune prouvée par un test déclenché, pas par une promesse de configuration (OPS-03 réécrite le 2026-10-28 : alertes mail, pas de pile Prometheus/Grafana/Loki)
   4. `check-cron-health.sh` valide les jobs pg_cron et attrape effectivement une rotation de secret ratée (prouvé rouge→vert)
   5. RPO, RTO et politique de rétention sont arbitrés et documentés dans `docs/`
 
