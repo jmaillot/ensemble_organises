@@ -128,6 +128,10 @@ Plans:
 **Goal**: Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + restic sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, supervision Prometheus/Grafana/Loki avec alertes testées — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
 **Depends on**: Phase 25 (les migrations peuvent s'appliquer sur la pile restaurée ; orthogonale aux phases 26-27)
 **Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
+**Tests UAT hérités de la phase 27** (reportés le 2026-10-28, à passer pendant cette phase — le SMTP réel du serveur docker est le lieu d'exécution) :
+- UAT-27.5 — Annulation : restauration nom/photo dans CHAQUE foyer (multi-foyer), page honnête sans promesse de sessions
+- UAT-27.6 — Données partagées du foyer survivent à la suppression d'un membre (tâches, courses, notes)
+- UAT-27.7 — E-mail de rappel J-7 réellement livré (simulation J-7 par SQL + lecture boîte mail)
 **Success Criteria** (what must be TRUE):
   1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
   2. Un exercice de restauration est joué sur un Compose isolé (jamais la prod), le RTO est mesuré et consigné, et le runbook de restauration permet à une autre session de rejouer sans deviner
