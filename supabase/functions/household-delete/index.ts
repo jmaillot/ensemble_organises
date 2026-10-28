@@ -127,7 +127,13 @@ type AdminClient = SupabaseClient;
  * headers Authorization/apikey et empêchent l'injection par options.
  */
 function rpcAdminClient(): SupabaseClient {
-  const url = Deno.env.get('SUPABASE_URL') ?? '';
+  // PostgREST EN INTERNE (http://rest:3000), pas la gateway : api-gw (Envoy)
+  // rejette en 401 les JWT service (HS256 legacy ET ES256 pré-signé) sur les
+  // routes /rest — preuve UAT G-27-4 : wget api-gw = 401 pour les deux,
+  // wget direct rest:3000 = 403 (garde SQL attendue, JWT accepté). Le réseau
+  // Compose interne est le chemin nominal du snapshot (le storage vise déjà
+  // POSTGREST_URL: http://rest:3000).
+  const url = Deno.env.get('SUPABASE_REST_URL') ?? 'http://rest:3000';
   // JWT asymétrique PRÉ-SIGNÉ en priorité : la gateway du snapshot rejette le
   // HS256 legacy dès que la vérification passe au JWKS ES256 (UAT G-27-4,
   // 2026-10-28 : wget direct rest:3000 = 403 SQL attendu avec l'ES256, 401
