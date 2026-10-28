@@ -59,8 +59,14 @@ import { z } from 'npm:zod@4.6.5';
 // `send-email-smtp`, déjà éprouvé dans `gift-list-invite` (phase 06). Version
 // exacte épinglée, jamais de plage flottante (AGENTS.md §2.1).
 import nodemailer from 'npm:nodemailer@10.0.15';
-// Kill global des sessions (RGDP-01) : le helper porte la correction CR-01
-// (scope en chaîne) et son contrat booléen testé par revoke-sessions.test.ts.
+// Kill global des sessions GoTrue (RGDP-01, correction CR-01).
+//
+// Piège runtime du snapshot (2026-10-28, UAT G-27-4) : l'import du type DOIT
+// porter le préfixe `npm:` — l'import map du runtime ne couvre que
+// `@supabase/functions-js` et `@supabase/server`, et une résolution nue
+// `@supabase/supabase-js` fait crasher le worker au boot (worker boot error),
+// tuant toute la fonction, test unitaire Vitest pourtant vert (la classe
+// « frontière du conteneur », AGENTS §2.7C).
 import { revokeGlobalSessions } from './revoke-sessions.ts';
 
 const JSON_HEADERS = {

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
  * Kill global des sessions GoTrue (RGDP-01, correction CR-01).
