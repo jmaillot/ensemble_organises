@@ -72,8 +72,8 @@ Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-27T16:09:11.195Z
-**Stopped at:** Completed 27-03-PLAN.md
+**Last session:** 2026-10-28T15:00:00Z
+**Stopped at:** UAT 27 en pause (awaiting_user) — tests 1-4, 8 passés (+ D1-D4) ; 5, 6, 7 reportés à la demande de l'utilisateur. 4 correctifs UAT poussés (8bdb858, efaed47, 9b29689, 9c8dddd) ; G-27-4 clos sur preuve SQL (sessions_restantes = 0). ROADMAP plans 27-04/27-05 cochés.
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -107,6 +107,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 27 P01 | ~40 min | 3 tasks | 5 files |
 | Phase 27 P02 | 19 min | 3 tasks | 2 files |
 | Phase 27 P03 | 90min | 3 tasks | 12 files |
+| Phase 27 P04 | ~50 min | 3 tasks | 4 files |
+| Phase 27 P05 | ~1h20 | 3 tasks | 6 files |
 
 ## Decisions
 
