@@ -60,6 +60,15 @@ services:
   # `.env` de la stack.
   functions:
     environment:
+      # RPC PostgREST depuis les Edges privilégiées (UAT G-27-4, 2026-10-28) :
+      # la gateway et PostgREST du snapshot rejettent le JWT legacy HS256
+      # (`SUPABASE_SERVICE_ROLE_KEY`) dès que la vérification passe au JWKS
+      # ES256 ; seul le JWT asymétrique PRÉ-SIGNÉ traverse. Les Edges qui
+      # appellent un RPC portant `auth.uid()`-dépendance en tant que service
+      # (`household-delete`, motif cron `post_gdpr_export_http`) lisent cette
+      # variable et la posent en `Authorization: Bearer`. Pré-signée par
+      # `add-new-auth-keys.sh`, kid aligné sur `JWT_KEYS`/`JWT_JWKS`.
+      SERVICE_ROLE_KEY_ASYMMETRIC: ${SERVICE_ROLE_KEY_ASYMMETRIC:-}
       INVITE_TOKEN_HMAC_SECRET: ${INVITE_TOKEN_HMAC_SECRET}
       # Partage des ardoises (`ardoise-invite`) : secret DÉDIÉ, jamais réutilisé
       # d'un autre HMAC. Génération : openssl rand -base64 48 (≥ 256 bits) ;

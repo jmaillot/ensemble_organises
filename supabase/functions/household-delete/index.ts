@@ -53,6 +53,7 @@
  */
 
 import { withSupabase } from '@supabase/server';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
 // Envoi SMTP (RGDP-02/03) : paquet béni par l'exemple officiel Supabase
@@ -110,6 +111,40 @@ class HouseholdDeleteError extends Error {
 
 /** Client privilégié fourni par `withSupabase` (contourne la RLS). */
 type AdminClient = SupabaseClient;
+
+/**
+ * Client RPC porte un JWT service_role SIGNÉ (UAT G-27-4, 2026-10-28).
+ *
+ * POURQUOI : `ctx.supabaseAdmin` de `withSupabase` porte la clé secrète
+ * OPAQUE (`sb_secret_*`) en `Authorization: Bearer` — PostgREST du snapshot
+ * exige un JWT vérifiable contre `PGRST_JWT_SECRET` (JWKS) pour poser
+ * `request.jwt.claims`, et répond 401 « Unauthorized » à une clé opaque.
+ * Le RPC `request_account_deletion` (0167) lit `auth.uid()` : sans JWT, il
+ * est inappelable. Le JWT legacy HS256 service_role (`SERVICE_ROLE_KEY`)
+ * reste accepté — le JWKS du projet contient la clé symétrique oct legacy —
+ * et c'est déjà lui que le cron pose (`post_gdpr_export_http`, motif 0019).
+ * Le client est créé à la main : les modes de `withSupabase` sanitizent les
+ * headers Authorization/apikey et empêchent l'injection par options.
+ */
+function rpcAdminClient(): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL') ?? '';
+  // JWT asymétrique PRÉ-SIGNÉ en priorité : la gateway du snapshot rejette le
+  // HS256 legacy dès que la vérification passe au JWKS ES256 (UAT G-27-4,
+  // 2026-10-28 : wget direct rest:3000 = 403 SQL attendu avec l'ES256, 401
+  // avec le HS256 via api-gw). La variable est injectée par l'override
+  // traefik (SERVICE_ROLE_KEY_ASYMMETRIC) ; le legacy reste en repli pour un
+  // environnement pas encore passé aux signing keys.
+  const serviceJwt =
+    Deno.env.get('SERVICE_ROLE_KEY_ASYMMETRIC') ??
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (url === '' || serviceJwt === '') {
+    throw new HouseholdDeleteError(500, 'Opération impossible.');
+  }
+  return createClient(url, serviceJwt, {
+    global: { headers: { Authorization: `Bearer ${serviceJwt}` } },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Validation des entrées (Zod)
@@ -370,7 +405,10 @@ function readBearerJwt(request: Request): string {
 }
 
 async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient; userId: string }) {
-  const admin = ctx.supabaseAdmin;
+  // Le RPC exige `auth.uid()` : le client doit porter un JWT service_role
+  // signé (voir rpcAdminClient — la clé opaque de supabaseAdmin est refusée
+  // par PostgREST, 401 « Unauthorized », UAT G-27-4).
+  const admin = rpcAdminClient();
 
   // 1. Le RPC 0167 fait tout (instantané D-04 + déshumanisation D-01/02/03 +
   //    demande D-06) DANS UNE SEULE transaction, et ne laisse agir que le
@@ -389,7 +427,20 @@ async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient;
   //    ici n'annule pas la demande (déjà commitée) : le verdict honnête
   //    `sessions_revoked: false` porte dans la réponse, jamais muet.
   const jwt = readBearerJwt(request);
-  const { revoked: sessionsRevoked } = await revokeGlobalSessions(admin, jwt);
+  // Kill global des sessions GoTrue (RGDP-01, correction CR-01).
+  //
+  // Piège runtime du snapshot (2026-10-28, UAT G-27-4) : l'import du type DOIT
+  // porter le préfixe `npm:` — l'import map du runtime ne couvre que
+  // `@supabase/functions-js` et `@supabase/server`, et une résolution nue
+  // `@supabase/supabase-js` fait crasher le worker au boot (worker boot error),
+  // tuant toute la fonction, test unitaire Vitest pourtant vert (la classe
+  // « frontière du conteneur », AGENTS §2.7C).
+  //
+  // Le kill lui-même ne passe PAS par PostgREST : il poste /auth/v1/logout
+  // (GoTrue), qui accepte la clé secrète opaque — supabaseAdmin convient ici.
+  // Le kill ne passe PAS par PostgREST : il poste /auth/v1/logout (GoTrue),
+  // qui accepte la clé secrète opaque — supabaseAdmin convient ici.
+  const { revoked: sessionsRevoked } = await revokeGlobalSessions(ctx.supabaseAdmin, jwt);
 
   // 3. E-mail de confirmation avec lien d'annulation vers une page de l'APP
   //    (D-05 : le lien ne crée jamais de session — /parametres/donnees est
