@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 27
-current_phase_name: suppression-de-compte-rgpd
-status: executing
-stopped_at: Completed 27-03-PLAN.md
-last_updated: "2026-10-27T16:34:01.508Z"
-state_head: 888793be525b30b916b30f646303a443bedbed24
+current_phase: 28
+current_phase_name: Exploitation — sauvegardes, restauration, supervision
+status: planning
+stopped_at: Phase 27 complete, ready to plan Phase 28
+last_updated: "2026-10-28T15:58:55.495Z"
+state_head: 2838b1043c11955826e796c6bf35d4ea83ce7e86
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 19
-  completed_plans: 17
-  percent: 29
+  completed_plans: 19
+  percent: 43
 last_activity: 2026-10-27
 ---
 
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 27 (suppression-de-compte-rgpd) — READY TO EXECUTE
-Plan: 3 of 3
-Status: Plan 27-01 terminé, plan 27-02 à exécuter
-Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phase approuvée et clôturée)
+Phase: 28 — Exploitation — sauvegardes, restauration, supervision
+Plan: Not started
+Status: Ready to plan
+Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
 
@@ -73,7 +73,7 @@ Progress: [███░░░░░░░] 29% (14/14 plans de la phase 26, phas
 ## Session Continuity
 
 **Last session:** 2026-10-28T15:00:00Z
-**Stopped at:** UAT 27 clôturée — tests 1-4, 8 passés (+ D1-D4) ; 5, 6, 7 reportés EN PHASE 28 (tracés ROADMAP, décision utilisateur). 4 correctifs UAT poussés (8bdb858, efaed47, 9b29689, 9c8dddd) ; G-27-4 clos sur preuve SQL (sessions_restantes = 0). Prochaine étape : clôturer la phase 27 puis discuter la 28.
+**Stopped at:** Phase 27 complete, ready to plan Phase 28
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).

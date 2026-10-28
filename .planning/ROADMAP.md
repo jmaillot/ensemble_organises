@@ -17,7 +17,7 @@
 
 - [x] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session (completed 2026-10-26)
 - [x] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée (completed 2026-10-27)
-- [ ] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur
+- [x] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur (completed 2026-10-28)
 - [ ] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles
 - [ ] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message
 - [ ] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles
@@ -109,7 +109,7 @@ Plans:
   3. La purge J+30 s'exécute en SQL/pg_cron depuis un manifest de médias construit à la demande — aucun envoi HTTP depuis le cron — et les données partagées au foyer sont anonymisées ou réattribuées, jamais cascadées (audit FK consigné en SPEC)
   4. Les profils enfants portés par le compte supprimé disparaissent avec lui selon la règle produit annoncée dans la phase, et la chaîne passe par la consolidation de `household-delete` (une seule voie de suppression vivante)
 
-**Plans**: 3/3 plans executed, +2 gap-closure plans (27-04, 27-05) from 27-VERIFICATION.md
+**Plans**: 5/5 plans complete, +2 gap-closure plans (27-04, 27-05) from 27-VERIFICATION.md
 
 Plans:
 **Wave 1**
@@ -132,6 +132,7 @@ Plans:
 - UAT-27.5 — Annulation : restauration nom/photo dans CHAQUE foyer (multi-foyer), page honnête sans promesse de sessions
 - UAT-27.6 — Données partagées du foyer survivent à la suppression d'un membre (tâches, courses, notes)
 - UAT-27.7 — E-mail de rappel J-7 réellement livré (simulation J-7 par SQL + lecture boîte mail)
+
 **Success Criteria** (what must be TRUE):
   1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
   2. Un exercice de restauration est joué sur un Compose isolé (jamais la prod), le RTO est mesuré et consigné, et le runbook de restauration permet à une autre session de rejouer sans deviner
@@ -191,7 +192,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
-| 27. Suppression de compte RGPD | 3/3 | In Progress|  |
+| 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 0/? | Not started | - |
 | 29. Messagerie v2 | 0/? | Not started | - |
 | 30. Hygiène du jalon | 0/? | Not started | - |
