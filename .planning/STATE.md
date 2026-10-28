@@ -5,9 +5,9 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
 current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: planning
-stopped_at: Phase 27 complete, ready to plan Phase 28
-last_updated: "2026-10-28T15:58:55.495Z"
-state_head: 2838b1043c11955826e796c6bf35d4ea83ce7e86
+stopped_at: Phase 28 context gathered
+last_updated: "2026-10-28T16:19:20.217Z"
+state_head: 0e9220c444ab33ed7d132f116ed9578f8343a9a6
 progress:
   total_phases: 7
   completed_phases: 3
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-28T15:00:00Z
-**Stopped at:** Phase 27 complete, ready to plan Phase 28
-**Resume file:** None
+**Last session:** 2026-10-28T16:19:20.128Z
+**Stopped at:** Phase 28 context gathered
+**Resume file:** .planning/phases/28-exploitation-sauvegardes-restauration-supervision/28-CONTEXT.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
