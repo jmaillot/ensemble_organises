@@ -53,7 +53,6 @@
  */
 
 import { withSupabase } from '@supabase/server';
-import { createClient } from 'npm:@supabase/supabase-js@2';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@4.6.5';
 // Envoi SMTP (RGDP-02/03) : paquet béni par l'exemple officiel Supabase
@@ -113,43 +112,55 @@ class HouseholdDeleteError extends Error {
 type AdminClient = SupabaseClient;
 
 /**
- * Client RPC porte un JWT service_role SIGNÉ (UAT G-27-4, 2026-10-28).
+ * Appel PostgREST direct en tant que service (UAT G-27-4, 2026-10-28).
  *
- * POURQUOI : `ctx.supabaseAdmin` de `withSupabase` porte la clé secrète
- * OPAQUE (`sb_secret_*`) en `Authorization: Bearer` — PostgREST du snapshot
- * exige un JWT vérifiable contre `PGRST_JWT_SECRET` (JWKS) pour poser
- * `request.jwt.claims`, et répond 401 « Unauthorized » à une clé opaque.
- * Le RPC `request_account_deletion` (0167) lit `auth.uid()` : sans JWT, il
- * est inappelable. Le JWT legacy HS256 service_role (`SERVICE_ROLE_KEY`)
- * reste accepté — le JWKS du projet contient la clé symétrique oct legacy —
- * et c'est déjà lui que le cron pose (`post_gdpr_export_http`, motif 0019).
- * Le client est créé à la main : les modes de `withSupabase` sanitizent les
- * headers Authorization/apikey et empêchent l'injection par options.
+ * POURQUOI PAS supabase-js NI la gateway :
+ *  1. `ctx.supabaseAdmin` porte la clé secrète OPAQUE (`sb_secret_*`) en
+ *     `Authorization: Bearer` — PostgREST du snapshot exige un JWT vérifiable
+ *     contre `PGRST_JWT_SECRET` (JWKS) et répond 401 « Unauthorized ».
+ *  2. La gateway api-gw (Envoy) rejette en 401 TOUT JWT service sur /rest
+ *     (HS256 legacy ET ES256 pré-signé) ; preuve : wget api-gw = 401 pour les
+ *     deux, wget direct rest:3000 = 403 (garde SQL attendue, JWT accepté).
+ *  3. supabase-js pointé sur `http://rest:3000` construit `/rest/v1/rpc/…`
+ *     alors que PostgREST interne écoute à la racine → `PGRST125 Invalid
+ *     path`. Un fetch direct sur `http://rest:3000/rpc/…` est le chemin
+ *     nominal du snapshot (le storage vise déjà `POSTGREST_URL`).
+ *
+ * Le JWT asymétrique PRÉ-SIGNÉ (`SERVICE_ROLE_KEY_ASYMMETRIC`, injecté par
+ * l'override traefik) porte `role: service_role` : le RPC (0167) vérifie
+ * l'acteur par `p_user_id` explicite, jamais `auth.uid()`.
+ *
+ * Rend le message d'erreur PostgREST brut (`{ message, code }`) pour
+ * `translateRpcError` ; lève `HouseholdDeleteError` si la clé manque.
  */
-function rpcAdminClient(): SupabaseClient {
-  // PostgREST EN INTERNE (http://rest:3000), pas la gateway : api-gw (Envoy)
-  // rejette en 401 les JWT service (HS256 legacy ET ES256 pré-signé) sur les
-  // routes /rest — preuve UAT G-27-4 : wget api-gw = 401 pour les deux,
-  // wget direct rest:3000 = 403 (garde SQL attendue, JWT accepté). Le réseau
-  // Compose interne est le chemin nominal du snapshot (le storage vise déjà
-  // POSTGREST_URL: http://rest:3000).
-  const url = Deno.env.get('SUPABASE_REST_URL') ?? 'http://rest:3000';
-  // JWT asymétrique PRÉ-SIGNÉ en priorité : la gateway du snapshot rejette le
-  // HS256 legacy dès que la vérification passe au JWKS ES256 (UAT G-27-4,
-  // 2026-10-28 : wget direct rest:3000 = 403 SQL attendu avec l'ES256, 401
-  // avec le HS256 via api-gw). La variable est injectée par l'override
-  // traefik (SERVICE_ROLE_KEY_ASYMMETRIC) ; le legacy reste en repli pour un
-  // environnement pas encore passé aux signing keys.
-  const serviceJwt =
-    Deno.env.get('SERVICE_ROLE_KEY_ASYMMETRIC') ??
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (url === '' || serviceJwt === '') {
-    throw new HouseholdDeleteError(500, 'Opération impossible.');
-  }
-  return createClient(url, serviceJwt, {
-    global: { headers: { Authorization: `Bearer ${serviceJwt}` } },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+async function rpcAsService(
+  rpcName: string,
+  payload: Record<string, string>,
+): Promise<{ ok: boolean; status: number; message: string; code?: string }> {
+  const jwt = Deno.env.get('SERVICE_ROLE_KEY_ASYMMETRIC') ?? '';
+  if (jwt === '') throw new HouseholdDeleteError(500, 'Opération impossible.');
+  const response = await fetch(`http://rest:3000/rpc/${rpcName}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${jwt}`,
+    },
+    body: JSON.stringify(payload),
   });
+  const text = await response.text();
+  if (response.ok) {
+    return { ok: true, status: response.status, message: text };
+  }
+  let message = text;
+  let code: string | undefined;
+  try {
+    const parsed = JSON.parse(text) as { message?: string; code?: string };
+    message = parsed.message ?? text;
+    code = parsed.code;
+  } catch {
+    // Corps non JSON (page d'erreur Gateway/HTML) : on garde le texte brut.
+  }
+  return { ok: false, status: response.status, message, code };
 }
 
 // ---------------------------------------------------------------------------
@@ -411,19 +422,22 @@ function readBearerJwt(request: Request): string {
 }
 
 async function handleCompte(request: Request, ctx: { supabaseAdmin: AdminClient; userId: string }) {
-  // Le RPC exige `auth.uid()` : le client doit porter un JWT service_role
-  // signé (voir rpcAdminClient — la clé opaque de supabaseAdmin est refusée
-  // par PostgREST, 401 « Unauthorized », UAT G-27-4).
-  const admin = rpcAdminClient();
+  // Le RPC exige un JWT service_role vérifiable : appel PostgREST direct en
+  // interne (voir rpcAsService — la clé opaque de supabaseAdmin est refusée
+  // par PostgREST 401, et la gateway rejette tout JWT service sur /rest,
+  // UAT G-27-4).
 
   // 1. Le RPC 0167 fait tout (instantané D-04 + déshumanisation D-01/02/03 +
   //    demande D-06) DANS UNE SEULE transaction, et ne laisse agir que le
   //    propriétaire du compte (42501). La base fait foi.
-  const { data: requestId, error: rpcError } = await admin.rpc('request_account_deletion', {
+  const rpc = await rpcAsService('request_account_deletion', {
     p_user_id: ctx.userId,
   });
-  if (rpcError) throw translateRpcError(rpcError);
-  if (typeof requestId !== 'string' || requestId === '') {
+  if (!rpc.ok) throw translateRpcError({ code: rpc.code, message: rpc.message });
+  // Le RPC retourne un uuid ; PostgREST sérialise un scalaire nu (texte brut)
+  // sans l'en-tête object+json — on retire les guillemets éventuels.
+  const requestId = rpc.message.replace(/^"|"$/g, '').trim();
+  if (requestId === '') {
     throw new HouseholdDeleteError(500, 'Opération impossible.');
   }
 
