@@ -14,6 +14,9 @@
 #                           « app.exemple.fr api.exemple.fr studio.exemple.fr »)
 #   EO_CERT_THRESHOLD_DAYS  alerte si expiration dans moins de N jours
 #                           (défaut : 21 — deux cycles de renouvellement)
+#   EO_CERT_TIMEOUT         délai d'attente max de la sonde TLS par hôte, en
+#                           secondes (défaut : 10 — coreutils `timeout`,
+#                           présent sur l'hôte Debian cible)
 #
 # Un mail [EO-certificats] part UNIQUEMENT si un certificat expire bientôt
 # (EO_MAIL_TO) ; silence et exit 0 sinon.
@@ -26,6 +29,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 HOSTS="${EO_CERT_HOSTS:-}"
 THRESHOLD_DAYS="${EO_CERT_THRESHOLD_DAYS:-21}"
+CERT_TIMEOUT="${EO_CERT_TIMEOUT:-10}"
 
 if [ -z "$HOSTS" ]; then
   echo "check-certs.sh: EO_CERT_HOSTS est vide — aucune liste d'hôtes à sonder." >&2
@@ -33,6 +37,9 @@ if [ -z "$HOSTS" ]; then
 fi
 case "$THRESHOLD_DAYS" in
   *[!0-9]*) echo "check-certs.sh: EO_CERT_THRESHOLD_DAYS doit être numérique." >&2; exit 1 ;;
+esac
+case "$CERT_TIMEOUT" in
+  *[!0-9]*) echo "check-certs.sh: EO_CERT_TIMEOUT doit être numérique (secondes)." >&2; exit 1 ;;
 esac
 
 now_epoch="$(date +%s)"
@@ -51,8 +58,12 @@ for entry in $HOSTS; do
     *)   host="$entry";    port="443" ;;
   esac
   # `echo |` ferme l'entrée standard : openssl s_client rend la main après la
-  # poignée de main, sans rester suspendu sur la session.
-  end_date="$(echo | openssl s_client -servername "$host" -connect "$host:$port" 2>/dev/null \
+  # poignée de main, sans rester suspendu sur la session. `timeout` borne le
+  # temps total : sur un hôte qui DROP les paquets (pare-feu silencieux, hôte
+  # gelé — précisément les cas que ce check doit détecter), la poignée de
+  # main TCP ne répond jamais et openssl resterait suspendu indéfiniment ;
+  # en cron, c'est le check entier qui mourrait sans alerte ni mail.
+  end_date="$(echo | timeout "$CERT_TIMEOUT" openssl s_client -servername "$host" -connect "$host:$port" 2>/dev/null \
     | openssl x509 -noout -enddate 2>/dev/null | sed 's/^notAfter=//')" || end_date=""
   if [ -z "$end_date" ]; then
     echo "  ✗ $host : TLS injoignable ou certificat illisible" >&2
