@@ -18,7 +18,7 @@
 - [x] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session (completed 2026-10-26)
 - [x] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée (completed 2026-10-27)
 - [x] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur (completed 2026-10-28)
-- [ ] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles
+- [x] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles *(2026-10-29 — verifier passed 4/5 must-haves ; OPS-02 exercice de restauration non joué, absence déclarée opérateur, re-diligence phase 31 porte OUV-07 ; CR-01/H-01/H-02 corrigés 6f2054d/097fe1a/0e70d74)*
 - [ ] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message
 - [ ] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles
 - [ ] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures

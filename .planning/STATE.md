@@ -3,27 +3,27 @@ gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
-current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: executing
 stopped_at: Completed 28-04-PLAN.md
-last_updated: "2026-10-29T10:27:58Z"
-state_head: 89e56457424fb91ed5bb321e9c859d305929a009
+last_updated: "2026-10-29T11:11:56.570Z"
+state_head: 0e70d740c26181fd4d2093613b2d9a25fabf71d6
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 22
+  completed_plans: 24
   percent: 43
 last_activity: 2026-10-27
+current_phase_name: Exploitation — sauvegardes, restauration, supervision
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
+Phase: 28 — COMPLETE
 Plan: 5 of 5 exécuté (28-05 clos par absence déclarée — OPS-02 non prouvée, re-diligence phase 31)
-Status: Ready to execute
+Status: Phase 28 complete
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
