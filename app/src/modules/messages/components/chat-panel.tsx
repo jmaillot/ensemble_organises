@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useState, type RefObject } from 'react';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/shared/icon';
 import { compressImage, describeFile, type CompressedImage } from '@/modules/cercle/lib/media';
+import { useReadReceipts } from '../hooks/use-messages';
 import { formatClock, type ConversationSummary, type Message } from '../types';
+import { ReadReceipts } from './read-receipts';
 
 export interface ChatPanelProps {
   conversation: ConversationSummary | null;
@@ -162,6 +164,10 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const conversationId = conversation?.id ?? null;
+  // Dernier message envoyé par l'émettrice : la rangée d'accusés (D-02) vit
+  // sous CETTE bulle, pas sous un message reçu après coup.
+  const lastMineId = [...messages].reverse().find((message) => message.isMine && !message.isSystem)?.id ?? null;
+  const readers = useReadReceipts(conversationId, lastMineId !== null);
 
   useEffect(() => {
     setDraft('');
@@ -379,8 +385,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
                 {message.content}
               </p>
             ) : (
+            <Fragment key={message.id}>
             <MessageBubble
-              key={message.id}
               message={message}
               showEdit={Boolean(onEditMessage) && !readOnly && message.isMine && !message.pending}
               showDelete={Boolean(onDeleteMessage) && !readOnly && !message.pending && message.isMine}
@@ -401,6 +407,8 @@ export function ChatPanel({ conversation, messages, isSending = false, onSend, o
               onSaveEdit={saveEditFor(message)}
               onRequestDelete={requestDeleteFor(message)}
             />
+            {message.id === lastMineId ? <ReadReceipts readers={readers} /> : null}
+            </Fragment>
             ),
           )
         )}
