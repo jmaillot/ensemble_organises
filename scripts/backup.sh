@@ -26,10 +26,11 @@
 
 set -eu
 
-# Le verdict traverse tout le script malgré `set -e` : chaque étape note
-# verdict_fail (son détail dans verdict_step) et, pour les étapes critiques,
-# sort explicitement. Le mail de fin (D-06) exige de survivre à un échec de
-# vérification, pas à un échec de dump.
+# Le verdict traverse tout le script malgré `set -e` : chaque étape critique
+# est gardée (`if ! commande; then verdict_fail=1; verdict_step=…; fi`) et
+# note son échec au lieu de tuer l'exécution. Un trap purge les artefacts en
+# clair tant que le chiffrement n'a pas abouti. Le mail de fin (D-06) part
+# donc à chaque exécution, succès comme échec.
 verdict_fail=0
 verdict_step=""
 
@@ -53,30 +54,52 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out="$BACKUP_DIR/$stamp"
 mkdir -p "$out"
 
+# Tant que le chiffrement n'a pas abouti, `database.dump` et les tars sont EN
+# CLAIR sur le disque : un `set -e` qui tuerait le script à la première
+# commande en échec les y laisserait, et supprimerait le mail D-06. Le trap
+# purge ces artefacts à toute sortie tant qu'il est posé ; il est retiré
+# après le chiffrement complet réussi.
+trap 'rm -f "$out"/database.dump "$out"/*.tar.gz' EXIT
+
 echo "Sauvegarde $stamp → $out"
 
 # --- Base de données --------------------------------------------------------
 echo "  · base de données"
 . "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/lib-db.sh"
 db_resolve
-db_exec_as postgres \
+# Étape gardée : sous set -e, un pg_dump en échec tuerait le script AVANT le
+# mail D-06 et le trap de purge n'aurait pas la décision d'archiver un dump
+# tronqué — verdict échec et poursuite, la suite saute les étapes downstream.
+if ! db_exec_as postgres \
   pg_dump -U "$DB_USER_RESOLVED" -d "$DB_NAME_RESOLVED" \
     --format=custom --compress=9 --no-owner --no-privileges \
-  > "$out/database.dump"
+  > "$out/database.dump"; then
+  echo "backup.sh: pg_dump a échoué." >&2
+  verdict_fail=1
+  verdict_step="dump base"
+fi
 
 # --- Objets stockés ---------------------------------------------------------
 echo "  · objets storage"
-docker run --rm \
+if ! docker run --rm \
   -v "${COMPOSE_PROJECT_NAME:-supabase}_storage:/source:ro" \
   -v "$out:/backup" \
-  alpine:3.21 tar -czf /backup/storage.tar.gz -C /source .
+  alpine:3.21 tar -czf /backup/storage.tar.gz -C /source .; then
+  echo "backup.sh: le tar du storage a échoué." >&2
+  verdict_fail=1
+  verdict_step="tar storage"
+fi
 
 # --- Clé pgsodium et configuration de la base -------------------------------
 echo "  · db-config (clé pgsodium, configuration)"
-docker run --rm \
+if ! docker run --rm \
   -v "${COMPOSE_PROJECT_NAME:-supabase}_db-config:/source:ro" \
   -v "$out:/backup" \
-  alpine:3.21 tar -czf /backup/db-config.tar.gz -C /source .
+  alpine:3.21 tar -czf /backup/db-config.tar.gz -C /source .; then
+  echo "backup.sh: le tar de db-config a échoué." >&2
+  verdict_fail=1
+  verdict_step="tar db-config"
+fi
 
 # --- Edge Functions ----------------------------------------------------------
 # Le service `functions` monte le bind hôte ./volumes/functions (docker-compose
@@ -111,12 +134,25 @@ fi
 # Le manifeste porte sur les fichiers CHIFFRÉS : c'est ce qui est archivé.
 if [ "$verdict_fail" -eq 0 ]; then
   for artefact in database.dump storage.tar.gz db-config.tar.gz functions.tar.gz; do
-    gpg --batch --yes --pinentry-mode loopback \
+    # Étape gardée comme les précédentes : un gpg en échec ne doit ni tuer le
+    # script avant le mail D-06, ni laisser croire que l'artefact a été
+    # chiffré — le clair correspondant reste à purger, le trap en décide.
+    if ! gpg --batch --yes --pinentry-mode loopback \
       --passphrase-file "$BACKUP_PASSPHRASE_FILE" \
       --symmetric --cipher-algo AES256 \
-      -o "$out/$artefact.gpg" "$out/$artefact"
-    rm -f "$out/$artefact"
+      -o "$out/$artefact.gpg" "$out/$artefact"; then
+      echo "backup.sh: le chiffrement de $artefact a échoué." >&2
+      verdict_fail=1
+      verdict_step="chiffrement"
+    else
+      rm -f "$out/$artefact"
+    fi
   done
+  if [ "$verdict_fail" -eq 0 ]; then
+    # Chiffrement complet réussi : plus aucun artefact en clair sur le disque,
+    # le trap de purge n'a plus de raison d'être.
+    trap - EXIT
+  fi
 fi
 ( cd "$out" && sha256sum ./*.gpg > SHA256SUMS ) 2>/dev/null || {
   echo "backup.sh: aucun artefact chiffré à archiver." >&2
