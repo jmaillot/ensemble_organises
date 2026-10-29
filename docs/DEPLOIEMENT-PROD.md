@@ -461,6 +461,7 @@ certificat à dépasser, injection pg_net). Commandes exactes :
    réel, puis remettre) :
    ```sh
    EO_CERT_HOSTS="app.votredomaine.fr api.votredomaine.fr studio.votredomaine.fr" \
+   # (le port est optionnel : « hôte » et « hôte:443 » sont acceptés) \
      EO_CERT_THRESHOLD_DAYS=400 sh scripts/check-certs.sh       # → rouge + mail [EO-certificats]
    # Remise en ordre : relancer sans EO_CERT_THRESHOLD_DAYS (défaut 21) → vert
    ```

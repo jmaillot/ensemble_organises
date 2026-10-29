@@ -42,10 +42,17 @@ alert_body=""
 echo "Expiration des certificats (seuil : ${THRESHOLD_DAYS} jours)"
 echo
 
-for host in $HOSTS; do
+for entry in $HOSTS; do
+  # Format accepté : « hôte » ou « hôte:port » (défaut 443). Un port collé au
+  # nom ne doit pas produire « hôte:443:443 » — l'alerte « injoignable » qui
+  # en résulte est vraie pour openssl et fausse pour l'opérateur.
+  case "$entry" in
+    *:*) host="${entry%:*}"; port="${entry##*:}" ;;
+    *)   host="$entry";    port="443" ;;
+  esac
   # `echo |` ferme l'entrée standard : openssl s_client rend la main après la
   # poignée de main, sans rester suspendu sur la session.
-  end_date="$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null \
+  end_date="$(echo | openssl s_client -servername "$host" -connect "$host:$port" 2>/dev/null \
     | openssl x509 -noout -enddate 2>/dev/null | sed 's/^notAfter=//')" || end_date=""
   if [ -z "$end_date" ]; then
     echo "  ✗ $host : TLS injoignable ou certificat illisible" >&2
