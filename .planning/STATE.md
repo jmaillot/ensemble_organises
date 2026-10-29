@@ -22,9 +22,9 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 29 (Messagerie v2) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
-Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécuté — 29-01 complet, SUMMARY écrit)
+Progress: [█████░░░░░] 80% (4/5 plans de la phase 29 exécutés — 29-01 à 29-04 complets, SUMMARY 29-04 écrit)
 
 ## Références du jalon v1.0
 
@@ -73,7 +73,7 @@ Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécut
 ## Session Continuity
 
 **Last session:** 2026-10-29T14:49:23.314Z
-**Stopped at:** Completed 29-03-PLAN.md
+**Stopped at:** Completed 29-04-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -91,6 +91,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
+| Phase 29 P04 | ~16 min | 3 tasks | 8 files |
 | Phase 25 P01 | 23 min | 2 tasks | 3 files |
 | Phase 25 P06 | 8 min | 1 tasks | 2 files |
 | Phase 25 P02 | 52 min | 3 tasks | 2 files |
@@ -117,6 +118,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 29 P03 | 35m | 2 tasks | 1 files |
 
 ## Decisions
+- 29-04 (2026-10-29) : migration localStorage D-03 strictement unidirectionnelle — la clé n'est jamais réécrite après push serveur réussi ; les marques optimistes restent en mémoire, le serveur fait foi.
+- 29-04 (2026-10-29) : la rangée d'accusés (D-02) est rendue sous la dernière bulle « mine » (lastMineId), pas en fin de liste — elle suit la bonne bulle quand des réponses arrivent après.
+- 29-04 (2026-10-29) : D-08 respecté — les receipts vivent sous le préfixe ['messages'], invalidés par useMessagesRealtime, aucune souscription Realtime dédiée.
 
 - [Phase 28]: [28-04] RPO ≤ 24 h par le cron nocturne 02:15 ; vérité tierce assumée : réplication non déployée → points de récupération sur le disque local de l'hôte prod seul (risque documenté, re-diligence avant phase 31). RTO : cible ≤ 4 h (D-09), valeur réelle réservée à la sous-section « RTO constaté » de docs/EXPLOITATION.md à remplir par l'exercice 28-05
 - [Phase 28]: [28-04] Clone de restauration isolé par docker-compose.isole.yml (ports: !override [] sur api-gw/supavisor) : sur prod, seul l'override Traefik retire les ports publiés ; sans lui, le clone binderait 8000/6543 déjà occupés par la stack qui tourne (D-08)

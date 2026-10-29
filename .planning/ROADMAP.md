@@ -173,7 +173,7 @@ Plans:
   3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
   4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
 
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 
 Plans:
 **Wave 1**
@@ -182,7 +182,7 @@ Plans:
 - [x] 29-03-PLAN.md — Preuve Realtime par souscription réelle (D-09) : scripts/test-realtime-subscription.sh (MSG-05)
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 29-04-PLAN.md — Frontend watermark : markRead à l'ouverture/focus (D-01), accusés avatars + horodatage (D-02), migration localStorage (D-03) (MSG-02/03)
+- [x] 29-04-PLAN.md — Frontend watermark : markRead à l'ouverture/focus (D-01), accusés avatars + horodatage (D-02), migration localStorage (D-03) (MSG-02/03) — exécuté (commits 3f6e490, ce02fec, 16478cf ; SUMMARY 29-04)
 
 **Wave 3** *(blocked on Waves 1-2)*
 - [ ] 29-05-PLAN.md — Frontend démarrage directe via member-picker (D-04/D-05) + invalidation Realtime fil/liste (D-08) + chaîne §2.7 app (MSG-01/05)
@@ -225,7 +225,7 @@ Plans:
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 2/5 | In Progress|  |
-| 29. Messagerie v2 | 3/5 | In Progress|  |
+| 29. Messagerie v2 | 4/5 | In Progress|  |
 | 30. Hygiène du jalon | 0/? | Not started | - |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |
 
