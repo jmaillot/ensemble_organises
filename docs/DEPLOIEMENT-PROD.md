@@ -229,6 +229,93 @@ EO_MAIL_NETWORK=<réseau de la stack> \
 #    15 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) EO_MAIL_NETWORK=<réseau> sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1
 ```
 
+## Réplication vers la machine tierce (D-01/D-02/D-03)
+
+Les sauvegardes chiffrées de `scripts/backup.sh` (les `.gpg` + `SHA256SUMS`,
+telles quelles — pas de re-chiffrement, pas de restic, per D-02) sont
+répliquées chaque nuit vers une machine tierce auto-hébergée. L'ordre est non
+négociable (Pitfall 6) : **réplication → vérification (stamp du jour +
+SHA256SUMS) → copie de la clé pgsodium → purge GFS**. La purge ne détruit
+jamais avant que la réplication du jour soit vérifiée.
+
+**Deux copies disjointes de la clé pgsodium** (D-03) : elle part avec le dump
+chiffré (`db-config.tar.gz`) ET vit séparément sur la tierce, **hors du
+répertoire des sauvegardes** (`EO_PGSODIUM_COPY`, ex. `/srv/secrets/eo/pgsodium/`).
+
+### Paramètres de réplication
+
+| Paramètre | Valeur | Rôle |
+|---|---|---|
+| `EO_REPL_TARGET` | `<utilisateur>@<hôte-tierce>` | cible ssh/réplication |
+| `EO_REPL_DIR` | `/srv/backups/eo/` | répertoire des sauvegardes sur la tierce |
+| `EO_REPL_SSH` | `~/.ssh/eo_replication` | clé ssh DÉDIÉE (fichier chmod 600, jamais la clé d'agent par défaut) |
+| `EO_REPL_KNOWN_HOSTS` | `~/.ssh/eo_replication_known_hosts` | known_hosts dédié : hôte tierce épinglé (T-28-05) |
+| `EO_PGSODIUM_COPY` | `/srv/secrets/eo/pgsodium/` | chemin tierce DISJOINT de `EO_REPL_DIR` (D-03, refusé sinon) |
+| `EO_PGSODIUM_LOCAL` | `supabase-project/backups/<stamp>/db-config.tar.gz` | la clé locale ; elle vit déjà dans le tar db-config répliqué |
+
+⚠ **Valeurs à remplir à la première installation** : `<utilisateur>` et
+`<hôte-tierce>` sont à consigner ici (nom de machine, pas un secret).
+
+### Commandes d'installation ssh (à livrer à l'utilisateur, D-05)
+
+**Sonde préalable (A2)** — sur l'hôte de prod, vérifier que `rsync` et `ssh`
+sont présents (`command -v rsync ssh` — présents sur la machine de
+développement au 2026-10-29 ; l'hôte de prod est à confirmer). Si absent :
+`apt install rsync openssh-client` (Debian/Ubuntu).
+
+```sh
+# 1. Créer la clé ssh DÉDIÉE à la réplication (fichier 600, jamais la clé d'agent) :
+ssh-keygen -t ed25519 -f ~/.ssh/eo_replication -N "" -C "eo-replication"
+chmod 600 ~/.ssh/eo_replication
+
+# 2. Déposer la clé sur la machine tierce (une fois, via un accès existant) :
+ssh-copy-id -i ~/.ssh/eo_replication.pub <utilisateur>@<hôte-tierce>
+
+# 3. Créer les répertoires sur la tierce — la clé pgsodium vit HORS des sauvegardes (D-03) :
+ssh -i ~/.ssh/eo_replication <utilisateur>@<hôte-tierce> \
+  'mkdir -p /srv/backups/eo /srv/secrets/eo/pgsodium && chmod 700 /srv/secrets/eo/pgsodium'
+
+# 4. Épingler l'hôte tierce dans un known_hosts DÉDIÉ (T-28-05) :
+ssh-keyscan -H <hôte-tierce> >> ~/.ssh/eo_replication_known_hosts
+chmod 600 ~/.ssh/eo_replication_known_hosts
+
+# 5. Sonde de connexion (BatchMode : échoue si la clé ne suffit pas) :
+ssh -o BatchMode=yes -o ConnectTimeout=5 -o UserKnownHostsFile=~/.ssh/eo_replication_known_hosts \
+  -i ~/.ssh/eo_replication <utilisateur>@<hôte-tierce> true \
+  && echo "JOIGNABLE" || echo "INJOIGNABLE — consigner ici"
+
+# 6. Première réplication + purge (la purge GFS ne s'exécute qu'après vérification) :
+EO_REPL_TARGET=<utilisateur>@<hôte-tierce> \
+EO_REPL_SSH=$HOME/.ssh/eo_replication \
+EO_REPL_DIR=/srv/backups/eo \
+EO_PGSODIUM_COPY=/srv/secrets/eo/pgsodium \
+  sh scripts/backup-replicate.sh
+
+# 7. Cron nocturne (D-05) — APRÈS backup.sh (le stamp du jour doit exister),
+#    dans le crontab de root :
+#    45 2 * * * EO_REPL_TARGET=<user>@<hôte-tierce> EO_REPL_SSH=/root/.ssh/eo_replication EO_REPL_DIR=/srv/backups/eo EO_PGSODIUM_COPY=/srv/secrets/eo/pgsodium EO_PGSODIUM_LOCAL=/srv/backups/eo sh /chemin/depot/scripts/backup-replicate.sh >> /var/log/eo-backup-replicate.log 2>&1
+```
+
+**Vérification par l'utilisateur** (exercice réel, D-05) : le stamp du jour
+est présent sous `/srv/backups/eo/`, `sha256sum -c SHA256SUMS` y répond vert,
+la purge GFS a conservé les strates (quotidien 7 j / hebdo 1 mois / mensuel
+1 an) et les a purgées de la même façon en local comme sur la tierce.
+
+### Rétention GFS (D-04, OPS-05)
+
+La purge GFS est la **même logique** des deux côtés (locale et tierce, via
+ssh) : elle complète la rétention plate `RETENTION_DAYS` de `backup.sh` et
+conserve — par date portée dans le nom du répertoire `20*` :
+
+- **quotidien** : les 7 derniers jours ;
+- **hebdomadaire** : le premier stamp de chaque semaine du mois écoulé ;
+- **mensuel** : le premier stamp de chaque mois de l'année écoulée.
+
+Elle ne s'exécute **qu'après** la vérification du stamp du jour sur la tierce
+(la destruction n'est jamais antérieure à la réplication vérifiée — T-28-03),
+jamais par `rsync --delete` : la sélection des répertoires à supprimer est
+explicite, par date.
+
 ## Retour arrière
 
 | Élément | Procédure |
