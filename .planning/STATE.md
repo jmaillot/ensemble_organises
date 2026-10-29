@@ -5,8 +5,8 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
 current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: executing
-stopped_at: Completed 28-01-PLAN.md
-last_updated: "2026-10-29T08:22:48.590Z"
+stopped_at: Completed 28-02-PLAN.md
+last_updated: "2026-10-29T08:32:24.000Z"
 state_head: 5882dc0da703aa264fb4f7e52f3d6e8c1ac4a580
 progress:
   total_phases: 7
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
@@ -73,7 +73,7 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 ## Session Continuity
 
 **Last session:** 2026-10-29T08:22:37.642Z
-**Stopped at:** Completed 28-01-PLAN.md
+**Stopped at:** Completed 28-02-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -110,6 +110,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 27 P04 | ~50 min | 3 tasks | 4 files |
 | Phase 27 P05 | ~1h20 | 3 tasks | 6 files |
 | Phase 28 P01 | 9 min | 3 tasks | 3 files |
+| Phase 28 P02 | 14 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -170,3 +171,6 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - 16 fichiers de test en échec connu post-0145 : la suite complète test-db.sh ne sera verte qu'après leur réécriture (plan futur) + tranchement D-01 storage. Détail : deferred-items.md (25-04) et WINDOWS.md #12. [OBSOLETE : suite verte après 26-02, 92 fichiers tous verts]
 - test-dispatch-push.sh (rappel réseau réel, pg_net → Vault → appareil abonné) : **absence déclarée à 26-06 ET re-déclarée à 26-07** (0 abonnement réel sur l'instance, le script refuse lui-même un endpoint factice) — à mener avec un appareil abonné, à la phase 31 (preuve SMTP/push de la porte OUV-07).
 - Observation 26-07 : un premier dispatch_gdpr_export_purge a répondu dispatched:true sans que la requête n'atteigne la Edge (aucun log serving, aucune _http_response) ; le second dispatch a servi la purge normalement (200, 24 objets supprimés). Cohérent avec la philosophie cron-retry ; à surveiller en 27/28.
+- [Phase 28]: [28-02] Corps GFS unique transmis par stdin ssh : purge locale et tierce exécutent la même chaîne (divergence de rétention impossible) ; sélection explicite des stamps à conserver, jamais rsync --delete
+- [Phase 28]: [28-02] D-03 en dur dans le script : refus fatal si EO_PGSODIUM_COPY imbrique EO_REPL_DIR ; source clé par défaut = db-config.tar.gz du stamp le plus récent
+- [Phase 28]: [28-02] OPS-01 marqué complete (dernier plan déclarant, gate #2388) ; exécution réelle de réplication à jouer sur prod (commandes livrées per D-05)

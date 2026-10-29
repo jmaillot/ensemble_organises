@@ -151,7 +151,7 @@ Plans:
 Plans:
 **Wave 1**
 - [x] 28-01-PLAN.md — Tracer : backup.sh étendu (tar functions, vérif D-07, mail) + send-mail.sh (OPS-01)
-- [ ] 28-02-PLAN.md — Réplication tierce rsync + purge GFS + pgsodium disjointe (OPS-01)
+- [x] 28-02-PLAN.md — Réplication tierce rsync + purge GFS + pgsodium disjointe (OPS-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
@@ -213,7 +213,7 @@ Plans:
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
-| 28. Exploitation | 1/5 | In Progress|  |
+| 28. Exploitation | 2/5 | In Progress|  |
 | 29. Messagerie v2 | 0/? | Not started | - |
 | 30. Hygiène du jalon | 0/? | Not started | - |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |

@@ -40,7 +40,7 @@
 
 ### Exploitation
 
-- [ ] **OPS-01** *(réécrite le 2026-10-28 en discussion de phase — « restic » retiré, décision verrouillée D-02 : les fichiers chiffrés existants de `scripts/backup.sh` sont répliqués tels quels, pas de nouvel outil de backup)* : Sauvegardes nocturnes : pg_dump chiffré + réplication des fichiers chiffrés de `scripts/backup.sh` (volumes `storage`, `functions` et `db-config`) vers une machine tierce auto-hébergée (clé pgsodium sauvegardée séparément du dump, en deux copies disjointes — D-03)
+- [x] **OPS-01** *(réécrite le 2026-10-28 en discussion de phase — « restic » retiré, décision verrouillée D-02 : les fichiers chiffrés existants de `scripts/backup.sh` sont répliqués tels quels, pas de nouvel outil de backup)* : Sauvegardes nocturnes : pg_dump chiffré + réplication des fichiers chiffrés de `scripts/backup.sh` (volumes `storage`, `functions` et `db-config`) vers une machine tierce auto-hébergée (clé pgsodium sauvegardée séparément du dump, en deux copies disjointes — D-03)
 - [ ] **OPS-02** : Exercice de restauration joué sur un Compose isolé (jamais sur la prod) avec RTO mesuré et consigné + runbook exploitable
 - [ ] **OPS-03** *(réécrite le 2026-10-28 en discussion de phase — la pile Prometheus/Grafana/Loki est retirée au profit d'alertes mail simples)* : Alertes par mail pour disque / certificats / pg_cron / erreurs Edge, chacune prouvée par un déclenchement réel, pas une promesse de configuration
 - [ ] **OPS-04** : `check-cron-health.sh` valide les jobs pg_cron et attrape une rotation ratée de secret
@@ -107,7 +107,7 @@
 | RGDP-05 | Phase 27 | Complete (27-01) |
 | RGDP-06 | Phase 27 | Complete (27-02 : enfants purgés avec le foyer orphelin, transférés D-08 sinon) |
 | RGDP-07 | Phase 27 | Complete (27-03 : Edge unifiée, panneau admin inchangé) |
-| OPS-01 | Phase 28 | Pending |
+| OPS-01 | Phase 28 | Complete | 2026-10-29 |
 | OPS-02 | Phase 28 | Pending |
 | OPS-03 | Phase 28 | Pending |
 | OPS-04 | Phase 28 | Pending |
