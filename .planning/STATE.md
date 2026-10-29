@@ -2,28 +2,28 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 28
+current_phase: 29
+current_phase_name: messagerie-v2
 status: executing
-stopped_at: Phase 29 context gathered
-last_updated: "2026-10-29T11:42:56.295Z"
-state_head: bb1df098feaefa02c50f2dcf934816f0ae8f1da5
+stopped_at: Phase 29 UI-SPEC approved
+last_updated: "2026-10-29T13:10:20.196Z"
+state_head: 14139d03606026b30ee7778aa62f86fcc07598da
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 24
+  total_plans: 29
   completed_plans: 24
   percent: 43
 last_activity: 2026-10-27
-current_phase_name: Exploitation — sauvegardes, restauration, supervision
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: 28 — COMPLETE
+Phase: 29 (messagerie-v2) — READY TO EXECUTE
 Plan: 5 of 5 exécuté (28-05 clos par absence déclarée — OPS-02 non prouvée, re-diligence phase 31)
-Status: Phase 28 complete
+Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
 ## Références du jalon v1.0
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T11:42:56.197Z
-**Stopped at:** Phase 29 context gathered
-**Resume file:** .planning/phases/29-messagerie-v2/29-CONTEXT.md
+**Last session:** 2026-10-29T12:43:41.512Z
+**Stopped at:** Phase 29 UI-SPEC approved
+**Resume file:** .planning/phases/29-messagerie-v2/29-UI-SPEC.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.

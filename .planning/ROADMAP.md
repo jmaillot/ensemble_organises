@@ -173,8 +173,19 @@ Plans:
   3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
   4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
 
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+- [ ] 29-01-PLAN.md — Migration 0171 : RPC open_direct_conversation (anti-doublon, verrou consultatif) + RPC conversation_read_receipts + tests SQL (MSG-01/03)
+- [ ] 29-02-PLAN.md — Migration 0172 : push groupé sans contenu (fuite 0042 corrigée) + Edge push-notify reminder_ids + preuve attribuable étendue (MSG-04)
+- [ ] 29-03-PLAN.md — Preuve Realtime par souscription réelle (D-09) : scripts/test-realtime-subscription.sh (MSG-05)
+
+**Wave 2** *(blocked on Wave 1)*
+- [ ] 29-04-PLAN.md — Frontend watermark : markRead à l'ouverture/focus (D-01), accusés avatars + horodatage (D-02), migration localStorage (D-03) (MSG-02/03)
+
+**Wave 3** *(blocked on Waves 1-2)*
+- [ ] 29-05-PLAN.md — Frontend démarrage directe via member-picker (D-04/D-05) + invalidation Realtime fil/liste (D-08) + chaîne §2.7 app (MSG-01/05)
 
 ### Phase 30: Hygiène du jalon — dettes et résidus
 
