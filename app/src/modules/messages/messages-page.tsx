@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { MetricRow, ModuleShell } from '@/components/shared/module-shell';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
 import { ConversationList } from './components/conversation-list';
 import { AddMembersDialog, ConversationFormDialog } from './components/conversation-form-dialog';
-import { useMessagesFeed, useMessagesRealtime, useThreadPage } from './hooks/use-messages';
+import { useMessagesFeed, useMessagesRealtime, useReadWatermark, useThreadPage } from './hooks/use-messages';
 
 export default function MessagesPage() {
   const feed = useMessagesFeed();
@@ -41,11 +41,10 @@ export default function MessagesPage() {
   // Quitté (pierre tombale) : lecture seule. Archivé pour moi : écrivable.
   const isLeft = active?.isLeft ?? false;
 
-  // Seul un choix explicite marque lu (mise à jour optimiste) : `activeId` est
-  // nul tant que la liste n'a pas été touchée.
-  useEffect(() => {
-    if (activeId) markRead(activeId);
-  }, [activeId, markRead]);
+  // Seul un choix explicite marque lu (D-01) : une écriture à l'ouverture du
+  // fil, une au retour sur l'onglet — jamais au rendu de chaque message.
+  // `activeId` est nul tant que la liste n'a pas été touchée.
+  useReadWatermark(activeId, markRead);
 
   // Le fil ouvert est paginé par conversation (D-05) ; son compte de
   // non-lus exact remplace le signal d'aperçu dans le total affiché.

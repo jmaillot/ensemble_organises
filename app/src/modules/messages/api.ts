@@ -2,7 +2,7 @@ import { data, DataError } from '@/lib/data';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
-import type { ConversationMemberRow, ConversationRow, MessageRow } from '@/types';
+import type { ConversationMemberRow, ConversationRow, HouseholdMemberRow, MemberColorTag, MessageRow, NotificationReadRow } from '@/types';
 
 /** Bucket privé : `household-media` (0010), chemin préfixé par le foyer. */
 const MESSAGES_BUCKET = 'household-media';
@@ -361,8 +361,7 @@ export async function addConversationMembers(conversationId: string, memberIds: 
  * tous les actifs (aucune RLS ni déclencheur à traverser — l'annonce
  * serveur n'a pas d'équivalent en démo, écart documenté comme en 0104).
  */
-export async function archiveConversation(conversationId: string): Promise<void> {
-  if (isSupabaseConfigured && supabase) {
+export async function archiveConversation(conversationId: string): Promise<void> {  if (isSupabaseConfigured && supabase) {
     const { error } = await supabase.rpc('archive_conversation', { p_conversation_id: conversationId });
     if (error) throw new DataError(error.message || 'L’archivage n’a pas pu être enregistré.', error);
     return;
@@ -382,4 +381,61 @@ export async function archiveConversation(conversationId: string): Promise<void>
       });
     }),
   );
+}
+
+/**
+ * Accusé de lecture d'un co-membre (0171, D-02) : `read_at` vaut null tant
+ * qu'il n'a pas lu — le rangé sans lecture n'est pas renvoyé à l'écran
+ * (UI-SPEC : absence, jamais un avatar grisé). En ligne le RPC
+ * `conversation_read_receipts`, qui exclut déjà l'appelante et refuse tout
+ * fil où elle n'est pas membre active ; en démo, les watermarks du fil joints
+ * au registre du foyer — la même jointure `user_id → household_members` que
+ * le RPC fait côté serveur.
+ */
+export interface ReadReceipt {
+  memberId: string;
+  displayName: string;
+  colorTag: MemberColorTag | null;
+  readAt: string | null;
+}
+
+interface ReadReceiptRpcRow {
+  member_id: string;
+  display_name: string;
+  color_tag: string | null;
+  read_at: string | null;
+}
+
+export async function fetchReadReceipts(
+  conversationId: string,
+  members: HouseholdMemberRow[] = [],
+): Promise<ReadReceipt[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data: rows, error } = await supabase.rpc('conversation_read_receipts', {
+      p_conversation_id: conversationId,
+    });
+    if (error) throw new DataError(error.message || 'Les accusés de lecture sont indisponibles.', error);
+    return ((rows ?? []) as ReadReceiptRpcRow[]).map((row) => ({
+      memberId: row.member_id,
+      displayName: row.display_name,
+      colorTag: row.color_tag as MemberColorTag | null,
+      readAt: row.read_at,
+    }));
+  }
+  const reads = await data.list<NotificationReadRow>('notification_reads', {
+    scope: 'conversation',
+    scope_id: conversationId,
+  });
+  return reads.flatMap((row) => {
+    const member = members.find((candidate) => candidate.user_id === row.user_id);
+    if (!member) return [];
+    return [
+      {
+        memberId: member.id,
+        displayName: member.display_name,
+        colorTag: member.color_tag,
+        readAt: row.read_at,
+      },
+    ];
+  });
 }

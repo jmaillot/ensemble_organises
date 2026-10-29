@@ -11,6 +11,53 @@ export const NOTIFICATION_READS_TABLE = 'notification_reads';
 /** Carte `identifiant → instant ISO` de dernière lecture. */
 export type ReadMap = Record<string, string>;
 
+/** Dépendances du portage D-03, injectées pour rester prouvable hors navigateur. */
+export interface LocalReadMigrationDeps {
+  scope: NotificationReadScope;
+  userId: string;
+  storageKey: string;
+  /** Lignes serveur connues au moment du portage : le max des deux gagne. */
+  serverRows: Pick<NotificationReadRow, 'id' | 'user_id' | 'scope' | 'scope_id' | 'read_at'>[];
+  create: (row: NotificationReadRow) => Promise<unknown>;
+  update: (id: string, readAt: string) => Promise<unknown>;
+  /** Effacement de la clé locale — appelé SEULEMENT après succès de chaque écriture. */
+  removeLocal: (key: string) => void;
+}
+
+/**
+ * Portage D-03 (one-way) : chaque entrée locale rejoint `notification_reads`
+ * (création, ou mise à jour si la marque locale est PLUS récente — le serveur
+ * garde le max, jamais une régression), puis la clé locale est retirée.
+ * Une écriture qui échoue lève : l'appelant conserve alors la clé (repli hors
+ * ligne = ne rien effacer) et reste silencieux pour l'utilisateur.
+ * Rien à porter (clé absente ou vide) : aucune écriture, aucun effacement.
+ */
+export async function migrateLocalReads(deps: LocalReadMigrationDeps): Promise<boolean> {
+  const local = readLocal(deps.storageKey);
+  const entries = Object.entries(local);
+  if (entries.length === 0) return false;
+  for (const [scopeId, at] of entries) {
+    const existing = deps.serverRows.find(
+      (row) => row.scope === deps.scope && row.scope_id === scopeId && row.user_id === deps.userId,
+    );
+    if (!existing) {
+      await deps.create({
+        id: randomId('notification-read'),
+        user_id: deps.userId,
+        scope: deps.scope,
+        scope_id: scopeId,
+        read_at: at,
+      });
+    } else if (readTime(at) > readTime(existing.read_at)) {
+      // Marque locale plus récente (typique d'une session hors ligne) : le
+      // serveur monte au max. Plus ancienne : il garde la sienne.
+      await deps.update(existing.id, at);
+    }
+  }
+  deps.removeLocal(deps.storageKey);
+  return true;
+}
+
 function readLocal(key: string): ReadMap {
   if (typeof localStorage === 'undefined') return {};
   try {
@@ -144,13 +191,56 @@ export function useSyncedReads(scope: NotificationReadScope, localKey: string): 
   const rowsRef = useRef(resource.rows);
   rowsRef.current = resource.rows;
 
+  /**
+   * Portage D-03 (one-way) : au premier chargement avec une clé locale non
+   * vide, les horodatages rejoignent le serveur, puis la clé part — SEULEMENT
+   * après succès. Un échec ne touche à rien et ne crie jamais : les badges
+   * 1/0 existants restent la borne inférieure honnête. Une fois le portage
+   * réussi, la clé n'est plus réécrite : le serveur devient la seule
+   * référence persistée (la carte en mémoire continue de fusionner les deux).
+   */
+  const migratedKeysRef = useRef(new Set<string>());
+  const inFlightKeysRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!userId || resource.isLoading) return;
+    const key = storageKey;
+    if (migratedKeysRef.current.has(key) || inFlightKeysRef.current.has(key)) return;
+    const local = readLocal(key);
+    if (Object.keys(local).length === 0) return;
+    inFlightKeysRef.current.add(key);
+    void (async () => {
+      try {
+        await migrateLocalReads({
+          scope,
+          userId,
+          storageKey: key,
+          serverRows: rowsRef.current,
+          create: (row) => data.create<NotificationReadRow>(NOTIFICATION_READS_TABLE, row),
+          update: (id, readAt) =>
+            data.update<NotificationReadRow>(NOTIFICATION_READS_TABLE, id, { read_at: readAt }),
+          removeLocal: (k) => localStorage.removeItem(k),
+        });
+        migratedKeysRef.current.add(key);
+        void refresh();
+      } catch {
+        // Repli silencieux (UI-SPEC copie D-03) : clé conservée, un essai
+        // ultérieur reprendra le portage. Jamais de message d'erreur visible
+        // pour une migration technique.
+        inFlightKeysRef.current.delete(key);
+      }
+    })();
+  }, [refresh, resource.isLoading, scope, storageKey, userId]);
+
   const markRead = useCallback(
     (id: string) => {
       const at = new Date().toISOString();
+      // Après le portage D-03, la clé locale ne revit plus : l'optimisme
+      // reste en mémoire, la persistance appartient au serveur (one-way).
+      const persistLocal = !migratedKeysRef.current.has(storageKey);
       setLocalMap((current) => {
         if (current[id] !== undefined && current[id] >= at) return current;
         const next = { ...current, [id]: at };
-        writeLocal(storageKey, next);
+        if (persistLocal) writeLocal(storageKey, next);
         return next;
       });
       if (!userId) {

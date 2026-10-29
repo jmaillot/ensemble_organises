@@ -3,12 +3,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { data } from '@/lib/data';
 import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
-import { useSyncedReads } from '@/lib/notification-reads';
+import { readTime, useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, leaveConversation as leaveConversationRow, deleteConversationForMe as deleteConversationForMeRow, archiveConversationForMe as archiveConversationForMeRow, unarchiveConversationForMe as unarchiveConversationForMeRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage } from '../api';
+import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, fetchReadReceipts, leaveConversation as leaveConversationRow, deleteConversationForMe as deleteConversationForMeRow, archiveConversationForMe as archiveConversationForMeRow, unarchiveConversationForMe as unarchiveConversationForMeRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage, type ReadReceipt } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
-import type { ConversationMemberRow, MessageRow } from '@/types';
+import type { ConversationMemberRow, MemberColorTag, MessageRow } from '@/types';
 
 export const messageKeys = {
   all: ['messages'] as const,
@@ -22,6 +22,12 @@ export const messageKeys = {
   /** Préfixe pour toucher toutes les fenêtres mises en cache d'un même fil. */
   threadPrefix: (householdId: string | null, conversationId: string) =>
     ['messages', 'thread', householdId, conversationId] as const,
+  /**
+   * Accusés de lecture d'un fil (D-02) : sous le préfixe `messages` pour être
+   * invalidé par le Realtime existant (D-08 : pas de souscription dédiée aux
+   * watermarks).
+   */
+  receipts: (conversationId: string | null) => ['messages', 'receipts', conversationId] as const,
 };
 
 const READ_STORAGE_KEY = 'ensemble-organises-messages-read';
@@ -34,6 +40,25 @@ const READ_STORAGE_KEY = 'ensemble-organises-messages-read';
 export function useReadConversations() {
   const { readMap, markRead } = useSyncedReads('conversation', READ_STORAGE_KEY);
   return { readMap, markRead } as const;
+}
+
+/**
+ * D-01 : le watermark s'écrit À L'OUVERTURE du fil et au retour sur l'onglet
+ * (`visibilitychange`) — une écriture par session de lecture. Jamais au rendu
+ * de chaque message : les réceptions en direct ne réécrivent rien, et la
+ * garde `current[id] >= at` du marquage rend de toute façon une écriture
+ * redondante inoffensive sans la rendre nécessaire.
+ */
+export function useReadWatermark(conversationId: string | null, markRead: (conversationId: string) => void): void {
+  useEffect(() => {
+    if (!conversationId) return;
+    markRead(conversationId);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') markRead(conversationId);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [conversationId, markRead]);
 }
 
 export interface MessagesFeed {
@@ -745,6 +770,45 @@ export function useThreadPage(conversationId: string | null): ThreadPage {
     loadMore,
     refetch,
   };
+}
+
+export interface ReadReceiptReader {
+  /** Identifiant du membre lecteur (jamais l'appelant : le RPC l'exclut). */
+  id: string;
+  name: string;
+  colorTag: MemberColorTag;
+  /** Instant de lecture : les membres sans lecture sont exclus en amont. */
+  readAt: string;
+}
+
+/**
+ * Accusés de lecture côté émetteur (D-02) : les co-membres qui ont lu le fil,
+ * dans l'ordre de leur lecture. La requête vit sous le préfixe `messages` :
+ * le Realtime existant l'invalidé (D-08 — aucun canal dédié aux watermarks),
+ * et elle ne se lance qu'une fois le fil porteur d'un message envoyé.
+ */
+export function useReadReceipts(conversationId: string | null, hasSent: boolean): ReadReceiptReader[] {
+  const members = useMembers();
+  const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
+  const receiptsQuery = useQuery({
+    queryKey: messageKeys.receipts(conversationId),
+    enabled: Boolean(conversationId && hasSent),
+    queryFn: () => fetchReadReceipts(conversationId as string, members),
+  });
+
+  return useMemo(() => {
+    const readers = (receiptsQuery.data ?? []).filter(
+      (receipt): receipt is ReadReceipt & { readAt: string } =>
+        receipt.readAt !== null && receipt.memberId !== currentMemberId,
+    );
+    readers.sort((left, right) => readTime(left.readAt) - readTime(right.readAt));
+    return readers.map((receipt) => ({
+      id: receipt.memberId,
+      name: receipt.displayName,
+      colorTag: receipt.colorTag ?? 'accent',
+      readAt: receipt.readAt,
+    }));
+  }, [currentMemberId, receiptsQuery.data]);
 }
 
 /** Abonnement temps réel : la RLS filtre les changements reçus. */
