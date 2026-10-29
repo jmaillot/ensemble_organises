@@ -488,7 +488,21 @@ Consigner date + résultat dans le tableau :
 
 | Alerte | Date déclenchement | Mail reçu | Remise en ordre |
 |--------|--------------------|-----------|-----------------|
-| pg_cron | 2026-10-29 (dev, agent — rouge 2 failed, job de test créé puis supprimé) | ☐ prod | ✓ (cron.unschedule(22)) |
-| Disque | 2026-10-29 (dev, agent — rouge par seuil 20 % < usage 29 %) | ☐ prod | ✓ (seuil par défaut 85 % → vert) |
-| Certificats | 2026-10-29 (dev, agent — rouge par seuil 4000 j sur example.com, 57 j restants) | ☐ prod | ✓ (seuil 21 j → vert) |
-| Erreurs Edge | 2026-10-29 (dev, agent — injection pg_net httpbin.org/status/404, id 66, rouge count=1) | ☐ prod | ✓ (la fenêtre 24 h vieillit l'entrée seule) |
+| pg_cron | 2026-10-29 (dev, agent — rouge 2 failed, job de test créé puis supprimé) ; **prod 2026-10-29 : job de test `eo-check-test-broken` (jobid 19/20/22, 5 s), 15–36 exécutions failed vues, rouge puis vert après unschedule** | ✓ prod 2026-10-29, [EO-cron] reçu | ✓ (cron.unschedule, count=0, trois axes au vert) |
+| Disque | 2026-10-29 (dev, agent) ; **prod 2026-10-29 : `EO_DISK_THRESHOLD=20`, `/` à 21 % → rouge** | ✓ prod 2026-10-29, [EO-disque] reçu | ✓ (seuil par défaut 85 % → vert, 21 %) |
+| Certificats | 2026-10-29 (dev, agent) ; **prod 2026-10-29 : seuil 4000 j sur `ensemble.` et `api.jeremymaillot.fr:443`, 79 jours restants → rouge** | ✓ prod 2026-10-29, [EO-certificats] reçu | ✓ (seuil 21 j → vert, 79 jours restants) |
+| Erreurs Edge | 2026-10-29 (dev, agent) ; **prod 2026-10-29 : injection pg_net id 178 vers /functions/v1/inexistant → réponse 500 InvalidWorkerCreation (≥ 400), rouge count=1** | ✓ prod 2026-10-29, [EO-edge] reçu | ✓ (la fenêtre 24 h vieillit l'entrée seule) |
+
+Notes de preuve prod (2026-10-29) :
+- Sans `EO_MAIL_TO` dans l'environnement, les checks alertent à l'écran mais
+  n'envoient **volontairement** rien — deux cycles ont tourné muets avant que
+  la variable ne soit exportée ; les mails ne partent qu'avec elle (comportement
+  voulu, T-28-08, pas un défaut).
+- Le certificat d'un hôte Let's Encrypt vit ~90 jours : le seuil par défaut
+  (21 jours) est le bon réglage en prod ; le seuil 4000 j n'est qu'un
+  déclencheur de preuve.
+- Deux défauts de script trouvés et corrigés pendant la preuve :
+  `check-cron-health.sh` criait au loup sur les jobs annuels jamais exécutés
+  (exemption `EO_CRON_NEVER_OK`, commit fc141d6) et `check-certs.sh`
+  doublait le port pour un `EO_CERT_HOSTS` portant `:443`
+  (commit 4be0050) — §2.7-E, corriger la classe.
