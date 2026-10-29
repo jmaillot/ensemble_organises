@@ -154,7 +154,7 @@ Plans:
 - [x] 28-02-PLAN.md — Réplication tierce rsync + purge GFS + pgsodium disjointe (OPS-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
+- [x] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)

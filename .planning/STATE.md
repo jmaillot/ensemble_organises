@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
 current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: executing
-stopped_at: Completed 28-02-PLAN.md
-last_updated: "2026-10-29T08:32:24.000Z"
-state_head: 5882dc0da703aa264fb4f7e52f3d6e8c1ac4a580
+stopped_at: Completed 28-03-PLAN.md
+last_updated: "2026-10-29T10:20:05.343Z"
+state_head: 89e56457424fb91ed5bb321e9c859d305929a009
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 22
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
-Plan: 3 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
