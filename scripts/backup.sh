@@ -18,8 +18,20 @@
 #                          (OBLIGATOIRE, jamais versionné, chmod 600 ; voir
 #                          docs/BACKEND.md §11). Lue par fichier uniquement :
 #                          jamais en argv, jamais journalisée.
+#   EO_MAIL_TO             destinataire du mail de résultat (D-06) ; sans
+#                          valeur, la sauvegarde s'exécute sans notification.
+#
+# En toute fin, un mail part à CHAQUE exécution — succès comme échec (D-06) —
+# via scripts/send-mail.sh, sujet préfixé [EO-backup].
 
 set -eu
+
+# Le verdict traverse tout le script malgré `set -e` : chaque étape note
+# verdict_fail (son détail dans verdict_step) et, pour les étapes critiques,
+# sort explicitement. Le mail de fin (D-06) exige de survivre à un échec de
+# vérification, pas à un échec de dump.
+verdict_fail=0
+verdict_step=""
 
 DB_CONTAINER="${DB_CONTAINER:-db}"
 STORAGE_SERVICE="${STORAGE_SERVICE:-storage}"
@@ -66,6 +78,21 @@ docker run --rm \
   -v "$out:/backup" \
   alpine:3.21 tar -czf /backup/db-config.tar.gz -C /source .
 
+# --- Edge Functions ----------------------------------------------------------
+# Le service `functions` monte le bind hôte ./volumes/functions (docker-compose
+#.yml) : le tar porte le répertoire hôte directement, sans conteneur — même
+# convention que « volumes/functions versionné ». Un tar relatif (.) : la
+# restauration déballera dans le répertoire, pas sur des chemins absolus.
+echo "  · fonctions (volumes/functions)"
+if [ ! -d "$PROJECT_DIR/volumes/functions" ]; then
+  echo "backup.sh: répertoire des fonctions introuvable : $PROJECT_DIR/volumes/functions" >&2
+  echo "           Déployez-les d'abord : sh scripts/deploy-functions.sh" >&2
+  verdict_fail=1
+  verdict_step="tar functions"
+else
+  tar -czf "$out/functions.tar.gz" -C "$PROJECT_DIR/volumes/functions" .
+fi
+
 # --- Chiffrement --------------------------------------------------------------
 # Données personnelles : aucun artefact ne reste en clair sur le disque.
 # La phrase secrète vit dans un fichier chmod 600, hors dépôt ; `gpg` la lit
@@ -82,14 +109,20 @@ fi
 
 # --- Manifeste --------------------------------------------------------------
 # Le manifeste porte sur les fichiers CHIFFRÉS : c'est ce qui est archivé.
-for artefact in database.dump storage.tar.gz db-config.tar.gz; do
-  gpg --batch --yes --pinentry-mode loopback \
-    --passphrase-file "$BACKUP_PASSPHRASE_FILE" \
-    --symmetric --cipher-algo AES256 \
-    -o "$out/$artefact.gpg" "$out/$artefact"
-  rm -f "$out/$artefact"
-done
-( cd "$out" && sha256sum ./*.gpg > SHA256SUMS )
+if [ "$verdict_fail" -eq 0 ]; then
+  for artefact in database.dump storage.tar.gz db-config.tar.gz functions.tar.gz; do
+    gpg --batch --yes --pinentry-mode loopback \
+      --passphrase-file "$BACKUP_PASSPHRASE_FILE" \
+      --symmetric --cipher-algo AES256 \
+      -o "$out/$artefact.gpg" "$out/$artefact"
+    rm -f "$out/$artefact"
+  done
+fi
+( cd "$out" && sha256sum ./*.gpg > SHA256SUMS ) 2>/dev/null || {
+  echo "backup.sh: aucun artefact chiffré à archiver." >&2
+  verdict_fail=1
+  verdict_step="chiffrement"
+}
 
 echo
 echo "Sauvegarde chiffrée terminée :"
@@ -98,5 +131,81 @@ echo
 echo "Contrôle d'intégrité : (cd '$out' && sha256sum -c SHA256SUMS)"
 echo "Restauration : BACKUP_PASSPHRASE_FILE=<fichier> sh scripts/restore.sh $stamp --confirm"
 
-# --- Rétention --------------------------------------------------------------
+# --- Vérification D-07 -------------------------------------------------------
+# Trois contrôles, aucun artefact en clair sur le disque :
+#   1. l'archive dump est valide : pg_restore --list lit le dump DÉCHIFFRÉ sur
+#      STDIN dans le conteneur db (§2.7-C : stdin seul traverse la frontière du
+#      conteneur — jamais -f, jamais -c "$(cat …)"). Le déchiffrement est
+#      pipe-éphémère : le dump clair ne touche jamais le disque (T-28-01).
+#   2. les quatre .gpg sont non vides.
+#   3. le manifeste SHA256SUMS se vérifie sur lui-même.
+echo
+echo "Vérification de la sauvegarde (D-07) :"
+if [ "$verdict_fail" -eq 0 ]; then
+  if ! gpg --batch --yes --pinentry-mode loopback \
+        --passphrase-file "$BACKUP_PASSPHRASE_FILE" \
+        -d "$out/database.dump.gpg" \
+      | db_exec_as postgres pg_restore --list -U "$DB_USER_RESOLVED" >/dev/null; then
+    echo "  ✗ l'archive de la base ne se relit pas (pg_restore --list)" >&2
+    verdict_fail=1
+    verdict_step="vérification pg_restore"
+  else
+    echo "  ✓ archive de la base lisible (pg_restore --list)"
+  fi
+
+  empty_gpg="$(find "$out" -name '*.gpg' -size 0)"
+  if [ -n "$empty_gpg" ]; then
+    echo "  ✗ artefact(s) vide(s) : $empty_gpg" >&2
+    verdict_fail=1
+    verdict_step="taille des artefacts"
+  else
+    echo "  ✓ 4 artefacts chiffrés non vides"
+  fi
+
+  if ! ( cd "$out" && sha256sum -c SHA256SUMS >/dev/null ); then
+    echo "  ✗ le manifeste SHA256SUMS ne correspond pas" >&2
+    verdict_fail=1
+    verdict_step="contrôle sha256"
+  else
+    echo "  ✓ manifeste SHA256SUMS vérifié"
+  fi
+fi
+
+# --- Mail du verdict (D-06) --------------------------------------------------
+# Succès ET échec notifiés. L'absence d'EO_MAIL_TO est une exécution sans
+# notification, pas une erreur : une sauvegarde sans destinataire configuré
+# ne doit pas échouer pour ça.
+if [ -n "${EO_MAIL_TO:-}" ] && [ -f "$(dirname -- "$0")/send-mail.sh" ]; then
+  sizes="$(ls -lh "$out"/*.gpg 2>/dev/null | awk '{print $9, $5}')"
+  body="$(mktemp "${TMPDIR:-/tmp}/eo-backup.XXXXXX")"
+  if [ "$verdict_fail" -eq 0 ]; then
+    mail_subject="[EO-backup] succès : $stamp"
+    {
+      echo "Sauvegarde $stamp terminée et vérifiée."
+      echo
+      echo "$sizes"
+      echo
+      echo "Vérification D-07 : pg_restore --list ✓, tailles ✓, sha256 ✓."
+    } > "$body"
+  else
+    mail_subject="[EO-backup] ÉCHEC : $stamp ($verdict_step)"
+    {
+      echo "La sauvegarde $stamp a ÉCHOUÉ à l'étape : $verdict_step."
+      echo
+      echo "Répertoire partiel : $out"
+      echo "Contenu :"
+      ls -lh "$out" | sed 's/^/  /'
+      echo
+      echo "Consulter le cron : journal de sh scripts/backup.sh."
+    } > "$body"
+  fi
+  if ! sh "$(dirname -- "$0")/send-mail.sh" "$mail_subject" "$body"; then
+    echo "backup.sh: le mail de résultat n'a pas pu être envoyé (cause sur stderr ci-dessus)." >&2
+  fi
+  rm -f "$body"
+fi
+
+# Verdict final : le code de sortie porte l'échec APRÈS le mail et la
+# rétention — le cron voit l'échec, l'opérateur a déjà été notifié.
 find "$BACKUP_DIR" -maxdepth 1 -type d -name '20*' -mtime "+$RETENTION_DAYS" -print -exec rm -rf {} +
+exit "$verdict_fail"
