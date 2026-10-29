@@ -16,12 +16,24 @@
 #
 #     1. le dispatch annonce `due ≥ 1` — le rappel semé par ce script a été vu
 #        par ce dispatch, et pas consommé par un job antérieur ;
-#     2. la réponse est `200` et porte `consumed = 1` ;
+#     2. la réponse est `200` et porte `consumed ≥ 1` ;
 #     3. la ligne de rappel a disparu de `public.task_reminders`.
 #
 #   Le troisième est le seul qui distingue « distribué » de « distribué ET
 #   consommé ». Un `delivered: 1` avec la ligne encore là prouverait que la
 #   notification part, mais que la boucle recommencera à l'infini.
+#
+# DEPUIS 0172 — PREUVE DU GROUPE DE MESSAGES (D-06/D-07)
+#   Trois messages sont semés dans UNE conversation pour le membre abonné.
+#   Le dispatch des messages doit n'émettre qu'UNE notification, compteur
+#   « 3 nouveaux messages de … » au titre, tag `message-<conversation>`, et
+#   AUCUNE marque de contenu semée dans le titre ni le corps (règle
+#   verrouillée : les notifications ne portent jamais le contenu d'un
+#   message). La preuve du payload est lue dans `due_push_notifications`
+#   (ce que l'Edge chiffrera), filtrée par le tag de la conversation créée
+#   ici ; la preuve de la consommation est attribuable à l'appel de dispatch
+#   du script (fenêtre `net._http_response` ouverte sur max(id) avant
+#   l'appel), et la file doit être vidée pour la conversation semée.
 #
 #   Il ne prouve PAS que le service Push a affiché quoi que ce soit : cela se
 #   voit sur l'appareil. `delivered` signifie « accepté par le service », pas
@@ -141,6 +153,9 @@ echo "  Membre        $Membre  (foyer $Foyer)"
 TacheCreee=0
 Tache=""
 Rappel=""
+Conv=""
+Expéditeur=""
+Marque=""
 NettoyerVerifie=0
 
 nettoyer() {
@@ -154,12 +169,22 @@ nettoyer() {
   if [ "$TacheCreee" -eq 1 ] && [ -n "$Tache" ]; then
     db_exec -q -c "delete from public.tasks where id = '$Tache'" >/dev/null 2>&1 || true
   fi
+  # Groupe de messages (0172) : la conversation d'abord (cascade messages et
+  # file), puis le membre expéditeur (cascade de ses messages restants).
+  if [ -n "$Conv" ]; then
+    db_exec -q -c "delete from public.conversations where id = '$Conv'" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$Expéditeur" ]; then
+    db_exec -q -c "delete from public.household_members where id = '$Expéditeur'" >/dev/null 2>&1 || true
+  fi
 }
 
 # Un comptage, pas le statut du DELETE : c'est l'etat de la table qui compte.
 reste_a_nettoyer() {
   un "select ((select count(*) from public.tasks where id = '$Tache')
-               + (select count(*) from public.task_reminders where id = '$Rappel'))::text"
+               + (select count(*) from public.task_reminders where id = '$Rappel')
+               + (select count(*) from public.conversations where id = '$Conv')
+               + (select count(*) from public.household_members where id = '$Expéditeur'))::text"
 }
 
 signaler_reste() {
@@ -282,8 +307,8 @@ if [ "$Code" != "200" ]; then
     *) echo "                corps : $Corps" >&2 ;;
   esac
   echec=1
-elif ! echo "$Corps" | grep -q '"consumed":1'; then
-  echo "  ÉCHEC         la réponse ne porte pas consumed=1 : la boucle ne se ferme pas." >&2
+elif ! echo "$Corps" | grep -Eq '"consumed":[1-9][0-9]*'; then
+  echo "  ÉCHEC         la réponse ne porte aucun rappel consommé : la boucle ne se ferme pas." >&2
   echec=1
 elif ! echo "$Corps" | grep -q '"delivered":[1-9]'; then
   echo "  AVERTISSEMENT delivered=0. La fonction a répondu et consommé, mais le" >&2
@@ -314,9 +339,149 @@ else
   echo "  Nettoyage     tâche et rappel supprimés."
 fi
 
+# ===========================================================================
+# Groupe de messages (0172) : D-06/D-07, compteur et silence du contenu.
+# ===========================================================================
+# Trois messages semés dans UNE conversation pour le membre abonné : le
+# dispatch des messages doit n'émettre qu'UNE notification « 3 nouveaux
+# messages de … », tag `message-<conversation>`, et AUCUNE marque de contenu
+# semée ne doit traverser le titre ni le corps (règle verrouillée ; T-29-04).
+#
+# La preuve du PAYLOAD est attribuable à ce passage : la ligne lue est celle
+# de `due_push_notifications('messages')` dont le tag vise la conversation
+# créée ICI — c'est exactement ce que l'Edge chiffrera et enverra. La preuve
+# de la CONSOMMATION est attribuable à l'appel de dispatch du script : fenêtre
+# `net._http_response` ouverte sur max(id) AVANT l'appel, comme plus haut.
+#
+# L'expéditeur est une ligne membre sans compte (profil géré, 0145) : l'auteur
+# est exclu du ventilateur par membre, jamais par compte.
+Marque="MARQUEPUSH-$(date +%s)-$$"
+
+Expéditeur="$(un "insert into public.household_members (household_id, user_id, display_name, color_tag, role)
+  values ('$Foyer', null, 'Semure Test', 'ink', 'enfant') returning id")"
+if [ -z "$Expéditeur" ]; then
+  echo "  ÉCHEC         la semure de l'expéditeur de test n'a rien produit." >&2
+  echec=1
+fi
+
+if [ -n "$Expéditeur" ]; then
+  Conv="$(un "insert into public.conversations (household_id, type)
+    values ('$Foyer', 'direct') returning id")"
+  db_exec -q -c "insert into public.conversation_members (conversation_id, member_id)
+    values ('$Conv', '$Membre'), ('$Conv', '$Expéditeur')" >/dev/null
+  i=1
+  while [ "$i" -le 3 ]; do
+    db_exec -q -c "insert into public.messages (conversation_id, household_id, sender_id, content)
+      values ('$Conv', '$Foyer', '$Expéditeur', '$Marque message $i sur trois')" >/dev/null
+    i=$((i + 1))
+  done
+  echo "  Messages      3 semés pour le membre (marque $Marque)"
+
+  # Ce que l'Edge enverra : la ligne de `due_push_notifications` vise la
+  # conversation semée. Avant tout dispatch, rien n'a consommé la file.
+  Titre="$(un "select n.value ->> 'title'
+     from jsonb_array_elements(public.due_push_notifications('messages')) n
+    where n.value ->> 'tag' = 'message-$Conv' limit 1")"
+  CorpsPush="$(un "select n.value ->> 'body'
+     from jsonb_array_elements(public.due_push_notifications('messages')) n
+    where n.value ->> 'tag' = 'message-$Conv' limit 1")"
+  Groupe="$(un "select jsonb_array_length(n.value -> 'reminder_ids')::text
+     from jsonb_array_elements(public.due_push_notifications('messages')) n
+    where n.value ->> 'tag' = 'message-$Conv' limit 1")"
+  echo "  Titre dû      $Titre"
+  echo "  Corps dû      $CorpsPush"
+
+  # 1. Le compteur est au titre, avec le prénom de l'expéditeur semé.
+  if [ "$Titre" != "3 nouveaux messages de Semure" ]; then
+    echo "  ÉCHEC         le titre du groupe n'est pas « 3 nouveaux messages de Semure »." >&2
+    echec=1
+  fi
+
+  # 2. Le corps est le gabarit prénoms des autres membres, JAMAIS un contenu.
+  case "$CorpsPush" in
+    'Conversation avec '*) ;;
+    *)
+      echo "  ÉCHEC         le corps n'est pas le gabarit « Conversation avec … » : $CorpsPush" >&2
+      echec=1
+      ;;
+  esac
+
+  # 3. T-29-04 : la marque semée ne traverse NI le titre NI le corps.
+  case "$Titre$CorpsPush" in
+    *MARQUEPUSH*)
+      echo "  ÉCHEC         le contenu d'un message semé a traversé le push (règle verrouillée)." >&2
+      echec=1
+      ;;
+  esac
+
+  # 4. Le groupe porte les trois ids de file à consommer d'un coup.
+  if [ "$Groupe" != "3" ]; then
+    echo "  ÉCHEC         reminder_ids ne compte pas les trois messages ($Groupe)." >&2
+    echec=1
+  fi
+
+  # Dispatch des messages : fenêtre attribuable propre à cet appel.
+  AvantMsg="$(un 'select coalesce(max(id), 0) from net._http_response')"
+  BrutMsg="$(un "with r as materialized (select private.dispatch_message_notifications() as j)
+             select (j ->> 'due') || '|' || (j ->> 'dispatched') || '|' || j::text
+               from r")"
+  DuesMsg="${BrutMsg%%|*}"
+  reste="${BrutMsg#*|}"
+  DispatchedMsg="${reste%%|*}"
+
+  # Même attente que plus haut : pg_net travaille en asynchrone.
+  trouve=0
+  i=0
+  while [ "$i" -lt "$ATTENTE" ]; do
+    if [ -n "$(un "select content from net._http_response where id > $AvantMsg limit 1")" ]; then
+      trouve=1
+      break
+    fi
+    i=$((i + 3))
+    sleep 3
+  done
+
+  if [ "$trouve" -eq 0 ]; then
+    echo "  ÉCHEC         aucune réponse de la fonction pour les messages après ${ATTENTE}s." >&2
+    echo "                cd supabase-project && sh run.sh logs functions" >&2
+    echec=1
+  else
+    CodeMsg="$(un "select status_code::text from net._http_response where id > $AvantMsg order by id limit 1")"
+    CorpsMsg="$(un "select content from net._http_response where id > $AvantMsg order by id limit 1")"
+    echo "  Réponse msg   $CodeMsg  $CorpsMsg"
+    RestantConv="$(un "select count(*)::text from public.message_notifications mn
+      join public.messages msg on msg.id = mn.message_id
+     where msg.conversation_id = '$Conv'")"
+
+    if [ -z "$DuesMsg" ] || [ "$DuesMsg" = "0" ]; then
+      echo "  ÉCHEC         le dispatch de messages n'a vu aucun groupe, alors que la" >&2
+      echo "                conversation semée est due. Un job l'a consommée entre-temps." >&2
+      echec=1
+    elif [ "$DispatchedMsg" != "true" ]; then
+      echo "  ÉCHEC         due = $DuesMsg mais dispatched = ${DispatchedMsg:-inconnu} (messages)." >&2
+      echec=1
+    elif [ "$CodeMsg" != "200" ]; then
+      echo "  ÉCHEC         statut $CodeMsg au dispatch des messages." >&2
+      echec=1
+    else
+      Consomme="$(printf '%s' "$CorpsMsg" | sed -n 's/.*"consumed":\([0-9][0-9]*\).*/\1/p')"
+      if ! [ "${Consomme:-0}" -ge 3 ] 2>/dev/null; then
+        echo "  ÉCHEC         la réponse ne porte pas consumed ≥ 3 : le groupe ne se vide pas ($Consomme)." >&2
+        echec=1
+      fi
+      if [ "$RestantConv" != "0" ]; then
+        echo "  ÉCHEC         $RestantConv ligne(s) de file restent pour la conversation semée :" >&2
+        echo "                le groupe sera renvoyé à chaque dispatch, indéfiniment." >&2
+        echec=1
+      fi
+    fi
+  fi
+fi
+
 echo
 if [ "$echec" -eq 0 ]; then
-  echo "  OK            base → Edge Function → service Push, et retour consommé."
+  echo "  OK            base → Edge Function → service Push, retour consommé,"
+  echo "                groupe de messages compté au titre et SANS contenu."
 else
   echo "  ÉCHEC         voir ci-dessus."
 fi

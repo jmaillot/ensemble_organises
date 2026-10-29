@@ -135,7 +135,11 @@ interface DueSubscription {
 
 interface DueNotification {
   user_id: string;
-  reminder_id: string;
+  // 0172 : pour les messages, le scalaire est complété par la LISTE des ids
+  // de file du groupe (une notification par conversation). `null` hors scope
+  // messages ; l'Edge retombe alors sur le scalaire seul.
+  reminder_id: string | null;
+  reminder_ids?: string[] | null;
   household_id: string | null;
   title: string;
   body: string | null;
@@ -260,7 +264,9 @@ async function send(
   onlyUserId?: string,
 ) {
   const results: DeliveryResult[] = [];
-  const consumed: { kind: string; id: string }[] = [];
+  // 0172 : les messages se consomment par LISTE d'ids de file (un groupe =
+  // une conversation), les autres kinds gardent le scalaire {kind, id}.
+  const consumed: { kind: string; id?: string | null; ids?: string[] }[] = [];
   let delivered = 0;
   let failed = 0;
   let dropped = 0;
@@ -304,7 +310,16 @@ async function send(
     // retentera au prochain passage, ce qui est le comportement voulu pour un
     // foyer dont les telephones sont éteints.
     const kind = reminderKind(notification.tag);
-    if (kind && sent > 0) consumed.push({ kind, id: notification.reminder_id });
+    if (kind && sent > 0) {
+      // 0172 : un groupe de messages livré au moins une fois est consommé EN
+      // ENTIER (liste `reminder_ids`) — sinon le cycle suivant recompterait
+      // des messages déjà affichés. Les autres kinds gardent le scalaire.
+      if (kind === 'message' && Array.isArray(notification.reminder_ids) && notification.reminder_ids.length > 0) {
+        consumed.push({ kind, ids: notification.reminder_ids });
+      } else {
+        consumed.push({ kind, id: notification.reminder_id });
+      }
+    }
   }
 
   // Deux appels, quel que soit le volume : c'est la condition pour que le job
