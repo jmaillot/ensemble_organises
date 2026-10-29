@@ -225,7 +225,7 @@ Plans:
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 2/5 | In Progress|  |
-| 29. Messagerie v2 | 4/5 | In Progress|  |
+| 29. Messagerie v2 | 5/5 | In Progress|  |
 | 30. Hygiène du jalon | 0/? | Not started | - |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |
 

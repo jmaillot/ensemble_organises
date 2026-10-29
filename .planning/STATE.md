@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 29
 current_phase_name: Messagerie v2
 status: executing
-stopped_at: Completed 29-03-PLAN.md
-last_updated: "2026-10-29T14:49:23.414Z"
-state_head: d5073870b19ef3093b8ff178c9a96674454fc9c7
+stopped_at: Completed 29-05-PLAN.md
+last_updated: "2026-10-29T17:29:18.782Z"
+state_head: 8b6b6cc822cb5dfc8ae759f7ff560ddf58d8ec22
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 29
-  completed_plans: 27
+  completed_plans: 28
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -24,7 +24,7 @@ last_activity: 2026-10-27
 Phase: 29 (Messagerie v2) — EXECUTING
 Plan: 5 of 5
 Status: Ready to execute
-Progress: [█████░░░░░] 80% (4/5 plans de la phase 29 exécutés — 29-01 à 29-04 complets, SUMMARY 29-04 écrit)
+Progress: [██████████] 43% (5/5 plans de la phase 29 exécutés — 29-01 à 29-05 complets, SUMMARY 29-05 écrit ; vérification de phase à l'orchestrateur)
 
 ## Références du jalon v1.0
 
@@ -72,8 +72,8 @@ Progress: [█████░░░░░] 80% (4/5 plans de la phase 29 exécut
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T14:49:23.314Z
-**Stopped at:** Completed 29-04-PLAN.md
+**Last session:** 2026-10-29T17:29:18.687Z
+**Stopped at:** Completed 29-05-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -92,6 +92,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 29 P04 | ~16 min | 3 tasks | 8 files |
+| Phase 29 P05 | ~25 min | 3 tasks | 6 files |
 | Phase 25 P01 | 23 min | 2 tasks | 3 files |
 | Phase 25 P06 | 8 min | 1 tasks | 2 files |
 | Phase 25 P02 | 52 min | 3 tasks | 2 files |
@@ -116,8 +117,10 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 29 P01 | 14 min | 2 tasks | 2 files |
 | Phase 29 P02 | 75m | 2 tasks | 4 files |
 | Phase 29 P03 | 35m | 2 tasks | 1 files |
+| Phase 29 P05 | ~25 min | 3 tasks | 6 files |
 
 ## Decisions
+
 - 29-04 (2026-10-29) : migration localStorage D-03 strictement unidirectionnelle — la clé n'est jamais réécrite après push serveur réussi ; les marques optimistes restent en mémoire, le serveur fait foi.
 - 29-04 (2026-10-29) : la rangée d'accusés (D-02) est rendue sous la dernière bulle « mine » (lastMineId), pas en fin de liste — elle suit la bonne bulle quand des réponses arrivent après.
 - 29-04 (2026-10-29) : D-08 respecté — les receipts vivent sous le préfixe ['messages'], invalidés par useMessagesRealtime, aucune souscription Realtime dédiée.
@@ -180,6 +183,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 29]: Push messages groupé (0172) : compteur au titre, reminder_ids par groupe, contenu banni ; Edge consomme par liste
 - [Phase 29]: reminder_id scalaire conservé (dernier id du groupe) pour compat Edge ; titre du fil autorisé au push, jamais le contenu
 - [Phase 29]: 29-03 : souscription Realtime par le chemin de production api-gw (Host de tenant) ; client WS natif Node, zéro dépendance npm ; aucune migration 0173 (publication déjà complète)
+- [Phase 29]: 29-05 : openDirectConversation appelle le RPC 0171 (anti-doublon D-05 côté serveur), picker « À qui écrire ? » un tap = démarrage/réouverture, conversation_members ajouté à useMessagesRealtime (D-08 : notification_reads jamais souscrite)
 
 ### Blockers
 

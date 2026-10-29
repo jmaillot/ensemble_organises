@@ -32,11 +32,11 @@
 
 ### Messagerie v2
 
-- [ ] **MSG-01** : Un membre démarre une conversation directe avec un autre membre via RPC serveur avec garde anti-doublon
-- [ ] **MSG-02** : Les badges non-lus s'appuient sur un watermark par membre sur la conversation (jamais une écriture par message)
-- [ ] **MSG-03** : L'accusé de lecture est visible côté émetteur
+- [x] **MSG-01** : Un membre démarre une conversation directe avec un autre membre via RPC serveur avec garde anti-doublon
+- [x] **MSG-02** : Les badges non-lus s'appuient sur un watermark par membre sur la conversation (jamais une écriture par message)
+- [x] **MSG-03** : L'accusé de lecture est visible côté émetteur
 - [x] **MSG-04** : Les notifications push sont groupées par conversation (« 2 nouveaux messages de X »), sans contenu du message, chaîne `dispatch_messages`→`push-notify` existante réutilisée
-- [ ] **MSG-05** : La publication Realtime (publication `supabase_realtime` self-hosted complétée) est testée par souscription avant d'être annoncée
+- [x] **MSG-05** : La publication Realtime (publication `supabase_realtime` self-hosted complétée) est testée par souscription avant d'être annoncée
 
 ### Exploitation
 
@@ -112,11 +112,11 @@
 | OPS-03 | Phase 28 | Complete (4 alertes mail prouvées rouge→vert sur prod, mails reçus 2026-10-29 — runbook § Preuves des alertes, 89e5645) |
 | OPS-04 | Phase 28 | Complete (check-cron-health.sh 3 axes, rotation ratée attrapée par job de test 15-36 failed, prod 2026-10-29) |
 | OPS-05 | Phase 28 | Complete (28-04 : RPO ≤ 24 h / RTO cible ≤ 4 h avec « RTO constaté » réservé à l'exercice 28-05 / rétention GFS dans docs/EXPLOITATION.md ; commandes cron livrées D-05 dans docs/DEPLOIEMENT-PROD.md) |
-| MSG-01 | Phase 29 | Pending |
-| MSG-02 | Phase 29 | Pending |
-| MSG-03 | Phase 29 | Pending |
+| MSG-01 | Phase 29 | Done (29-01 RPC 0171 + 29-05 picker « À qui écrire ? », un tap démarre/rouvre) |
+| MSG-02 | Phase 29 | Done (29-04) |
+| MSG-03 | Phase 29 | Done (29-04) |
 | MSG-04 | Phase 29 | Pending |
-| MSG-05 | Phase 29 | Pending |
+| MSG-05 | Phase 29 | Done (29-03 preuve Realtime + 29-05 invalidation fil/liste côté app, D-08) |
 | DET-01 | Phase 30 | Pending |
 | DET-02 | Phase 30 | Pending |
 | DET-03 | Phase 30 | Pending |
