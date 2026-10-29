@@ -157,9 +157,11 @@ select testkit.expect_ok(format(
 reset role;
 
 -- Ventilateur push : le message d'avant-départ vise bien Bob (actif alors).
+-- Depuis 0172, le ventilateur groupe par (destinataire, conversation) : la
+-- jointure passe par la liste `reminder_ids` du groupe, plus par le scalaire.
 select testkit.eq(testkit.count(
   'select 1 from private.push_message_notifications(now()) n'
-  ' join public.message_notifications mn on mn.id = n.reminder_id'
+  ' join public.message_notifications mn on n.reminder_ids ? mn.id'
   ' join public.messages m on m.id = mn.message_id'
   ' where m.id = ''mleave-pre'''
   ' and n.user_id = (select user_id from testkit.fx where key = ''bob'')'), 1::bigint,

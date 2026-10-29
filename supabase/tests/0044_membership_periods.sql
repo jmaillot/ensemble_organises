@@ -264,9 +264,11 @@ select testkit.eq(testkit.count(format(
 reset role;
 
 -- Ventilateur : le tombé n'est pas notifié du creux (0100, contrôle).
+-- Depuis 0172, le ventilateur groupe par (destinataire, conversation) : la
+-- jointure passe par la liste `reminder_ids` du groupe, plus par le scalaire.
 select testkit.eq(testkit.count(format(
   'select 1 from private.push_message_notifications(now()) n'
-  ' join public.message_notifications mn on mn.id = n.reminder_id'
+  ' join public.message_notifications mn on n.reminder_ids ? mn.id'
   ' where mn.message_id = %L'
   ' and n.user_id = (select user_id from testkit.fx where key = ''gap_bob'')',
   (select row_id from testkit.fx where key = 'gap_msg_gap1'))), 0::bigint,
@@ -274,7 +276,7 @@ select testkit.eq(testkit.count(format(
 
 select testkit.eq(testkit.count(format(
   'select 1 from private.push_message_notifications(now()) n'
-  ' join public.message_notifications mn on mn.id = n.reminder_id'
+  ' join public.message_notifications mn on n.reminder_ids ? mn.id'
   ' where mn.message_id = %L',
   (select row_id from testkit.fx where key = 'gap_msg_gap1'))), 2::bigint,
   'le ventilateur vise les deux presentes pour le creux (controle)');
@@ -595,9 +597,10 @@ select testkit.eq(testkit.count(format(
   'aucun systeme (departs comme arrivees) n''entre en file push');
 
 -- Le ré-ajouté est entier pour le push : notifié du post-retour...
+-- (0172 : jointure par la liste `reminder_ids` du groupe.)
 select testkit.eq(testkit.count(format(
   'select 1 from private.push_message_notifications(now()) n'
-  ' join public.message_notifications mn on mn.id = n.reminder_id'
+  ' join public.message_notifications mn on n.reminder_ids ? mn.id'
   ' where mn.message_id = %L'
   ' and n.user_id = (select user_id from testkit.fx where key = ''gap_bob'')',
   (select row_id from testkit.fx where key = 'gap_msg_after'))), 1::bigint,
@@ -606,7 +609,7 @@ select testkit.eq(testkit.count(format(
 -- ... et toujours sourd aux systèmes.
 select testkit.eq(testkit.count(format(
   'select 1 from private.push_message_notifications(now()) n'
-  ' join public.message_notifications mn on mn.id = n.reminder_id'
+  ' join public.message_notifications mn on n.reminder_ids ? mn.id'
   ' join public.messages m on m.id = mn.message_id'
   ' where m.household_id = %L and m.conversation_id = %L and m.sender_id is null',
   (select household_id from testkit.fx where key = 'gap_home'),
