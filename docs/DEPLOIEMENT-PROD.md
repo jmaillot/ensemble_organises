@@ -155,6 +155,58 @@ sh scripts/set-push-secrets.sh --check
 - La route API ne porte **aucun** middleware d'authentification Traefik ; un
   middleware de session devant `api-gw` bloquerait l'application.
 
+## Transport mail des checks (alertes et sauvegardes, D-06/D-13)
+
+Les scripts d'exploitation (`send-mail.sh`, `backup.sh`, puis les checks
+d'alerte de la phase 28) notifient le résultat par mail. Le canal est le SMTP
+de la stack (D-13), celui que GoTrue utilise — mais **l'envoi ne se fait jamais
+depuis l'hôte avec ce réglage sans avoir tranché le transport** :
+
+- Le `.env` de la stack définit `SMTP_HOST=supabase-mail`, `SMTP_PORT=2500`.
+  `supabase-mail` est un **nom de réseau Docker interne** : il n'est pas
+  résolvable depuis l'hôte. Un envoi depuis un script hôte (cron) avec ces
+  valeurs échouerait en « name or service not known », sans le moindre
+  rapport avec les identifiants.
+- **Sonde à jouer sur l'hôte de prod** (cette section est écrite depuis le
+  dépôt ; le résultat réel se consigne à l'exécution) — le `.env` est lu par
+  `sed`, jamais sourcé (§2.7 C et H) :
+
+  ```sh
+  STACK_ENV=supabase-project/.env
+  SMTP_HOST="$(sed -n 's/^SMTP_HOST=//p' "$STACK_ENV" | head -n1)"
+  SMTP_PORT="$(sed -n 's/^SMTP_PORT=//p' "$STACK_ENV" | head -n1)"
+  echo "sonde : $SMTP_HOST:$SMTP_PORT (depuis l'hôte)"
+  if nc -z -w5 "$SMTP_HOST" "$SMTP_PORT" 2>/dev/null; then
+    echo "JOIGNABLE depuis l'hôte"
+  else
+    echo "INJOIGNABLE depuis l'hôte (attendu : nom de réseau Docker)"
+  fi
+  ```
+
+- **Arbitrage retenu** (décidé par le résultat de la sonde, pas à la main) :
+  - **Sonde injoignable** — cas attendu et retenu par défaut :
+    `supabase-mail` n'existe que sur le réseau Docker de la stack. Le transport
+    est alors un **conteneur jetable** branché sur ce réseau
+    (`docker run --rm --network <réseau de la stack> …`), comme le font déjà
+    les tars de `backup.sh` pour les volumes nommés. `scripts/send-mail.sh`
+    implémente ce mode : c'est l'option par défaut qu'il retient quand `msmtp`
+    est absent de l'hôte.
+  - **Sonde joignable** (relais SMTP externe renseigné dans `SMTP_HOST`) — le
+    transport peut être `msmtp` **installé sur l'hôte**. Vérifier sa présence
+    avec `command -v msmtp` ; s'il est absent, l'installer avant de s'appuyer
+    dessus, et consigner ici la variante retenue. `send-mail.sh` bascule
+    automatiquement sur ce mode quand `msmtp` est présent.
+
+  Dans les deux cas, les identifiants SMTP ne sont **jamais** en ligne de
+  commande, en variable de session ni versionnés : ils vivent dans des fichiers
+  chmod 600 dont les chemins sont donnés par des variables d'environnement
+  (cf. `scripts/send-mail.sh`).
+
+**Résultat de la sonde sur la prod :** à consigner à la première exécution
+(date + verdict joignable/injoignable + option retenue). Tant qu'il n'est pas
+consigné, `send-mail.sh` choisit seul à l'exécution (msmtp présent → msmtp,
+sinon conteneur jetable) — aucun réglage manuel requis.
+
 ## Retour arrière
 
 | Élément | Procédure |
