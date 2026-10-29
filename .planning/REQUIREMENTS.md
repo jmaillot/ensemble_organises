@@ -108,7 +108,7 @@
 | RGDP-06 | Phase 27 | Complete (27-02 : enfants purgés avec le foyer orphelin, transférés D-08 sinon) |
 | RGDP-07 | Phase 27 | Complete (27-03 : Edge unifiée, panneau admin inchangé) |
 | OPS-01 | Phase 28 | Complete | 2026-10-29 |
-| OPS-02 | Phase 28 | Pending |
+| OPS-02 | Phase 28 | Non joué (absence déclarée opérateur 2026-10-29, « pass » — edda816) : runbook livré mais exercice réel non exécuté, RTO non mesuré ; re-diligence obligatoire phase 31 (porte OUV-07) |
 | OPS-03 | Phase 28 | Complete (4 alertes mail prouvées rouge→vert sur prod, mails reçus 2026-10-29 — runbook § Preuves des alertes, 89e5645) |
 | OPS-04 | Phase 28 | Complete (check-cron-health.sh 3 axes, rotation ratée attrapée par job de test 15-36 failed, prod 2026-10-29) |
 | OPS-05 | Phase 28 | Complete (28-04 : RPO ≤ 24 h / RTO cible ≤ 4 h avec « RTO constaté » réservé à l'exercice 28-05 / rétention GFS dans docs/EXPLOITATION.md ; commandes cron livrées D-05 dans docs/DEPLOIEMENT-PROD.md) |

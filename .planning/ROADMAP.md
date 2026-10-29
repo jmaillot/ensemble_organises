@@ -160,7 +160,7 @@ Plans:
 - [x] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 28-05-PLAN.md — Exercice de restauration isolé + RTO consigné + UAT-27 sur prod (OPS-02)
+- [x] 28-05-PLAN.md — Exercice de restauration isolé + RTO consigné + UAT-27 sur prod (OPS-02) *(clos par absence déclarée opérateur 2026-10-29 : runbook livré, exercice non joué, RTO non mesuré — re-diligence phase 31)*
 
 ### Phase 29: Messagerie v2
 

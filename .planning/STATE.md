@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
-Plan: 4 of 5 exécuté (28-05 restant — exercice de restauration, OPS-02)
+Plan: 5 of 5 exécuté (28-05 clos par absence déclarée — OPS-02 non prouvée, re-diligence phase 31)
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
