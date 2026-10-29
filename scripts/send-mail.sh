@@ -96,7 +96,11 @@ else
   cat
 fi > "${TMPDIR:-/tmp}/send-mail.$$.body"
 body="${TMPDIR:-/tmp}/send-mail.$$.body"
-trap 'rm -f "$body"' EXIT INT TERM
+# smtp_envfile est déclaré ici (pas seulement en mode conteneur) pour que le
+# trap FINAL référence une variable toujours définie : un trap évaluant une
+# variable vide ferait rm -f sur un chemin relatif imprévisible.
+smtp_envfile=""
+trap 'rm -f "$body" ${smtp_envfile:+"$smtp_envfile"}' EXIT INT TERM
 
 subject="$1"
 headers="From: ${MAIL_FROM}
@@ -149,17 +153,26 @@ smtp_pass=""
 # secret mal protégé.
 if [ -n "${EO_SMTP_USER_FILE:-}" ]; then smtp_user="$(secret_file "$EO_SMTP_USER_FILE")"; fi
 if [ -n "${EO_SMTP_PASS_FILE:-}" ]; then smtp_pass="$(secret_file "$EO_SMTP_PASS_FILE")"; fi
-smtp_auth_args=""
 if [ -n "$smtp_user" ] && [ -n "$smtp_pass" ]; then
-  # Les identifiants passent par l'environnement du conteneur (-e), jamais
-  # par argv ni par le shell du conteneur : ils ne sont ni listés dans les
-  # processus, ni journalisés.
-  smtp_auth_args="--env SMTP_USER=$smtp_user --env SMTP_PASS=$smtp_pass"
+  # Les identifiants passent par un env-file chmod 600 assemblé dans un
+  # fichier temporaire privé : ni argv, ni `--env VAR=valeur`. La forme
+  # `--env VAR=$secret` place la valeur dans la ligne de commande de
+  # `docker run` — lisible par ps / /proc/<pid>/cmdline pour tout utilisateur
+  # de l'hôte, et persistée dans les métadonnées du conteneur (`docker
+  # inspect`) — exactement ce que §2.7-H interdit. Le fichier est détruit par
+  # le trap EXIT posé plus haut, quel que soit le chemin de sortie.
+  smtp_envfile="$(mktemp "${TMPDIR:-/tmp}/eo-smtp.XXXXXX")"
+  umask 077
+  {
+    printf 'SMTP_USER=%s\n' "$smtp_user"
+    printf 'SMTP_PASS=%s\n' "$smtp_pass"
+  } > "$smtp_envfile"
 fi
 
 if ! { printf '%s\n\n' "$headers"; cat "$body"; } \
     | docker run --rm --interactive \
-        --network "$EO_MAIL_NETWORK" $smtp_auth_args \
+        --network "$EO_MAIL_NETWORK" \
+        ${smtp_envfile:+"--env-file" "$smtp_envfile"} \
         --env MAIL_FROM="$MAIL_FROM" --env MAIL_TO="$MAIL_TO" \
         --env SMTP_HOST="$smtp_host" --env SMTP_PORT="$smtp_port" \
         alpine:3.21 sh -c '
