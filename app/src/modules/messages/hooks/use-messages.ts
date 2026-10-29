@@ -5,7 +5,7 @@ import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { readTime, useSyncedReads } from '@/lib/notification-reads';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
-import { createConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, fetchReadReceipts, leaveConversation as leaveConversationRow, deleteConversationForMe as deleteConversationForMeRow, archiveConversationForMe as archiveConversationForMeRow, unarchiveConversationForMe as unarchiveConversationForMeRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage, type ReadReceipt } from '../api';
+import { createConversation, openDirectConversation, addConversationMembers, createMessage, deleteMessage as removeMessageRow, depositMessageImage, fetchConversationParticipants, fetchConversations, fetchLatestMessages, fetchMessagePage, fetchReadReceipts, leaveConversation as leaveConversationRow, deleteConversationForMe as deleteConversationForMeRow, archiveConversationForMe as archiveConversationForMeRow, unarchiveConversationForMe as unarchiveConversationForMeRow, archiveConversation as archiveConversationRow, updateMessageContent, MESSAGE_PAGE_SIZE, MAX_MESSAGE_LENGTH, type ConversationDraft, type MessagePage, type ReadReceipt } from '../api';
 import type { CompressedImage } from '@/modules/cercle/lib/media';
 import { resolveConversationTitle, sortMessages, toMessage, toParticipant, type ConversationSummary, type Message, type ReadMap } from '../types';
 import type { ConversationMemberRow, MemberColorTag, MessageRow } from '@/types';
@@ -87,6 +87,10 @@ export interface MessagesFeed {
   isSending: boolean;
   sendMedia: (conversationId: string, content: string, image: CompressedImage) => Promise<void>;
   createConversation: (draft: Omit<ConversationDraft, 'householdId'>) => Promise<string>;
+  /** D-04 : démarre ou rouvre la directe avec un membre, retourne l'identifiant du fil. */
+  openDirect: (otherMemberId: string) => Promise<string>;
+  /** D-04 : le membre dont l'ouverture est en cours (spinner inline, double-tap protégé). */
+  openingMemberId: string | null;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
   /** Fige le fil pour tous (D-14) : tombe collective, lecture seule. */
   archiveConversation: (conversationId: string) => Promise<void>;
@@ -425,6 +429,29 @@ export function useMessagesFeed(): MessagesFeed {
     },
   });
 
+  // D-04 : le member-picker démarre ou rouvre la directe. L'anti-doublon
+  // D-05 vit dans le RPC (0171) — ici, aucun fil n'est fabriqué localement,
+  // le retour sert seulement à sélectionner le fil ouvert.
+  const [openingMemberId, setOpeningMemberId] = useState<string | null>(null);
+  const openDirectMutation = useMutation({
+    mutationFn: async (otherMemberId: string): Promise<string> => {
+      if (!householdId) throw new Error('Aucun foyer sélectionné.');
+      if (!currentMemberId) throw new Error('Aucun membre courant pour démarrer la conversation.');
+      const result = await openDirectConversation({
+        householdId,
+        myMemberId: currentMemberId,
+        otherMemberId,
+      });
+      return result.id;
+    },
+    onMutate: (otherMemberId) => setOpeningMemberId(otherMemberId),
+    onSettled: () => {
+      setOpeningMemberId(null);
+      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+  });
+
+
   /**
    * Archivage-pour-tous (D-14) : la tombe collective retire le fil des
    * actifs (il bascule dans les archives, lecture seule), sans rien
@@ -622,6 +649,10 @@ export function useMessagesFeed(): MessagesFeed {
     async (conversationId: string, memberIds: string[]) => addMembersMutation.mutateAsync({ conversationId, memberIds }),
     [addMembersMutation],
   );
+  const openDirect = useCallback(
+    (otherMemberId: string) => openDirectMutation.mutateAsync(otherMemberId),
+    [openDirectMutation],
+  );
   const archiveConversation = useCallback(
     async (conversationId: string) => archiveMutation.mutateAsync(conversationId),
     [archiveMutation],
@@ -678,6 +709,8 @@ export function useMessagesFeed(): MessagesFeed {
     isSending: sendMutation.isPending,
     sendMedia,
     createConversation: createConversationAndSelect,
+    openDirect,
+    openingMemberId,
     addMembers,
     archiveConversation,
     editMessage,
@@ -815,6 +848,11 @@ export function useReadReceipts(conversationId: string | null, hasSent: boolean)
 export function useMessagesRealtime() {
   const queryClient = useQueryClient();
   useEffect(() => {
+    // D-08 : l'événement sert UNIQUEMENT à rafraîchir le fil ouvert et la
+    // liste (nouveaux messages, badges, nouvelle directe ouverte par un
+    // co-membre, arrivées/départs). Jamais d'accusé de lecture en direct :
+    // `notification_reads` n'est PAS souscrite — surface de preuve réduite,
+    // décision verrouillée.
     const invalidate = () => {
       void queryClient.invalidateQueries({ queryKey: messageKeys.all });
     };

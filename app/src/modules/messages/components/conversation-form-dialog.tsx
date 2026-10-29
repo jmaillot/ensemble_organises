@@ -161,6 +161,72 @@ export function ConversationFormDialog({
   );
 }
 
+export interface DirectPickerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  members: HouseholdMemberRow[];
+  /** Membre courant : jamais proposé — on n'écrit pas à soi-même. */
+  currentMemberId: string;
+  /** Membre dont l'ouverture est en cours : sa ligne porte le spinner inline, toutes sont désactivées. */
+  pendingMemberId: string | null;
+  /** Un tap sur une ligne démarre ou rouvre la directe — pas de bouton « créer » intermédiaire (D-04, UI-SPEC). */
+  onPick: (memberId: string) => void;
+}
+
+/**
+ * Picker « À qui écrire ? » (D-04) : le member-picker du foyer, enfants
+ * gérés inclus, comme le reste de l'app. Un tap = un résultat : le fil
+ * démarre ou se rouvre (D-05), l'échec est rejouable.
+ */
+export function DirectPickerDialog({
+  open,
+  onOpenChange,
+  members,
+  currentMemberId,
+  pendingMemberId,
+  onPick,
+}: DirectPickerDialogProps) {
+  const others = members.filter((member) => member.id !== currentMemberId);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <p className="eyebrow mb-2">Messages</p>
+          <DialogTitle>À qui écrire ?</DialogTitle>
+          <DialogDescription>Un tap suffit : l’échange privé s’ouvre, ou se rouvre s’il existe déjà.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-1.5" aria-label="Membres du foyer">
+          {others.length === 0 ? (
+            <p className="m-0 px-1 py-3 text-[12px] text-muted">Vous êtes le seul membre du foyer pour l’instant.</p>
+          ) : (
+            others.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                disabled={pendingMemberId !== null}
+                aria-label={`Écrire à ${member.display_name}`}
+                onClick={() => onPick(member.id)}
+                className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-[11px] border border-border bg-surface px-3 text-left text-[12px] transition-colors duration-[var(--duration-quick)] hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <MemberAvatar member={member} size="sm" />
+                {/* Libellé inchangé pendant l'appel (UI-SPEC) : le spinner
+                    inline porte l'attente, jamais un « Connexion… ». */}
+                <span className="min-w-0 flex-1 truncate font-semibold">{member.display_name}</span>
+                {pendingMemberId === member.id ? (
+                  <span
+                    aria-hidden="true"
+                    className="size-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-accent"
+                  />
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export interface AddMembersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

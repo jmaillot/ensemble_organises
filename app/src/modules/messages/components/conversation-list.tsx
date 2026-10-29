@@ -1,5 +1,6 @@
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { CountBadge } from '@/components/shared/module-shell';
+import { Button } from '@/components/ui/button';
 import { LoadingRows } from '@/components/ui/empty-state';
 import { pluralize } from '@/lib/utils';
 import { formatListTime, type ConversationSummary } from '../types';
@@ -10,12 +11,14 @@ export interface ConversationListProps {
   archivedConversations?: ConversationSummary[];
   activeId: string | null;
   onSelect: (conversationId: string) => void;
+  /** CTA « Démarrer une conversation » (D-04) : présent sur le panneau ET la liste vide. */
+  onStartConversation?: () => void;
   isLoading?: boolean;
   className?: string;
 }
 
 /** Liste des conversations : une vraie liste de boutons, `aria-current` compris. */
-export function ConversationList({ conversations, archivedConversations = [], activeId, onSelect, isLoading = false, className }: ConversationListProps) {
+export function ConversationList({ conversations, archivedConversations = [], activeId, onSelect, onStartConversation, isLoading = false, className }: ConversationListProps) {
   const renderItem = (conversation: ConversationSummary) => {
     const isActive = conversation.id === activeId;
     const unreadLabel =
@@ -69,9 +72,20 @@ export function ConversationList({ conversations, archivedConversations = [], ac
         <h3 className="m-0 font-display text-base tracking-[-0.035em]">Conversations</h3>
         <CountBadge value={conversations.length} label="conversations" />
       </div>
+      {onStartConversation ? (
+        <div className="px-2 pb-2">
+          {/* CTA tactille ≥ 44px (min-h-11), icône `people` (UI-SPEC). */}
+          <Button size="sm" icon="people" className="min-h-11" onClick={onStartConversation}>
+            Démarrer une conversation
+          </Button>
+        </div>
+      ) : null}
       {isLoading ? <LoadingRows rows={3} className="px-2" /> : null}
       {!isLoading && conversations.length === 0 ? (
-        <p className="m-0 px-2 pb-2 text-xs text-muted">Aucune conversation pour le moment.</p>
+        <div className="px-2 pb-2">
+          <strong className="block text-xs">Aucune conversation</strong>
+          <p className="m-0 mt-0.5 text-xs text-muted">Écrivez à un membre du foyer en un tap.</p>
+        </div>
       ) : null}
       <ul className="grid list-none gap-0.5 p-0">
         {conversations.map(renderItem)}

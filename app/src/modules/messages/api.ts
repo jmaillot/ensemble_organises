@@ -259,6 +259,67 @@ export interface ConversationDraft {
   memberIds: string[];
 }
 
+/** Résultat d'ouverture d'une directe : le serveur dit si le fil existait. */
+export interface DirectOpenResult {
+  id: string;
+  /** Vrai si une NOUVELLE conversation a été créée, faux si elle a été rouverte. */
+  created: boolean;
+}
+
+/**
+ * Démarrage d'une directe depuis le member-picker (D-04). En ligne, le RPC
+ * `open_direct_conversation` (0171) rouvre la directe existante si les deux
+ * participations sont actives (D-05) et crée sinon — l'anti-doublon est
+ * garanti côté serveur, le client ne fabrique jamais de fil en double. En
+ * démo, la même sémantique est rejouée localement : recherche d'une directe
+ * active entre les deux membres, création à défaut.
+ */
+export async function openDirectConversation(input: {
+  householdId: string;
+  myMemberId: string;
+  otherMemberId: string;
+}): Promise<DirectOpenResult> {
+  if (input.otherMemberId === input.myMemberId) {
+    throw new Error('Choisissez un autre membre que vous-même.');
+  }
+  if (isSupabaseConfigured && supabase) {
+    const { data: row, error } = await supabase.rpc('open_direct_conversation', {
+      p_other_member_id: input.otherMemberId,
+    });
+    if (error) throw new DataError(error.message || 'Impossible d’ouvrir la conversation. Réessayez.', error);
+    const result = row as { id?: unknown; created?: unknown };
+    if (typeof result?.id !== 'string') {
+      throw new DataError('Impossible d’ouvrir la conversation. Réessayez.', error);
+    }
+    return { id: result.id, created: result.created === true };
+  }
+  const conversations = await data.list<ConversationRow>('conversations', { household_id: input.householdId });
+  const directIds = new Set(conversations.filter((row) => row.type === 'direct').map((row) => row.id));
+  const participants = await data.list<ConversationMemberRow>('conversation_members');
+  const activesByConversation = new Map<string, Set<string>>();
+  for (const row of participants) {
+    // D-05 : seules les participations ACTIVES comptent (une pierre tombale
+    // ne rouvre pas — une nouvelle directe sera créée, comme côté serveur).
+    if (row.left_at || !directIds.has(row.conversation_id)) continue;
+    const actives = activesByConversation.get(row.conversation_id) ?? new Set<string>();
+    actives.add(row.member_id);
+    activesByConversation.set(row.conversation_id, actives);
+  }
+  for (const [conversationId, actives] of activesByConversation) {
+    if (actives.size === 2 && actives.has(input.myMemberId) && actives.has(input.otherMemberId)) {
+      return { id: conversationId, created: false };
+    }
+  }
+  const row = await createConversation({
+    householdId: input.householdId,
+    type: 'direct',
+    title: null,
+    memberIds: [input.myMemberId, input.otherMemberId],
+  });
+  return { id: row.id, created: true };
+}
+
+
 /**
  * Création d'une conversation et de ses membres initiaux. En mode Supabase,
  * le RPC atomique `create_conversation` (0041) ; en mode local, les mêmes

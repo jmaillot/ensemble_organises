@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useIsAdmin, useMembers } from '@/stores/household-store';
 import { ChatPanel } from './components/chat-panel';
 import { ConversationList } from './components/conversation-list';
-import { AddMembersDialog, ConversationFormDialog } from './components/conversation-form-dialog';
+import { AddMembersDialog, ConversationFormDialog, DirectPickerDialog } from './components/conversation-form-dialog';
 import { useMessagesFeed, useMessagesRealtime, useReadWatermark, useThreadPage } from './hooks/use-messages';
 
 export default function MessagesPage() {
@@ -16,6 +16,7 @@ export default function MessagesPage() {
   const members = useMembers();
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingArchive, setPendingArchive] = useState<string | null>(null);
@@ -65,6 +66,22 @@ export default function MessagesPage() {
   const isSolo = !isLeft && activeId !== null && declaredIds.length === 1;
   const leavingTitle = active?.title ?? 'cette conversation';
 
+  // D-04 : un tap sur un membre démarre ou rouvre la directe, puis sélectionne
+  // le fil. L'échec reste rejouable (picker ouvert, ligne désérialisée) et
+  // porte le toast contractuel — le message serveur lisible prime s'il existe.
+  const startDirect = (memberId: string) => {
+    void feed
+      .openDirect(memberId)
+      .then((id) => {
+        setPickerOpen(false);
+        setSelectedId(id);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : '';
+        toast(message.length > 0 ? message : 'Impossible d’ouvrir la conversation. Réessayez.', 'error');
+      });
+  };
+
   if (feed.isError) {
     return (
       <ModuleShell module="messages">
@@ -83,27 +100,18 @@ export default function MessagesPage() {
           <EmptyState
             icon="message"
             title="Aucune conversation"
-            description="Les échanges de votre foyer apparaîtront ici dès qu’une conversation sera ouverte. Les messages privés restent dans le périmètre du foyer."
+            description="Écrivez à un membre du foyer en un tap."
             actionLabel="Démarrer une conversation"
-            onAction={() => setCreateOpen(true)}
+            onAction={() => setPickerOpen(true)}
           />
         )}
-        <ConversationFormDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
+        <DirectPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
           members={members}
           currentMemberId={feed.currentMemberId}
-          isSaving={feed.isCreating}
-          onSubmit={async (values) => {
-            try {
-              const id = await feed.createConversation(values);
-              setCreateOpen(false);
-              setSelectedId(id);
-              toast('Conversation démarrée.');
-            } catch (error) {
-              toast(error instanceof Error ? error.message : 'La conversation n’a pas pu être créée.', 'error');
-            }
-          }}
+          pendingMemberId={feed.openingMemberId}
+          onPick={startDirect}
         />
       </ModuleShell>
     );
@@ -138,6 +146,7 @@ export default function MessagesPage() {
           archivedConversations={archivedConversations}
           activeId={activeId}
           isLoading={feed.isLoading}
+          onStartConversation={() => setPickerOpen(true)}
           onSelect={(conversationId) => {
             setSelectedId(conversationId);
             setListVisible(false);
@@ -241,6 +250,14 @@ export default function MessagesPage() {
         />
       </div>
 
+      <DirectPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        members={members}
+        currentMemberId={feed.currentMemberId}
+        pendingMemberId={feed.openingMemberId}
+        onPick={startDirect}
+      />
       <ConversationFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
