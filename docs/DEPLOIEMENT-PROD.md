@@ -158,9 +158,11 @@ sh scripts/set-push-secrets.sh --check
 ## Transport mail des checks (alertes et sauvegardes, D-06/D-13)
 
 Les scripts d'exploitation (`send-mail.sh`, `backup.sh`, puis les checks
-d'alerte de la phase 28) notifient le résultat par mail. Le canal est le SMTP
-de la stack (D-13), celui que GoTrue utilise — mais **l'envoi ne se fait jamais
-depuis l'hôte avec ce réglage sans avoir tranché le transport** :
+d'alerte de la phase 28) notifient le résultat par mail. Le transport retenu
+est **msmtp sur l'hôte avec un relais Gmail** (révision D-13 du 2026-10-29,
+décision opérateur) — le canal d'origine, le SMTP de la stack D-13, reste le
+repli conteneur. Les alertes des checks passent par `send-mail.sh`, qui
+sélectionne seul msmtp quand il est présent.
 
 - Le `.env` de la stack définit `SMTP_HOST=supabase-mail`, `SMTP_PORT=2500`.
   `supabase-mail` est un **nom de réseau Docker interne** : il n'est pas
