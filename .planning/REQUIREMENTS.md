@@ -44,7 +44,7 @@
 - [ ] **OPS-02** : Exercice de restauration joué sur un Compose isolé (jamais sur la prod) avec RTO mesuré et consigné + runbook exploitable
 - [x] **OPS-03** *(réécrite le 2026-10-28 en discussion de phase — la pile Prometheus/Grafana/Loki est retirée au profit d'alertes mail simples)* : Alertes par mail pour disque / certificats / pg_cron / erreurs Edge, chacune prouvée par un déclenchement réel, pas une promesse de configuration
 - [x] **OPS-04** : `check-cron-health.sh` valide les jobs pg_cron et attrape une rotation ratée de secret
-- [ ] **OPS-05** : RPO, RTO et politique de rétention arbitrés et documentés dans `docs/`
+- [x] **OPS-05** : RPO, RTO et politique de rétention arbitrés et documentés dans `docs/`
 
 ### Ouverture des inscriptions
 
@@ -111,7 +111,7 @@
 | OPS-02 | Phase 28 | Pending |
 | OPS-03 | Phase 28 | Complete (4 alertes mail prouvées rouge→vert sur prod, mails reçus 2026-10-29 — runbook § Preuves des alertes, 89e5645) |
 | OPS-04 | Phase 28 | Complete (check-cron-health.sh 3 axes, rotation ratée attrapée par job de test 15-36 failed, prod 2026-10-29) |
-| OPS-05 | Phase 28 | Pending |
+| OPS-05 | Phase 28 | Complete (28-04 : RPO ≤ 24 h / RTO cible ≤ 4 h avec « RTO constaté » réservé à l'exercice 28-05 / rétention GFS dans docs/EXPLOITATION.md ; commandes cron livrées D-05 dans docs/DEPLOIEMENT-PROD.md) |
 | MSG-01 | Phase 29 | Pending |
 | MSG-02 | Phase 29 | Pending |
 | MSG-03 | Phase 29 | Pending |

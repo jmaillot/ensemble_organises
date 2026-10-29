@@ -157,7 +157,7 @@ Plans:
 - [x] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)
+- [x] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 28-05-PLAN.md — Exercice de restauration isolé + RTO consigné + UAT-27 sur prod (OPS-02)

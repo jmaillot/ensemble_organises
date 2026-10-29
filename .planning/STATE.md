@@ -5,8 +5,8 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
 current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: executing
-stopped_at: Completed 28-03-PLAN.md
-last_updated: "2026-10-29T10:20:05.343Z"
+stopped_at: Completed 28-04-PLAN.md
+last_updated: "2026-10-29T10:27:58Z"
 state_head: 89e56457424fb91ed5bb321e9c859d305929a009
 progress:
   total_phases: 7
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
-Plan: 5 of 5
+Plan: 4 of 5 exécuté (28-05 restant — exercice de restauration, OPS-02)
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
@@ -72,8 +72,8 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T08:22:37.642Z
-**Stopped at:** Completed 28-02-PLAN.md
+**Last session:** 2026-10-29T10:27:58Z
+**Stopped at:** Completed 28-04-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -111,8 +111,13 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 27 P05 | ~1h20 | 3 tasks | 6 files |
 | Phase 28 P01 | 9 min | 3 tasks | 3 files |
 | Phase 28 P02 | 14 min | 2 tasks | 2 files |
+| Phase 28 P04 | 4 min | 2 tasks | 2 files |
 
 ## Decisions
+
+- [Phase 28]: [28-04] RPO ≤ 24 h par le cron nocturne 02:15 ; vérité tierce assumée : réplication non déployée → points de récupération sur le disque local de l'hôte prod seul (risque documenté, re-diligence avant phase 31). RTO : cible ≤ 4 h (D-09), valeur réelle réservée à la sous-section « RTO constaté » de docs/EXPLOITATION.md à remplir par l'exercice 28-05
+- [Phase 28]: [28-04] Clone de restauration isolé par docker-compose.isole.yml (ports: !override [] sur api-gw/supavisor) : sur prod, seul l'override Traefik retire les ports publiés ; sans lui, le clone binderait 8000/6543 déjà occupés par la stack qui tourne (D-08)
+- [Phase 28]: [28-04] Créneau nocturne arbitré contre les jobs pg_cron internes (04:14-06:40) : backup 02:15 / réplication 02:45 / checks 07:10-07:40 — commandes livrées D-05 dans docs/DEPLOIEMENT-PROD.md « Installation de l'ordonnancement nocturne »
 
 - [Phase 25]: Restriction par module portée par la ligne household_members (managed_modules text[]), pas par households — D-05 par enfant
 - [Phase 25]: CHECK de format uniquement (private.has_valid_module_keys de 0140) : la validité sémantique du catalogue reste côté client
