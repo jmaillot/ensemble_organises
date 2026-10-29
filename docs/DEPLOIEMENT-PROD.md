@@ -332,3 +332,98 @@ explicite, par date.
 - Les étapes **M-01** (preuve push prod) et **M-02** (clés VAPID en production)
   se jouent à ce moment-là ; leur checklist est dans `docs/PWA.md`
   (« Exploitation push — checklist opérateur »).
+
+## Preuves des alertes
+
+Chaque alerte est **prouvée par un déclenchement réel** (§2.7-B : vu rouge
+avant vert), mail reçu et lu, puis remise en ordre — jamais promise. Les
+preuves jouées par l'agent sur la base de développement sont consignées
+ci-dessous ; les preuves finales **sur prod avec mail reçu** se jouent par
+l'opérateur (commandes fournies dans chaque entrée) et sont horodatées à la
+main dans ce tableau.
+
+### pg_cron — déclenché par l'agent (2026-10-29, base de dev)
+
+Méthode du plan : un job de test pointant vers une fonction inexistante
+créé, vu en échec, supprimé — l'échec d'une rotation de secret se présente
+identiquement (status `failed` sur `cron.job_run_details`).
+
+```sh
+# Déclenchement
+echo "select cron.schedule('eo-check-test-broken', '* * * * *',
+  'select private.check_cron_test_absente()');" | sh scripts/psql.sh
+sleep 75   # pg_cron exécute à la minute suivante
+
+# Preuve rouge — l'axe « échecs » alerte, exit 1 :
+EO_CRON_JOBS="…catalogue de test…" sh scripts/check-cron-health.sh   # → ✗ axe échecs, 2 exécutions failed
+
+# Remise en ordre
+echo "select cron.unschedule(22);" | sh scripts/psql.sh
+
+# Preuve vert — silence, exit 0 :
+EO_CRON_JOBS="…" sh scripts/check-cron-health.sh                    # → ✓ trois axes au vert
+```
+
+Observation au passage : sur la base de développement, les jobs quotidiens
+(05 h–06 h) n'ont pas tourné pendant la nuit — la machine était éteinte et
+pg_cron ne rattrape pas les créneaux manqués. Sur un hôte prod toujours
+allumé, c'est un vrai signal ; sur la base dev, l'axe récence crie au loup à
+chaque matin — utiliser `EO_CRON_JOBS` pour un test local (voir
+`scripts/check-cron-health.sh`).
+
+Mail : la patte d'envoi passe par `send-mail.sh` (transport arbitré en 28-01)
+avec `EO_MAIL_TO` ; sur la base de dev, sans `EO_MAIL_TO`, l'alerte reste sur
+stderr + exit 1. **La preuve mail reçu et lu se joue sur prod** (checkpoint
+utilisateur, ci-dessous).
+
+### Disque, certificats, erreurs Edge — preuves opérateur sur prod
+
+Les déclenchements exigent l'hôte de prod (tmpfs à remplir, seuil de
+certificat à dépasser, injection pg_net). Commandes exactes :
+
+1. **Disque** — remplir un tmpfs au-delà du seuil puis relâcher :
+   ```sh
+   mkdir -p /tmp/eo-disk-proof && mount -t tmpfs -o size=200M tmpfs /tmp/eo-disk-proof
+   dd if=/dev/zero of=/tmp/eo-disk-proof/fill bs=1M count=190    # 95 % > seuil 85 %
+   EO_DISK_THRESHOLD=90 sh scripts/check-disk.sh                 # → rouge + mail [EO-disque]
+   umount /tmp/eo-disk-proof && rmdir /tmp/eo-disk-proof         # remise en ordre
+   ```
+   (Les checks tournant depuis la racine de la stack, le tmpfs de test cible
+   le point de montage surveillé ; ajuster le chemin si `EO_DISK_PATH` vise
+   un volume dédié.)
+
+2. **Certificats** — dépasser le seuil de 21 jours en sondant un hôte dont le
+   certificat expire plus tôt (ou en abaissant le seuil sous l'âge restant
+   réel, puis remettre) :
+   ```sh
+   EO_CERT_HOSTS="app.votredomaine.fr api.votredomaine.fr studio.votredomaine.fr" \
+     EO_CERT_THRESHOLD_DAYS=400 sh scripts/check-certs.sh       # → rouge + mail [EO-certificats]
+   # Remise en ordre : relancer sans EO_CERT_THRESHOLD_DAYS (défaut 21) → vert
+   ```
+
+3. **Erreurs Edge** — injecter un appel pg_net vers une URL en 404 :
+   ```sh
+   echo "select net.http_post(
+           url := 'https://app.votredomaine.fr/eo-injection-404-test',
+           headers := '{\"Content-Type\": \"application/json\"}'::jsonb,
+           body := '{}'::jsonb);" | sh scripts/psql.sh
+   sleep 10
+   sh scripts/check-edge-errors.sh                               # → rouge + mail [EO-edge]
+   # Remise en ordre : aucune — la fenêtre de 24 h vieillit l'entrée seule ;
+   # le check redevient vert à la purge de net._http_response (ou vérifier
+   # immédiatement que le seuil retombe après nettoyage de la fenêtre de test).
+   ```
+
+   Sanitizer : les mails d'alerte reprennent status_code + chemin, tronqués —
+   jamais le corps de la réponse.
+
+**Confirmation opérateur :** pour chaque alerte — commande de déclenchement
+jouée, mail reçu et lu, remise en ordre faite, check revenu au vert.
+Consigner date + résultat dans le tableau :
+
+| Alerte | Date déclenchement | Mail reçu | Remise en ordre |
+|--------|--------------------|-----------|-----------------|
+| pg_cron | 2026-10-29 (dev, agent — mail à prouver sur prod) | ☐ | ✓ (job de test supprimé) |
+| Disque | ☐ | ☐ | ☐ |
+| Certificats | ☐ | ☐ | ☐ |
+| Erreurs Edge | ☐ | ☐ | ☐ |
