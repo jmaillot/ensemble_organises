@@ -125,13 +125,19 @@ Plans:
 
 ### Phase 28: Exploitation — sauvegardes, restauration, supervision
 
-**Goal**: Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + restic sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, alertes par mail (disque/certificats/pg_cron/erreurs Edge) chacune prouvée par un déclenchement réel — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
+**Goal** *(annoté le 2026-10-29 : « restic » retiré par la décision verrouillée D-02 — les fichiers chiffrés existants de backup.sh sont répliqués tels quels, cf. OPS-01 réécrite dans REQUIREMENTS.md)* : Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + réplication des fichiers chiffrés existants sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, alertes par mail (disque/certificats/pg_cron/erreurs Edge) chacune prouvée par un déclenchement réel — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
 **Depends on**: Phase 25 (les migrations peuvent s'appliquer sur la pile restaurée ; orthogonale aux phases 26-27)
 **Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
 **Tests UAT hérités de la phase 27** (reportés le 2026-10-28, à passer pendant cette phase — le SMTP réel du serveur docker est le lieu d'exécution) :
 - UAT-27.5 — Annulation : restauration nom/photo dans CHAQUE foyer (multi-foyer), page honnête sans promesse de sessions
 - UAT-27.6 — Données partagées du foyer survivent à la suppression d'un membre (tâches, courses, notes)
 - UAT-27.7 — E-mail de rappel J-7 réellement livré (simulation J-7 par SQL + lecture boîte mail)
+
+**Plans**:
+- Wave 1 : 28-01 (tracer — backup.sh étendu + send-mail.sh + sonde SMTP, OPS-01) ∥ 28-02 (backup-replicate.sh — rsync tierce + purge GFS + pgsodium disjointe, OPS-01)
+- Wave 2 *(bloquée sur Wave 1)* : 28-03 (check-cron-health.sh rouge→vert + 4 checks d'alerte mail + preuves réelles, OPS-03/OPS-04)
+- Wave 3 *(bloquée sur Wave 2)* : 28-04 (RPO/RTO/rétention + runbook + commandes cron, OPS-05)
+- Wave 4 *(bloquée sur Wave 3)* : 28-05 (exercice de restauration isolé + RTO consigné + UAT-27.5/6/7, OPS-02)
 
 **Success Criteria** (what must be TRUE):
   1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
