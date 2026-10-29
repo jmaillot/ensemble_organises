@@ -202,10 +202,12 @@ sélectionne seul msmtp quand il est présent.
   chmod 600 dont les chemins sont donnés par des variables d'environnement
   (cf. `scripts/send-mail.sh`).
 
-**Résultat de la sonde sur la prod :** à consigner à la première exécution
-(date + verdict). Le transport retenu est Gmail via msmtp (révision D-13 du
-2026-10-29) ; en l'absence de msmtp sur un hôte donné, `send-mail.sh` retombe
-sur le conteneur jetable (repli conservé).
+**Résultat de la sonde sur la prod :** **2026-10-29 — sonde JOIGNABLE, mail
+`[EO-sonde]` reçu et lu** (transport msmtp → smtp.gmail.com:587, révision
+D-13). Caveat consigné à l'usage : `/var/log/msmtp.log` est réservé à root ;
+une sonde lancée en utilisateur doit désactiver le log avec
+`msmtp --log=stderr` (le réglage `logfile` du msmtprc reste le bon pour cron
+et checks, qui tournent en root).
 
 **Commandes à jouer sur l'hôte de prod** (arbitrage Gmail via msmtp — révision
 D-13 du 2026-10-29 ; les secrets vivent dans des fichiers 600, jamais en argv) :
