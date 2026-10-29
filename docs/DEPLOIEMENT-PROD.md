@@ -381,16 +381,23 @@ utilisateur, ci-dessous).
 Les déclenchements exigent l'hôte de prod (tmpfs à remplir, seuil de
 certificat à dépasser, injection pg_net). Commandes exactes :
 
-1. **Disque** — remplir un tmpfs au-delà du seuil puis relâcher :
+1. **Disque** — deux méthodes selon les droits disponibles. Sans racine sur
+   l'hôte (cas de la preuve dev), dépasser le seuil par le seuil lui-même —
+   même philosophie que les certificats ci-dessous :
+   ```sh
+   EO_DISK_THRESHOLD=20 sh scripts/check-disk.sh   # → rouge + mail [EO-disque] (usage réel > 20 %)
+   sh scripts/check-disk.sh                        # remise en ordre : seuil par défaut 85 % → vert
+   ```
+   Avec la racine, remplir un tmpfs au-delà du seuil puis relâcher (preuve
+   plus proche du réel) :
    ```sh
    mkdir -p /tmp/eo-disk-proof && mount -t tmpfs -o size=200M tmpfs /tmp/eo-disk-proof
    dd if=/dev/zero of=/tmp/eo-disk-proof/fill bs=1M count=190    # 95 % > seuil 85 %
-   EO_DISK_THRESHOLD=90 sh scripts/check-disk.sh                 # → rouge + mail [EO-disque]
+   EO_DISK_PATHS=/tmp/eo-disk-proof sh scripts/check-disk.sh     # → rouge + mail
    umount /tmp/eo-disk-proof && rmdir /tmp/eo-disk-proof         # remise en ordre
    ```
-   (Les checks tournant depuis la racine de la stack, le tmpfs de test cible
-   le point de montage surveillé ; ajuster le chemin si `EO_DISK_PATH` vise
-   un volume dédié.)
+   (Le tmpfs cible un chemin surveillé via `EO_DISK_PATHS` ; ajuster pour
+   viser le point de montage réel de la stack en prod.)
 
 2. **Certificats** — dépasser le seuil de 21 jours en sondant un hôte dont le
    certificat expire plus tôt (ou en abaissant le seuil sous l'âge restant
@@ -423,7 +430,7 @@ Consigner date + résultat dans le tableau :
 
 | Alerte | Date déclenchement | Mail reçu | Remise en ordre |
 |--------|--------------------|-----------|-----------------|
-| pg_cron | 2026-10-29 (dev, agent — mail à prouver sur prod) | ☐ | ✓ (job de test supprimé) |
-| Disque | ☐ | ☐ | ☐ |
-| Certificats | ☐ | ☐ | ☐ |
-| Erreurs Edge | ☐ | ☐ | ☐ |
+| pg_cron | 2026-10-29 (dev, agent — rouge 2 failed, job de test créé puis supprimé) | ☐ prod | ✓ (cron.unschedule(22)) |
+| Disque | 2026-10-29 (dev, agent — rouge par seuil 20 % < usage 29 %) | ☐ prod | ✓ (seuil par défaut 85 % → vert) |
+| Certificats | 2026-10-29 (dev, agent — rouge par seuil 4000 j sur example.com, 57 j restants) | ☐ prod | ✓ (seuil 21 j → vert) |
+| Erreurs Edge | 2026-10-29 (dev, agent — injection pg_net httpbin.org/status/404, id 66, rouge count=1) | ☐ prod | ✓ (la fenêtre 24 h vieillit l'entrée seule) |
