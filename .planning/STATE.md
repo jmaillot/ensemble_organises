@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 29
 current_phase_name: Messagerie v2
 status: executing
-stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-10-29T14:33:38.012Z"
-state_head: 7bd2a4bb59973d26e2965b8d000eb4851543edfe
+stopped_at: Completed 29-03-PLAN.md
+last_updated: "2026-10-29T14:49:23.414Z"
+state_head: d5073870b19ef3093b8ff178c9a96674454fc9c7
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 29
-  completed_plans: 26
+  completed_plans: 27
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 29 (Messagerie v2) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécuté — 29-01 complet, SUMMARY écrit)
 
@@ -72,8 +72,8 @@ Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécut
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T14:33:37.870Z
-**Stopped at:** Completed 29-02-PLAN.md
+**Last session:** 2026-10-29T14:49:23.314Z
+**Stopped at:** Completed 29-03-PLAN.md
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -114,6 +114,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 28 P04 | 4 min | 2 tasks | 2 files |
 | Phase 29 P01 | 14 min | 2 tasks | 2 files |
 | Phase 29 P02 | 75m | 2 tasks | 4 files |
+| Phase 29 P03 | 35m | 2 tasks | 1 files |
 
 ## Decisions
 
@@ -174,6 +175,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 28]: [28-01] OPS-01 non marqué complete : ID partagé avec 28-02 (gate #2388), le dernier plan déclarant le marquera ; sonde SMTP et première sauvegarde notifiée à jouer sur prod (commandes livrées per D-05)
 - [Phase 29]: Push messages groupé (0172) : compteur au titre, reminder_ids par groupe, contenu banni ; Edge consomme par liste
 - [Phase 29]: reminder_id scalaire conservé (dernier id du groupe) pour compat Edge ; titre du fil autorisé au push, jamais le contenu
+- [Phase 29]: 29-03 : souscription Realtime par le chemin de production api-gw (Host de tenant) ; client WS natif Node, zéro dépendance npm ; aucune migration 0173 (publication déjà complète)
 
 ### Blockers
 
