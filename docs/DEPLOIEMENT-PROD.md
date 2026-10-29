@@ -279,6 +279,15 @@ EO_MAIL_TO="$(cat /etc/eo-mail-to)" sh scripts/backup.sh
 
 ## Réplication vers la machine tierce (D-01/D-02/D-03)
 
+> **Absence déclarée (décision opérateur, 2026-10-29)** : la réplication
+> vers la machine tierce n'est **pas** déployée à ce stade — l'opérateur a
+> choisi de considérer D-01/D-02/D-03 comme acquises sans preuve
+> d'exécution réelle. La chaîne prouvée reste : backup local chiffré +
+> vérification D-07 + mail (preuve réelle du 2026-10-29,
+> `20261029T092434Z`). Le script `scripts/backup-replicate.sh` existe et est
+> prêt ; les commandes ci-dessous sont à jouer le jour où une machine tierce
+> est désignée. À re-diligencer avant l'ouverture publique (phase 31).
+
 Les sauvegardes chiffrées de `scripts/backup.sh` (les `.gpg` + `SHA256SUMS`,
 telles quelles — pas de re-chiffrement, pas de restic, per D-02) sont
 répliquées chaque nuit vers une machine tierce auto-hébergée. L'ordre est non
