@@ -373,6 +373,153 @@ Elle ne s'exécute **qu'après** la vérification du stamp du jour sur la tierce
 jamais par `rsync --delete` : la sélection des répertoires à supprimer est
 explicite, par date.
 
+## Installation de l'ordonnancement nocturne (D-05)
+
+Section de référence : **toutes les commandes d'installation à livrer à
+l'opérateur** sont ici (exigence explicite « me donner toutes les commandes
+plus consigner dans le readme »). Aucun secret dans ces commandes —
+uniquement des chemins de fichiers chmod 600 (§2.7-H). La procédure de
+**restauration** ne se duplique pas : elle vit dans
+`docs/EXPLOITATION.md` (« Runbook de restauration », D-10) — une seule copie
+de chaque procédure ; si elle change, la corriger **dans toutes les copies**
+(§2.7-I, ici : une seule).
+
+### Arbitrage du créneau nocturne
+
+Les jobs `pg_cron` internes tournent déjà la nuit et le matin
+(`cron.job`, relevé dans `docs/EXPLOITATION.md` § « Catalogue des jobs ») :
+purges et rappels entre 04:14 et 06:40, `eo-push-dispatch` chaque minute,
+`eo-push-messages` toutes les 5 minutes. Choix retenu :
+
+- **backup.sh à 02:15** : avant les jobs internes du matin. Le dump est un
+  instantané cohérent à chaud (§11), donc les jobs de la minute ne le
+  corrompent pas ; le créneau 02:15 laisse toute la fenêtre 02:45–04:14 à la
+  réplication, sans chevaucher les purges nocturnes de la base.
+- **backup-replicate.sh à 02:45** : 30 minutes après le backup — marge pour
+  un dump de taille prod ; si un jour la réplication dépasse 04:14, rien ne
+  casse (elle ne touche que des fichiers, pas la base), mais la marge est
+  l'objectif de dimensionnement.
+- **Checks d'alerte le matin (07:10–07:40)** : après le dernier job interne
+  (06:40) — un check de santé lancé au milieu des purges crierait au loup ;
+  les checks de récence (pg_cron) jugent alors la nuit entière.
+
+### Crontabs complets (root, `crontab -e`)
+
+```cron
+# ── Sauvegarde et réplication (D-05) ──────────────────────────────────────
+# 02:15 — sauvegarde chiffrée + vérification D-07 + mail du verdict D-06.
+#         EO_MAIL_TO est requis : sans destinataire, aucune notification.
+15 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1
+
+# 02:45 — réplication tierce + purge GFS (seulement quand la tierce est
+#         connectée ; aujourd'hui NON déployée, voir la bannière ci-dessus).
+45 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) EO_REPL_TARGET=<user>@<hote-tierce> EO_REPL_SSH=/root/.ssh/eo_replication EO_REPL_DIR=/srv/backups/eo EO_PGSODIUM_COPY=/srv/secrets/eo/pgsodium EO_PGSODIUM_LOCAL=/srv/backups/eo sh /chemin/depot/scripts/backup-replicate.sh >> /var/log/eo-backup-replicate.log 2>&1
+
+# ── Checks d'alerte (silence = vert ; un mail part uniquement si alerte) ──
+# 07:10 — disque : seuil 85 % (EO_DISK_THRESHOLD), points de montage par
+#         EO_DISK_PATHS. Quotidien : un disque qui se remplit en 8 h exige
+#         une détection journalière.
+10 7 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/check-disk.sh >> /var/log/eo-checks.log 2>&1
+
+# 07:20 — certificats TLS : seuil 21 jours (EO_CERT_THRESHOLD_DAYS), hôtes
+#         EO_CERT_HOSTS="app.votredomaine.fr api.votredomaine.fr studio.votredomaine.fr".
+20 7 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) EO_CERT_HOSTS="app.votredomaine.fr api.votredomaine.fr studio.votredomaine.fr" sh /chemin/depot/scripts/check-certs.sh >> /var/log/eo-checks.log 2>&1
+
+# 07:30 — santé pg_cron (OPS-04) : présence/active, récence N×période,
+#         échecs 'failed'. La liste des jobs est codée dans le script
+#         (relevé réel du catalogue — docs/EXPLOITATION.md).
+30 7 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/check-cron-health.sh >> /var/log/eo-checks.log 2>&1
+
+# 07:40 — erreurs Edge : seuil 0 sur la fenêtre 24 h
+#         (EO_EDGE_ERROR_THRESHOLD=0, EO_EDGE_WINDOW_HOURS=24).
+40 7 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/check-edge-errors.sh >> /var/log/eo-checks.log 2>&1
+```
+
+| Check | Fréquence | Seuil par défaut | Alerte [EO-*] |
+|---|---|---|---|
+| `check-disk.sh` | quotidien 07:10 | 85 % de remplissage | `[EO-disque]` |
+| `check-certs.sh` | quotidien 07:20 | expiration < 21 jours | `[EO-certificats]` |
+| `check-cron-health.sh` | quotidien 07:30 | job absent/inactif, récence > N×période, statut `failed` | `[EO-cron]` |
+| `check-edge-errors.sh` | quotidien 07:40 | ≥ 1 réponse status ≥ 400 sur 24 h | `[EO-edge]` |
+
+Les quatre checks réutilisent `scripts/send-mail.sh` (transport arbitré
+msmtp/conteneur, D-13) : l'installation du transport est dans la section
+« Transport mail des checks » ci-dessus — elle précède l'installation du cron.
+
+### Variante timers systemd (acceptée par D-05)
+
+Même horaire, un fichier `*.timer` + `*.service` par script, ex. pour le
+backup (les autres checks : copier en changeant `OnCalendar`, la description
+et le script) :
+
+```ini
+# /etc/systemd/system/eo-backup.timer
+[Unit]
+Description=EO — sauvegarde chiffrée nocturne (D-05)
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```ini
+# /etc/systemd/system/eo-backup.service
+[Unit]
+Description=EO — scripts/backup.sh (dump + tars + vérification + mail)
+
+[Service]
+Type=oneshot
+# Aucun secret ici : les chemins de fichiers 600 seulement (§2.7-H).
+Environment=EO_MAIL_TO_FILE=/etc/eo-mail-to
+ExecStart=/bin/sh -c 'EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1'
+```
+
+```sh
+systemctl daemon-reload && systemctl enable --now eo-backup.timer
+systemctl list-timers 'eo-*'   # vérifier la prochaine échéance
+```
+
+### Test de bout en bout après installation
+
+Chaque unité est déclenchée **manuellement** une première fois, et deux
+preuves sont exigées : le mail correspondant reçu, et l'effet de bord attendu
+consigné.
+
+```sh
+# 1. Sauvegarde — mail [EO-backup] succès + stamp du jour créé :
+EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/backup.sh
+ls -1 /chemin/depot/supabase-project/backups          # ← le stamp du jour y est
+
+# 2. Réplication (tierce connectée seulement) — mail en échec uniquement :
+EO_REPL_TARGET=<user>@<hote-tierce> EO_REPL_SSH=/root/.ssh/eo_replication \
+EO_REPL_DIR=/srv/backups/eo EO_PGSODIUM_COPY=/srv/secrets/eo/pgsodium \
+  sh /chemin/depot/scripts/backup-replicate.sh
+ssh -i /root/.ssh/eo_replication <user>@<hote-tierce> 'ls /srv/backups/eo'  # ← stamp du jour
+
+# 3. Checks — chaque commande suivante est silencieuse et exit 0 (vert) ;
+#    pour prouver la chaîne complète, déclencher une fois en rouge (procédure
+#    de preuve : « Preuves des alertes » ci-dessous) puis remettre en ordre :
+EO_CERT_HOSTS="app.votredomaine.fr api.votredomaine.fr studio.votredomaine.fr" sh /chemin/depot/scripts/check-certs.sh
+sh /chemin/depot/scripts/check-disk.sh
+sh /chemin/depot/scripts/check-cron-health.sh
+sh /chemin/depot/scripts/check-edge-errors.sh
+```
+
+Vérification finale du cron : après la première nuit, `grep EO /var/log/cron`
+(ou `journalctl -u eo-backup.timer`) montre les exécutions, et le mail du
+verdict D-06 est arrivé — un cron silencieux sans mail de succès est un échec
+inexpliqué (§2.7-F).
+
+### Restauration
+
+La procédure pas-à-pas (Compose isolé `supabase-project-restore/`,
+désactivation des cron jobs avant démarrage, ordre db → storage →
+db-config, mesure du RTO) vit dans `docs/EXPLOITATION.md` — « Runbook de
+restauration » (D-10). Ne pas la recopier ici.
+
 ## Retour arrière
 
 | Élément | Procédure |
