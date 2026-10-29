@@ -177,7 +177,7 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 29-01-PLAN.md — Migration 0171 : RPC open_direct_conversation (anti-doublon, verrou consultatif) + RPC conversation_read_receipts + tests SQL (MSG-01/03)
+- [x] 29-01-PLAN.md — Migration 0171 : RPC open_direct_conversation (anti-doublon, verrou consultatif) + RPC conversation_read_receipts + tests SQL (MSG-01/03) — exécuté (commits 6f10c40, 668d40d ; SUMMARY 29-01)
 - [ ] 29-02-PLAN.md — Migration 0172 : push groupé sans contenu (fuite 0042 corrigée) + Edge push-notify reminder_ids + preuve attribuable étendue (MSG-04)
 - [ ] 29-03-PLAN.md — Preuve Realtime par souscription réelle (D-09) : scripts/test-realtime-subscription.sh (MSG-05)
 

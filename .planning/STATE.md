@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 29
-current_phase_name: messagerie-v2
+current_phase_name: Messagerie v2
 status: executing
 stopped_at: Phase 29 UI-SPEC approved
-last_updated: "2026-10-29T13:10:20.196Z"
-state_head: 14139d03606026b30ee7778aa62f86fcc07598da
+last_updated: "2026-10-29T13:54:00.000Z"
+state_head: 00fc5c7cf4fac42388c031df8770bcad8dcd73ec
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 29
-  completed_plans: 24
+  completed_plans: 25
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 29 (messagerie-v2) — READY TO EXECUTE
-Plan: 5 of 5 exécuté (28-05 clos par absence déclarée — OPS-02 non prouvée, re-diligence phase 31)
-Status: Ready to execute
-Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
+Phase: 29 (Messagerie v2) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 29
+Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécuté — 29-01 complet, SUMMARY écrit)
 
 ## Références du jalon v1.0
 
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T12:43:41.512Z
-**Stopped at:** Phase 29 UI-SPEC approved
-**Resume file:** .planning/phases/29-messagerie-v2/29-UI-SPEC.md
+**Last session:** 2026-10-29T13:54:00.000Z
+**Stopped at:** Plan 29-01 exécuté (2 commits : 6f10c40 migration, 668d40d tests) ; plan suivant = 29-02
+**Resume file:** .planning/phases/29-messagerie-v2/29-01-SUMMARY.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -112,6 +112,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 28 P01 | 9 min | 3 tasks | 3 files |
 | Phase 28 P02 | 14 min | 2 tasks | 2 files |
 | Phase 28 P04 | 4 min | 2 tasks | 2 files |
+| Phase 29 P01 | 14 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -178,4 +179,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - Observation 26-07 : un premier dispatch_gdpr_export_purge a répondu dispatched:true sans que la requête n'atteigne la Edge (aucun log serving, aucune _http_response) ; le second dispatch a servi la purge normalement (200, 24 objets supprimés). Cohérent avec la philosophie cron-retry ; à surveiller en 27/28.
 - [Phase 28]: [28-02] Corps GFS unique transmis par stdin ssh : purge locale et tierce exécutent la même chaîne (divergence de rétention impossible) ; sélection explicite des stamps à conserver, jamais rsync --delete
 - [Phase 28]: [28-02] D-03 en dur dans le script : refus fatal si EO_PGSODIUM_COPY imbrique EO_REPL_DIR ; source clé par défaut = db-config.tar.gz du stamp le plus récent
+
+- [Phase 29] (29-01) : types TEXTE réels pour les deux RPC (le plan disait uuid — le schéma 0002/0004/0046 fait foi : ids private.new_id, seul user_id est uuid)
+- [Phase 29] (29-01) : garde D-06/0146 (enfant géré sans module 'messages' → 22023) portée par open_direct_conversation — parité avec create_conversation, sinon contournement
+- [Phase 29] (29-01) : rouverture D-05 lue sur left_at is null seul (archived_at n'empêche pas, A1) ; « membre actif » ciblé = account_deleted_at is null ; l'appelant est exclu de ses propres accusés
+- [Phase 29] (29-01) : échec préexistant 0147_child_push_adults (anniversaires D-23) reproduit sans 0171 — hors périmètre, deferred-items.md
 - [Phase 28]: [28-02] OPS-01 marqué complete (dernier plan déclarant, gate #2388) ; exécution réelle de réplication à jouer sur prod (commandes livrées per D-05)
