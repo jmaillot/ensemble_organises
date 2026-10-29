@@ -183,19 +183,17 @@ depuis l'hôte avec ce réglage sans avoir tranché le transport** :
   fi
   ```
 
-- **Arbitrage retenu** (décidé par le résultat de la sonde, pas à la main) :
-  - **Sonde injoignable** — cas attendu et retenu par défaut :
-    `supabase-mail` n'existe que sur le réseau Docker de la stack. Le transport
-    est alors un **conteneur jetable** branché sur ce réseau
-    (`docker run --rm --network <réseau de la stack> …`), comme le font déjà
-    les tars de `backup.sh` pour les volumes nommés. `scripts/send-mail.sh`
-    implémente ce mode : c'est l'option par défaut qu'il retient quand `msmtp`
-    est absent de l'hôte.
-  - **Sonde joignable** (relais SMTP externe renseigné dans `SMTP_HOST`) — le
-    transport peut être `msmtp` **installé sur l'hôte**. Vérifier sa présence
-    avec `command -v msmtp` ; s'il est absent, l'installer avant de s'appuyer
-    dessus, et consigner ici la variante retenue. `send-mail.sh` bascule
-    automatiquement sur ce mode quand `msmtp` est présent.
+- **Arbitrage retenu** (révisé le 2026-10-29, décision opérateur) : le transport
+  retenu est **msmtp sur l'hôte avec un relais externe Gmail** — révision
+  explicite de D-13, qui pointait initialement le SMTP de la stack (Stalwart).
+  Le propriétaire du projet préfère la simplicité opérationnelle du relais
+  Google à la conformité self-hosted stricte : les contenus d'alerte
+  (noms de tables, chemins, contexte serveur) transitent par Google — arbitrage
+  assumé et consigné ici. Le support msmtp/TLS est déjà celui du script
+  (`tls on`, `tls_trust_file`, creds dans un fichier 600 référencé par
+  `EO_MAIL_RC`), aucune modification de `send-mail.sh` n'est nécessaire.
+  Le mode conteneur jetable reste disponible en repli si `msmtp` est absent
+  (l'option d'origine, jamais supprimée).
 
   Dans les deux cas, les identifiants SMTP ne sont **jamais** en ligne de
   commande, en variable de session ni versionnés : ils vivent dans des fichiers
@@ -203,30 +201,71 @@ depuis l'hôte avec ce réglage sans avoir tranché le transport** :
   (cf. `scripts/send-mail.sh`).
 
 **Résultat de la sonde sur la prod :** à consigner à la première exécution
-(date + verdict joignable/injoignable + option retenue). Tant qu'il n'est pas
-consigné, `send-mail.sh` choisit seul à l'exécution (msmtp présent → msmtp,
-sinon conteneur jetable) — aucun réglage manuel requis.
+(date + verdict). Le transport retenu est Gmail via msmtp (révision D-13 du
+2026-10-29) ; en l'absence de msmtp sur un hôte donné, `send-mail.sh` retombe
+sur le conteneur jetable (repli conservé).
 
-**Commandes à jouer sur l'hôte de prod** (sonde puis première sauvegarde
-notifiée — les secrets vivent dans des fichiers 600, jamais en argv) :
+**Commandes à jouer sur l'hôte de prod** (arbitrage Gmail via msmtp — révision
+D-13 du 2026-10-29 ; les secrets vivent dans des fichiers 600, jamais en argv) :
 
 ```sh
-# 1. Sonde (commande du bloc ci-dessus) → consigner le verdict ici.
+# 1. Installer msmtp (si absent) :
+command -v msmtp || { apt-get update && apt-get install -y msmtp; }
 
-# 2. Destinataire du verdict : fichier simple, pas un secret, mais même
+# 2. Côté Google (une fois, dans le compte Gmail) : activer la validation
+#    en 2 étapes, puis créer un MOT DE PASSE D'APPLICATION
+#    (https://myaccount.google.com/apppasswords) — le mot de passe du compte
+#    seul ne suffit plus pour SMTP.
+
+# 3. Config msmtp — /etc/msmtprc, chmod 600. Le mot de passe d'application
+#    se met au même endroit ; il n'est ni versionné ni journalisé :
+#    defaults
+#    auth           on
+#    tls            on
+#    tls_trust_file /etc/ssl/certs/ca-certificates.crt
+#    logfile        /var/log/msmtp.log
+#
+#    account        gmail
+#    host           smtp.gmail.com
+#    port           587
+#    from           votreadresse@gmail.com
+#    user           votreadresse@gmail.com
+#    password       <mot-de-passe-application>
+#
+#    account default : gmail
+cat > /etc/msmtprc <<'MSMTP'
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+account        gmail
+host           smtp.gmail.com
+port           587
+from           votreadresse@gmail.com
+user           votreadresse@gmail.com
+password       MOT_DE_PASSE_APPLICATION_ICI
+
+account default : gmail
+MSMTP
+chmod 600 /etc/msmtprc
+# (éditer le fichier pour y poser le vrai mot de passe d'application)
+
+# 4. Sonde d'envoi réelle (le verdict doit arriver dans la boîte Gmail cible) :
+printf 'From: votreadresse@gmail.com\nTo: operateur@votredomaine.fr\nSubject: [EO-sonde] test transport msmtp\n\nSonde de transport.\n' \
+  | msmtp --file=/etc/msmtprc --read-recipients && echo "SONDE OK"
+
+# 5. Destinataire du verdict : fichier simple, pas un secret, mais même
 #    discipline — un fichier, pas une variable de session.
 echo "operateur@votredomaine.fr" > /etc/eo-mail-to && chmod 600 /etc/eo-mail-to
 
-# 3. Réseau Docker de la stack (nom réel) :
-docker network ls | grep -i supa   # ex. supabase_default
+# 6. Première sauvegarde complète notifiée (4 .gpg + SHA256SUMS + mail) —
+#    avec msmtp présent, send-mail.sh bascule seul sur ce transport :
+EO_MAIL_TO="$(cat /etc/eo-mail-to)" sh scripts/backup.sh
 
-# 4. Première sauvegarde complète notifiée (4 .gpg + SHA256SUMS + mail) :
-EO_MAIL_TO="$(cat /etc/eo-mail-to)" \
-EO_MAIL_NETWORK=<réseau de la stack> \
-  sh scripts/backup.sh
-
-# 5. Cron nocturne (D-05) — le même bloc, dans le crontab de root :
-#    15 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) EO_MAIL_NETWORK=<réseau> sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1
+# 7. Cron nocturne (D-05) — le même bloc, dans le crontab de root :
+#    15 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1
 ```
 
 ## Réplication vers la machine tierce (D-01/D-02/D-03)
