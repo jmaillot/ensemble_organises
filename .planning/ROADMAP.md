@@ -140,7 +140,14 @@ Plans:
   4. `check-cron-health.sh` valide les jobs pg_cron et attrape effectivement une rotation de secret ratée (prouvé rouge→vert)
   5. RPO, RTO et politique de rétention sont arbitrés et documentés dans `docs/`
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Tracer : backup.sh étendu (tar functions, vérif D-07, mail) + send-mail.sh (OPS-01)
+- [ ] 28-02-PLAN.md — Réplication tierce rsync + purge GFS + pgsodium disjointe (OPS-01)
+- [ ] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
+- [ ] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)
+- [ ] 28-05-PLAN.md — Exercice de restauration isolé + RTO consigné + UAT-27 sur prod (OPS-02)
 
 ### Phase 29: Messagerie v2
 
