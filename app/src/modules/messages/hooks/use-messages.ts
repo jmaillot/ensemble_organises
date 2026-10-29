@@ -858,9 +858,11 @@ export function useMessagesRealtime() {
     };
     const unsubscribeMessages = data.subscribe('messages', invalidate);
     const unsubscribeConversations = data.subscribe('conversations', invalidate);
+    const unsubscribeMembers = data.subscribe('conversation_members', invalidate);
     return () => {
       unsubscribeMessages();
       unsubscribeConversations();
+      unsubscribeMembers();
     };
   }, [queryClient]);
 }
