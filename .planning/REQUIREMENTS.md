@@ -35,7 +35,7 @@
 - [ ] **MSG-01** : Un membre démarre une conversation directe avec un autre membre via RPC serveur avec garde anti-doublon
 - [ ] **MSG-02** : Les badges non-lus s'appuient sur un watermark par membre sur la conversation (jamais une écriture par message)
 - [ ] **MSG-03** : L'accusé de lecture est visible côté émetteur
-- [ ] **MSG-04** : Les notifications push sont groupées par conversation (« 2 nouveaux messages de X »), sans contenu du message, chaîne `dispatch_messages`→`push-notify` existante réutilisée
+- [x] **MSG-04** : Les notifications push sont groupées par conversation (« 2 nouveaux messages de X »), sans contenu du message, chaîne `dispatch_messages`→`push-notify` existante réutilisée
 - [ ] **MSG-05** : La publication Realtime (publication `supabase_realtime` self-hosted complétée) est testée par souscription avant d'être annoncée
 
 ### Exploitation

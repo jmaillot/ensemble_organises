@@ -173,12 +173,12 @@ Plans:
   3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
   4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 **Wave 1**
 - [x] 29-01-PLAN.md — Migration 0171 : RPC open_direct_conversation (anti-doublon, verrou consultatif) + RPC conversation_read_receipts + tests SQL (MSG-01/03) — exécuté (commits 6f10c40, 668d40d ; SUMMARY 29-01)
-- [ ] 29-02-PLAN.md — Migration 0172 : push groupé sans contenu (fuite 0042 corrigée) + Edge push-notify reminder_ids + preuve attribuable étendue (MSG-04)
+- [x] 29-02-PLAN.md — Migration 0172 : push groupé sans contenu (fuite 0042 corrigée) + Edge push-notify reminder_ids + preuve attribuable étendue (MSG-04)
 - [ ] 29-03-PLAN.md — Preuve Realtime par souscription réelle (D-09) : scripts/test-realtime-subscription.sh (MSG-05)
 
 **Wave 2** *(blocked on Wave 1)*
@@ -225,7 +225,7 @@ Plans:
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 2/5 | In Progress|  |
-| 29. Messagerie v2 | 1/5 | In Progress|  |
+| 29. Messagerie v2 | 2/5 | In Progress|  |
 | 30. Hygiène du jalon | 0/? | Not started | - |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |
 

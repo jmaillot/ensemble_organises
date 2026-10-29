@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 29
 current_phase_name: Messagerie v2
 status: executing
-stopped_at: Phase 29 UI-SPEC approved
-last_updated: "2026-10-29T13:54:00.000Z"
-state_head: 00fc5c7cf4fac42388c031df8770bcad8dcd73ec
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-10-29T14:33:38.012Z"
+state_head: 7bd2a4bb59973d26e2965b8d000eb4851543edfe
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 29
-  completed_plans: 25
+  completed_plans: 26
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -22,8 +22,8 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 29 (Messagerie v2) — EXECUTING
-Plan: 2 of 5
-Status: Executing Phase 29
+Plan: 3 of 5
+Status: Ready to execute
 Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécuté — 29-01 complet, SUMMARY écrit)
 
 ## Références du jalon v1.0
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% (1/5 plans de la phase 29 exécut
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T13:54:00.000Z
-**Stopped at:** Plan 29-01 exécuté (2 commits : 6f10c40 migration, 668d40d tests) ; plan suivant = 29-02
-**Resume file:** .planning/phases/29-messagerie-v2/29-01-SUMMARY.md
+**Last session:** 2026-10-29T14:33:37.870Z
+**Stopped at:** Completed 29-02-PLAN.md
+**Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -113,6 +113,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 28 P02 | 14 min | 2 tasks | 2 files |
 | Phase 28 P04 | 4 min | 2 tasks | 2 files |
 | Phase 29 P01 | 14 min | 2 tasks | 2 files |
+| Phase 29 P02 | 75m | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -171,6 +172,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 28]: [28-01] Arbitrage transport mail consigné (DEPLOIEMENT-PROD) : conteneur jetable sur le réseau de la stack par défaut (SMTP_HOST=supabase-mail injoignable de l'hôte), msmtp si la sonde prod dit joignable — send-mail.sh choisit seul à l'exécution
 - [Phase 28]: [28-01] D-07 par stdin : déchiffrement pipe-éphémère vers pg_restore --list dans le conteneur db, aucun dump clair sur disque ; backup.sh produit 4 artefacts (functions.tar.gz ajouté, bind ./volumes/functions) et maile son verdict succès/échec via send-mail.sh
 - [Phase 28]: [28-01] OPS-01 non marqué complete : ID partagé avec 28-02 (gate #2388), le dernier plan déclarant le marquera ; sonde SMTP et première sauvegarde notifiée à jouer sur prod (commandes livrées per D-05)
+- [Phase 29]: Push messages groupé (0172) : compteur au titre, reminder_ids par groupe, contenu banni ; Edge consomme par liste
+- [Phase 29]: reminder_id scalaire conservé (dernier id du groupe) pour compat Edge ; titre du fil autorisé au push, jamais le contenu
 
 ### Blockers
 
