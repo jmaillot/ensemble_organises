@@ -212,6 +212,11 @@ et checks, qui tournent en root).
 **Commandes à jouer sur l'hôte de prod** (arbitrage Gmail via msmtp — révision
 D-13 du 2026-10-29 ; les secrets vivent dans des fichiers 600, jamais en argv) :
 
+**Résultat de la première exécution sur la prod :** **2026-10-29 —
+sauvegarde `20261029T092434Z` terminée et vérifiée, mail de verdict reçu**
+(4 `.gpg` + SHA256SUMS ; vérification D-07 : `pg_restore --list` ✓, tailles ✓,
+sha256 ✓ ; steps 5-6 du transport mail joués OK par l'opérateur).
+
 ```sh
 # 1. Installer msmtp (si absent) :
 command -v msmtp || { apt-get update && apt-get install -y msmtp; }
