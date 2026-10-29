@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 28
 current_phase_name: Exploitation — sauvegardes, restauration, supervision
 status: executing
-stopped_at: Phase 28 context gathered
-last_updated: "2026-10-29T07:49:07.211Z"
-state_head: ad48122bd2d345d925a138b738b1963df3461b7b
+stopped_at: Completed 28-01-PLAN.md
+last_updated: "2026-10-29T08:22:48.590Z"
+state_head: 5882dc0da703aa264fb4f7e52f3d6e8c1ac4a580
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -21,8 +21,8 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — READY TO EXECUTE
-Plan: Not started
+Phase: 28 (Exploitation — sauvegardes, restauration, supervision) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
 Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phase approuvée et clôturée)
 
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% (14/14 plans de la phase 26, phas
 
 ## Session Continuity
 
-**Last session:** 2026-10-28T16:19:20.128Z
-**Stopped at:** Phase 28 context gathered
-**Resume file:** .planning/phases/28-exploitation-sauvegardes-restauration-supervision/28-CONTEXT.md
+**Last session:** 2026-10-29T08:22:37.642Z
+**Stopped at:** Completed 28-01-PLAN.md
+**Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -109,6 +109,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 27 P03 | 90min | 3 tasks | 12 files |
 | Phase 27 P04 | ~50 min | 3 tasks | 4 files |
 | Phase 27 P05 | ~1h20 | 3 tasks | 6 files |
+| Phase 28 P01 | 9 min | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -160,6 +161,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 27]: 27-02: demande marquee 'purgee' avant delete from auth.users — la ligne meurt avec le compte via le cascade 0166, preuve RGPD assertée dans les tests
 - [Phase 27]: Edge unifiée household-delete : mode foyer (défaut sans discriminant) + mode compte (rpc 0167 puis signOut global via Bearer header, F1) + actions cron reminder/purge-medias en secret ; manifest privé exposé par wrappers public 0169 (motif 0163)
 - [Phase 27]: Échec d'e-mail après RPC réussi : réponse honnête email_sent:false (jamais un 500 mensonger) ; lien d'annulation vers /parametres/donnees, jamais /auth/v1/* (D-05)
+- [Phase 28]: [28-01] Arbitrage transport mail consigné (DEPLOIEMENT-PROD) : conteneur jetable sur le réseau de la stack par défaut (SMTP_HOST=supabase-mail injoignable de l'hôte), msmtp si la sonde prod dit joignable — send-mail.sh choisit seul à l'exécution
+- [Phase 28]: [28-01] D-07 par stdin : déchiffrement pipe-éphémère vers pg_restore --list dans le conteneur db, aucun dump clair sur disque ; backup.sh produit 4 artefacts (functions.tar.gz ajouté, bind ./volumes/functions) et maile son verdict succès/échec via send-mail.sh
+- [Phase 28]: [28-01] OPS-01 non marqué complete : ID partagé avec 28-02 (gate #2388), le dernier plan déclarant le marquera ; sonde SMTP et première sauvegarde notifiée à jouer sur prod (commandes livrées per D-05)
 
 ### Blockers
 
