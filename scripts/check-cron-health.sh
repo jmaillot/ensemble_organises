@@ -31,6 +31,19 @@
 #   EO_CRON_JOBS                catalogue attendu (défaut : le relevé réel)
 #   EO_CRON_RECENCY_FACTOR      facteur de récence (défaut : 3)
 #   EO_CRON_FAIL_WINDOW_HOURS   fenêtre des échecs en heures (défaut : 24)
+#   EO_CRON_NEVER_OK            jobs « jamais exécuté » légitimes, séparés par
+#                               des espaces. Défaut : les deux jobs ANNUELS
+#                               eo-calendrier-refresh-jan et -sept — installés
+#                               par 0087, leur première occurrence planifiée
+#                               (1er janvier / 1er septembre) peut être des
+#                               mois après l'installation, et « jamais
+#                               exécuté » avant elle est l'état normal. Après
+#                               leur première exécution réelle, l'axe (b)
+#                               reprend la main : un âge > 3 × période (3 ans)
+#                               redevient une alerte. Cette liste est une
+#                               affirmation vérifiable : un job annualisé dont
+#                               la première occurrence est PASSÉE doit sortir
+#                               de la liste, sinon son silence serait ignoré.
 #
 # Les requêtes SQL passent par psql.sh sur l'entrée standard (§2.7-C) et sont
 # en LECTURE SEULE : ce check n'écrit jamais dans la base.
@@ -48,6 +61,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 RECENCY_FACTOR="${EO_CRON_RECENCY_FACTOR:-3}"
 FAIL_WINDOW_HOURS="${EO_CRON_FAIL_WINDOW_HOURS:-24}"
+NEVER_OK="${EO_CRON_NEVER_OK:-eo-calendrier-refresh-jan eo-calendrier-refresh-sept}"
 
 # Garde-fou : les deux seuils sont numériques, sans quoi ils finiraient
 # interpolés dans le SQL par l'environnement de l'appelant.
@@ -150,7 +164,18 @@ for entry in $EXPECTED_JOBS; do
   fi
   age="${row##*|}"
   if [ "$age" = "" ] || [ "$age" = "NULL" ]; then
-    note_alert "axe récence : job '$name' n'a JAMAIS été exécuté"
+    case " $NEVER_OK " in
+      *" $name "*)
+        # Exemption déclarée (voir entête EO_CRON_NEVER_OK) : la première
+        # occurrence planifiée du job est à venir — « jamais exécuté » est
+        # l'état normal. Affiché, non compté : un silence qui ne se voit
+        # pas serait un contrôle qui ne regarde rien.
+        echo "  – '$name' jamais exécuté (première occurrence planifiée à venir — EO_CRON_NEVER_OK)"
+        ;;
+      *)
+        note_alert "axe récence : job '$name' n'a JAMAIS été exécuté"
+        ;;
+    esac
   elif [ "$age" -gt "$max_age" ] 2>/dev/null; then
     note_alert "axe récence : job '$name' sans exécution depuis ${age} s (seuil ${max_age} s) — cron mort ?"
   fi
