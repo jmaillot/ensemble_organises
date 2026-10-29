@@ -44,6 +44,13 @@ describe('rangée d’accusés de lecture (D-02)', () => {
     expect(screen.getByText('+1')).toBeTruthy();
   });
 
+  it('cinq lecteurs pile : tous les avatars, aucun « +0 »', () => {
+    const readers = Array.from({ length: 5 }, (_, index) => reader(`m${index}`, `Membre ${index}`));
+    render(<ReadReceipts readers={readers} />);
+    expect(screen.getAllByTitle(/^Membre \d$/)).toHaveLength(5);
+    expect(screen.queryByText('+0')).toBeNull();
+  });
+
   it('membre sans photo : initiale blanche sur la couleur profonde (contraste AA)', () => {
     render(<ReadReceipts readers={[reader('m1', 'Zoé Bell')]} />);
     const avatar = screen.getByTitle('Zoé Bell');
