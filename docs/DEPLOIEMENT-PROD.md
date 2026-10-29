@@ -653,3 +653,28 @@ Notes de preuve prod (2026-10-29) :
   (exemption `EO_CRON_NEVER_OK`, commit fc141d6) et `check-certs.sh`
   doublait le port pour un `EO_CERT_HOSTS` portant `:443`
   (commit 4be0050) — §2.7-E, corriger la classe.
+
+## Preuves UAT-27 (campagne distincte de l'exercice, D-11)
+
+> **Absence déclarée (décision opérateur, 2026-10-29)** : la campagne UAT-27
+> (27.5 / 27.6 / 27.7) n'a **pas** été jouée sur la prod. Comme pour
+> l'exercice de restauration et la réplication tierce (28-02, commit
+> `0c9bd9a`), l'absence est documentée honnêtement : **aucun des trois UAT
+> ci-dessous n'est marqué comme vérifié**, et la dette de validation de la
+> phase 27 reste ouverte. Elle est reportée sur la phase 31 (ouverture
+> publique), où un SMTP livrable est de toute façon exigé par le critère de
+> succès 1 — le test 27.7 (mail J-7 réellement livré) se jouera dans le même
+> élan. Les prescriptions de campagne restent valables telles quelles.
+
+| UAT | Ce qui devait être prouvé | Statut | Report |
+|-----|---------------------------|--------|--------|
+| UAT-27.5 | Annulation de suppression multi-foyer : restauration nom/photo dans CHAQUE foyer du membre, page de confirmation honnête (aucune promesse de sessions restaurées) | non joué — absence déclarée 2026-10-29 | phase 31 |
+| UAT-27.6 | Données partagées survivantes : contributions d'un membre supprimé (tâches, courses, notes) restent au foyer | non joué — absence déclarée 2026-10-29 | phase 31 |
+| UAT-27.7 | Mail J-7 réellement livré : simulation SQL de la date J-7 sur un compte de test, dispatch observé, réception dans la boîte réelle | non joué — absence déclarée 2026-10-29 | phase 31 (avec le SMTP réel exigé par OUV-01) |
+
+Prescriptions de campagne (inchangées, à rejouer telles quelles) : campagne
+**distincte** de tout exercice de restauration, sur la **prod** avec le SMTP
+réel du serveur ; compte de test dédié, jamais un vrai compte famille ;
+consigner pour chaque UAT la date, la commande, le résultat observé et, pour
+27.7, la lecture du mail reçu ; purger le compte de test en fin de campagne
+(T-28-12, §2.7-B).
