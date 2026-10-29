@@ -207,6 +207,28 @@ depuis l'hôte avec ce réglage sans avoir tranché le transport** :
 consigné, `send-mail.sh` choisit seul à l'exécution (msmtp présent → msmtp,
 sinon conteneur jetable) — aucun réglage manuel requis.
 
+**Commandes à jouer sur l'hôte de prod** (sonde puis première sauvegarde
+notifiée — les secrets vivent dans des fichiers 600, jamais en argv) :
+
+```sh
+# 1. Sonde (commande du bloc ci-dessus) → consigner le verdict ici.
+
+# 2. Destinataire du verdict : fichier simple, pas un secret, mais même
+#    discipline — un fichier, pas une variable de session.
+echo "operateur@votredomaine.fr" > /etc/eo-mail-to && chmod 600 /etc/eo-mail-to
+
+# 3. Réseau Docker de la stack (nom réel) :
+docker network ls | grep -i supa   # ex. supabase_default
+
+# 4. Première sauvegarde complète notifiée (4 .gpg + SHA256SUMS + mail) :
+EO_MAIL_TO="$(cat /etc/eo-mail-to)" \
+EO_MAIL_NETWORK=<réseau de la stack> \
+  sh scripts/backup.sh
+
+# 5. Cron nocturne (D-05) — le même bloc, dans le crontab de root :
+#    15 2 * * * EO_MAIL_TO=$(cat /etc/eo-mail-to) EO_MAIL_NETWORK=<réseau> sh /chemin/depot/scripts/backup.sh >> /var/log/eo-backup.log 2>&1
+```
+
 ## Retour arrière
 
 | Élément | Procédure |
