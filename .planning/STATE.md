@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 29
 current_phase_name: Messagerie v2
 status: executing
-stopped_at: Completed 29-05-PLAN.md
-last_updated: "2026-10-29T17:29:18.782Z"
-state_head: 8b6b6cc822cb5dfc8ae759f7ff560ddf58d8ec22
+stopped_at: Phase 30 context gathered
+last_updated: "2026-10-30T13:08:31.981Z"
+state_head: 4f5f8f447457b16d985489f654f91231f5931b31
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 29
-  completed_plans: 28
+  total_plans: 30
+  completed_plans: 30
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 29 (Messagerie v2) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Progress: [██████████] 43% (5/5 plans de la phase 29 exécutés — 29-01 à 29-05 complets, SUMMARY 29-05 écrit ; vérification de phase à l'orchestrateur)
+Phase: 29 (Messagerie v2) — COMPLETE (VERIFICATION PASSED, 2026-10-30)
+Plan: 6 of 6 (dont gap closure 29-06)
+Status: Phase terminée — prochaine : phase 30 (hygiène du jalon)
+Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
 
 ## Références du jalon v1.0
 
@@ -72,9 +72,9 @@ Progress: [██████████] 43% (5/5 plans de la phase 29 exécut
 
 ## Session Continuity
 
-**Last session:** 2026-10-29T17:29:18.687Z
-**Stopped at:** Completed 29-05-PLAN.md
-**Resume file:** None
+**Last session:** 2026-10-30T13:08:31.870Z
+**Stopped at:** Phase 30 context gathered
+**Resume file:** .planning/phases/30-hygi-ne-du-jalon-dettes-et-r-sidus/30-CONTEXT.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
