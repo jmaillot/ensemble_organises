@@ -1351,6 +1351,15 @@ sh run.sh logs <service>
 sh run.sh recreate <service>          # après une modification de .env
 sh run.sh config add traefik
 
+Après TOUTE modification du .env de la stack (clé, `VAPID_*`, `SMTP_*`,
+`GOOGLE_*`, …) : `sh run.sh recreate <service>` — un `docker restart` / `run.sh
+restart` redémarre le conteneur avec son environnement **figé à sa création** et
+ne ré-interpole JAMAIS le .env. Cas documenté (2026-10-30, UAT 29) :
+`SUPABASE_SECRET_KEYS` (`docker-compose.yml:463`) est retombée silencieusement
+sur `{"default":""}` et `push-notify` a répondu `401 INVALID_API_KEY`.
+`sh scripts/test-dispatch-push.sh` sonde désormais l'auth Edge dans son
+prévoluble et nomme la commande à appliquer.
+
 cd supabase-project
 sh ../scripts/migrate.sh --status
 sh ../scripts/test-db.sh

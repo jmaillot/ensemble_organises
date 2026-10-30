@@ -80,7 +80,13 @@ sh run.sh recreate functions      # l'environnement est figé à la création
 ```
 
 Le `recreate` est obligatoire : le service `functions` lit `SMTP_*` et les
-secrets d'environnement **à sa création**, pas à chaud.
+secrets d'environnement **à sa création**, pas à chaud. Contre-indication :
+`restart` ≠ `recreate` — l'env du conteneur est figé à sa création, un
+`docker restart` ne ré-interpole JAMAIS le .env. Après toute modification du
+.env, c'est toujours `sh run.sh recreate <service>`. La sonde
+`sh scripts/test-dispatch-push.sh` vérifie désormais l'auth Edge dans son
+prévoluble et dit laquelle des deux commandes appliquer (`recreate functions`
+vs `sh scripts/set-push-secrets.sh`).
 
 La copie n'a d'effet qu'au `recreate` : on la place **après** les migrations
 pour qu'une Edge neuve ne démarre jamais avant le schéma qu'elle attend
