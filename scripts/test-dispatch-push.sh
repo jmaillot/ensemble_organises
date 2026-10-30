@@ -250,7 +250,7 @@ TacheCreee=0
 Tache=""
 Rappel=""
 Conv=""
-Expéditeur=""
+Expediteur=""
 Marque=""
 NettoyerVerifie=0
 
@@ -270,8 +270,8 @@ nettoyer() {
   if [ -n "$Conv" ]; then
     db_exec -q -c "delete from public.conversations where id = '$Conv'" >/dev/null 2>&1 || true
   fi
-  if [ -n "$Expéditeur" ]; then
-    db_exec -q -c "delete from public.household_members where id = '$Expéditeur'" >/dev/null 2>&1 || true
+  if [ -n "$Expediteur" ]; then
+    db_exec -q -c "delete from public.household_members where id = '$Expediteur'" >/dev/null 2>&1 || true
   fi
 }
 
@@ -280,7 +280,7 @@ reste_a_nettoyer() {
   un "select ((select count(*) from public.tasks where id = '$Tache')
                + (select count(*) from public.task_reminders where id = '$Rappel')
                + (select count(*) from public.conversations where id = '$Conv')
-               + (select count(*) from public.household_members where id = '$Expéditeur'))::text"
+               + (select count(*) from public.household_members where id = '$Expediteur'))::text"
 }
 
 signaler_reste() {
@@ -453,22 +453,22 @@ fi
 # est exclu du ventilateur par membre, jamais par compte.
 Marque="MARQUEPUSH-$(date +%s)-$$"
 
-Expéditeur="$(un "insert into public.household_members (household_id, user_id, display_name, color_tag, role)
+Expediteur="$(un "insert into public.household_members (household_id, user_id, display_name, color_tag, role)
   values ('$Foyer', null, 'Semure Test', 'ink', 'enfant') returning id")"
-if [ -z "$Expéditeur" ]; then
+if [ -z "$Expediteur" ]; then
   echo "  ÉCHEC         la semure de l'expéditeur de test n'a rien produit." >&2
   echec=1
 fi
 
-if [ -n "$Expéditeur" ]; then
+if [ -n "$Expediteur" ]; then
   Conv="$(un "insert into public.conversations (household_id, type)
     values ('$Foyer', 'direct') returning id")"
   db_exec -q -c "insert into public.conversation_members (conversation_id, member_id)
-    values ('$Conv', '$Membre'), ('$Conv', '$Expéditeur')" >/dev/null
+    values ('$Conv', '$Membre'), ('$Conv', '$Expediteur')" >/dev/null
   i=1
   while [ "$i" -le 3 ]; do
     db_exec -q -c "insert into public.messages (conversation_id, household_id, sender_id, content)
-      values ('$Conv', '$Foyer', '$Expéditeur', '$Marque message $i sur trois')" >/dev/null
+      values ('$Conv', '$Foyer', '$Expediteur', '$Marque message $i sur trois')" >/dev/null
     i=$((i + 1))
   done
   echo "  Messages      3 semés pour le membre (marque $Marque)"
