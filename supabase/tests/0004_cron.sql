@@ -135,6 +135,39 @@ select testkit.expect_ok('select private.run_daily_routine_maintenance()');
 select testkit.expect_ok('select private.prune_expired_invite_tokens()');
 
 -- ===========================================================================
+-- 3 bis. L'occurrence du jour est générée par la maintenance (D-03, phase 30)
+-- ===========================================================================
+-- Le symptôme « les routines ne s'alimentent pas au quotidien » se tranche
+-- ici : après un appel à `run_daily_routine_maintenance()`, une routine
+-- quotidienne DOIT porter son occurrence d'aujourd'hui (Europe/Paris).
+-- Le comptage est borné au foyer d'essai (§2.7-D : jamais un count total en
+-- `postgres`, la RLS y est court-circuitée).
+do $$
+declare
+  bob uuid := testkit.auth_user('bob-routine@example.fr', 'Bob Routine');
+  home_b text := testkit.household(bob, 'Foyer Routine 30');
+  bob_m text := testkit.member(home_b, bob, 'Bob Routine', 'admin', 'accent');
+  daily_b text := private.new_id('routine');
+  v_today date := (now() at time zone 'Europe/Paris')::date;
+begin
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at)
+  values (daily_b, home_b, 'Arrosage 30', 'FREQ=DAILY', bob_m, now() - interval '5 days');
+
+  -- La fonction de maintenance, exactement ce que le job pg_cron appelle.
+  perform private.run_daily_routine_maintenance();
+
+  perform testkit.eq(
+    (select count(*) from public.routine_completions
+      where routine_id = daily_b
+        and household_id = home_b
+        and occurrence_date = v_today),
+    1::bigint,
+    'la maintenance quotidienne génère l''occurrence du jour d''une routine quotidienne'
+  );
+end;
+$$;
+
+-- ===========================================================================
 -- 4. Jobs pg_cron
 -- ===========================================================================
 do $$
