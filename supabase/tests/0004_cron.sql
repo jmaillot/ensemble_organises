@@ -222,8 +222,8 @@ begin
   );
 
   perform testkit.ok(
-    exists (select 1 from cron.job where jobname = 'eo-routine-maintenance' and schedule = '5 6 * * *'),
-    'la maintenance quotidienne est planifiée à 06 h 05'
+    exists (select 1 from cron.job where jobname = 'eo-routine-maintenance' and schedule = '5 6 * * * Europe/Paris'),
+    'la maintenance quotidienne est planifiée à 06 h 05, heure de Paris (0173)'
   );
   perform testkit.ok(
     exists (select 1 from cron.job where jobname = 'eo-push-dispatch' and schedule = '* * * * *'),
