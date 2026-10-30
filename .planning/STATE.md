@@ -2,16 +2,16 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 29
-current_phase_name: Messagerie v2
+current_phase: 30
+current_phase_name: Hygiène du jalon — dettes et résidus
 status: executing
 stopped_at: Phase 30 context gathered
-last_updated: "2026-10-30T13:08:31.981Z"
-state_head: 4f5f8f447457b16d985489f654f91231f5931b31
+last_updated: "2026-10-30T13:25:24.588Z"
+state_head: 0431faf63abca065b54fb896fc41c2bc2abd7541
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 30
+  total_plans: 35
   completed_plans: 30
   percent: 43
 last_activity: 2026-10-27
@@ -21,7 +21,7 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 29 (Messagerie v2) — COMPLETE (VERIFICATION PASSED, 2026-10-30)
+Phase: 30 (Hygiène du jalon — dettes et résidus) — READY TO EXECUTE
 Plan: 6 of 6 (dont gap closure 29-06)
 Status: Phase terminée — prochaine : phase 30 (hygiène du jalon)
 Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
