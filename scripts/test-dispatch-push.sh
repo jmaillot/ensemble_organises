@@ -101,6 +101,102 @@ prevoluble() {
     echo "  Les inscrire avec sh scripts/set-push-secrets.sh." >&2
     exit 1
   fi
+
+  # --- Sonde d'authentification Edge (gap G-29-1, UAT 29) ---------------------
+  #
+  # Le 401 INVALID_API_KEY de l'UAT 2026-10-30 venait d'un conteneur functions
+  # dont l'env ne connaissait pas la clé sb_secret_ du Vault : SUPABASE_SECRET_KEYS
+  # (docker-compose.yml:463) retombe silencieusement sur {"default":""} quand la
+  # variable manque du contexte Compose, et un `docker restart` ne ré-interpole
+  # JAMAIS le .env — seul `recreate` le fait. La sonde interroge push-notify avec
+  # la clé du Vault AVANT toute semure, pour que la classe de défaut devienne
+  # diagnostiquable au lieu d'être reconstituée à la main.
+  #
+  # La sonde est émise PAR LE MÊME CHEMIN que le dispatch : un net.http_post avec
+  # l'en-tête `apikey` portant la clé Vault (contrat 0025 — jamais Authorization).
+  # La fenêtre `net._http_response` est ouverte sur max(id) AVANT l'émission, pour
+  # l'attribuabilité ; la sonde consomme une ligne, et les fenêtres du dispatch
+  # réel (ouvertes plus bas, après prevoluble) partent du nouveau max(id).
+  SondeAvant="$(un 'select coalesce(max(id), 0) from net._http_response')"
+  SondeId="$(un "with s as materialized (
+                  select net.http_post(
+                           url     := (select decrypted_secret from vault.decrypted_secrets
+                                        where name = 'project_url') || '/functions/v1/push-notify',
+                           headers := jsonb_build_object(
+                                        'content-type', 'application/json',
+                                        'apikey',
+                                        (select decrypted_secret from vault.decrypted_secrets
+                                          where name = 'service_role_key')),
+                           body    := jsonb_build_object('scope', 'sonde'),
+                           timeout_milliseconds := 30000
+                         ) as id)
+                select id::text from s")"
+  if [ -z "$SondeId" ]; then
+    echo "test-dispatch-push.sh: l'émission de la sonde Edge n'a rien produit." >&2
+    exit 1
+  fi
+
+  # Même attente bornée que pour le dispatch : pg_net est asynchrone.
+  sonde_trouve=0
+  i=0
+  while [ "$i" -lt "$ATTENTE" ]; do
+    if [ -n "$(un "select content from net._http_response where id > $SondeAvant limit 1")" ]; then
+      sonde_trouve=1
+      break
+    fi
+    i=$((i + 3))
+    sleep 3
+  done
+  if [ "$sonde_trouve" -eq 0 ]; then
+    echo "  ÉCHEC         aucune réponse de la sonde Edge après ${ATTENTE}s." >&2
+    echo "                cd supabase-project && sh run.sh logs functions" >&2
+    exit 1
+  fi
+  SondeCode="$(un "select status_code::text from net._http_response where id > $SondeAvant order by id limit 1")"
+  SondeCorps="$(un "select content from net._http_response where id > $SondeAvant order by id limit 1")"
+
+  if [ "$SondeCode" = "401" ]; then
+    # Le runtime ne connaît PAS la clé du Vault. Distinguer les deux causes sans
+    # afficher de secret : la comparaison passe par des empreintes md5, jamais
+    # par les valeurs.
+    EmpreinteVault="$(un "select md5(decrypted_secret) from vault.decrypted_secrets
+                           where name = 'service_role_key'")"
+    EnvBrut="$(db_compose exec -T functions printenv SUPABASE_SECRET_KEYS </dev/null 2>/dev/null || true)"
+    EnvCle="$(printf '%s' "$EnvBrut" | sed -n 's/.*"default":"\([^"]*\)".*/\1/p')"
+    if [ -z "$EnvCle" ]; then
+      echo "  ÉCHEC         la sonde Edge a reçu 401 INVALID_API_KEY." >&2
+      echo "                SUPABASE_SECRET_KEYS est absente ou vide dans le conteneur" >&2
+      echo "                functions — la retombée silencieuse {\"default\":\"\"} du" >&2
+      echo "                compose (docker-compose.yml:463). Le .env n'a pas été" >&2
+      echo "                interpolé à la création du conteneur." >&2
+      echo "                  cd supabase-project && sh run.sh recreate functions" >&2
+      echo "                (un docker restart ne ré-interpole JAMAIS le .env)" >&2
+      exit 1
+    fi
+    EmpreinteEnv="$(printf '%s' "$EnvCle" | md5sum | cut -d' ' -f1)"
+    echo "  ÉCHEC         la sonde Edge a reçu 401 INVALID_API_KEY (corps : $SondeCorps)." >&2
+    if [ "$EmpreinteEnv" = "$EmpreinteVault" ]; then
+      echo "                L'env du conteneur functions porte la bonne clé (empreintes" >&2
+      echo "                identiques) mais le runtime qui a répondu ne l'appliquait" >&2
+      echo "                pas : runtime functions en retard sur le .env." >&2
+      echo "                  cd supabase-project && sh run.sh recreate functions" >&2
+      echo "                (un docker restart ne ré-interpole JAMAIS le .env)" >&2
+    else
+      echo "                La clé du Vault diffère de celle de l'env du conteneur" >&2
+      echo "                (empreintes distinctes)." >&2
+      echo "                  sh scripts/set-push-secrets.sh puis sh run.sh recreate functions" >&2
+    fi
+    exit 1
+  elif [ -z "$SondeCode" ]; then
+    echo "  ÉCHEC         réponse de sonde Edge illisible (statut vide)." >&2
+    echo "                corps : $SondeCorps" >&2
+    exit 1
+  fi
+
+  # Auth OK : tout statut ≠ 401 signifie que le runtime a accepté la clé du
+  # Vault (400 « Portée inconnue » = refus métier attendu pour la portée sonde).
+  # Preuve visible du passage, jamais un silence (§2.7 F).
+  echo "  Sonde Edge    auth OK ($SondeCode métier attendu)"
 }
 
 # --- Abonnement réel --------------------------------------------------------
