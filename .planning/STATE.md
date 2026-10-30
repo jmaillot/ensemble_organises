@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
 current_phase_name: Hygiène du jalon — dettes et résidus
 status: executing
-stopped_at: Phase 30 context gathered
-last_updated: "2026-10-30T13:25:24.588Z"
-state_head: 0431faf63abca065b54fb896fc41c2bc2abd7541
+stopped_at: Plan 30-01 clos (résidus D-03/D-04 en attente)
+last_updated: "2026-10-30T13:45:10.148Z"
+state_head: e2a917041d976eedc1e8d09a8efb9d042ed5025a
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 35
-  completed_plans: 30
+  completed_plans: 31
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -21,9 +21,9 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 30 (Hygiène du jalon — dettes et résidus) — READY TO EXECUTE
-Plan: 6 of 6 (dont gap closure 29-06)
-Status: Phase terminée — prochaine : phase 30 (hygiène du jalon)
+Phase: 30 (Hygiène du jalon — dettes et résidus) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
 Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
 
 ## Références du jalon v1.0
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-
 
 ## Session Continuity
 
-**Last session:** 2026-10-30T13:08:31.870Z
-**Stopped at:** Phase 30 context gathered
-**Resume file:** .planning/phases/30-hygi-ne-du-jalon-dettes-et-r-sidus/30-CONTEXT.md
+**Last session:** 2026-10-30T13:45:09.697Z
+**Stopped at:** Plan 30-01 clos (résidus D-03/D-04 en attente)
+**Resume file:** .planning/phases/30-hygi-ne-du-jalon-dettes-et-r-sidus/30-01-SUMMARY.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -118,8 +118,13 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 29 P02 | 75m | 2 tasks | 4 files |
 | Phase 29 P03 | 35m | 2 tasks | 1 files |
 | Phase 29 P05 | ~25 min | 3 tasks | 6 files |
+| Phase 30 P01 | ~90m | 3 tasks | 3 files |
 
 ## Decisions
+
+- 30-01 (2026-10-30) : **arrêt anticipé sur décision humaine** — volets techniques de DET-01 livrés (verdict H2 fuseau UTC→Europe/Paris, migration 0173, assertion occurrence-du-jour rouge→vert, doc §6.3), preuves humaines reportées en RÉSIDU : **D-03** = exécution matinale fraîche du job à constater dans cron.job_run_details (statut succeeded, start_time ≈ 06:05 +02, demain 2026-10-31) ; **D-04** = constat d'usage (créer une routine dans un foyer, occurrence visible dans la vue du jour de l'app — 0 routine réelle en base). `/gsd-verify-work` doit collecter ces deux preuves avant la porte de la phase 31.
+- 30-01 (2026-10-30) : verdict H2 — le job tournait à 06:05 UTC (08:05 Paris) ; re-planification `5 6 * * * Europe/Paris` (0173), 0011 non réécrite ; 0154 déjà pris → nom 0173.
+- 30-01 (2026-10-30) : `0147_child_push_adults.sql` échoue pour cause pré-existante hors périmètre (push anniversaires, pas cron) — consigné dans deferred-items.md.
 
 - 29-04 (2026-10-29) : migration localStorage D-03 strictement unidirectionnelle — la clé n'est jamais réécrite après push serveur réussi ; les marques optimistes restent en mémoire, le serveur fait foi.
 - 29-04 (2026-10-29) : la rangée d'accusés (D-02) est rendue sous la dernière bulle « mine » (lastMineId), pas en fin de liste — elle suit la bonne bulle quand des réponses arrivent après.
