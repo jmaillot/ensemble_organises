@@ -19,7 +19,7 @@
 - [x] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée (completed 2026-10-27)
 - [x] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur (completed 2026-10-28)
 - [x] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles *(2026-10-29 — verifier passed 4/5 must-haves ; OPS-02 exercice de restauration non joué, absence déclarée opérateur, re-diligence phase 31 porte OUV-07 ; CR-01/H-01/H-02 corrigés 6f2054d/097fe1a/0e70d74)*
-- [ ] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message
+- [x] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message *(2026-10-30 — 6/6 plans dont gap G-29-1 ; UAT verte : push delivered sur appareil, payload sans contenu, rappel collant consommé ; VERIFICATION PASSED)*
 - [ ] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles
 - [ ] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures
 
@@ -173,7 +173,7 @@ Plans:
   3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
   4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed + 1 plan de clôture de gap (29-06, G-29-1 UAT)
 
 Plans:
 **Wave 1**
@@ -185,7 +185,10 @@ Plans:
 - [x] 29-04-PLAN.md — Frontend watermark : markRead à l'ouverture/focus (D-01), accusés avatars + horodatage (D-02), migration localStorage (D-03) (MSG-02/03) — exécuté (commits 3f6e490, ce02fec, 16478cf ; SUMMARY 29-04)
 
 **Wave 3** *(blocked on Waves 1-2)*
-- [ ] 29-05-PLAN.md — Frontend démarrage directe via member-picker (D-04/D-05) + invalidation Realtime fil/liste (D-08) + chaîne §2.7 app (MSG-01/05)
+- [x] 29-05-PLAN.md — Frontend démarrage directe via member-picker (D-04/D-05) + invalidation Realtime fil/liste (D-08) + chaîne §2.7 app (MSG-01/05)
+
+**Wave 4** *(gap closure — G-29-1, UAT blocker)*
+- [x] 29-06-PLAN.md — Sonde push-notify prévoluble (recreate vs set-push-secrets) + docs recreate≠restart + re-passage UAT 1 (G-29-1) *(exécuté 2026-10-30 : commits 8d49c22, b592759, 1e48b16 ; UAT 1 verte sur serveur réel — delivered=4/consumed=1 rappel, delivered=4/consumed=3 groupe, notifications reçues sur appareil ; SUMMARY 29-06)*
 
 ### Phase 30: Hygiène du jalon — dettes et résidus
 
@@ -199,7 +202,14 @@ Plans:
   4. Sans estampille de build, le panneau de version affiche un message crédible (jamais « 0.1.0 » inventé) — complément des findings de la phase 24
   5. Les feuilles mobiles rendent « Anniversaires » sans césure disgracieuse et avec animations de sortie cohérentes, e2e au vert (arbitrage forceMount consigné)
 
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 30-01-PLAN.md — DET-01 : diagnostic prod du job `eo-routine-maintenance` (D-02), correction cause racine + migration [BLOCKING], test SQL rouge-avant-vert, mesure prod + constat d'usage (D-01/D-03/D-04)
+- [ ] 30-02-PLAN.md — DET-02 : rejouement des preuves des todos hors-ligne 13/14/15 (D-05/D-06), balayage de classe (D-07), clôture avec preuve fraîche
+- [ ] 30-03-PLAN.md — DET-03 : photo du semis recette (chemin public /assets/recettes/, D-08/D-09/D-10), test de contrat rouge-avant-vert, crédits ATTRIBUTION.md
+- [ ] 30-04-PLAN.md — DET-04 : libellé « Version de développement » sans estampille (D-11/D-12), test deux familles (D-13)
+- [ ] 30-05-PLAN.md — DET-05 : césure « Anniversaires » corrigée (D-14), mécanisme partagé forceMount + animation de sortie (D-15/D-16), e2e 390 px au vert (D-17)
 **UI hint**: yes
 
 ### Phase 31: Inscriptions ouvertes
