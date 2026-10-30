@@ -1044,7 +1044,7 @@ docker compose exec db psql -U postgres -c "select jobid, run_time, status, retu
 
 | Job | Horaire | Effet |
 |---|---|---|
-| `eo-routine-maintenance` | `5 6 * * *` | génère les occurrences dues (14 derniers jours → aujourd'hui) et escalade en `manque` celles de plus de 7 jours |
+| `eo-routine-maintenance` | `5 6 * * * Europe/Paris` | génère les occurrences dues (14 derniers jours → aujourd'hui) et escalade en `manque` celles de plus de 7 jours (0173) |
 | `eo-invite-token-prune` | `20 6 * * *` | désactive les tokens expirés ou épuisés |
 | `eo-birthday-alerts` | `40 6 * * *` | annonce les anniversaires **du jour** de chaque foyer |
 | `eo-push-dispatch` | `* * * * *` | distribue les rappels de tâche, d'événement et de routine dus |
@@ -1052,7 +1052,12 @@ docker compose exec db psql -U postgres -c "select jobid, run_time, status, retu
 
 Points de conception :
 
-* **Fuseau** : toutes les dates sont calculées en `Europe/Paris`
+* **Fuseau** : toutes les dates sont calculées en `Europe/Paris`. L'horaire du
+  job des routines porte le fuseau explicite (`5 6 * * * Europe/Paris`,
+  migration 0173) : un horaire nu est interprété en UTC par pg_cron, et le job
+  tournait de fait à 08 h 05 de Paris — d'où des matinées sans occurrence avant
+  cette heure. Les autres jobs quotidiens restent en horaire nu (UTC), sans
+  effet observé à ce jour sur leur comportement.
   (`now() at time zone 'Europe/Paris'`), jamais via le fuseau du conteneur. La
   planification est donc indépendante de la configuration système.
 * **`database_name` explicite** : les jobs sont installés avec
