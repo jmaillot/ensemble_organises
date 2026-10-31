@@ -136,3 +136,31 @@ describe('RoutineFormDialog — garde D-06 du picker d’assignataires', () => {
     expect(onSubmit.mock.calls[0][0].assigneeIds).toEqual([admin.id]);
   });
 });
+
+describe('RoutineFormDialog — sélecteur de dossier (G-30-2)', () => {
+  it('affiche UNE SEULE entrée « Général » et toutes les dossiers personnalisés fournis', () => {
+    const customFolders = [
+      { id: 'folder-maison', name: 'Maison' },
+      { id: 'folder-ecole', name: 'École' },
+    ];
+    renderWithProviders(
+      <RoutineFormDialog
+        open
+        onOpenChange={() => {}}
+        routine={null}
+        currentMemberId={admin.id}
+        folders={customFolders}
+        onSubmit={() => Promise.resolve()}
+      />,
+      { withHousehold: false },
+    );
+
+    // Le doublon G-30-2 était l'option codée en dur PLUS la ligne is_default
+    // rendue par le .map : le hook filtre désormais (formFoldersOf), et ce
+    // test verrouille le rendu — exactement une option « Général ».
+    const options = screen.getAllByRole('option');
+    expect(options.filter((option) => option.textContent === 'Général')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: 'Maison' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'École' })).toBeInTheDocument();
+  });
+});

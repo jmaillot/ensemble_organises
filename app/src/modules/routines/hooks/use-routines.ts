@@ -61,6 +61,8 @@ export interface UseRoutinesResult extends RoutineMetrics {
   members: HouseholdMemberRow[];
   currentMemberId: string;
   folders: RoutineFolderRow[];
+  /** Dossiers du formulaire : `folders` sans le dossier par défaut (G-30-2). */
+  formFolders: { id: string; name: string }[];
   /** Onglet dossier : `null` = Général. */
   activeFolderId: string | null;
   setActiveFolderId: (id: string | null) => void;
@@ -109,9 +111,19 @@ export interface UseRoutinesResult extends RoutineMetrics {
 const NO_ASSIGNEES: RoutineAssigneeRecord[] = [];
 const NO_REMINDERS: RoutineReminderRecord[] = [];
 
+/**
+ * Dossiers fournis au FORMULAIRE de routine : sans le dossier par défaut.
+ * L'option « Général » (value="" = NULL en base, 0050) est codée en dur dans
+ * le dialogue — rendre aussi la ligne is_default faisait deux entrées
+ * « Général » au menu déroulant (gap G-30-2, UAT 2026-10-31). La vue par
+ * onglets continue de recevoir la liste COMPLÈTE (folders).
+ */
+export function formFoldersOf(folders: RoutineFolderRow[]): { id: string; name: string }[] {
+  return folders.filter((folder) => !folder.is_default).map((folder) => ({ id: folder.id, name: folder.name }));
+}
+
 /** Données du module Routines : définitions, occurrences et historique. */
-export function useRoutines(): UseRoutinesResult {
-  const queryClient = useQueryClient();
+export function useRoutines(): UseRoutinesResult {  const queryClient = useQueryClient();
   const members = useMembers();
   const currentMember = useCurrentMember();
   const householdId = useHouseholdStore((state) => state.householdId);
@@ -125,6 +137,8 @@ export function useRoutines(): UseRoutinesResult {
     () => [...foldersResource.rows].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
     [foldersResource.rows],
   );
+  // Le filtre du formulaire est dérivé : `folders` reste complet pour les onglets.
+  const formFolders = useMemo(() => formFoldersOf(folders), [folders]);
 
   const folderStorageKey = `eo:routines:folder:${householdId ?? 'none'}`;
   const [storedFolderId, setStoredFolderId] = useState<string | null>(() => {
@@ -359,6 +373,7 @@ export function useRoutines(): UseRoutinesResult {
     members,
     currentMemberId: currentMember?.id ?? '',
     folders,
+    formFolders,
     activeFolderId,
     setActiveFolderId,
     assigneeFilter,

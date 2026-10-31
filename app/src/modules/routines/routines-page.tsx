@@ -31,6 +31,7 @@ export default function RoutinesPage() {
     members,
     currentMemberId,
     folders,
+    formFolders,
     activeFolderId,
     setActiveFolderId,
     assigneeFilter,
@@ -372,7 +373,7 @@ export default function RoutinesPage() {
         routine={dialog.routine}
         currentMemberId={currentMemberId}
         initialFolderId={activeFolderId}
-        folders={folders}
+        folders={formFolders}
         isSaving={isMutating}
         onSubmit={async (values) => {
           const editing = dialog.routine;
