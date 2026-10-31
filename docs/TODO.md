@@ -261,7 +261,12 @@ functions` ; un unique `ARG GIT_SHA` alimente les quatre canaux d'estampille,
 et sans SHA la valeur est `unknown`. Preuve : `sh scripts/check-version-stamp.sh`
 → `ESTAMPILLE DE BUILD: OK` (quatre canaux au SHA avec estampille, quatre à
 `unknown` sans, les deux familles différentes). Vérification de phase : 10/10
-must-haves. Le résidu qui restait ouvert — le transit de `X-App-Version` derrière
+must-haves. **Re-prouvé le 2026-10-31 (phase 30, plan 02, rejouement D-06, fixes non réécrits)** :
+`cd app && npm run typecheck` OK et suite complète rejouée (1678/1679 — le seul échec,
+`calendrier-page.test.tsx`, est antérieur et hors périmètre, consigné dans
+`deferred-items.md`), et le constat d'usage hors ligne à froid du même jour sur la
+production (`https://ensemble.jeremymaillot.fr`) a été approuvé par l'opérateur : aucune
+des trois preuves de la famille hors-ligne n'a tourné court. Le résidu qui restait ouvert — le transit de `X-App-Version` derrière
 le proxy — a été **mesuré le 2026-10-19 en production** : `x-app-version` y rend
 `4e48b3cdec…`, soit exactement le commit poussé, à travers Traefik **puis**
 Cloudflare, et `/version.json` rend le même SHA avec `Cache-Control: no-cache`.
@@ -441,6 +446,15 @@ isolé**. L'échec est donc réel, non attribuable aux deux courses documentées
 reproduit. À reprendre si un passage le retrouve : la première chose à faire alors est
 de **capturer la sortie entière**, jamais un `tail`.
 
+**Re-prouvé le 2026-10-31 (phase 30, plan 02, rejouement D-06 — le correctif
+`2a74f8b`…`1a180a3` n'est pas réécrit)** : tests rejoués verts (typecheck OK ;
+`online-status` + `query-policy` 9/9 ; suite complète 1678/1679, l'unique échec
+`calendrier-page.test.tsx` étant antérieur et hors périmètre, consigné dans
+`deferred-items.md`), et le constat d'usage hors ligne à froid du même jour sur la
+production (`https://ensemble.jeremymaillot.fr`), approuvé par l'opérateur : le badge
+« À faire » compte juste — ou n'affiche rien tant que la lecture des assignations n'a
+pas rendu — jamais une valeur fausse.
+
 ---
 
 - [x] **15. Hors ligne, l'application affiche « rien » au lieu de dire qu'elle n'a pas pu lire**
@@ -569,6 +583,17 @@ précis, et non à un « quelque chose de plus récent ». Les deux correctifs o
 donc été livrés ensemble : la lecture dit qu'elle a échoué, le bandeau dit
 pourquoi dès le premier rendu, et le retour du réseau recharge sans
 rechargement de page.
+
+**Re-prouvé le 2026-10-31 (phase 30, plan 02, rejouement D-06 — `networkMode:
+'always'` et `seedOnlineStatus()` vérifiés en place, non réécrits)** : preuves
+automatisées rejouées (`cd app && npm run typecheck` OK ; `online-status` +
+`query-policy` 9/9 verts ; suite complète 1678/1679, l'unique échec
+`calendrier-page.test.tsx` étant antérieur et hors périmètre, consigné dans
+`deferred-items.md`), et le constat d'usage hors ligne à froid refait le même jour par
+l'opérateur sur la production (`https://ensemble.jeremymaillot.fr`) et **approuvé** :
+Courses rend l'erreur d'origine avec « Réessayer », jamais « Aucune liste pour ce
+foyer » ; le bandeau hors-ligne est présent dès le premier rendu ; le retour en ligne
+recharge les données sans recharger la page. Aucun écart signalé.
 
 ---
 
