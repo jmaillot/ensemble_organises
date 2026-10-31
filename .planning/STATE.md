@@ -5,14 +5,14 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
 current_phase_name: Hygiène du jalon — dettes et résidus
 status: executing
-stopped_at: Plan 30-02 clos (todos 13/14/15 re-prouvés 2026-10-31)
-last_updated: "2026-10-31T10:31:06.254Z"
-state_head: e490dde75b4d0dbc8354fb45c1f1a0b45648baa5
+stopped_at: "Plan 30-03 clos (DET-03 : photo du semis creditee, contrat rouge-avant-vert)"
+last_updated: "2026-10-31T10:43:14.811Z"
+state_head: 2448a82b6d836c5c441edc689326dce2fe1b682a
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 33
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 30 (Hygiène du jalon — dettes et résidus) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
 
@@ -72,8 +72,8 @@ Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-
 
 ## Session Continuity
 
-**Last session:** 2026-10-31T10:30:56.126Z
-**Stopped at:** Plan 30-02 clos (todos 13/14/15 re-prouvés 2026-10-31)
+**Last session:** 2026-10-31T10:43:00.133Z
+**Stopped at:** Plan 30-03 clos (DET-03 : photo du semis creditee, contrat rouge-avant-vert)
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -120,6 +120,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 29 P05 | ~25 min | 3 tasks | 6 files |
 | Phase 30 P01 | ~90m | 3 tasks | 3 files |
 | Phase 30 P02 | session | 3 tasks | 1 files |
+| Phase 30 P03 | ~15 min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -191,6 +192,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 29]: 29-03 : souscription Realtime par le chemin de production api-gw (Host de tenant) ; client WS natif Node, zéro dépendance npm ; aucune migration 0173 (publication déjà complète)
 - [Phase 29]: 29-05 : openDirectConversation appelle le RPC 0171 (anti-doublon D-05 côté serveur), picker « À qui écrire ? » un tap = démarrage/réouverture, conversation_members ajouté à useMessagesRealtime (D-08 : notification_reads jamais souscrite)
 - [Phase 30]: D-06 : todos 13/14/15 clos par rejouement de preuves (tests verts + constat hors ligne à froid approuvé par l'opérateur le 2026-10-31 en production), fixes non réécrits
+- [Phase 30]: Photo du semis démo : CC0 Wikimedia plutôt que CC BY — domaine public, crédit conservé au gabarit lisbonne.jpg — Arbitrage D-08 appliqué à la mesure : 1 recette du semis (seed.ts:568) = 1 photo, gabarit réutilisable pour toute recette future
 
 ### Blockers
 

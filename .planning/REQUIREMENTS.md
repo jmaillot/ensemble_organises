@@ -60,7 +60,7 @@
 
 - [ ] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences)
 - [ ] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 »)
-- [ ] **DET-03** : Les semis démo embarquent des photos de recette
+- [x] **DET-03** : Les semis démo embarquent des photos de recette
 - [ ] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
 - [ ] **DET-05** : Feuilles mobiles : césures « Anniver-saires » corrigées et animations de sortie sans régression (arbitrage forceMount tranché)
 
