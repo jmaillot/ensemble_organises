@@ -566,7 +566,14 @@ export const demoRoutineCompletions: RoutineCompletionRow[] = [
 ];
 
 export const demoRecipes: RecipeRow[] = [
-  { id: 'recipe-1', household_id: DEMO_HOUSEHOLD_ID, title: 'Tartiflette de saison', servings: 4, created_at: now() },
+  {
+    id: 'recipe-1',
+    household_id: DEMO_HOUSEHOLD_ID,
+    title: 'Tartiflette de saison',
+    servings: 4,
+    cover_photo: '/assets/recettes/tartiflette.jpg',
+    created_at: now(),
+  },
 ];
 
 /** Categorie par defaut + 14 tags (miroir des seeds SQL 0122, R2/R4). */
