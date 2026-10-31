@@ -16,10 +16,13 @@
 //   qu'il n'a pas.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithProviders } from '@/test/render';
-import { OfflinePanel } from './offline-panel';
 
 const SHA_40 = '42b76a163b845c6f29c196ea3852172063583fb1';
+// D-11 : sans estampille, le libellé écran est une déclaration honnête —
+// « Version de développement » — jamais `unknown` brut ni `0.1.0`. Les DEUX
+// points d'affichage sont couverts (ligne « Version » du panneau Données et
+// pied du panneau « Application web »), chacun avec une explication au survol.
+const LIBELLE_REPLI = 'Version de développement';
 
 // La constante de version est calculée au chargement du module : un stub
 // après un import classique ne changerait rien au module déjà mémoïsé.
@@ -42,13 +45,34 @@ afterEach(() => {
 });
 
 describe('OfflinePanel — estampille de build', () => {
-  it('affiche `unknown` sans VITE_APP_VERSION et jamais `0.1.0`', () => {
-    renderWithProviders(<OfflinePanel />);
+  // Famille 1 (D-11/D-13) : sans estampille — VITE_APP_VERSION absente.
+  it('affiche « Version de développement » aux deux points d\'affichage, jamais `unknown` ni `0.1.0`', async () => {
+    await rendreAvecVersion('unknown');
 
-    expect(screen.getAllByText('unknown').length).toBeGreaterThan(0);
+    const affichages = screen.getAllByText(LIBELLE_REPLI);
+    expect(affichages.length).toBe(2);
+    for (const affichage of affichages) {
+      const title = affichage.getAttribute('title');
+      expect(title).toBeTruthy();
+      expect(title?.length).toBeGreaterThan(0);
+    }
+    expect(document.body.textContent).not.toContain('unknown');
     expect(document.body.textContent).not.toContain('0.1.0');
   });
 
+  // Famille 1, variante chaîne vide : `||` traite une estampille vidée comme
+  // absente — le rendu est identique à la variante sans variable.
+  it('affiche « Version de développement » quand l\'estampille est une chaîne vide', async () => {
+    await rendreAvecVersion('');
+
+    const affichages = screen.getAllByText(LIBELLE_REPLI);
+    expect(affichages.length).toBe(2);
+    expect(document.body.textContent).not.toContain('unknown');
+    expect(document.body.textContent).not.toContain('0.1.0');
+  });
+
+  // Famille 2 (D-03, inchangée) : estampillée → SHA court + title complet,
+  // aux DEUX points d'affichage.
   it('affiche les 8 premiers caractères du SHA, le complet en title', async () => {
     await rendreAvecVersion(SHA_40);
 
@@ -58,19 +82,19 @@ describe('OfflinePanel — estampille de build', () => {
     expect(affichee).toHaveAttribute('title', SHA_40);
   });
 
+  it('affiche le SHA court avec title complet au pied « Application web »', async () => {
+    await rendreAvecVersion(SHA_40);
+
+    const pied = screen.getByText(/service worker mis à jour/i).closest('p');
+    expect(pied).not.toBeNull();
+    expect(pied?.textContent).toContain(SHA_40.slice(0, 8));
+  });
+
   it('laisse une valeur courte affichée en entier, title égal à la valeur', async () => {
     await rendreAvecVersion('abc');
 
     const ligneVersion = screen.getByText('Version').parentElement;
     const affichee = within(ligneVersion as HTMLElement).getByText('abc');
     expect(affichee).toHaveAttribute('title', 'abc');
-  });
-
-  it('affiche `unknown` en entier avec title égal à `unknown`', async () => {
-    await rendreAvecVersion('unknown');
-
-    const ligneVersion = screen.getByText('Version').parentElement;
-    const affichee = within(ligneVersion as HTMLElement).getByText('unknown');
-    expect(affichee).toHaveAttribute('title', 'unknown');
   });
 });
