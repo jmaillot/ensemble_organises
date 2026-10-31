@@ -37,21 +37,23 @@ $$;
 -- Semis sain : un Général par table, deux dossiers personnalisés sur les
 -- routines pour que le filtre de dédoublonnage soit prouvé sélectif.
 -- ---------------------------------------------------------------------------
-insert into public.task_lists (household_id, name, visibility, owner_member_id, is_default)
+insert into public.task_lists (household_id, name, visibility, owner_member_id, is_default, created_at)
 select (select household_id from testkit.fx where key = 'home'), 'Général', 'foyer',
-       (select row_id from testkit.fx where key = 'alice_m'), true;
-insert into public.note_folders (household_id, name, visibility, owner_member_id, is_default)
+       (select row_id from testkit.fx where key = 'alice_m'), true, now() - interval '1 day';
+insert into public.note_folders (household_id, name, visibility, owner_member_id, is_default, created_at)
 select (select household_id from testkit.fx where key = 'home'), 'Général', 'foyer',
-       (select row_id from testkit.fx where key = 'alice_m'), true;
-insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default)
+       (select row_id from testkit.fx where key = 'alice_m'), true, now() - interval '1 day';
+insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default, created_at)
 select (select household_id from testkit.fx where key = 'home'), 'Général', 'foyer',
-       (select row_id from testkit.fx where key = 'alice_m'), true;
+       (select row_id from testkit.fx where key = 'alice_m'), true, now() - interval '1 day';
 insert into public.routine_folders (household_id, name, visibility, owner_member_id)
 select (select household_id from testkit.fx where key = 'home'), 'Maison', 'foyer',
        (select row_id from testkit.fx where key = 'alice_m');
 
--- La marque reconnaissable du survivant (§2.7-D.2) : le Général est créé en
--- premier, donc created_at le plus ancien ; le doublon de Test C viendra après.
+-- La marque reconnaissable du survivant (§2.7-D.2) : le Général porte une
+-- created_at EXPLICITEMENT plus ancienne — now() vaut le début de
+-- TRANSACTION, identique pour toutes les lignes du fichier, le tie-break
+-- (created_at, id) serait sinon arbitraire dans le fixture.
 insert into testkit.fx (key, row_id)
 select 'gen_survivant', id from public.routine_folders
  where household_id = (select household_id from testkit.fx where key = 'home')
@@ -82,10 +84,7 @@ select testkit.eq(
 -- refusée par l'index unique partiel routine_folders_default_unique (0050).
 -- ---------------------------------------------------------------------------
 select testkit.expect_denied(
-  format(
-    'insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default)
-     values ((select household_id from testkit.fx where key = ''home''), ''Général'', ''foyer'',
-             (select row_id from testkit.fx where key = ''alice_m''), true)'),
+  'insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default) values ((select household_id from testkit.fx where key = ''home''), ''Général'', ''foyer'', (select row_id from testkit.fx where key = ''alice_m''), true)',
   'Test B : une deuxième insertion is_default même foyer doit échouer (index partiel 0050)');
 
 -- ---------------------------------------------------------------------------
@@ -102,9 +101,9 @@ select testkit.expect_denied(
 drop index if exists public.routine_folders_default_unique;
 alter table public.routine_folders drop constraint routine_folders_name_unique;
 
-insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default)
+insert into public.routine_folders (household_id, name, visibility, owner_member_id, is_default, created_at)
 select (select household_id from testkit.fx where key = 'home'), 'Général', 'foyer',
-       (select row_id from testkit.fx where key = 'alice_m'), true;
+       (select row_id from testkit.fx where key = 'alice_m'), true, now();
 
 -- La garde d'unicité est recréée SEULEMENT APRÈS le dédoublonnage (c'est ce
 -- que fait la migration : dédupe puis crée l'index s'il manque) ; son succès
@@ -179,4 +178,4 @@ select testkit.ok(
        and folder_id = (select row_id from testkit.fx where key = 'gen_survivant')),
   'Test C : second appel — la routine reste sur le survivant');
 
-commit;
+rollback;
