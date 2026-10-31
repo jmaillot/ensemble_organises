@@ -22,8 +22,10 @@ describe('Semis démo — couvertures recettes (DET-03)', () => {
     for (const recipe of demoRecipes) {
       const cover = recipe.cover_photo ?? '';
       if (!/^\/assets\/recettes\//.test(cover)) continue;
-      const relative = cover.replace(/^\/assets\//, '');
-      const filePath = join(__dirname, '..', '..', '..', 'public', relative);
+      // L'URL `/assets/recettes/<slug>.jpg` sert `public/assets/recettes/`
+      // (Vite : tout ce qui est sous `public/` est servi à la racine) —
+      // `public/` + chemin SANS le préfixe d'URL.
+      const filePath = join(__dirname, '..', '..', '..', 'public', cover.slice(1));
       expect(existsSync(filePath), `fichier manquant : ${filePath}`).toBe(true);
     }
   });
