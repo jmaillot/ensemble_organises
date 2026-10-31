@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
 current_phase_name: Hygiène du jalon — dettes et résidus
-status: executing
-stopped_at: "Plan 30-04 clos (DET-04 : Version de développement sans estampille, contrat rouge-avant-vert)"
-last_updated: "2026-10-31T11:12:56.614Z"
-state_head: 7f1fe13cbf993ee0c4fb03adae441678ee7ea91b
+status: verifying
+stopped_at: "Completed 30-05-PLAN.md (DET-05 : césure + sortie animée feuilles, forceMount écarté sur preuve a11y)"
+last_updated: "2026-10-31T12:05:55.809Z"
+state_head: 3f879b4386fe5fd354323092ba9a6ab6d92678fc
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
   percent: 43
 last_activity: 2026-10-27
 ---
@@ -23,7 +23,7 @@ last_activity: 2026-10-27
 
 Phase: 30 (Hygiène du jalon — dettes et résidus) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
 
 ## Références du jalon v1.0
@@ -72,8 +72,8 @@ Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-
 
 ## Session Continuity
 
-**Last session:** 2026-10-31T11:12:56.505Z
-**Stopped at:** Plan 30-04 clos (DET-04 : Version de développement sans estampille, contrat rouge-avant-vert)
+**Last session:** 2026-10-31T12:05:44.376Z
+**Stopped at:** Completed 30-05-PLAN.md (DET-05 : césure + sortie animée feuilles, forceMount écarté sur preuve a11y)
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
@@ -122,6 +122,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 30 P02 | session | 3 tasks | 1 files |
 | Phase 30 P03 | ~15 min | 2 tasks | 4 files |
 | Phase 30 P04 | ~30 min | 2 tasks | 3 files |
+| Phase 30 P05 | ~1h20 | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -195,6 +196,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 30]: D-06 : todos 13/14/15 clos par rejouement de preuves (tests verts + constat hors ligne à froid approuvé par l'opérateur le 2026-10-31 en production), fixes non réécrits
 - [Phase 30]: Photo du semis démo : CC0 Wikimedia plutôt que CC BY — domaine public, crédit conservé au gabarit lisbonne.jpg — Arbitrage D-08 appliqué à la mesure : 1 recette du semis (seed.ts:568) = 1 photo, gabarit réutilisable pour toute recette future
 - [Phase 30]: 30-04 : le repli « Version de développement » est un choix de RENDU strict — appVersion reste 'unknown' côté machine, les trois canaux (X-App-Version, /version.json, LABEL image) gardent leur contrat (D-12) ; title du repli déclare la cause (build hors pipeline, valeur non fiable), jamais un semver faux (D-11)
+- [Phase 30]: 30-05 : arbitrage forceMount amendé — écarté sur preuve a11y (hideOthers/focus guards actifs feuille fermée = page aria-hidden, prouvé par scan-flow.test) ; sortie animée appuyée sur la Présence Radix (contenu monté PENDANT la sortie, démontage propre)
+- [Phase 30]: 30-05 : inventaire D-16 consigné — feuilles du mécanisme = MobileDrawer (feuille « Plus ») + ProductSheet (DialogContent feuille ≤650px) ; les autres consommateurs de DialogContent sans animation restent inchangés
 
 ### Blockers
 
