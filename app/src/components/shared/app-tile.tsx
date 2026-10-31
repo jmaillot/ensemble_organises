@@ -57,11 +57,15 @@ const TILE_CLASS = cn(
 function TileContent({ label, module, counter }: { label: string; module: ModuleObjectKey; counter?: TileCounter }) {
   return (
     <>
-      {/* `hyphens-auto` : en trois colonnes (feuille « Plus », 390 px),
-          « Anniversaires » ne tient pas sur une ligne — le nom passe sur
-          deux avec sa césure française (`lang="fr"` posé sur <html>) au
-          lieu d'être rogné par l'overflow de la tuile. */}
-      <strong className="relative z-1 text-[16px] font-bold leading-tight tracking-[-0.01em] text-fg hyphens-auto">
+      {/* Wrap sans césure (D-14) : en trois colonnes (feuille « Plus »,
+          390 px), « Anniversaires » ne tient pas sur une ligne. L'ancien
+          `hyphens-auto` coupait le mot avec la césure française héritée de
+          `lang="fr"` (posée sur <html>) — un nom d'espace ne se coupe pas.
+          `text-wrap: balance` est indispensable : seul, `hyphens-none`
+          laisserait la deuxième ligne quasi vide en fin de mot long, la
+          balance répartit les deux lignes. La largeur de la tuile borne le
+          nom, l'overflow de la tuile ne rogne plus rien. */}
+      <strong className="relative z-1 text-[16px] font-bold leading-tight tracking-[-0.01em] text-fg hyphens-none [text-wrap:balance]">
         {label}
       </strong>
       {/* L'objet de la tuile, calé en bas à droite mais ENTIER : rogné à
