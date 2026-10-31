@@ -23,6 +23,24 @@ const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || '
 // cas spécial à gérer.
 const appVersionShort = appVersion.slice(0, 8);
 
+// D-11 : à l'ÉCRAN, `unknown` n'est jamais montré tel quel. Un build sans
+// estampille (ou avec chaîne vide, déjà replacée par `unknown` ci-dessus) est
+// un build local : afficher `0.1.0` serait une version fausse avec assurance
+// et `unknown` un libellé de machine, pas un message pour l'humain. On
+// déclare alors « Version de développement », avec au survol la raison de
+// l'imprécision. Ce repli est strictement un choix de RENDU : les trois
+// canaux machine de l'estampille (`X-App-Version`, `/version.json`, LABEL
+// image) continuent de porter `unknown` tel quel — leur contrat `unknown` est
+// consommé par `scripts/check-version-stamp.sh` et les diagnostics de
+// production (D-12). Avec estampille : SHA court à l'écran, SHA complet au
+// survol, comportement inchangé (D-13).
+const appVersionInconnue = appVersion === 'unknown';
+const libelleRepli = 'Version de développement';
+const titleRepli =
+  'Version de développement : cette version a été construite hors du pipeline estampillé, sa valeur exacte n’est pas fiable.';
+const versionEcran = appVersionInconnue ? libelleRepli : appVersionShort;
+const titleEcran = appVersionInconnue ? titleRepli : appVersion;
+
 export function OfflinePanel() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -40,7 +58,7 @@ export function OfflinePanel() {
           </div>
           <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
             <span className="text-muted">Version</span>
-            <strong title={appVersion}>{appVersionShort}</strong>
+            <strong title={titleEcran}>{versionEcran}</strong>
           </div>
         </div>
         {isLocalMode ? (
@@ -77,7 +95,7 @@ export function OfflinePanel() {
           <li>Les rappels arrivent en notification push, réglables dans le panneau notifications.</li>
         </ul>
         <p className="mt-4 mb-0 text-[11px] text-muted">
-          Version <span title={appVersion}>{appVersionShort}</span> · service worker mis à jour automatiquement à chaque
+          Version <span title={titleEcran}>{versionEcran}</span> · service worker mis à jour automatiquement à chaque
           déploiement.
         </p>
       </Panel>
