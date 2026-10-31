@@ -271,7 +271,11 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* D-16 : la fiche produit est une feuille du même gabarit que le
+          tiroir (inventaire D-16) — la sortie est animée par `feuille-mobile`
+          (app.css, mécanisme partagé), l'état reste réinitialisé à chaque
+          ouverture plus haut. */}
+      <DialogContent feuille>
         <DialogHeader>
           <p className="eyebrow mb-2">Courses</p>
           <DialogTitle>{offProduct ? offProduct.name : 'Produit non trouvé — créez-le'}</DialogTitle>

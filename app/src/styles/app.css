@@ -259,9 +259,11 @@
   backdrop-filter: blur(18px);
 }
 
-/* Feuille basse du menu mobile : monte du bas au montage (Radix démonte à
-   la fermeture, le keyframe rejoue à chaque ouverture). transform+opacity
-   uniquement ; reduced-motion garde la tombée d'opacité, sans mouvement. */
+/* Feuille basse du menu mobile : monte du bas à l'ouverture. La sortie
+   animée (miroir) vit plus bas : Radix garde la feuille montée pendant la
+   fermeture (Présence), le keyframe y est déclenché par data-state.
+   transform+opacity uniquement ; reduced-motion garde la tombée d'opacité,
+   sans mouvement. */
 @keyframes monter-feuille {
   from {
     transform: translateY(100%);
@@ -307,6 +309,55 @@
   .feuille-mobile,
   .tuile-mobile {
     animation: apparaitre 150ms ease-out both;
+  }
+}
+
+/* Sortie de la feuille (D-16) — miroir de l'entrée, déclenché par l'état
+   Radix. Radix garde le contenu monté PENDANT l'animation de sortie
+   (Présence), puis le démonte : aucun masquage persistant nécessaire, et
+   aucun minuteur JS. Aucune valeur inventée : mêmes durées et courbes que
+   l'entrée (340ms --ease-drawer, 200ms ease-out). La sortie animée ne
+   concerne que le gabarit feuille basse (≤650px) ; l'overlay fermé perd
+   ses pointeurs dès data-state=closed, à toutes les largeurs, pour ne pas
+   intercepter un clic pendant les 340ms de glissade. */
+@keyframes descendre-feuille {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes disparaitre-voile {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.feuille-mobile-overlay[data-state='closed'] {
+  pointer-events: none;
+}
+
+@media (max-width: 650px) {
+  .feuille-mobile[data-state='closed'] {
+    animation: descendre-feuille 340ms var(--ease-drawer);
+  }
+
+  .feuille-mobile-overlay[data-state='closed'] {
+    animation: disparaitre-voile 200ms ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Repli opacity seule, symétrique du bloc d'entrée ci-dessus : la
+     fermeture fond, elle ne glisse pas. */
+  .feuille-mobile[data-state='closed'],
+  .feuille-mobile-overlay[data-state='closed'] {
+    animation: disparaitre-voile 150ms ease-out;
   }
 }
 

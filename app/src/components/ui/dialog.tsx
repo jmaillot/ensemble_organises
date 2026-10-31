@@ -7,13 +7,45 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
-export const DialogContent = forwardRef<
+/**
+ * Couple de feuille basse partagé (D-15, posé UNE fois) : le portal, la
+ * classe d'overlay et la classe de contenu portent les animations entrée/
+ * sortie et le gabarit feuille (app.css, source unique). Radix garde le
+ * contenu monté PENDANT l'animation de sortie (Présence) puis le démonte —
+ * le montage `forceMount` a été écarté : la machinerie modale de Radix
+ * (hideOthers, focus guards) reste active feuille fermée et laissait la
+ * page entière aria-hidden (déviation D-15 consignée en 30-05).
+ */
+export interface FeuillePortalProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  overlayClassName?: string;
+}
+
+export const FeuillePortal = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
->(function DialogContent({ className, children, hideClose, ...rest }, ref) {
+  FeuillePortalProps
+>(function FeuillePortal({ overlayClassName, className, children, ...contentProps }, ref) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px]" />
+      <DialogPrimitive.Overlay className={cn('feuille-mobile-overlay', overlayClassName)} />
+      <DialogPrimitive.Content ref={ref} {...contentProps} className={cn('feuille-mobile', className)}>
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+});
+
+export const DialogContent = forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean; feuille?: boolean }
+>(function DialogContent({ className, children, hideClose, feuille = false, ...rest }, ref) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className={cn(
+          'fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px]',
+          feuille && 'feuille-mobile-overlay',
+        )}
+      />
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
@@ -21,6 +53,7 @@ export const DialogContent = forwardRef<
           // centré par lui-même au-dessus du voile, sinon il tomberait dans le
           // flux normal de la page, sous la ligne de flottaison.
           'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-40px)] w-[calc(100vw-40px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[22px] bg-surface p-[23px] shadow-[var(--shadow-lg)] sm:max-h-[720px] max-[650px]:top-auto max-[650px]:right-[10px] max-[650px]:bottom-[calc(10px+env(safe-area-inset-bottom))] max-[650px]:left-[10px] max-[650px]:w-auto max-[650px]:max-w-none max-[650px]:translate-x-0 max-[650px]:translate-y-0 max-[650px]:rounded-t-[22px] max-[650px]:rounded-b-none max-[650px]:px-4 max-[650px]:pt-5 max-[650px]:pb-[calc(20px+env(safe-area-inset-bottom))] max-[650px]:max-h-[calc(100dvh-20px-env(safe-area-inset-bottom))]',
+          feuille && 'feuille-mobile',
           className,
         )}
         {...rest}

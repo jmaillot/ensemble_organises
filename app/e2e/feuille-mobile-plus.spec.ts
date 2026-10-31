@@ -68,4 +68,25 @@ test.describe('Feuille « Plus » mobile — césure et débordement à 390px', 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
+
+  test('cycle ouverture/fermeture : contenu monté pendant la sortie, propre au repos (D-15/D-16)', async ({ page }) => {
+    const feuille = await openFeuillePlus(page);
+    await page.getByRole('button', { name: 'Fermer le menu' }).click();
+
+    // Fermeture : Radix garde la feuille montée PENDANT l'animation de
+    // sortie (Présence) — l'élément est encore dans le DOM, en état closed,
+    // le temps de la glissade (miroir de l'entrée, D-16).
+    await expect(feuille).toHaveAttribute('data-state', 'closed');
+
+    // À l'état de repos fermé, la feuille est démontée : aucun contenu
+    // invisible ne traîne dans le DOM (pas de forceMount — la machinerie
+    // modale Radix laisserait la page aria-hidden, déviation D-15 consignée).
+    await expect(feuille).toHaveCount(0);
+    await expect(page.locator('.feuille-mobile-overlay')).toHaveCount(0);
+
+    // Réouverture : l'entrée rejoue (état open, feuille visible).
+    await page.getByRole('button', { name: 'Plus' }).click();
+    await expect(feuille).toBeVisible();
+    expect(await feuille.getAttribute('data-state')).toBe('open');
+  });
 });

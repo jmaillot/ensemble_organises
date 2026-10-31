@@ -6,6 +6,7 @@ import { isChildHiddenModule, isModuleDisabled, moduleMap, modulePath, type Modu
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
 import { signOut } from '@/hooks/use-auth';
 import { useToast } from '@/components/ui/toast';
+import { FeuillePortal } from '@/components/ui/dialog';
 import { Icon, type IconName } from './icon';
 import { memberTagClass } from './member-avatar';
 import { Input } from '@/components/ui/input';
@@ -151,12 +152,14 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="feuille-mobile-overlay fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px] min-[651px]:hidden max-[650px]:z-[80]" />
-        <DialogPrimitive.Content
-          id={MOBILE_DRAWER_ID}
-          className="feuille-mobile fixed right-0 bottom-0 left-0 z-50 flex max-h-[calc(100dvh-56px)] flex-col gap-4 overflow-hidden rounded-t-[32px] border-t border-border bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] min-[651px]:hidden max-[650px]:z-[80]"
-        >
+      {/* D-15 : le mécanisme partagé (FeuillePortal) porte les classes
+          feuille-mobile — Radix garde le contenu monté pendant l'animation
+          de sortie (Présence), puis le démonte. */}
+      <FeuillePortal
+        id={MOBILE_DRAWER_ID}
+        overlayClassName="fixed inset-0 z-50 bg-[oklch(20%_0.02_240/0.42)] backdrop-blur-[6px] min-[651px]:hidden max-[650px]:z-[80]"
+        className="fixed right-0 bottom-0 left-0 z-50 flex max-h-[calc(100dvh-56px)] flex-col gap-4 overflow-hidden rounded-t-[32px] border-t border-border bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] min-[651px]:hidden max-[650px]:z-[80]"
+      >
           {/* Poignée décorative : la feuille se referme aussi par l'overlay,
               le bouton et Échap — la poignée ne porte aucune action. */}
           <span aria-hidden="true" className="mx-auto block h-[5px] w-[38px] shrink-0 rounded-full bg-border" />
@@ -261,8 +264,7 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
               </button>
             </div>
           </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
+      </FeuillePortal>
     </DialogPrimitive.Root>
   );
 }
