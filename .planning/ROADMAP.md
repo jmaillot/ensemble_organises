@@ -202,13 +202,13 @@ Plans:
   4. Sans estampille de build, le panneau de version affiche un message crédible (jamais « 0.1.0 » inventé) — complément des findings de la phase 24
   5. Les feuilles mobiles rendent « Anniversaires » sans césure disgracieuse et avec animations de sortie cohérentes, e2e au vert (arbitrage forceMount consigné)
 
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 - [x] 30-01-PLAN.md — DET-01 : diagnostic prod du job `eo-routine-maintenance` (D-02), correction cause racine + migration [BLOCKING], test SQL rouge-avant-vert, mesure prod + constat d'usage (D-01/D-03/D-04)
 - [x] 30-02-PLAN.md — DET-02 : rejouement des preuves des todos hors-ligne 13/14/15 (D-05/D-06), balayage de classe (D-07), clôture avec preuve fraîche
 - [x] 30-03-PLAN.md — DET-03 : photo du semis recette (chemin public /assets/recettes/, D-08/D-09/D-10), test de contrat rouge-avant-vert, crédits ATTRIBUTION.md
-- [ ] 30-04-PLAN.md — DET-04 : libellé « Version de développement » sans estampille (D-11/D-12), test deux familles (D-13)
+- [x] 30-04-PLAN.md — DET-04 : libellé « Version de développement » sans estampille (D-11/D-12), test deux familles (D-13)
 - [ ] 30-05-PLAN.md — DET-05 : césure « Anniversaires » corrigée (D-14), mécanisme partagé forceMount + animation de sortie (D-15/D-16), e2e 390 px au vert (D-17)
 
 **UI hint**: yes
@@ -237,7 +237,7 @@ Plans:
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 2/5 | In Progress|  |
 | 29. Messagerie v2 | 5/5 | In Progress|  |
-| 30. Hygiène du jalon | 3/5 | In Progress|  |
+| 30. Hygiène du jalon | 4/5 | In Progress|  |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |
 
 ## Couverture v1.0

@@ -61,7 +61,7 @@
 - [ ] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences)
 - [ ] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 »)
 - [x] **DET-03** : Les semis démo embarquent des photos de recette
-- [ ] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
+- [x] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
 - [ ] **DET-05** : Feuilles mobiles : césures « Anniver-saires » corrigées et animations de sortie sans régression (arbitrage forceMount tranché)
 
 ## Exigences v1.1 (hors roadmap actuel)
@@ -120,7 +120,7 @@
 | DET-01 | Phase 30 | Pending |
 | DET-02 | Phase 30 | Pending |
 | DET-03 | Phase 30 | Pending |
-| DET-04 | Phase 30 | Pending |
+| DET-04 | Phase 30 | Done (30-04) |
 | DET-05 | Phase 30 | Pending |
 | OUV-01 | Phase 31 | Pending |
 | OUV-02 | Phase 31 | Pending |
