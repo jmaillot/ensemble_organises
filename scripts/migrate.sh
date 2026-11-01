@@ -137,8 +137,13 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
   fi
 
   echo "  → $version"
-  psql_exec -q -f - <"$file" >/dev/null
-  psql_exec -q -c "insert into public.schema_migrations (version) values ('$version');" >/dev/null
+  # ON_ERROR_STOP est la promesse d'AGENTS.md §8.1 : une erreur au milieu d'un
+  # fichier arrête psql en non-zéro, la version n'est PAS journalisée, et le
+  # fichier sera rejeté au prochain passage. Sans ce drapeau, un échec avalé
+  # journalisait la version quand même — c'est ainsi que 0173 a pu être
+  # marquée appliquée sur prod le 2026-10-31 sans que son bloc ait pris effet.
+  psql_exec -q -v ON_ERROR_STOP=1 -f - <"$file" >/dev/null
+  psql_exec -q -v ON_ERROR_STOP=1 -c "insert into public.schema_migrations (version) values ('$version');" >/dev/null
 
   applied=$((applied + 1))
 done

@@ -616,3 +616,41 @@ du distant) ; forme découpée verte sans trace ; contrôle statique n°8
 liste dérivée des migrations) rouge sur 0055 avant, vert après, `0039`
 signalé sans échouer. Chaîne : statique 112 fonctions OK, `test-db.sh`
 19/19.
+
+## 2026-11-01 — 0173 journalisée sans effet : migrate.sh avalait les erreurs
+
+**Symptôme** : D-03 (phase 30) demandait la preuve que le job cron
+`eo-routine-maintenance` tourne à 06:05 heure de Paris. Sur prod, `cron.job`
+montrait toujours le jobid=1 au schedule nu `5 6 * * *` (interprété UTC) alors
+que `schema_migrations` journalisait `0173_routine_cron_fix.sql` depuis la
+veille. Le bloc de la migration, rejoué à la main, réussissait du premier coup.
+
+**Cause racine** : `scripts/migrate.sh` exécutait chaque fichier avec
+`psql -q -f -` **sans** `-v ON_ERROR_STOP=1`. Une erreur au milieu d'un fichier
+n'arrêtait pas psql — qui sortait en 0 — et le script journalisait la version
+quand même. `AGENTS.md` §8.1 et `docs/BACKEND.md` §4 affirmaient tous deux le
+comportement inverse (« un échec annule le fichier entier, version non
+enregistrée ») : la documentation décrivait un garde qui n'existait pas (§2.7-I,
+l'affirmation non vérifiée). C'est aussi §2.7-F : un succès muet est un échec
+inexpliqué, et celui-ci a dormi une nuit entière.
+
+**Correctif** : `-v ON_ERROR_STOP=1` sur les deux appels psql de la boucle
+d'application, avec le commentaire qui nomme l'incident. La doc était déjà
+juste ; c'est le script qui l'a rejointe.
+
+**Preuve sur la base de développement** (§2.7 : un contrôle se prouve sur un
+cas qui doit échouer) : une migration factice `9999` contenant `select 1/0;`
+produit `ERROR: division by zero` à l'écran, exit 3, et **zéro ligne** dans
+`schema_migrations` — puis nettoyage du fichier factice. Avant le correctif, le
+même scénario journalisait la version.
+
+**Audit de la classe (§2.7-E)** : 27 migrations portent `raise notice`. La
+quasi-totalité sont légitimes — information de progression, ou dégradation
+*documentée* d'une fonctionnalité optionnelle (`pg_cron absent : jobs non
+installés`, `pg_net ou Vault absent : aucun envoi`). Le motif dangereux est
+`raise notice … return` devant une opération **requise** : 0173 était le seul
+cas, son garde sautait silencieusement un re-scheduling attendu. Les migrations
+appliquées ne se réécrivent pas ; la règle retenue pour l'avenir est écrite ici :
+**un garde qui saute une opération requise doit lever (`raise exception`),
+jamais notifier.** Leçon §2.7-B dans sa forme la plus pure — le contrôle qui ne
+regarde rien est vert, ne fait aucun bruit, et ne peut rien voir.

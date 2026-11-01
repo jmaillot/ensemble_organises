@@ -93,6 +93,18 @@ pour qu'une Edge neuve ne démarre jamais avant le schéma qu'elle attend
 (`AGENTS.md` §8.3 copie d'abord, mais il ne lance alors que des transitions de
 fichiers — l'ordre effectif reste migrations puis rechargement).
 
+> **Rotation d'une clé secrète = `recreate` de TOUTE la pile (constaté le
+> 2026-10-31, prod).** La règle « l'env est figé à la création » ne vaut pas
+> que pour `functions` : après une rotation de `SUPABASE_SECRET_KEY` /
+> `SUPABASE_PUBLISHABLE_KEY` dans le `.env`, chaque service qui les lit
+> (`auth`, `rest`, `realtime`, `storage`, `functions`…) continue de tourner
+> avec l'ANCIENNE valeur jusqu'à son `recreate` — sans aucune erreur à
+> l'écran. Symptôme vu : bannière « hors ligne » persistante côté app alors
+> que `docker restart` vient de passer ; guérison par
+> `sh run.sh recreate realtime`. Après toute rotation de clé, enchaîner
+> `sh run.sh recreate` sur les services de la pile (ou un `up -d --force-recreate`),
+> pas seulement sur le service dont on se dit qu'il est concerné.
+
 ```
 Point de contrôle : sh run.sh logs functions  ne montre pas d'erreur de
                     démarrage, et les fonctions copiées sont bien listées.
@@ -116,6 +128,17 @@ Point de contrôle : sh ../scripts/check-hosts.sh   (les hôtes publiés par
 Le build Vite **incorpore** l'URL, la clé publiable et l'estampille : elles sont
 passées comme `ARG` à l'image, pas comme variables de conteneur. Un déploiement
 frontend signifie donc **reconstruire**, pas redémarrer.
+
+> **Échec silencieux si `.env.app` manque (constaté le 2026-10-31, prod).**
+> Sans `--env-file .env.app` (fichier absent ou clé vidée), Compose
+> n'interpole PAS en erreur : le build part avec des `VITE_*` vides, l'image
+> se construit « avec succès », et la prod sert un frontend cassé
+> (`JSON.parse: unexpected character` à la connexion — le client pointe
+> nulle part). D'où le `config` AVANT le `up --build` ci-dessous : si la
+> sortie montre `VITE_SUPABASE_URL: ""` ou n'affiche pas les args, arrête
+> tout et répare `.env.app` d'abord (§2.7-F : un succès muet est un échec
+> inexpliqué). Même logique que `/version.json` = « unknown » : le build a
+> tourné sans `GIT_SHA`.
 
 ```sh
 cd ..
