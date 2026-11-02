@@ -221,9 +221,15 @@ begin
     'les jobs appellent uniquement des fonctions privées sans paramètre'
   );
 
+  -- 0175 : le suffixe Europe/Paris de 0173 est enregistré par l'extension
+  -- mais IGNORÉ par le bgworker (mesure prod 2026-11-02 : run à 06:05 UTC =
+  -- 07:05 Paris hiver). Retour à l'horaire nu décalé, en UTC : 04:05 UTC =
+  -- 06:05 Paris l'été, 05:05 l'hiver — l'occurrence du jour existe avant
+  -- l'usage matinal toute l'année, qui est l'objectif de DET-01. La dérive
+  -- saisonnière d'une heure est documentée dans 0175.
   perform testkit.ok(
-    exists (select 1 from cron.job where jobname = 'eo-routine-maintenance' and schedule = '5 6 * * * Europe/Paris'),
-    'la maintenance quotidienne est planifiée à 06 h 05, heure de Paris (0173)'
+    exists (select 1 from cron.job where jobname = 'eo-routine-maintenance' and schedule = '5 4 * * *'),
+    'la maintenance quotidienne est planifiée à 04 h 05 UTC (0175, fuseau non honoré)'
   );
   perform testkit.ok(
     exists (select 1 from cron.job where jobname = 'eo-push-dispatch' and schedule = '* * * * *'),
