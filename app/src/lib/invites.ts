@@ -127,6 +127,83 @@ export async function redeemInviteToken(token: string): Promise<string> {
 export const inviteHeaders = (token: string) => ({ [INVITE_SECRET_HEADER]: token });
 
 /**
+ * Consultation PRÉ-AUTH d'un lien d'invitation (31-02, D-01/D-02).
+ *
+ * Seul appel PUBLIC de la famille invitation : `household-invite-preview` est
+ * déclarée `auth: ['publishable']` côté Edge, donc la requête porte la clé
+ * publiable et AUCUN `Bearer` — un étranger sans session doit pouvoir nommer
+ * le foyer avant de s'inscrire. La réponse ne porte que deux champs
+ * (`householdName`, `inviterFirstName?`) : tout motif d'échec est une 404
+ * uniforme (D-03), que l'appelant traduit par un message unique sans jamais
+ * distinguer inconnu/expiré/épuisé/erreur.
+ */
+export interface HouseholdInvitePreview {
+  householdName: string;
+  inviterFirstName?: string | null;
+}
+
+export async function previewHouseholdInvite(token: string): Promise<HouseholdInvitePreview> {
+  if (!supabaseFunctionsBase) throw new Error('Edge Function indisponible.');
+  const response = await fetch(`${supabaseFunctionsBase}/household-invite-preview`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      // Volontairement SANS `authorization` : c'est le contrat `publishable`
+      // de la preview (D-01), le seul appel pré-auth de la famille.
+    },
+    body: JSON.stringify({ token: token.trim() }),
+  });
+  if (!response.ok) {
+    // Le détail serveur n'est pas exposé : 404 uniforme ou panne réseau ont le
+    // même traitement côté UI (D-03 — pas d'énumération de tokens valides).
+    throw new Error('Ce lien d’invitation n’est plus valable.');
+  }
+  return (await response.json()) as HouseholdInvitePreview;
+}
+
+/**
+ * Traversée du lien d'invitation à travers l'inscription (D-06/D-07).
+ *
+ * Le mail de confirmation ramène de façon GÉNÉRIQUE sur `SITE_URL` : le token
+ * ne voyage jamais dans l'URL du mail (ni dans les logs du MTA). La seule
+ * mémoire du parcours côté client est donc `sessionStorage` — copié au départ
+ * vers l'inscription, réadopté par le pré-écran au retour, nettoyé après
+ * application ou abandon. « Le stockage est un confort, pas un requis » :
+ * chaque accès est blindé, une panne de stockage ne casse jamais la page.
+ */
+const PENDING_INVITE_KEY = 'ensemble-organises-pending-invite-token';
+
+export function setPendingInviteToken(token: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(PENDING_INVITE_KEY, token);
+  } catch {
+    // Stockage plein ou refusé : la traversée manuelle du lien reste possible.
+  }
+}
+
+export function getPendingInviteToken(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(PENDING_INVITE_KEY);
+    return typeof raw === 'string' && raw.length > 0 ? raw : null;
+  } catch {
+    // Valeur illisible : on l'ignore plutôt que de casser le pré-écran.
+    return null;
+  }
+}
+
+export function clearPendingInviteToken(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.removeItem(PENDING_INVITE_KEY);
+  } catch {
+    // Sans objet : le nettoyage est un confort, pas un requis.
+  }
+}
+
+/**
  * Rappel local du dernier token généré sur cet appareil.
  *
  * Le serveur ne conserve que l'empreinte HMAC : le brut ne peut pas être

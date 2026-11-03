@@ -222,9 +222,12 @@ export function AppRoutes() {
       <Route
         path="/foyer/rejoindre"
         element={
-          <RequireAuth>
-            <LazyRoute load={routeChunkLoaders.joinHousehold} />
-          </RequireAuth>
+          // 31-03 (D-18/OUV-04) : le pré-écran d'invitation est PUBLIC — un
+          // étranger porteur du lien doit nommer le foyer avant de s'inscrire,
+          // pas être renvoyé vers la connexion. La consultation (Edge preview)
+          // ne révèle rien sur un token mort (D-03) et n'écrit rien : le
+          // jeton EST le contrôle d'accès et il vit dans l'URL jusqu'au clic.
+          <LazyRoute load={routeChunkLoaders.joinHousehold} />
         }
       />
       <Route

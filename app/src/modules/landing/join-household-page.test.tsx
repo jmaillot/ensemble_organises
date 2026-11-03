@@ -1,34 +1,46 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
 import { renderWithProviders } from '@/test/render';
+import { demoUser } from '@/hooks/use-auth';
+import { useSessionStore } from '@/stores/session-store';
+import {
+  clearPendingInviteToken,
+  getPendingInviteToken,
+  setPendingInviteToken,
+} from '@/lib/invites';
 
 /**
- * 19-16 — le lien partagé `/foyer/rejoindre?token=…` (émis par
- * `parametres/components/invitations-panel.tsx`, ce qu'un administrateur copie
- * ou fait scanner en QR) portait son jeton sans que la page le lise : l'invité
- * arrivait sur le bon écran et devait retaper 22 caractères à la main. Le
- * paramètre préremplit désormais le champ ; la saisie manuelle reste le repli.
+ * 31-03 (OUV-04, D-18/D-19/D-20) — `join-household-page` est le **pré-écran
+ * d'invitation** : la page consulte le foyer via l'Edge preview (31-02),
+ * nomme l'inviteur et le foyer (D-20), et propose UNE action selon la session
+ * (D-19) — « Continuer vers l'inscription » pour l'étranger (token copié en
+ * sessionStorage au départ, D-06), « Rejoindre le foyer » pour la personne
+ * déjà connectée. Jamais de redeem au simple chargement (D-08) : un aperçu de
+ * lien ne consomme pas un token à usage compté.
  *
- * D-10 — la page de jonction sondait `import.meta.env.VITE_SUPABASE_URL` SEUL,
- * alors que tout le reste de l'application sonde `isSupabaseConfigured` (URL
- * **et** clé). Une URL sans clé faisait donc croire à un backend présent, la
- * branche locale n'était pas prise, et le client Supabase n'existant pas,
- * l'appel serveur échouait au lieu de tourner en mode démonstration.
+ * La surface publique ne nuance jamais les motifs d'échec (D-03) : token mort
+ * et erreur réseau portent le MÊME message uniforme.
  */
-const { redeemInviteTokenMock, joinHouseholdLocalMock, loadHouseholdMock, supabaseClient } = vi.hoisted(() => ({
-  redeemInviteTokenMock: vi.fn(),
-  joinHouseholdLocalMock: vi.fn(),
-  loadHouseholdMock: vi.fn(),
-  // Drapeau mutable : `vi.mock` est hissé et son résultat est mis en cache, donc
-  // les deux cas (clé absente / configuration complète) ne peuvent pas se
-  // contenter d'une valeur figée à la fabrique.
-  supabaseClient: { configured: false },
-}));
+const { previewHouseholdInviteMock, redeemInviteTokenMock, joinHouseholdLocalMock, loadHouseholdMock, supabaseClient } =
+  vi.hoisted(() => ({
+    previewHouseholdInviteMock: vi.fn(),
+    redeemInviteTokenMock: vi.fn(),
+    joinHouseholdLocalMock: vi.fn(),
+    loadHouseholdMock: vi.fn(),
+    // Drapeau mutable : `vi.mock` est hissé et son résultat est mis en cache,
+    // donc les cas (démo / configuration complète) basculent le drapeau.
+    supabaseClient: { configured: false },
+  }));
 
 vi.mock('@/lib/invites', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/invites')>();
-  return { ...actual, redeemInviteToken: redeemInviteTokenMock };
+  return {
+    ...actual,
+    previewHouseholdInvite: previewHouseholdInviteMock,
+    redeemInviteToken: redeemInviteTokenMock,
+  };
 });
 
 vi.mock('@/stores/session-store', async (importOriginal) => {
@@ -38,8 +50,8 @@ vi.mock('@/stores/session-store', async (importOriginal) => {
 
 vi.mock('@/lib/supabase/client', () => ({
   supabase: null,
-  // Accesseur, et non valeur : la page lit l'export au moment de la soumission,
-  // donc le cas peut le faire basculer dans le corps du test.
+  // Accesseur, et non valeur : la page lit l'export au montage, donc le cas
+  // peut le faire basculer avant le rendu.
   get isSupabaseConfigured() {
     return supabaseClient.configured;
   },
@@ -48,90 +60,195 @@ vi.mock('@/lib/supabase/client', () => ({
   supabaseFunctionsBase: null,
 }));
 
-import { redeemInviteToken } from '@/lib/invites';
 import JoinHouseholdPage from './join-household-page';
 
-// 25 caractères, distinct de tout identifiant de la graine : une valeur codée
-// en dur ne peut pas satisfaire le cas (a) par hasard.
-const TOKEN_DU_LIEN = 'jeton-lien-19-16-abcdefgh';
+// 25 caractères, distinct de tout identifiant de la graine.
+const TOKEN = 'jeton-invitation-31-03-abcdefgh';
+
+/** Sonde de localisation : le MemoryRouter de `renderWithProviders` ne
+    partage pas `window.location` avec l'historique du navigateur. */
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <span
+      data-testid="location-probe"
+      data-pathname={location.pathname}
+      data-state={JSON.stringify(location.state ?? null)}
+    />
+  );
+}
+
+function renderPage(route: string) {
+  return renderWithProviders(
+    <>
+      <LocationProbe />
+      <JoinHouseholdPage />
+    </>,
+    { route, withHousehold: false },
+  );
+}
+
+const probe = () => document.querySelector('[data-testid="location-probe"]') as HTMLElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  supabaseClient.configured = false;
+  supabaseClient.configured = true;
+  window.sessionStorage.clear();
+  previewHouseholdInviteMock.mockResolvedValue({ householdName: 'Foyer Martin', inviterFirstName: 'Marie' });
   redeemInviteTokenMock.mockResolvedValue('household-rejoint');
   joinHouseholdLocalMock.mockResolvedValue({ id: 'household-demo' });
   loadHouseholdMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  window.sessionStorage.clear();
 });
 
-const champToken = () => screen.getByLabelText(/Token d’invitation/) as HTMLInputElement;
+describe('Pré-écran — titre selon la réponse preview (D-20)', () => {
+  it('nomme l’inviteur et le foyer : « Marie t’invite à rejoindre Foyer Martin »', async () => {
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
 
-describe('JoinHouseholdPage — le lien d’invitation préremplit le champ (19-16)', () => {
-  it('(a) le paramètre ?token= devient la valeur initiale du champ, sans rien consommer', () => {
-    renderWithProviders(<JoinHouseholdPage />, {
-      route: `/foyer/rejoindre?token=${TOKEN_DU_LIEN}`,
-      withHousehold: false,
-    });
-
-    expect(champToken()).toHaveValue(TOKEN_DU_LIEN);
-    // Le geste de l'utilisateur reste requis : un aperçu de lien ne consomme
-    // pas un token à usage compté (T-19-51).
-    expect(redeemInviteToken).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Marie t’invite à rejoindre Foyer Martin' }),
+    ).toBeInTheDocument();
+    // Aucun redeem au chargement : la consultation ne consomme rien (D-08).
+    expect(redeemInviteTokenMock).not.toHaveBeenCalled();
+    expect(previewHouseholdInviteMock).toHaveBeenCalledWith(TOKEN);
   });
 
-  it('(b) sans paramètre, le champ est vide et la saisie manuelle reste possible', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<JoinHouseholdPage />, { route: '/foyer/rejoindre', withHousehold: false });
+  it('sans inviteur connu : « Vous avez été invité à rejoindre Foyer Martin »', async () => {
+    previewHouseholdInviteMock.mockResolvedValue({ householdName: 'Foyer Martin' });
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
 
-    const champ = champToken();
-    expect(champ).toHaveValue('');
-
-    await user.type(champ, TOKEN_DU_LIEN);
-    expect(champ).toHaveValue(TOKEN_DU_LIEN);
-    await user.click(screen.getByRole('button', { name: /Rejoindre le foyer/ }));
-
-    await waitFor(() => expect(redeemInviteToken).toHaveBeenCalledWith(TOKEN_DU_LIEN));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vous avez été invité à rejoindre Foyer Martin' }),
+    ).toBeInTheDocument();
   });
 });
 
-describe('JoinHouseholdPage — la sonde de configuration est celle de l’application (D-10)', () => {
-  it('(a) URL présente mais clé absente ⇒ la branche locale est prise', async () => {
-    // Le stub d'URL est INDISPENSABLE au cas : sans lui, l'ancienne sonde
-    // (`import.meta.env.VITE_SUPABASE_URL`) aurait elle aussi pris la branche
-    // locale, et le test serait vert sur le code fautif — c'est exactement le
-    // piège que ce cas doit fermer.
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://api.exemple.fr');
-    supabaseClient.configured = false;
+describe('Pré-écran — chargement et échec (D-03)', () => {
+  it('pendant la preview : skeleton sur la ligne du foyer et CTA désactivé', async () => {
+    previewHouseholdInviteMock.mockReturnValue(new Promise(() => {}));
+    const { container } = renderPage(`/foyer/rejoindre?token=${TOKEN}`);
 
-    const user = userEvent.setup();
-    renderWithProviders(<JoinHouseholdPage />, { route: '/foyer/rejoindre', withHousehold: false });
-
-    await user.type(champToken(), TOKEN_DU_LIEN);
-    await user.click(screen.getByRole('button', { name: /Rejoindre le foyer/ }));
-
-    try {
-      await waitFor(() => expect(joinHouseholdLocalMock).toHaveBeenCalledTimes(1));
-      expect(loadHouseholdMock).toHaveBeenCalled();
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    // Le skeleton est le seul titre affiché tant que la réponse n'est pas là.
+    expect(container.querySelector('[aria-hidden="true"].animate-pulse')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Continuer vers l’inscription' })).toBeDisabled();
   });
 
-  it('(b) configuration complète ⇒ la branche locale n’est PAS prise (verrou de non-régression)', async () => {
-    supabaseClient.configured = true;
+  it('token mort : le message uniforme public, sans distinction de motif', async () => {
+    previewHouseholdInviteMock.mockRejectedValue(new Error('Ce lien d’invitation n’est plus valable.'));
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
 
+    expect(
+      await screen.findByText(
+        'Ce lien d’invitation n’est plus valable. Demandez un nouveau lien à l’administrateur de votre foyer.',
+      ),
+    ).toBeInTheDocument();
+    // Aucun CTA d'action tant que le lien est mort : la surface publique ne
+    // propose de continuer que pour un lien vivant.
+    expect(screen.queryByRole('button', { name: 'Continuer vers l’inscription' })).not.toBeInTheDocument();
+  });
+
+  it('échec réseau : le MÊME message uniforme (l’UI ne nuance jamais)', async () => {
+    previewHouseholdInviteMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    expect(
+      await screen.findByText(
+        'Ce lien d’invitation n’est plus valable. Demandez un nouveau lien à l’administrateur de votre foyer.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Pré-écran — traversée du token par sessionStorage (D-06/D-07)', () => {
+  it('l’étranger qui continue vers l’inscription pose le token AVANT de naviguer, en mode inscription', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<JoinHouseholdPage />, { route: '/foyer/rejoindre', withHousehold: false });
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+    await user.click(await screen.findByRole('button', { name: 'Continuer vers l’inscription' }));
 
-    await user.type(champToken(), TOKEN_DU_LIEN);
-    await user.click(screen.getByRole('button', { name: /Rejoindre le foyer/ }));
+    // D-06 : le token est en sessionStorage AVANT de quitter le pré-écran.
+    expect(getPendingInviteToken()).toBe(TOKEN);
+    await waitFor(() => expect(probe().dataset.pathname).toBe('/connexion'));
+    // Le CTA mène au MODE inscription de sign-in, avec la route d'origine
+    // préservée dans `from` (retour au pré-écran après une session immédiate).
+    const state = JSON.parse(probe().dataset.state ?? 'null') as { mode?: string; from?: string };
+    expect(state.mode).toBe('inscription');
+    expect(state.from).toBe(`/foyer/rejoindre?token=${TOKEN}`);
+  });
+
+  it('au retour sans token dans l’URL, le pré-écran réadopte le token en attente', async () => {
+    // D-07 : le mail de confirmation ramène génériquement — le token attend
+    // en sessionStorage est la seule mémoire du parcours.
+    setPendingInviteToken(TOKEN);
+    renderPage('/foyer/rejoindre');
+
+    expect(previewHouseholdInviteMock).toHaveBeenCalledWith(TOKEN);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Marie t’invite à rejoindre Foyer Martin' }),
+    ).toBeInTheDocument();
+  });
+
+  it('après application (redeem réussi), le token est nettoyé de sessionStorage', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
 
     await waitFor(() => expect(loadHouseholdMock).toHaveBeenCalled());
-    // La branche Supabase reste la branche nominale : la correction de sonde ne
-    // doit pas la court-circuiter.
-    expect(joinHouseholdLocalMock).not.toHaveBeenCalled();
+    expect(redeemInviteTokenMock).toHaveBeenCalledWith(TOKEN);
+    await waitFor(() => expect(getPendingInviteToken()).toBeNull());
+    await waitFor(() => expect(probe().dataset.pathname).toBe('/accueil'));
   });
+
+  it('après abandon (token mort au retour), le token en attente est nettoyé', async () => {
+    setPendingInviteToken(TOKEN);
+    previewHouseholdInviteMock.mockRejectedValue(new Error('mort'));
+    renderPage('/foyer/rejoindre');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await waitFor(() => expect(getPendingInviteToken()).toBeNull());
+  });
+});
+
+describe('Pré-écran — une action selon la session (D-19)', () => {
+  it('connecté : le CTA « Rejoindre le foyer » déclenche le redeem (consentement explicite, D-08)', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    // Jamais de redeem au chargement : seul le clic applique le token.
+    expect(redeemInviteTokenMock).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    await waitFor(() => expect(redeemInviteTokenMock).toHaveBeenCalledWith(TOKEN));
+  });
+
+  it('la session de démonstration (backend absent) reste fonctionnelle sans Edge preview', async () => {
+    supabaseClient.configured = false;
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    // Pas d'Edge à interroger : le pré-écran s'affiche sans nom de foyer, et
+    // le redeem LOCAL reste possible (le mode démo ne régresse pas).
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    await waitFor(() => expect(joinHouseholdLocalMock).toHaveBeenCalled());
+    expect(previewHouseholdInviteMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Pré-écran — vocabulaire (UI-SPEC copywriting)', () => {
+  it('aucun vocabulaire technique à l’écran', async () => {
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+    await screen.findByRole('heading', { level: 1 });
+    const bodyText = document.body.textContent ?? '';
+    for (const mot of ['token', 'Token', 'Edge', 'HMAC', 'base64url']) {
+      expect(bodyText).not.toContain(mot);
+    }
+  });
+});
+
+afterEach(() => {
+  clearPendingInviteToken();
 });

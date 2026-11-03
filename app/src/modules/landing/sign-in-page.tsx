@@ -76,7 +76,12 @@ export default function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const [mode, setMode] = useState<'connexion' | 'inscription'>('connexion');
+  // 31-03 (D-19) : le pré-écran d'invitation pose `state.mode` quand il
+  // envoie un étranger vers l'inscription — l'écran s'ouvre directement au
+  // bon mode au lieu de lui faire retrouver le lien « Créer un compte ».
+  const [mode, setMode] = useState<'connexion' | 'inscription'>(() =>
+    (location.state as { mode?: unknown } | null)?.mode === 'inscription' ? 'inscription' : 'connexion',
+  );
   const [pending, setPending] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const {

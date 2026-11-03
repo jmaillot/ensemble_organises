@@ -141,13 +141,17 @@ describe('Garde /foyer', () => {
 });
 
 /**
- * Ces deux écrans ÉCRIVENT (créer un foyer, en consommer un jeton) : ils
- * doivent exiger une session comme `/foyer`, sans quoi l'écriture part d'un
- * visiteur anonyme. La RLS reste la frontière serveur ; la garde de route
- * évite d'y arriver.
+ * `/foyer/nouveau` ÉCRIT (crée un foyer) : il doit exiger une session comme
+ * `/foyer`, sans quoi l'écriture part d'un visiteur anonyme. La RLS reste la
+ * frontière serveur ; la garde de route évite d'y arriver.
+ *
+ * `/foyer/rejoindre` a QUITTÉ cette garde (31-03, D-18/OUV-04) : un étranger
+ * porteur d'un lien d'invitation doit voir le pré-écran public, pas une
+ * redirection vers la connexion. Sa consultation (Edge preview, 31-02) ne
+ * révèle rien sur un token mort (D-03) et n'écrit jamais.
  */
 describe('Garde des écrans de foyer en écriture', () => {
-  it.each(['/foyer/nouveau', '/foyer/rejoindre'])(
+  it.each(['/foyer/nouveau'])(
     'redirige un visiteur anonyme de %s vers /connexion',
     async (path) => {
       useHouseholdStore.getState().reset();
@@ -167,25 +171,25 @@ describe('Garde des écrans de foyer en écriture', () => {
 
   /**
    * Le défaut mesuré : la chaîne de requête EST la route visée. Un lien
-   * d'invitation (`/foyer/rejoindre?token=…`, émis par les paramètres du foyer)
-   * porte son jeton dans l'URL ; ne garder que `pathname` le perd à la
-   * connexion, et le jeton est le contrôle d'accès (AGENTS.md §4).
+   * d'invitation porte son jeton dans l'URL ; ne garder que `pathname` le
+   * perd à la connexion. La préservation vaut pour TOUTES les routes gatées
+   * (`/foyer/nouveau` ici, depuis que `/foyer/rejoindre` est public — 31-03).
    */
   it('conserve la chaîne de requête dans `from`', async () => {
     useHouseholdStore.getState().reset();
     useSessionStore.setState({ status: 'guest', user: null });
-    const target = '/foyer/rejoindre?token=abcdefghijklmnopqrstuv';
+    const target = '/foyer/nouveau?origine=lien-invitation';
     renderAt(target);
 
     await waitFor(() => expect(window.location.pathname).toBe('/connexion'));
     expect(window.history.state?.usr).toEqual({ from: target });
   });
 
-  it('ramène le visiteur sur la route visée après connexion, jeton compris', async () => {
+  it('ramène le visiteur sur la route visée après connexion, chaîne de requête comprise', async () => {
     const user = userEvent.setup();
     useHouseholdStore.getState().reset();
     useSessionStore.setState({ status: 'guest', user: null });
-    const target = '/foyer/rejoindre?token=abcdefghijklmnopqrstuv';
+    const target = '/foyer/nouveau?origine=lien-invitation';
     renderAt(target);
 
     await waitFor(() => expect(window.location.pathname).toBe('/connexion'));
@@ -195,6 +199,24 @@ describe('Garde des écrans de foyer en écriture', () => {
     await waitFor(() =>
       expect(window.location.pathname + window.location.search).toBe(target),
     );
+  });
+
+  /**
+   * 31-03 (D-18/OUV-04) : un étranger sans session arrivant sur le lien
+   * d'invitation voit le pré-écran PUBLIC — jamais une redirection vers la
+   * connexion. Le jeton EST le contrôle d'accès : il vit dans l'URL et la
+   * consultation n'écrit rien.
+   */
+  it('le pré-écran d’invitation est public : un visiteur sans session reste sur /foyer/rejoindre', async () => {
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null });
+    renderAt('/foyer/rejoindre?token=abcdefghijklmnopqrstuv');
+
+    // Pas de redirection synchrone : l'URL reste celle du lien.
+    await waitFor(() => expect(window.location.pathname).toBe('/foyer/rejoindre'), { timeout: 5000 });
+    expect(screen.queryByRole('heading', { name: 'Ravi de vous revoir' })).not.toBeInTheDocument();
+    // Le pré-écran finit par s'afficher (morceau paresseux chargé).
+    expect(await screen.findByRole('button', { name: 'Continuer vers l’inscription' }, { timeout: 5000 })).toBeInTheDocument();
   });
 
   /**
