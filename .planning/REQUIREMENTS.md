@@ -48,11 +48,11 @@
 
 ### Ouverture des inscriptions
 
-- [ ] **OUV-01** : Un MTA auto-hébergé (Stalwart) établit SPF/DKIM/DMARC pour le domaine, avec une preuve de réception réelle sur Gmail et Outlook
+- [ ] **OUV-01** *(reformulée tour 1 discuss 2026-11-03, alignée sur ROADMAP : le relais Gmail (D-10) rend Stalwart/SPF/DKIM/DMARC sans objet)* : Preuve de réception réelle des emails de confirmation via le relais Gmail existant (alias FROM contact@jeremymaillot.fr), en boîte de réception sur Gmail ET Outlook — pas de MTA à déployer
 - [ ] **OUV-02** : Confirmations email obligatoires ; SMTP de GoTrue durci (limites de débit applicatives activées)
 - [ ] **OUV-03** : Un rate-limit Traefik filtre `/auth/v1/signup` et `/auth/v1/token` contre les abus d'inscription
-- [ ] **OUV-04** : Un étranger arrivant sur un lien d'invitation voit un pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer
-- [ ] **OUV-05** : L'administration du token de foyer expose une gouvernance : expiration obligatoire (défaut 30 j), nombre max d'utilisations (défaut 10), révocation à tout moment
+- [x] **OUV-04** : Un étranger arrivant sur un lien d'invitation voit un pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer
+- [x] **OUV-05** : L'administration du token de foyer expose une gouvernance : expiration obligatoire (défaut 30 j), nombre max d'utilisations (défaut 10), révocation à tout moment
 - [ ] **OUV-06** : Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
 - [ ] **OUV-07** : L'ouverture passe les portes dures : voie de suppression vivante + exercice de restauration consigné + preuve SMTP (séquence roadmap, pas une promesse)
 
@@ -126,7 +126,7 @@
 | OUV-02 | Phase 31 | Pending |
 | OUV-03 | Phase 31 | Pending |
 | OUV-04 | Phase 31 | Pending |
-| OUV-05 | Phase 31 | Pending |
+| OUV-05 | Phase 31 | Complete |
 | OUV-06 | Phase 31 | Pending |
 | OUV-07 | Phase 31 | Pending |
 

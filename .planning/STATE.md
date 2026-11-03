@@ -5,8 +5,8 @@ milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
 current_phase_name: Hygiène du jalon — dettes et résidus
 status: phase_complete
-stopped_at: "Phase 30 clôturée le 2026-11-03 : UAT 4/4 pass, D-03 prouvée (jobid=25, 05:05 Paris), G-30-2 corrigé (30-06), résidus outillage traités (ON_ERROR_STOP, runbook)"
-last_updated: "$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")"
+stopped_at: "31-04 terminé le 2026-11-03 (commits 3274231, 8f6116f) : liste anonymisée, révocation individuelle par modale, formulaire durci 30 j/10 — prochaine : 31-05"
+last_updated: "2026-11-03T14:25:00.000Z"
 state_head: 3f879b4386fe5fd354323092ba9a6ab6d92678fc
 progress:
   total_phases: 7
@@ -22,7 +22,7 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 31 (Inscriptions ouvertes) — EXECUTING
-Plan: 4 of 6 (31-03 terminé : pré-écran d'invitation pré-auth — route publique, traversée sessionStorage, messages D-17)
+Plan: 5 of 6 (31-04 terminé : panneau invitations enrichi — liste D-15, révocation modale D-16, formulaire durci D-14)
 Status: Ready to execute
 Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
 
@@ -47,6 +47,8 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
    sur une dette connue.
 
 ## Accumulated Context
+
+- 31-04 (2026-11-03) : panneau invitations = liste anonymisée D-15 (statut honnête : épuisé/expiré → « Révoqué »), révocation individuelle D-16 par modale (sentinelle 'all' conserve la révocation globale), formulaire durci D-14 (refus client vide/passé/<1/90 j avant l'Edge, Pitfall 6), isRecallValid matche par tokenId (Pitfall 5). Consommateurs adaptés : listInviteTokens, revokeInviteTokenById. 6 échecs de tests pré-existants (anniversaires/calendrier) hors périmètre.
 
 - 31-02 (2026-11-03) : Edge `household-invite-preview` créée (publishable, 404 uniforme D-03, rate-limit 8/min D-04, réponse 2 champs D-02) ; `household-invite` : summary → liste D-15, revoke-one D-16, create exige expiresAt. OUV-04/OUV-05 restent à cocher à la livraison UI (31-03/31-04) — la surface serveur seule ne prouve pas le parcours.
 

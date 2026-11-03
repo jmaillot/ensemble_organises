@@ -225,7 +225,7 @@ Plans:
   4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
   5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
 
-**Plans**: 3/6 plans executed
+**Plans**: 4/6 plans executed
 Plans:
 **Wave 1**
 - [x] 31-01-PLAN.md — migration 0176 : modèle liste de tokens + RPC preview no-consume + tests SQL (OUV-05)
@@ -235,7 +235,7 @@ Plans:
 - [x] 31-03-PLAN.md — pré-écran pré-auth + traversée sessionStorage + messages D-17 (OUV-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 31-04-PLAN.md — panneau invitations enrichi : défauts 30 j/10, liste, révocation modale (OUV-05)
+- [x] 31-04-PLAN.md — panneau invitations enrichi : défauts 30 j/10, liste, révocation modale (OUV-05)
 - [ ] 31-05-PLAN.md — /mentions-legales + middlewares Traefik rateLimit + preuves 429 (OUV-03/06)
 - [ ] 31-06-PLAN.md — transport SMTP + GOTRUE_RATE_LIMIT_* + portes opérateur (RTO, push) (OUV-01/02/07)
 
