@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { addDays, formatMediumDate, todayIso } from '@/lib/utils';
@@ -41,6 +41,79 @@ const token = (tokenId: string, overrides: Partial<InviteTokenSummary> = {}): In
 function renderPanel() {
   return renderWithProviders(<InvitationsPanel />);
 }
+
+describe('InvitationsPanel — formulaire de création durci (D-14, Pitfall 6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    listMock.mockResolvedValue([token('tok-new')]);
+  });
+
+  it('pré-remplit 30 jours et 10 utilisations, sans hint « Laissez vide »', () => {
+    renderPanel();
+
+    expect(screen.getByLabelText(/Expire le/)).toHaveValue(addDays(todayIso(), 30));
+    expect(screen.getByLabelText(/Utilisations maximum/)).toHaveValue(10);
+    expect(screen.queryByText(/Laissez vide/)).not.toBeInTheDocument();
+  });
+
+  it('refuse une expiration vide sans appeler l’Edge', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText(/Expire le/), { target: { value: '' } });
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
+
+    expect(await screen.findByText('Choisissez une date dans le futur.')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('refuse une expiration dans le passé sans appeler l’Edge', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText(/Expire le/), { target: { value: '2020-01-01' } });
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
+
+    expect(await screen.findByText('Choisissez une date dans le futur.')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('refuse moins d’une utilisation sans appeler l’Edge', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText(/Utilisations maximum/), { target: { value: '0' } });
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
+
+    expect(await screen.findByText('Indiquez au moins 1 utilisation.')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('soumet une création valide avec expiration future et affiche le toast pluriel', async () => {
+    const user = userEvent.setup();
+    createMock.mockResolvedValue({
+      token: 'BRUT-affiche-une-seule-fois',
+      expiresAt: `${dayIso(30)}T23:59:00.000Z`,
+      maxUses: 10,
+      householdId: 'household-martin',
+    });
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
+
+    await waitFor(() => {
+      expect(createMock).toHaveBeenCalledWith({
+        expiresAt: `${addDays(todayIso(), 30)}T23:59:00.000Z`,
+        maxUses: 10,
+      });
+    });
+    expect(await screen.findByText('Nouveau lien généré. Les liens précédents sont invalidés.')).toBeInTheDocument();
+    // Le brut s'affiche une fois (bloc de rappel), la liste est rafraîchie.
+    expect(await screen.findByText('BRUT-affiche-une-seule-fois')).toBeInTheDocument();
+    expect(await screen.findByText('Liens actifs')).toBeInTheDocument();
+  });
+});
 
 describe('InvitationsPanel — liste des liens actifs (D-15)', () => {
   beforeEach(() => {
