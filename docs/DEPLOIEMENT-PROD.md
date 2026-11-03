@@ -231,6 +231,83 @@ sélectionne seul msmtp quand il est présent.
   chmod 600 dont les chemins sont donnés par des variables d'environnement
   (cf. `scripts/send-mail.sh`).
 
+## Transport SMTP de GoTrue — emails de confirmation (D-10, phase 31)
+
+Révision du 2026-11-03 (phase 31, plan 31-06) : le transport SMTP que lit
+GoTrue passe du conteneur Stalwart interne (`supabase-mail:2500`) au **relais
+Gmail** déjà éprouvé côté hôte (msmtp, 2026-10-29). Les inscriptions publiques
+OUV-01/OUV-02 exigent un canal livrable ; Stalwart n'en est pas un. Le canal
+msmtp des checks ci-dessus **ne change pas** : la section qui suit concerne
+uniquement le `.env` de la stack, consommé par le service `auth`.
+
+### `.env` de la stack — valeurs à poser (sur l'hôte de prod)
+
+Le `.env` de la stack est **non versionné** (§2.7-H) : les commandes ci-dessous
+nomment les variables, jamais les valeurs de secret. Les valeurs non secrètes
+sont citées telles quelles ; `SMTP_PASS` est le **mot de passe d'application**
+Gmail (`jeremymaillot@gmail.com` — Google Account → Security → 2-Step
+Verification → App passwords), à poser à la main dans le fichier.
+
+```dotenv
+# Transport GoTrue — révision D-10 (phase 31) : relais Gmail, pas Stalwart
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=jeremymaillot@gmail.com
+SMTP_SENDER_NAME=Ensemble & Organisés
+SMTP_ADMIN_EMAIL=contact@jeremymaillot.fr
+```
+
+`SMTP_ADMIN_EMAIL` pilote le FROM des emails de confirmation (hypothèse A2 du
+plan : à **constater** sur le premier email reçu — si le FROM observé n'est pas
+`contact@jeremymaillot.fr`, corriger cette variable avant les captures D-11).
+Côté Gmail, l'alias « Envoyer en tant que » `contact@jeremymaillot.fr`
+(Traiter comme un alias : oui) est un prérequis opérateur — Prohibition ② :
+l'adresse Gmail brute n'apparaît jamais en FROM.
+
+### Limites de débit GoTrue — `GOTRUE_RATE_LIMIT_*` explicites (D-12)
+
+Le `.env.example` du snapshot ne fournit **aucune** variable
+`GOTRUE_RATE_LIMIT_*` prête ; elles se posent à la main dans le `.env` :
+
+```dotenv
+# Source : github.com/supabase/auth — _autodocs/configuration.md + internal/conf/rate.go (Decode)
+# Format « Rate » : « 30 » = 30/heure (intervalle fixe) ; « 6/1m » = burst 6/minute (rate.go Decode).
+# La forme burst est REQUISE pour une preuve 429 minute-lisible — le « 30 » simple est un quota horaire.
+GOTRUE_RATE_LIMIT_EMAIL_SENT=6/1m
+GOTRUE_RATE_LIMIT_TOKEN_REFRESH=150
+GOTRUE_RATE_LIMIT_VERIFY=30
+GOTRUE_RATE_LIMIT_OTP=30
+GOTRUE_RATE_LIMIT_ANONYMOUS_USERS=30
+```
+
+### Recreate du service `auth` — obligatoire
+
+Le service `auth` lit `SMTP_*` et les `GOTRUE_RATE_LIMIT_*` **au démarrage du
+conteneur** : après toute édition du `.env`, `sh run.sh recreate auth`
+(l.79-89 ci-dessus — `restart` ne ré-interpole JAMAIS le `.env`). Vérification
+préalable que le rendu Compose porte les variables :
+
+```sh
+cd supabase-project
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.traefik.yml config \
+  | grep -E 'GOTRUE_RATE_LIMIT_EMAIL_SENT|SMTP_ADMIN_EMAIL'
+```
+
+Si le bloc env du service `auth` (`docker-compose.yml`) ne transmet pas les
+`GOTRUE_RATE_LIMIT_*`, ajouter les entrées de passthrough au bloc `auth`
+(noms de variables seulement) avant le `recreate`.
+
+### Partage du mot de passe d'application (msmtp hôte / GoTrue)
+
+Le même compte Gmail sert deux transports : msmtp côté hôte (checks, D-13) et
+GoTrue côté stack (D-10). Les deux usages lisent chacun leur fichier de
+secrets (`.env` de stack vs `/etc/msmtprc`) — aucune collision technique
+prévisible — mais ils dépendent du **même mot de passe d'application** : sa
+rotation invalide les deux transports simultanément et impose l'édition des
+deux fichiers, puis `recreate auth` (et tout service qui lirait le secret).
+Point de vigilance consigné au plan 31-06 (RESEARCH, Code Examples SMTP).
+
+
 **Résultat de la sonde sur la prod :** **2026-10-29 — sonde JOIGNABLE, mail
 `[EO-sonde]` reçu et lu** (transport msmtp → smtp.gmail.com:587, révision
 D-13). Caveat consigné à l'usage : `/var/log/msmtp.log` est réservé à root ;
