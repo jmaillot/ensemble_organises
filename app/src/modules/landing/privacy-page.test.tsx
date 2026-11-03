@@ -20,7 +20,8 @@ describe('PrivacyPage', () => {
       expect(contact).toHaveAttribute('href', 'mailto:jeremymaillot@gmail.com');
     }
     expect(screen.getByRole('heading', { name: /Durée de conservation/ })).toBeInTheDocument();
-    expect(screen.getByText(/au plus tard sous 30 jours/)).toBeInTheDocument();
+    expect(screen.getByText(/supprimées au plus tard/)).toBeInTheDocument();
+    expect(screen.getByText(/sauvegardes sont chiffrées et tournent chaque nuit/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'www.cnil.fr' })).toHaveAttribute('href', 'https://www.cnil.fr');
     expect(screen.getByRole('link', { name: /Retour à l’accueil/ })).toHaveAttribute('href', '/');
   });

@@ -21,6 +21,7 @@ export const routeChunkLoaders = {
   signIn: () => import('@/modules/landing/sign-in-page'),
   privacy: () => import('@/modules/landing/privacy-page'),
   terms: () => import('@/modules/landing/terms-page'),
+  legal: () => import('@/modules/landing/legal-page'),
   guestArdoise: () => import('@/modules/ardoise/guest-ardoise-page'),
   guestCadeau: () => import('@/modules/cadeaux/guest-cadeau-page'),
   guestVoyage: () => import('@/modules/voyages/guest-trip-page'),

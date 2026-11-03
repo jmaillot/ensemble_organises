@@ -233,6 +233,10 @@ export default function TermsPage() {
       </div>
 
       <footer className="mt-10 border-t border-border pt-4 text-[11px] text-muted">
+        <Link to="/mentions-legales" className="font-bold text-accent-strong">
+          Mentions légales
+        </Link>
+        {' · '}
         <Link to="/" className="font-bold text-accent-strong">
           ← Retour à l’accueil
         </Link>

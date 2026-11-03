@@ -267,6 +267,12 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/mentions-legales"
+        element={
+          <LazyRoute load={routeChunkLoaders.legal} />
+        }
+      />
+      <Route
         element={
           <RequireAuth>
             <RequireHousehold>

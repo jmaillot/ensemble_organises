@@ -187,7 +187,13 @@ export default function PrivacyPage() {
             irréversible.
           </p>
           <p className="mt-0 mb-2">
-            Les copies présentes dans nos sauvegardes sont supprimées au plus tard sous 30 jours.
+            Vos données sont supprimées au plus tard <strong>30 jours</strong> après la demande effective. Les
+            <strong> sauvegardes sont chiffrées et tournent chaque nuit</strong> : leurs copies disparaissent avec ce
+            même délai. En savoir plus :{' '}
+            <Link to="/mentions-legales" className="font-bold text-accent-strong">
+              mentions légales
+            </Link>
+            .
           </p>
           <p className="mt-0 mb-2">
             Vous pouvez aussi demander la suppression de votre compte par e-mail à{' '}
@@ -263,6 +269,10 @@ export default function PrivacyPage() {
       </div>
 
       <footer className="mt-10 border-t border-border pt-4 text-[11px] text-muted">
+        <Link to="/mentions-legales" className="font-bold text-accent-strong">
+          Mentions légales
+        </Link>
+        {' · '}
         <Link to="/" className="font-bold text-accent-strong">
           ← Retour à l’accueil
         </Link>
