@@ -239,6 +239,10 @@ Plans:
 - [x] 31-05-PLAN.md — /mentions-legales + middlewares Traefik rateLimit + preuves 429 (OUV-03/06)
 - [x] 31-06-PLAN.md — transport SMTP + GOTRUE_RATE_LIMIT_* + portes opérateur (RTO, push) (OUV-01/02/07)
 
+**Gap closure** *(2026-11-03, verification gaps_found)*
+- [ ] 31-07-PLAN.md — G-31-1 : libellés d'invalidation faux corrigés (panneau + pré-écran) + assertion de test (OUV-05)
+- [ ] 31-08-PLAN.md — G-31-2 : scaffold 31-UAT.md HV-1..HV-6 + docs/EXPLOITATION.md véridique, routage /gsd-verify-work 31 (OUV-01/02/03/07)
+
 **UI hint**: yes
 
 ## Progress
