@@ -116,7 +116,7 @@ export function InvitationsPanel() {
       }
       setRecallBump((bump) => bump + 1);
       setShowQr(false);
-      toast('Nouveau lien généré. Les liens précédents sont invalidés.');
+      toast('Nouveau lien généré. Les liens précédents restent actifs jusqu’à leur expiration ou leur révocation.');
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : 'Génération impossible.');
     } finally {

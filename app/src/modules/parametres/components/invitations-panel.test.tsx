@@ -108,7 +108,7 @@ describe('InvitationsPanel — formulaire de création durci (D-14, Pitfall 6)',
         maxUses: 10,
       });
     });
-    expect(await screen.findByText('Nouveau lien généré. Les liens précédents sont invalidés.')).toBeInTheDocument();
+    expect(await screen.findByText('Nouveau lien généré. Les liens précédents restent actifs jusqu’à leur expiration ou leur révocation.')).toBeInTheDocument();
     // Le brut s'affiche une fois (bloc de rappel), la liste est rafraîchie.
     expect(await screen.findByText('BRUT-affiche-une-seule-fois')).toBeInTheDocument();
     expect(await screen.findByText('Liens actifs')).toBeInTheDocument();
