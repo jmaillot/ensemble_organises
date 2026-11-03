@@ -92,13 +92,15 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------------------
--- Test A — modèle liste : les DEUX tokens A et B coexistent actifs.
--- ---------------------------------------------------------------------------
+-- Test A — modèle liste : les tokens A et B, créés à la suite, coexistent
+-- actifs (le semis crée d'autres tokens ensuite ; le comptage est borné aux
+-- deux premiers, §2.7-D).
 select testkit.eq(
   testkit.count($t$select 1 from public.household_invite_tokens
                  where household_id = (select household_id from testkit.fx where key = 'home')
-                   and is_active$t$),
+                   and is_active
+                   and id in ((select row_id from testkit.fx where key = 'tok_a'),
+                              (select row_id from testkit.fx where key = 'tok_b'))$t$),
   2::bigint, 'Test A : deux tokens créés à la suite restent actifs (modèle liste D-14)');
 
 select testkit.ok(
@@ -166,7 +168,9 @@ select testkit.expect_denied(
 select testkit.eq(
   testkit.count($t$select 1 from public.household_invite_tokens
                  where household_id = (select household_id from testkit.fx where key = 'home')
-                   and is_active$t$),
+                   and is_active
+                   and id in ((select row_id from testkit.fx where key = 'tok_a'),
+                              (select row_id from testkit.fx where key = 'tok_b'))$t$),
   2::bigint, 'Test C1 : après le refus non-admin, les deux tokens restent actifs');
 
 do $$
@@ -179,7 +183,7 @@ begin
   home := (select household_id from testkit.fx where key = 'home');
   v := public.revoke_household_invite_token(
          alice, home, (select row_id from testkit.fx where key = 'tok_a'));
-  perform testkit.eq(v -> 'revoked', 1::jsonb,
+  perform testkit.eq(v -> 'revoked', to_jsonb(1),
     'Test C2 : la révocation individuelle touche exactement 1 ligne');
 end;
 $$;
@@ -208,7 +212,7 @@ begin
   -- borné à household_id = foyer 2 ne peut toucher le token B (foyer 1).
   v := public.revoke_household_invite_token(
          carol, home2, (select row_id from testkit.fx where key = 'tok_b'));
-  perform testkit.eq(v -> 'revoked', 0::jsonb,
+  perform testkit.eq(v -> 'revoked', to_jsonb(0),
     'Test C3 : cross-foyer → 0 ligne modifiée');
 end;
 $$;
@@ -228,7 +232,7 @@ begin
   alice := (select user_id from testkit.fx where key = 'alice');
   home := (select household_id from testkit.fx where key = 'home');
   v := public.revoke_household_invite_token(alice, home, 'invite-inconnu');
-  perform testkit.eq(v -> 'revoked', 0::jsonb,
+  perform testkit.eq(v -> 'revoked', to_jsonb(0),
     'Test C4 : id inconnu → 0 ligne modifiée');
 end;
 $$;
@@ -273,7 +277,11 @@ begin
   update public.household_invite_tokens
      set use_count = max_uses
    where id = (select row_id from testkit.fx where key = 'tok_e');
-  -- tok_b a déjà été révoqué au Test C2 : quatrième motif.
+  -- tok_b est révoqué ici par UPDATE direct (quatrième motif ; la révocation
+  -- par fonction a déjà été prouvée au Test C, l'état fautif suffit).
+  update public.household_invite_tokens
+     set is_active = false
+   where id = (select row_id from testkit.fx where key = 'tok_b');
 end;
 $$;
 

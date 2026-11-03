@@ -154,16 +154,11 @@ select testkit.expect_denied(format(
   (select user_id from testkit.fx where key = 'bob'), (select household_id from testkit.fx where key = 'alice')));
 
 -- ===========================================================================
--- 4. Régénération : le token précédent est immédiatement invalidé
+-- 4. Modèle liste (0176) : créer un token n'invalide PAS le précédent —
+-- plusieurs tokens actifs coexistent sur un même foyer.
 --
--- Et elle ne sort pas du foyer. Carol, administratrice du Foyer B, a son propre
+-- Et ça ne sort pas du foyer : Carol, administratrice du Foyer B, a son propre
 -- token actif, et il doit survivre à ce qui suit.
---
--- C'est aussi ce qui manquait à cette section. L'assertion du token actif
--- comptait les tokens de TOUTE la base, et échouait donc dès qu'un autre foyer
--- en possédait un — y compris un token légitime d'un foyer réel, créé la veille.
--- Le produit désactivait bien le sien, et l'assertion suivante le confirmait :
--- c'est la mesure qui était trop large, pas le code.
 -- ===========================================================================
 select public.create_household_invite_token(
   p_actor_id => (select user_id from testkit.fx where key = 'carol'),
@@ -179,24 +174,21 @@ select public.create_household_invite_token(
   p_max_uses => 5
 );
 
--- La règle est « un FOYER n'a qu'un token actif à la fois », pas « un seul
--- token actif dans toute la base ». La forme est celle de la section 7.
+-- Le comptage est borné aux DEUX tokens du récit (h1 et h2) : la règle 0176
+-- est « plusieurs tokens actifs coexistent », d'autres foyers en ont aussi.
 select testkit.eq(
   (select count(*) from public.household_invite_tokens
     where household_id = (select household_id from testkit.fx where key = 'alice')
-      and is_active), 1::bigint,
-  'un seul token actif à la fois, pour ce foyer');
+      and is_active
+      and token_hash in ((select h1 from testkit.hashes), (select h2 from testkit.hashes))), 2::bigint,
+  'deux tokens créés à la suite coexistent actifs (modèle liste 0176)');
 select testkit.eq(
   (select is_active from public.household_invite_tokens
     where token_hash = repeat('7', 64)), true,
-  'la régénération d''un foyer laisse intact le token d''un autre foyer');
+  'la création d''un second token laisse intact le token d''un autre foyer');
 select testkit.eq(
-  (select is_active from public.household_invite_tokens where token_hash = (select h1 from testkit.hashes)), false,
-  'le token précédent est désactivé');
-select testkit.expect_denied(format(
-  'select public.redeem_household_invite_token(%L, %L, %L)',
-  (select h1 from testkit.hashes), (select user_id from testkit.fx where key = 'dave'), 'Dave'),
-  'un token régénéré ne fonctionne plus');
+  (select is_active from public.household_invite_tokens where token_hash = (select h1 from testkit.hashes)), true,
+  'le token précédent reste actif (modèle liste 0176)');
 
 -- ===========================================================================
 -- 5. Utilisation du token
