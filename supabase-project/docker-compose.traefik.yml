@@ -137,6 +137,14 @@ services:
   # et RLS : AUCUN middleware d'authentification Traefik sur cette route, sinon
   # l'application serait bloquée. Les WebSockets Realtime doivent conserver
   # les en-têtes Upgrade/Connection : aucun middleware ne doit les supprimer.
+  #
+  # Rate-limit (phase 31 plan 05, T-31-11) : DEUX routers dédiés de priorité
+  # supérieure portent les middlewares rateLimit sur les seuls points d'entrée
+  # anonymes attaquables en rafale (/auth/v1/signup et /auth/v1/token). Le
+  # router général eo-api-rtr reste SANS middleware — sinon Storage, Realtime
+  # et Edge Functions seraient limités avec eux (RESEARCH, Anti-Pattern).
+  # Seuils verrouillés par la SPEC (tour 3, compromis « très strict » assumé) :
+  # signup 3/min rafale 6 ; token 10/min rafale 20.
   api-gw:
     ports: !override []
     networks:
@@ -147,6 +155,27 @@ services:
       - "traefik.http.routers.eo-api-rtr.entrypoints=https"
       - "traefik.http.routers.eo-api-rtr.rule=Host(`${EO_API_HOST:-api.votredomaine.fr}`)"
       - "traefik.http.routers.eo-api-rtr.service=eo-api-svc"
+      # Router dédié signup : priority 200 (> défaut) pour passer avant le
+      # router général sur le chemin exact /auth/v1/signup.
+      - "traefik.http.routers.eo-api-signup-rtr.entrypoints=https"
+      - "traefik.http.routers.eo-api-signup-rtr.rule=Host(`${EO_API_HOST:-api.votredomaine.fr}`) && PathPrefix(`/auth/v1/signup`)"
+      - "traefik.http.routers.eo-api-signup-rtr.priority=200"
+      - "traefik.http.routers.eo-api-signup-rtr.middlewares=eo-signup-rl"
+      - "traefik.http.routers.eo-api-signup-rtr.service=eo-api-svc"
+      # Router dédié token (connexion + refresh) : même mécanique.
+      - "traefik.http.routers.eo-api-token-rtr.entrypoints=https"
+      - "traefik.http.routers.eo-api-token-rtr.rule=Host(`${EO_API_HOST:-api.votredomaine.fr}`) && PathPrefix(`/auth/v1/token`)"
+      - "traefik.http.routers.eo-api-token-rtr.priority=200"
+      - "traefik.http.routers.eo-api-token-rtr.middlewares=eo-token-rl"
+      - "traefik.http.routers.eo-api-token-rtr.service=eo-api-svc"
+      # 3 req/min/IP, rafale 6 : la 4ᵉ requête dans la minute reçoit 429.
+      - "traefik.http.middlewares.eo-signup-rl.ratelimit.average=3"
+      - "traefik.http.middlewares.eo-signup-rl.ratelimit.period=1m"
+      - "traefik.http.middlewares.eo-signup-rl.ratelimit.burst=6"
+      # 10 req/min/IP, rafale 20 : la 11ᵉ requête dans la minute reçoit 429.
+      - "traefik.http.middlewares.eo-token-rl.ratelimit.average=10"
+      - "traefik.http.middlewares.eo-token-rl.ratelimit.period=1m"
+      - "traefik.http.middlewares.eo-token-rl.ratelimit.burst=20"
       - "traefik.http.services.eo-api-svc.loadbalancer.server.port=8000"
       - "traefik.docker.network=frontend"
 
