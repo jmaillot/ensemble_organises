@@ -3,15 +3,15 @@ gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
-current_phase_name: Hygiène du jalon — dettes et résidus
+current_phase_name: inscriptions-ouvertes
 status: phase_complete
 stopped_at: "31-04 terminé le 2026-11-03 (commits 3274231, 8f6116f) : liste anonymisée, révocation individuelle par modale, formulaire durci 30 j/10 — prochaine : 31-05"
-last_updated: "2026-11-03T14:25:00.000Z"
-state_head: 3f879b4386fe5fd354323092ba9a6ab6d92678fc
+last_updated: "2026-11-03T14:15:50.609Z"
+state_head: 251413af5d8089c5d23afd4f93787f2936ebf996
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 35
+  total_plans: 44
   completed_plans: 35
   percent: 43
 last_activity: 2026-10-27
@@ -21,7 +21,7 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 31 (Inscriptions ouvertes) — EXECUTING
+Phase: 31 (inscriptions-ouvertes) — READY TO EXECUTE
 Plan: 5 of 6 (31-04 terminé : panneau invitations enrichi — liste D-15, révocation modale D-16, formulaire durci D-14)
 Status: Ready to execute
 Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
