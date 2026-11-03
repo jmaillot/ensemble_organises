@@ -1,6 +1,6 @@
 import { supabase, supabaseFunctionsBase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { data } from '@/lib/data';
-import { generateInviteToken, randomId } from '@/lib/utils';
+import { addDays, generateInviteToken, randomId, todayIso } from '@/lib/utils';
 import { useSessionStore } from '@/stores/session-store';
 import { useHouseholdStore } from '@/stores/household-store';
 import type { HouseholdInviteTokenRow, InviteTokenPreview, InviteTokenSummary } from '@/types';
@@ -41,16 +41,34 @@ function toInstant(value?: string | null) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/**
+ * Défaut d'expiration (+30 jours, même motif que le panneau d'invitations,
+ * 31-04) : l'Edge Function `household-invite` (0176/D-14) refuse un expiresAt
+ * absent avec 400, et l'appel onboarding de create-household-page n'en
+ * fournit pas — sans ce défaut, le catch de compensation annulait le foyer
+ * créé (B-1, bloqueur audit v1.0).
+ */
+export function defaultInviteExpiry(): string {
+  return `${addDays(todayIso(), 30)}T23:59:00.000Z`;
+}
+
 export async function createInviteToken(options?: {
   expiresAt?: string | null;
   maxUses?: number;
 }): Promise<InviteTokenPreview> {
+  // `undefined` (non fourni) → défaut +30 j ; un `null` explicite reste tel
+  // quel (contrat du type `string | null`, pas de sur-interprétation). La
+  // valeur effective est calculée AVANT la branche : les modes Supabase et
+  // démo partagent la même règle, pour qu'aucun futur appelant ne redécouvre
+  // le 400 de l'Edge.
+  const expiresEffective =
+    options?.expiresAt === undefined ? defaultInviteExpiry() : options.expiresAt;
   const activeHouseholdId = useHouseholdStore.getState().householdId;
   if (isSupabaseConfigured) {
     return callInviteFunction<InviteTokenPreview>({
       action: 'create',
       householdId: activeHouseholdId ?? undefined,
-      expiresAt: toInstant(options?.expiresAt),
+      expiresAt: toInstant(expiresEffective),
       maxUses: options?.maxUses ?? undefined,
     });
   }
@@ -62,13 +80,13 @@ export async function createInviteToken(options?: {
       household_id: householdId,
       token_hash: `local:${token}`,
       created_by: useSessionStore.getState().user?.id ?? '',
-      expires_at: options?.expiresAt ?? null,
+      expires_at: expiresEffective,
       max_uses: options?.maxUses ?? 10,
       use_count: 0,
       is_active: true,
     } as Partial<HouseholdInviteTokenRow>);
   }
-  return { token, expiresAt: toInstant(options?.expiresAt), maxUses: options?.maxUses ?? 10, householdId: householdId ?? '' };
+  return { token, expiresAt: toInstant(expiresEffective), maxUses: options?.maxUses ?? 10, householdId: householdId ?? '' };
 }
 
 export async function revokeInviteToken(): Promise<void> {
