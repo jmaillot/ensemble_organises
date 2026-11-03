@@ -11,6 +11,7 @@ import {
   previewHouseholdInvite,
   redeemInviteToken,
   setPendingInviteToken,
+  translateRedeemError,
 } from '@/lib/invites';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { joinHouseholdLocal, loadHousehold } from '@/stores/session-store';
@@ -38,6 +39,12 @@ import { useIsAuthenticated } from '@/hooks/use-auth';
 const tokenSchema = z.string().trim().min(22, 'Un lien d’invitation fait au moins 22 caractères.');
 
 const MESSAGE_LIEN_MORT = 'Ce lien d’invitation n’est plus valable. Demandez un nouveau lien à l’administrateur de votre foyer.';
+
+// D-09 : après un échec de redeem, le message dédié reste lisible quelques
+// secondes, puis l'utilisateur atterrit sur son état normal (le choix
+// créer/rejoindre s'il est sans foyer, son tableau de bord sinon — les gardes
+// de route décident). Jamais un écran bloquant, jamais un « retour » muet.
+const DELAI_ATERRISSAGE_MS = 3000;
 
 type PreviewState =
   | { phase: 'loading' }
@@ -144,7 +151,13 @@ export default function JoinHouseholdPage() {
       toast('Vous avez rejoint le foyer.');
       navigate('/accueil');
     } catch (joinError) {
-      setError(joinError instanceof Error ? joinError.message : 'Impossible de rejoindre ce foyer.');
+      // D-17 : le motif serveur devient le verbatim dédié — jamais le message
+      // technique brut (« token », statut HTTP) ni un détail exposé.
+      setError(translateRedeemError(joinError instanceof Error ? joinError.message : ''));
+      // Échec de l'application : la traversée est terminée, la mémoire aussi.
+      clearPendingInviteToken();
+      // D-09 : le message reste lisible, puis atterrissage sur l'état normal.
+      window.setTimeout(() => navigate('/foyer'), DELAI_ATERRISSAGE_MS);
     } finally {
       setPending(false);
     }

@@ -212,11 +212,20 @@ describe('Garde des écrans de foyer en écriture', () => {
     useSessionStore.setState({ status: 'guest', user: null });
     renderAt('/foyer/rejoindre?token=abcdefghijklmnopqrstuv');
 
-    // Pas de redirection synchrone : l'URL reste celle du lien.
-    await waitFor(() => expect(window.location.pathname).toBe('/foyer/rejoindre'), { timeout: 5000 });
+    // Le pré-écran public se monte (morceau paresseux) : l'eyebrow « Invitation »
+    // est son marqueur stable — présent dès le premier rendu, dans tous ses
+    // états (chargement, lien vivant, lien mort).
+    await waitFor(() => expect(screen.getByText('Invitation')).toBeInTheDocument(), { timeout: 5000 });
+    // Aucune redirection vers la connexion : l'URL et l'écran restent ceux du
+    // lien (D-18 — le jeton EST le contrôle d'accès, la consultation n'écrit
+    // rien, la surface publique ne révèle rien sur un token mort).
+    expect(window.location.pathname).toBe('/foyer/rejoindre');
     expect(screen.queryByRole('heading', { name: 'Ravi de vous revoir' })).not.toBeInTheDocument();
-    // Le pré-écran finit par s'afficher (morceau paresseux chargé).
-    expect(await screen.findByRole('button', { name: 'Continuer vers l’inscription' }, { timeout: 5000 })).toBeInTheDocument();
+    // Le CTA de l'étranger finit par s'afficher (réponse preview ou état démo).
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Continuer vers l’inscription' })).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
   });
 
   /**

@@ -249,6 +249,46 @@ describe('Pré-écran — vocabulaire (UI-SPEC copywriting)', () => {
   });
 });
 
+describe('Redeem authentifié — messages D-17 et atterrissage D-09', () => {
+  const casRedeem = [
+    ['inconnu', 'Ce token est introuvable.', 'Ce lien est invalide.'],
+    ['révoqué', 'Ce token a été révoqué.', 'Ce lien est invalide.'],
+    ['expiré', 'Ce token est expiré.', 'Ce lien a expiré. Demandez-en un nouveau à l’administrateur.'],
+    [
+      'épuisé',
+      'Ce token a atteint son nombre d’utilisations maximal.',
+      'Ce lien a atteint sa limite d’utilisations. Demandez-en un nouveau à l’administrateur.',
+    ],
+  ] as const;
+
+  it.each(casRedeem)('serveur %s → verbatim « %s »', async (_motif, messageServeur, verbatim) => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    redeemInviteTokenMock.mockRejectedValue(new Error(messageServeur));
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(verbatim);
+    // Aucun verbatim technique ne fuit : le motif serveur reste hors écran.
+    expect(document.body.textContent).not.toContain('token');
+  });
+
+  it('après l’échec, atterrissage sur le choix créer/rejoindre (D-09, jamais bloqué)', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    redeemInviteTokenMock.mockRejectedValue(new Error('Ce token est expiré.'));
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ce lien a expiré.');
+    // Le message reste lisible un instant, puis l'état normal de l'utilisateur
+    // reprend la main (choix créer/rejoindre d'un utilisateur sans foyer).
+    await waitFor(() => expect(probe().dataset.pathname).toBe('/foyer'), { timeout: 6000 });
+    // La traversée a échoué : la mémoire du token s'est effacée.
+    expect(getPendingInviteToken()).toBeNull();
+  }, 10_000);
+});
+
 afterEach(() => {
   clearPendingInviteToken();
 });

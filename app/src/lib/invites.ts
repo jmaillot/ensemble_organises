@@ -204,6 +204,27 @@ export function clearPendingInviteToken(): void {
 }
 
 /**
+ * D-17 — traduction du motif serveur d'un redeem authentifié en verbatim
+ * dédié. Les messages serveur sont ceux de `household-invite`
+ * (`translateRpcError`, 31-02) : introuvable 404, révoqué/expiré/épuisé 410.
+ *
+ * La révocation NE reçoit PAS de message distinct : pour le visiteur, un lien
+ * révoqué est simplement invalide — la distinction exposerait l'existence
+ * d'une action d'administration sur le lien. Le défaut reste « Ce lien est
+ * invalide. » : un motif inconnu ne révèle jamais son détail technique.
+ */
+export function translateRedeemError(serverMessage: string): string {
+  if (serverMessage.includes('nombre d’utilisations maximal')) {
+    return 'Ce lien a atteint sa limite d’utilisations. Demandez-en un nouveau à l’administrateur.';
+  }
+  if (serverMessage.includes('est expiré')) {
+    return 'Ce lien a expiré. Demandez-en un nouveau à l’administrateur.';
+  }
+  // Introuvable, révoqué, motif inconnu, chaîne vide : le même message.
+  return 'Ce lien est invalide.';
+}
+
+/**
  * Rappel local du dernier token généré sur cet appareil.
  *
  * Le serveur ne conserve que l'empreinte HMAC : le brut ne peut pas être
