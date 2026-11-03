@@ -220,7 +220,7 @@ export default function JoinHouseholdPage() {
           <h2 className="mb-1.5 font-display text-[15px] tracking-[-0.03em]">Pas de lien sous la main ?</h2>
           <p className="mb-0 text-xs text-muted">
             Demandez-le directement à un administrateur du foyer : il peut en générer un nouveau à tout moment depuis
-            les préférences, ce qui invalide immédiatement le précédent.
+            les préférences ; chaque lien reste actif jusqu’à son expiration ou sa révocation individuelle.
           </p>
         </div>
         <p className="mt-4 mb-0 text-xs text-muted">
