@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
 
 ## Session Continuity
 
-**Last session:** 2026-10-31T12:05:44.376Z
-**Stopped at:** Completed 30-05-PLAN.md (DET-05 : césure + sortie animée feuilles, forceMount écarté sur preuve a11y)
-**Resume file:** None
+**Last session:** 2026-11-03T09:12:35.580Z
+**Stopped at:** Phase 31 context gathered
+**Resume file:** .planning/phases/31-inscriptions-ouvertes/31-CONTEXT.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
