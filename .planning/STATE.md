@@ -220,3 +220,9 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 29] (29-01) : rouverture D-05 lue sur left_at is null seul (archived_at n'empêche pas, A1) ; « membre actif » ciblé = account_deleted_at is null ; l'appelant est exclu de ses propres accusés
 - [Phase 29] (29-01) : échec préexistant 0147_child_push_adults (anniversaires D-23) reproduit sans 0171 — hors périmètre, deferred-items.md
 - [Phase 28]: [28-02] OPS-01 marqué complete (dernier plan déclarant, gate #2388) ; exécution réelle de réplication à jouer sur prod (commandes livrées per D-05)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | [261103-pym](./quick/261103-pym-fix-b-1-audit-v1-0-expiration-obligatoir/) Fix B-1 audit v1.0 : expiration obligatoire du token d'invitation manquant à la création de foyer + rattrapage MSG-04 Done + W-1 doc cron UTC | 2026-11-03 | 39b4fee | .planning/quick/261103-pym-fix-b-1-audit-v1-0-expiration-obligatoir/ |
