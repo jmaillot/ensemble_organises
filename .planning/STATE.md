@@ -22,8 +22,8 @@ last_activity: 2026-10-27
 ## Current Position
 
 Phase: 31 (Inscriptions ouvertes) — EXECUTING
-Plan: 2 of 6 (31-01 terminé : migration 0176 modèle liste + preview RPC, test-db 103/103)
-Status: Executing Phase 31
+Plan: 4 of 6 (31-03 terminé : pré-écran d'invitation pré-auth — route publique, traversée sessionStorage, messages D-17)
+Status: Ready to execute
 Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
 
 ## Références du jalon v1.0
@@ -47,6 +47,8 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
    sur une dette connue.
 
 ## Accumulated Context
+
+- 31-02 (2026-11-03) : Edge `household-invite-preview` créée (publishable, 404 uniforme D-03, rate-limit 8/min D-04, réponse 2 champs D-02) ; `household-invite` : summary → liste D-15, revoke-one D-16, create exige expiresAt. OUV-04/OUV-05 restent à cocher à la livraison UI (31-03/31-04) — la surface serveur seule ne prouve pas le parcours.
 
 - Décisions héritées v0.9.0 : tous les 20 espaces en prod, e2e 147/147 à la clôture
   v0.9.0 (baseline courante : 155, cf. ROADMAP 25-08), audits
@@ -72,9 +74,9 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
 
 ## Session Continuity
 
-**Last session:** 2026-11-03T10:57:16Z
-**Stopped at:** 31-01 complet — migration 0176 appliquée, test-db 103/103 verts
-**Resume file:** .planning/phases/31-inscriptions-ouvertes/31-01-SUMMARY.md
+**Last session:** 2026-11-03T11:51:22.532Z
+**Stopped at:** Completed 31-03-PLAN.md
+**Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -124,6 +126,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 30 P04 | ~30 min | 2 tasks | 3 files |
 | Phase 30 P05 | ~1h20 | 3 tasks | 6 files |
 | Phase 31 P01 | ~25 min | 2 tasks | 3 files |
+| Phase 31 P03 | ~70 min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -201,6 +204,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 30]: 30-05 : inventaire D-16 consigné — feuilles du mécanisme = MobileDrawer (feuille « Plus ») + ProductSheet (DialogContent feuille ≤650px) ; les autres consommateurs de DialogContent sans animation restent inchangés
 
 - [Phase 31] (31-01) : promote assumé — le modèle « un token actif par foyer » disparaît, 0003 section 4 réécrite vers la vérité 0176 ; preview éxecutable par anon (seule fonction pré-auth du lot), le reste réservé service_role ; base post-migration : 0 token actif (jetables).
+- [Phase 31]: 31-03 : /foyer/rejoindre public (pré-écran D-18) ; token traverse l'inscription par sessionStorage, jamais dans l'email ; sign-in accepte state.mode=inscription (écart Rule 3)
 
 ### Blockers
 
