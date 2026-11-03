@@ -225,7 +225,7 @@ Plans:
   4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
   5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
 
-**Plans**: 6/6 plans executed
+**Plans**: 7/8 plans executed
 Plans:
 **Wave 1**
 - [x] 31-01-PLAN.md — migration 0176 : modèle liste de tokens + RPC preview no-consume + tests SQL (OUV-05)
@@ -240,7 +240,7 @@ Plans:
 - [x] 31-06-PLAN.md — transport SMTP + GOTRUE_RATE_LIMIT_* + portes opérateur (RTO, push) (OUV-01/02/07)
 
 **Gap closure** *(2026-11-03, verification gaps_found)*
-- [ ] 31-07-PLAN.md — G-31-1 : libellés d'invalidation faux corrigés (panneau + pré-écran) + assertion de test (OUV-05)
+- [x] 31-07-PLAN.md — G-31-1 : libellés d'invalidation faux corrigés (panneau + pré-écran) + assertion de test (OUV-05)
 - [ ] 31-08-PLAN.md — G-31-2 : scaffold 31-UAT.md HV-1..HV-6 + docs/EXPLOITATION.md véridique, routage /gsd-verify-work 31 (OUV-01/02/03/07)
 
 **UI hint**: yes
@@ -255,7 +255,7 @@ Plans:
 | 28. Exploitation | 2/5 | In Progress|  |
 | 29. Messagerie v2 | 5/5 | In Progress|  |
 | 30. Hygiène du jalon | 5/5 | In Progress|  |
-| 31. Inscriptions ouvertes | 6/6 | In Progress|  |
+| 31. Inscriptions ouvertes | 7/8 | In Progress|  |
 
 ## Couverture v1.0
 
