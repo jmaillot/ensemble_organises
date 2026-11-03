@@ -2,18 +2,17 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 30
-current_phase_name: Inscriptions ouvertes
-status: executing
-stopped_at: "31-04 terminé le 2026-11-03 (commits 3274231, 8f6116f) : liste anonymisée, révocation individuelle par modale, formulaire durci 30 j/10 — prochaine : 31-05"
-last_updated: "2026-11-03T14:23:53.237Z"
-state_head: 8461529c4137585fec0621647caf653f37b96ade
+current_phase: 31
+status: completed
+stopped_at: Phase 31 complete — all phases complete
+last_updated: "2026-11-03T16:39:12.154Z"
+state_head: 0d4daf038ad46f7eb87c01b5862c3f0d8a1c81de
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 7
   total_plans: 44
-  completed_plans: 42
-  percent: 43
+  completed_plans: 44
+  percent: 100
 last_activity: 2026-10-27
 ---
 
@@ -21,10 +20,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 31 (Inscriptions ouvertes) — EXECUTING
-Plan: 1 of 8
-Status: Executing Phase 31
-Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
+Phase: 31
+Plan: Not started
+Status: All phases complete
+Progress: [██████████] 100% du jalon — phases 25-31 complètes (31 clôturée le 2026-11-03)
 
 ## Références du jalon v1.0
 
@@ -77,7 +76,7 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
 ## Session Continuity
 
 **Last session:** 2026-11-03T11:51:22.532Z
-**Stopped at:** Completed 31-03-PLAN.md
+**Stopped at:** Phase 31 complete — all phases complete
 **Resume file:** None
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).

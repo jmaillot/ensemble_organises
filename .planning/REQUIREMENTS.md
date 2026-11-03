@@ -48,13 +48,13 @@
 
 ### Ouverture des inscriptions
 
-- [ ] **OUV-01** *(reformulée tour 1 discuss 2026-11-03, alignée sur ROADMAP : le relais Gmail (D-10) rend Stalwart/SPF/DKIM/DMARC sans objet)* : Preuve de réception réelle des emails de confirmation via le relais Gmail existant (alias FROM contact@jeremymaillot.fr), en boîte de réception sur Gmail ET Outlook — pas de MTA à déployer
-- [ ] **OUV-02** : Confirmations email obligatoires ; SMTP de GoTrue durci (limites de débit applicatives activées)
-- [ ] **OUV-03** : Un rate-limit Traefik filtre `/auth/v1/signup` et `/auth/v1/token` contre les abus d'inscription
+- [x] **OUV-01** *(reformulée tour 1 discuss 2026-11-03, alignée sur ROADMAP : le relais Gmail (D-10) rend Stalwart/SPF/DKIM/DMARC sans objet)* : Preuve de réception réelle des emails de confirmation via le relais Gmail existant (alias FROM contact@jeremymaillot.fr), en boîte de réception sur Gmail ET Outlook — pas de MTA à déployer
+- [x] **OUV-02** : Confirmations email obligatoires ; SMTP de GoTrue durci (limites de débit applicatives activées)
+- [x] **OUV-03** : Un rate-limit Traefik filtre `/auth/v1/signup` et `/auth/v1/token` contre les abus d'inscription
 - [x] **OUV-04** : Un étranger arrivant sur un lien d'invitation voit un pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer
 - [x] **OUV-05** : L'administration du token de foyer expose une gouvernance : expiration obligatoire (défaut 30 j), nombre max d'utilisations (défaut 10), révocation à tout moment
-- [ ] **OUV-06** : Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
-- [ ] **OUV-07** : L'ouverture passe les portes dures : voie de suppression vivante + exercice de restauration consigné + preuve SMTP (séquence roadmap, pas une promesse)
+- [x] **OUV-06** : Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
+- [x] **OUV-07** : L'ouverture passe les portes dures : voie de suppression vivante + exercice de restauration consigné + preuve SMTP (séquence roadmap, pas une promesse)
 
 ### Dettes et résidus
 
@@ -122,13 +122,13 @@
 | DET-03 | Phase 30 | Done (30-03, constat démo 2026-10-31) |
 | DET-04 | Phase 30 | Done (30-04) |
 | DET-05 | Phase 30 | Done (30-05, constat mouvement 2026-10-31) |
-| OUV-01 | Phase 31 | Pending |
-| OUV-02 | Phase 31 | Pending |
-| OUV-03 | Phase 31 | Pending |
-| OUV-04 | Phase 31 | Pending |
+| OUV-01 | Phase 31 | Done (HV-1 passée — attestation opérateur 2026-11-03, amendement du protocole de preuve ; VERIFICATION 39/39) |
+| OUV-02 | Phase 31 | Done (HV-1 + HV-2 passées — attestation opérateur 2026-11-03 ; preuve non consignée) |
+| OUV-03 | Phase 31 | Done (HV-3 passée — attestation opérateur 2026-11-03 ; preuve non consignée) |
+| OUV-04 | Phase 31 | Done (code-verified + HV-6 attestée 2026-11-03 — état de prod opérateur) |
 | OUV-05 | Phase 31 | Complete |
-| OUV-06 | Phase 31 | Pending |
-| OUV-07 | Phase 31 | Pending |
+| OUV-06 | Phase 31 | Done (pages légales en ligne, routes publiques vérifiées au code ; mention human HV passée par attestation) |
+| OUV-07 | Phase 31 | Done (HV-4 restaur. + HV-5 push attestées 2026-11-03 — valeur RTO non consignée, dette documentée) |
 
 **Couverture :**
 - v1.0 : 38 exigences totales (5 ENF + 4 RGEX + 7 RGDP + 5 OPS + 5 MSG + 5 DET + 7 OUV)
