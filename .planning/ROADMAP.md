@@ -20,7 +20,7 @@
 - [x] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur (completed 2026-10-28)
 - [x] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles *(2026-10-29 — verifier passed 4/5 must-haves ; OPS-02 exercice de restauration non joué, absence déclarée opérateur, re-diligence phase 31 porte OUV-07 ; CR-01/H-01/H-02 corrigés 6f2054d/097fe1a/0e70d74)*
 - [x] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message *(2026-10-30 — 6/6 plans dont gap G-29-1 ; UAT verte : push delivered sur appareil, payload sans contenu, rappel collant consommé ; VERIFICATION PASSED)*
-- [ ] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles
+- [x] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles (clôturée le 2026-11-03 : UAT 4/4 pass, preuves cron 0175/jobid=25 à 05:05 Paris, gap G-30-2 corrigé par 30-06)
 - [ ] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures
 
 ## Phase Details
@@ -202,14 +202,14 @@ Plans:
   4. Sans estampille de build, le panneau de version affiche un message crédible (jamais « 0.1.0 » inventé) — complément des findings de la phase 24
   5. Les feuilles mobiles rendent « Anniversaires » sans césure disgracieuse et avec animations de sortie cohérentes, e2e au vert (arbitrage forceMount consigné)
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans executed
 
 Plans:
 - [x] 30-01-PLAN.md — DET-01 : diagnostic prod du job `eo-routine-maintenance` (D-02), correction cause racine + migration [BLOCKING], test SQL rouge-avant-vert, mesure prod + constat d'usage (D-01/D-03/D-04)
 - [x] 30-02-PLAN.md — DET-02 : rejouement des preuves des todos hors-ligne 13/14/15 (D-05/D-06), balayage de classe (D-07), clôture avec preuve fraîche
 - [x] 30-03-PLAN.md — DET-03 : photo du semis recette (chemin public /assets/recettes/, D-08/D-09/D-10), test de contrat rouge-avant-vert, crédits ATTRIBUTION.md
 - [x] 30-04-PLAN.md — DET-04 : libellé « Version de développement » sans estampille (D-11/D-12), test deux familles (D-13)
-- [ ] 30-05-PLAN.md — DET-05 : césure « Anniversaires » corrigée (D-14), mécanisme partagé forceMount + animation de sortie (D-15/D-16), e2e 390 px au vert (D-17)
+- [x] 30-05-PLAN.md — DET-05 : césure « Anniversaires » corrigée (D-14), mécanisme partagé forceMount + animation de sortie (D-15/D-16), e2e 390 px au vert (D-17)
 
 **UI hint**: yes
 
@@ -237,7 +237,7 @@ Plans:
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
 | 28. Exploitation | 2/5 | In Progress|  |
 | 29. Messagerie v2 | 5/5 | In Progress|  |
-| 30. Hygiène du jalon | 4/5 | In Progress|  |
+| 30. Hygiène du jalon | 5/5 | In Progress|  |
 | 31. Inscriptions ouvertes | 0/? | Not started | - |
 
 ## Couverture v1.0

@@ -4,9 +4,9 @@ milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
 current_phase: 30
 current_phase_name: Hygiène du jalon — dettes et résidus
-status: verifying
-stopped_at: "Completed 30-05-PLAN.md (DET-05 : césure + sortie animée feuilles, forceMount écarté sur preuve a11y)"
-last_updated: "2026-10-31T12:05:55.809Z"
+status: phase_complete
+stopped_at: "Phase 30 clôturée le 2026-11-03 : UAT 4/4 pass, D-03 prouvée (jobid=25, 05:05 Paris), G-30-2 corrigé (30-06), résidus outillage traités (ON_ERROR_STOP, runbook)"
+last_updated: "$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")"
 state_head: 3f879b4386fe5fd354323092ba9a6ab6d92678fc
 progress:
   total_phases: 7
@@ -21,10 +21,10 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 30 (Hygiène du jalon — dettes et résidus) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Progress: [████░░░░░░] 43% de la phase 29 (6/6 plans — 29-01 à 29-06, G-29-1 clos, UAT verte)
+Phase: 30 (Hygiène du jalon — dettes et résidus) — COMPLETE
+Plan: 6 of 6 (dont gap 30-06)
+Status: Clôturée le 2026-11-03 — DET-01 à DET-05 cochées, preuves datées dans 30-UAT.md
+Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
 
 ## Références du jalon v1.0
 

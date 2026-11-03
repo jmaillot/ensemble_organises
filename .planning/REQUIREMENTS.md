@@ -58,11 +58,11 @@
 
 ### Dettes et résidus
 
-- [ ] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences)
-- [ ] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 »)
+- [x] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences) — jobid=25 `5 4 * * *` UTC (06:05 Paris été / 05:05 hiver, 0175 : le suffixe fuseau de 0173 est ignoré par le bgworker, mesure prod 2026-11-02/03 : run succeeded à 05:05 Paris)
+- [x] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 ») — constat humain approuvé le 2026-10-31, todos 13/14/15 fermés avec preuve datée dans docs/TODO.md
 - [x] **DET-03** : Les semis démo embarquent des photos de recette
 - [x] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
-- [ ] **DET-05** : Feuilles mobiles : césures « Anniver-saires » corrigées et animations de sortie sans régression (arbitrage forceMount tranché)
+- [x] **DET-05** : Feuilles mobiles : césures « Anniver-saires » corrigées et animations de sortie sans régression (arbitrage forceMount tranché)
 
 ## Exigences v1.1 (hors roadmap actuel)
 
@@ -117,11 +117,11 @@
 | MSG-03 | Phase 29 | Done (29-04) |
 | MSG-04 | Phase 29 | Pending |
 | MSG-05 | Phase 29 | Done (29-03 preuve Realtime + 29-05 invalidation fil/liste côté app, D-08) |
-| DET-01 | Phase 30 | Pending |
-| DET-02 | Phase 30 | Pending |
-| DET-03 | Phase 30 | Pending |
+| DET-01 | Phase 30 | Done (30-01 + 0173/0175, preuve cron 2026-11-03) |
+| DET-02 | Phase 30 | Done (30-02, constat 2026-10-31) |
+| DET-03 | Phase 30 | Done (30-03, constat démo 2026-10-31) |
 | DET-04 | Phase 30 | Done (30-04) |
-| DET-05 | Phase 30 | Pending |
+| DET-05 | Phase 30 | Done (30-05, constat mouvement 2026-10-31) |
 | OUV-01 | Phase 31 | Pending |
 | OUV-02 | Phase 31 | Pending |
 | OUV-03 | Phase 31 | Pending |
