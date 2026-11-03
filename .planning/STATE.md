@@ -21,9 +21,9 @@ last_activity: 2026-10-27
 
 ## Current Position
 
-Phase: 30 (Hygiène du jalon — dettes et résidus) — COMPLETE
-Plan: 6 of 6 (dont gap 30-06)
-Status: Clôturée le 2026-11-03 — DET-01 à DET-05 cochées, preuves datées dans 30-UAT.md
+Phase: 31 (Inscriptions ouvertes) — EXECUTING
+Plan: 2 of 6 (31-01 terminé : migration 0176 modèle liste + preview RPC, test-db 103/103)
+Status: Executing Phase 31
 Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31 (go-live)
 
 ## Références du jalon v1.0
@@ -72,9 +72,9 @@ Progress: [████░░░░░░] 43% du jalon — prochaine : phase 31
 
 ## Session Continuity
 
-**Last session:** 2026-11-03T09:12:35.580Z
-**Stopped at:** Phase 31 context gathered
-**Resume file:** .planning/phases/31-inscriptions-ouvertes/31-CONTEXT.md
+**Last session:** 2026-11-03T10:57:16Z
+**Stopped at:** 31-01 complet — migration 0176 appliquée, test-db 103/103 verts
+**Resume file:** .planning/phases/31-inscriptions-ouvertes/31-01-SUMMARY.md
 
 - Prochaine étape : phase 27 (suppression RGPD) — l'export est proposé avant l'offre (porte de séquence).
 - Observation 26-07 conservée aux Blockers : premier dispatch purge sans atteinte Edge à surveiller en 27/28.
@@ -123,6 +123,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | Phase 30 P03 | ~15 min | 2 tasks | 4 files |
 | Phase 30 P04 | ~30 min | 2 tasks | 3 files |
 | Phase 30 P05 | ~1h20 | 3 tasks | 6 files |
+| Phase 31 P01 | ~25 min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -198,6 +199,8 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 - [Phase 30]: 30-04 : le repli « Version de développement » est un choix de RENDU strict — appVersion reste 'unknown' côté machine, les trois canaux (X-App-Version, /version.json, LABEL image) gardent leur contrat (D-12) ; title du repli déclare la cause (build hors pipeline, valeur non fiable), jamais un semver faux (D-11)
 - [Phase 30]: 30-05 : arbitrage forceMount amendé — écarté sur preuve a11y (hideOthers/focus guards actifs feuille fermée = page aria-hidden, prouvé par scan-flow.test) ; sortie animée appuyée sur la Présence Radix (contenu monté PENDANT la sortie, démontage propre)
 - [Phase 30]: 30-05 : inventaire D-16 consigné — feuilles du mécanisme = MobileDrawer (feuille « Plus ») + ProductSheet (DialogContent feuille ≤650px) ; les autres consommateurs de DialogContent sans animation restent inchangés
+
+- [Phase 31] (31-01) : promote assumé — le modèle « un token actif par foyer » disparaît, 0003 section 4 réécrite vers la vérité 0176 ; preview éxecutable par anon (seule fonction pré-auth du lot), le reste réservé service_role ; base post-migration : 0 token actif (jetables).
 
 ### Blockers
 

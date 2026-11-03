@@ -215,17 +215,30 @@ Plans:
 
 ### Phase 31: Inscriptions ouvertes
 
-**Goal**: Le serveur accueille des étrangers en sécurité et avec une voie de sortie : un MTA auto-hébergé (Stalwart) livrable au domaine (SPF/DKIM/DMARC, preuve de réception réelle sur Gmail et Outlook), confirmations email obligatoires et SMTP GoTrue durci, rate-limit Traefik sur `/auth/v1/signup|token`, invitation pré-auth traversant l'inscription, gouvernance du token de foyer (expiration 30 j défaut, max 10 utilisations, révocation), pages légales en ligne. **Dernière phase du jalon : la porte dure OUV-07 exige la voie de suppression vivante (27), l'exercice de restauration consigné (28) et la preuve SMTP.**
+**Goal** *(reformulée tour 1 discuss 2026-11-03 : le relais Gmail (D-13) rend Stalwart/SPF/DKIM/DMARC sans objet — OUV-01 porte sur la preuve de réception via le relais existant, pas sur un MTA à déployer)* : Le serveur accueille des étrangers en sécurité et avec une voie de sortie : inscriptions publiques avec confirmations email réellement délivrées en boîte de réception (relais Gmail, alias FROM contact@jeremymaillot.fr), rate-limit durci (Traefik + GoTrue), invitation pré-auth traversant l'inscription, gouvernance complète du token de foyer, pages légales en ligne — portes dures OUV-07 prouvées (suppression vivante, restauration exécutée, SMTP et push réels).
 **Depends on**: Phase 27 (porte : voie de suppression vivante) ; Phase 28 (porte : exercice de restauration + supervision consignés) ; Phase 30 (aucune dette connue au go-live)
 **Requirements**: OUV-01, OUV-02, OUV-03, OUV-04, OUV-05, OUV-06, OUV-07
 **Success Criteria** (what must be TRUE):
-  1. Un email de confirmation envoyé par la stack (MTA auto-hébergé, SPF/DKIM/DMARC en place) est réellement reçu et délivré en boîte de réception sur Gmail ET Outlook — preuve de réception consignée, pas supposée
+  1. Un email de confirmation envoyé par la stack (relais Gmail, alias FROM contact@jeremymaillot.fr) est réellement reçu et délivré en boîte de réception sur Gmail ET Outlook — preuve de réception consignée, pas supposée
   2. Une inscription sans confirmation d'email ne parvient pas à se connecter, et le rate-limit Traefik bloque effectivement les rafales sur `/auth/v1/signup` et `/auth/v1/token` (prouvé par test)
   3. Un étranger arrivant sur un lien d'invitation voit le pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer ; un admin peut définir l'expiration et le max d'utilisations du token, et le révoquer à tout moment
   4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
   5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
 
-**Plans**: TBD
+**Plans**: 1/6 plans executed
+Plans:
+**Wave 1**
+- [x] 31-01-PLAN.md — migration 0176 : modèle liste de tokens + RPC preview no-consume + tests SQL (OUV-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 31-02-PLAN.md — Edge preview dédiée + summary-liste + révocation individuelle (OUV-04/05)
+- [ ] 31-03-PLAN.md — pré-écran pré-auth + traversée sessionStorage + messages D-17 (OUV-04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 31-04-PLAN.md — panneau invitations enrichi : défauts 30 j/10, liste, révocation modale (OUV-05)
+- [ ] 31-05-PLAN.md — /mentions-legales + middlewares Traefik rateLimit + preuves 429 (OUV-03/06)
+- [ ] 31-06-PLAN.md — transport SMTP + GOTRUE_RATE_LIMIT_* + portes opérateur (RTO, push) (OUV-01/02/07)
+
 **UI hint**: yes
 
 ## Progress
@@ -238,7 +251,7 @@ Plans:
 | 28. Exploitation | 2/5 | In Progress|  |
 | 29. Messagerie v2 | 5/5 | In Progress|  |
 | 30. Hygiène du jalon | 5/5 | In Progress|  |
-| 31. Inscriptions ouvertes | 0/? | Not started | - |
+| 31. Inscriptions ouvertes | 1/6 | In Progress|  |
 
 ## Couverture v1.0
 
