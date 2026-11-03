@@ -2,7 +2,7 @@
  * Edge Function `household-invite`.
  *
  * Point d'entrée : `POST /functions/v1/household-invite`
- * Corps : `{ action: 'create' | 'revoke' | 'summary' | 'redeem', ... }`
+ * Corps : `{ action: 'create' | 'revoke' | 'revoke-one' | 'summary' | 'redeem', ... }`
  *
  * MODES D'AUTHENTIFICATION DÉCLARÉS
  *   `auth: ['user', 'publishable']`
@@ -15,10 +15,11 @@
  *                     401 SANS valider le token. Aucun oracle de validité n'est
  *                     donc exposé aux appels non authentifiés.
  *
- *   create / revoke / summary : rôle `admin` du foyer, revérifié EN BASE par
- *                               `public.create_household_invite_token`,
- *                               `public.revoke_household_invite_tokens` et
- *                               `public.household_invite_token_summary`.
+ *   create / revoke / revoke-one / summary : rôle `admin` du foyer, revérifié
+ *                               EN BASE par `public.create_household_invite_token`,
+ *                               `public.revoke_household_invite_tokens`,
+ *                               `public.revoke_household_invite_token` et
+ *                               `public.household_invite_tokens_list` (0176).
  *   redeem                    : `user` + transaction unique côté base
  *                               (`public.redeem_household_invite_token`).
  *
@@ -42,10 +43,12 @@
  *     JavaScript.
  *
  * CONTRAT DE RÉPONSE (aligné sur `app/src/types/index.ts`)
- *   create  -> InviteTokenPreview  { token, expiresAt, maxUses, householdId }
- *   revoke  -> { revoked: number }
- *   summary -> InviteTokenSummary | null
- *   redeem  -> { household_id: string }
+ *   create     -> InviteTokenPreview  { token, expiresAt, maxUses, householdId }
+ *   revoke     -> { revoked: number }
+ *   revoke-one -> { revoked: number }   (0 ou 1 : le token visé uniquement)
+ *   summary    -> liste anonymisée      { tokenId, createdAt, expiresAt,
+ *                                            maxUses, useCount, isActive }[]
+ *   redeem     -> { household_id: string }
  *
  * Note d'exécution : `withSupabase` renvoie un gestionnaire `fetch` ; on le
  * passe à `Deno.serve`, forme équivalente à `export default { fetch }` pour le
@@ -120,8 +123,7 @@ const householdField = z.string().trim().min(1).max(128);
 const isoInstant = z
   .string()
   .datetime({ offset: true })
-  .nullish()
-  .transform((value) => value ?? null);
+  .transform((value) => value);
 
 const requestSchema = z.discriminatedUnion('action', [
   z.object({
@@ -138,6 +140,12 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('summary'),
     householdId: householdField.optional(),
+  }),
+  z.object({
+    action: z.literal('revoke-one'),
+    householdId: householdField.optional(),
+    /** Identifiant de la ligne `household_invite_tokens` visée. */
+    tokenId: z.string().trim().min(1).max(128),
   }),
   z.object({
     action: z.literal('redeem'),
@@ -209,7 +217,13 @@ async function hmacSha256Hex(token: string, secret: string): Promise<string> {
 // partagé (table ou Redis) — voir docs/BACKEND.md.
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { redeem: 8, create: 20, revoke: 20, summary: 30 };
+const LIMITS: Record<string, number> = {
+  redeem: 8,
+  create: 20,
+  revoke: 20,
+  'revoke-one': 20,
+  summary: 30,
+};
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -262,13 +276,14 @@ interface TokenIssueResult {
   max_uses: number;
 }
 
-interface TokenSummaryRow {
-  household_id: string;
-  is_active: boolean;
+/** Ligne anonymisée du RPC `household_invite_tokens_list` (0176, D-15). */
+interface TokenListRow {
+  id: string;
+  created_at: string;
   expires_at: string | null;
   max_uses: number;
   use_count: number;
-  created_at: string;
+  is_active: boolean;
 }
 
 /** Foyer visé : celui demandé s'il est fourni, sinon le premier de l'appelant. */
@@ -334,6 +349,13 @@ function translateRpcError(error: { code?: string; message: string }): InviteErr
 // ---------------------------------------------------------------------------
 
 async function handleCreate(admin: AdminClient, userId: string, body: RequestBody & { action: 'create' }) {
+  // Expiration OBLIGATOIRE (D-14, base 0176) : l'Edge refuse l'absence avant
+  // tout appel RPC. Une date passée est laissée à la base, qui répond 22023 —
+  // le client traduit (« Choisissez une date dans le futur. »).
+  if (!body.expiresAt) {
+    throw new InviteError(400, 'Choisissez une date d’expiration pour ce lien.');
+  }
+
   const membership = await resolveHousehold(admin, userId, body.householdId);
   const secret = env('INVITE_TOKEN_HMAC_SECRET');
   if (secret.length < 32) {
@@ -347,7 +369,7 @@ async function handleCreate(admin: AdminClient, userId: string, body: RequestBod
     p_actor_id: userId,
     p_household_id: membership.household_id,
     p_token_hash: tokenHash,
-    p_expires_at: body.expiresAt ?? null,
+    p_expires_at: body.expiresAt,
     p_max_uses: body.maxUses ?? MAX_USES_DEFAULT,
   });
 
@@ -380,23 +402,48 @@ async function handleRevoke(admin: AdminClient, userId: string, body: RequestBod
 async function handleSummary(admin: AdminClient, userId: string, body: RequestBody & { action: 'summary' }) {
   const membership = await resolveHousehold(admin, userId, body.householdId);
 
-  const { data, error } = await admin.rpc('household_invite_token_summary', {
+  // Modèle liste (0176, D-15) : le RPC `household_invite_tokens_list` renvoie
+  // les tokens du foyer SANS `token_hash` — l'empreinte ne quitte jamais la
+  // base, et le token brut n'a jamais existé côté serveur. Mapping camelCase
+  // anonymisé ; AUCUN champ d'empreinte n'est exposé, quel que soit le RPC.
+  const { data, error } = await admin.rpc('household_invite_tokens_list', {
     p_actor_id: userId,
     p_household_id: membership.household_id,
   });
 
   if (error) throw translateRpcError(error);
-  if (!data) return json(null);
 
-  const summary = data as TokenSummaryRow;
-  return json({
-    householdId: summary.household_id,
-    isActive: summary.is_active,
-    expiresAt: summary.expires_at,
-    maxUses: summary.max_uses,
-    useCount: summary.use_count,
-    createdAt: summary.created_at,
+  const rows = (Array.isArray(data) ? data : []) as TokenListRow[];
+  return json(
+    rows.map((row) => ({
+      tokenId: row.id,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      maxUses: row.max_uses,
+      useCount: row.use_count,
+      isActive: row.is_active,
+    })),
+  );
+}
+
+/** Révocation INDIVIDUELLE (D-16) : seul le token visé passe à inactif. */
+async function handleRevokeOne(
+  admin: AdminClient,
+  userId: string,
+  body: RequestBody & { action: 'revoke-one' },
+) {
+  const membership = await resolveHousehold(admin, userId, body.householdId);
+
+  // Le RPC fait foi : assert admin en base, UPDATE borné id + household_id +
+  // is_active — un token d'un autre foyer ou déjà inactif ne correspond pas.
+  const { data, error } = await admin.rpc('revoke_household_invite_token', {
+    p_actor_id: userId,
+    p_household_id: membership.household_id,
+    p_token_id: body.tokenId,
   });
+
+  if (error) throw translateRpcError(error);
+  return json((data ?? { revoked: 0 }) as { revoked: number });
 }
 
 async function handleRedeem(admin: AdminClient, userId: string, body: RequestBody & { action: 'redeem' }) {
@@ -456,6 +503,7 @@ Deno.serve(
 
       if (body.action === 'create') return await handleCreate(admin, userId, body);
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);
+      if (body.action === 'revoke-one') return await handleRevokeOne(admin, userId, body);
       if (body.action === 'summary') return await handleSummary(admin, userId, body);
       return await handleRedeem(admin, userId, body);
     } catch (error) {
