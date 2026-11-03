@@ -115,7 +115,7 @@
 | MSG-01 | Phase 29 | Done (29-01 RPC 0171 + 29-05 picker « À qui écrire ? », un tap démarre/rouvre) |
 | MSG-02 | Phase 29 | Done (29-04) |
 | MSG-03 | Phase 29 | Done (29-04) |
-| MSG-04 | Phase 29 | Pending |
+| MSG-04 | Phase 29 | Done (push groupé câblé : 0172 compteur au titre + consommation par push-notify ; attestation HV-5) |
 | MSG-05 | Phase 29 | Done (29-03 preuve Realtime + 29-05 invalidation fil/liste côté app, D-08) |
 | DET-01 | Phase 30 | Done (30-01 + 0173/0175, preuve cron 2026-11-03) |
 | DET-02 | Phase 30 | Done (30-02, constat 2026-10-31) |
