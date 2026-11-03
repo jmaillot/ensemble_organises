@@ -51,7 +51,7 @@ vi.mock('@/lib/supabase/client', () => ({
 // module `invites` (rappel local, validité) reste réel.
 vi.mock('@/lib/invites', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/invites')>();
-  return { ...actual, getInviteTokenSummary: summaryMock };
+  return { ...actual, listInviteTokens: summaryMock };
 });
 
 const baseMember: HouseholdMemberRow = {
@@ -94,13 +94,13 @@ const seedStore = (...rows: HouseholdMemberRow[]) => {
   });
 };
 
-const summaryActif = (createdAt: string): InviteTokenSummary => ({
-  householdId: 'h-1',
+const summaryActif = (tokenId: string): InviteTokenSummary => ({
+  tokenId,
   isActive: true,
   expiresAt: null,
   maxUses: 10,
   useCount: 0,
-  createdAt,
+  createdAt: '2026-10-01T00:00:00Z',
 });
 
 beforeEach(() => {
@@ -216,15 +216,14 @@ describe('api.ts — wrappers RPC des profils enfants (D-01/0146)', () => {
   });
 
   it("giveChildAccess retourne le lien d'invitation standard D-21 quand le token brut est rappelable", async () => {
-    const createdAt = '2026-10-01T00:00:00Z';
-    summaryMock.mockResolvedValue(summaryActif(createdAt));
-    rememberInviteToken({ token: 't0ken', householdId: 'h-1', createdAt });
+    summaryMock.mockResolvedValue([summaryActif('tok-1')]);
+    rememberInviteToken({ token: 't0ken', householdId: 'h-1', tokenId: 'tok-1' });
 
     expect(await giveChildAccess('h-1')).toContain('foyer/rejoindre?token=t0ken');
   });
 
   it("giveChildAccess retourne null sans token rappelable — la fiche renvoie vers la section Inviter", async () => {
-    summaryMock.mockResolvedValue(null);
+    summaryMock.mockResolvedValue([]);
     expect(await giveChildAccess('h-1')).toBeNull();
   });
 });

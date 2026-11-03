@@ -84,29 +84,50 @@ export async function revokeInviteToken(): Promise<void> {
   );
 }
 
-export async function getInviteTokenSummary(): Promise<InviteTokenSummary | null> {
+/**
+ * Révocation INDIVIDUELLE (D-16) : seul le lien visé devient inutilisable —
+ * action Edge `revoke-one` (31-02), le RPC base revérifie l'admin et borne
+ * l'UPDATE à l'id du foyer. En mode local, écriture directe (pas de RLS).
+ */
+export async function revokeInviteTokenById(tokenId: string): Promise<void> {
   if (isSupabaseConfigured) {
-    return callInviteFunction<InviteTokenSummary | null>({
+    await callInviteFunction({
+      action: 'revoke-one',
+      householdId: useHouseholdStore.getState().householdId ?? undefined,
+      tokenId,
+    });
+    return;
+  }
+  await data.update<HouseholdInviteTokenRow>('household_invite_tokens', tokenId, { is_active: false });
+}
+
+/**
+ * Liste ANONYMISÉE des tokens du foyer (D-15, action `summary` →
+ * `household_invite_tokens_list`, 31-02) : aucune empreinte ne quitte la
+ * base, le brut n'a jamais existé côté serveur.
+ */
+export async function listInviteTokens(): Promise<InviteTokenSummary[]> {
+  if (isSupabaseConfigured) {
+    return callInviteFunction<InviteTokenSummary[]>({
       action: 'summary',
       householdId: useHouseholdStore.getState().householdId ?? undefined,
     });
   }
   // Même règle que la création : la session absente (démo, tests) retombe sur
-  // le foyer actif plutôt que sur aucun résumé.
+  // le foyer actif plutôt que sur une liste vide silencieuse.
   const householdId = useSessionStore.getState().user
     ? await currentHouseholdId()
     : (useHouseholdStore.getState().householdId ?? null);
-  if (!householdId) return null;
-  const [token] = await data.list<HouseholdInviteTokenRow>('household_invite_tokens', { household_id: householdId });
-  if (!token) return null;
-  return {
-    householdId: token.household_id,
+  if (!householdId) return [];
+  const rows = await data.list<HouseholdInviteTokenRow>('household_invite_tokens', { household_id: householdId });
+  return rows.map((token) => ({
+    tokenId: token.id,
     isActive: token.is_active,
     expiresAt: token.expires_at,
     maxUses: token.max_uses,
     useCount: token.use_count,
     createdAt: token.created_at,
-  };
+  }));
 }
 
 export async function redeemInviteToken(token: string): Promise<string> {
@@ -238,12 +259,12 @@ export function translateRedeemError(serverMessage: string): string {
 export interface RememberedInviteToken {
   token: string;
   householdId: string;
-  createdAt: string;
+  tokenId: string;
 }
 
 const REMEMBER_KEY = 'ensemble-organises-invite-token';
 
-export function rememberInviteToken(input: { token: string; householdId: string; createdAt: string }): void {
+export function rememberInviteToken(input: { token: string; householdId: string; tokenId: string }): void {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(REMEMBER_KEY, JSON.stringify(input));
@@ -258,11 +279,11 @@ export function recallInviteToken(): RememberedInviteToken | null {
     const raw = localStorage.getItem(REMEMBER_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<RememberedInviteToken>;
-    if (typeof parsed.token !== 'string' || typeof parsed.householdId !== 'string' || typeof parsed.createdAt !== 'string') {
+    if (typeof parsed.token !== 'string' || typeof parsed.householdId !== 'string' || typeof parsed.tokenId !== 'string') {
       return null;
     }
-    if (!parsed.token || !parsed.householdId || !parsed.createdAt) return null;
-    return { token: parsed.token, householdId: parsed.householdId, createdAt: parsed.createdAt };
+    if (!parsed.token || !parsed.householdId || !parsed.tokenId) return null;
+    return { token: parsed.token, householdId: parsed.householdId, tokenId: parsed.tokenId };
   } catch {
     // Valeur corrompue : on l'ignore plutôt que de casser le panneau.
     return null;
@@ -278,14 +299,14 @@ export function forgetInviteToken(): void {
   }
 }
 
-/** Le rappel ne vaut que pour le token actif désigné par le résumé serveur. */
-export function isRecallValid(saved: RememberedInviteToken | null, summary: InviteTokenSummary | null): boolean {
-  if (!saved || !summary) return false;
-  return (
-    summary.isActive &&
-    summary.householdId === saved.householdId &&
-    summary.createdAt === saved.createdAt
-  );
+/**
+ * Le rappel ne vaut que pour un token encore PRÉSENT ET ACTIF dans la liste
+ * serveur (match par `tokenId`, modèle liste — Pitfall 5). Le foyer du rappel
+ * est vérifié par l'appelant contre son foyer courant.
+ */
+export function isRecallValid(saved: RememberedInviteToken | null, tokens: InviteTokenSummary[]): boolean {
+  if (!saved) return false;
+  return tokens.some((token) => token.tokenId === saved.tokenId && token.isActive);
 }
 
 async function currentHouseholdId() {

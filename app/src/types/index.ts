@@ -27,7 +27,7 @@ export interface InviteTokenPreview {
 }
 
 export interface InviteTokenSummary {
-  householdId: string;
+  tokenId: string;
   isActive: boolean;
   expiresAt: string | null;
   maxUses: number;

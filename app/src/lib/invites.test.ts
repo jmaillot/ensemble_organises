@@ -3,7 +3,7 @@ import { forgetInviteToken, isRecallValid, recallInviteToken, rememberInviteToke
 import type { InviteTokenSummary } from '@/types';
 
 const summary = (overrides: Partial<InviteTokenSummary> = {}): InviteTokenSummary => ({
-  householdId: 'foyer-a',
+  tokenId: 'tok-1',
   isActive: true,
   expiresAt: null,
   maxUses: 10,
@@ -17,11 +17,11 @@ describe('rappel local du token d’invitation', () => {
     forgetInviteToken();
     expect(recallInviteToken()).toBeNull();
 
-    rememberInviteToken({ token: 'token-secret', householdId: 'foyer-a', createdAt: '2026-09-30T10:00:00.000Z' });
+    rememberInviteToken({ token: 'token-secret', householdId: 'foyer-a', tokenId: 'tok-1' });
     expect(recallInviteToken()).toEqual({
       token: 'token-secret',
       householdId: 'foyer-a',
-      createdAt: '2026-09-30T10:00:00.000Z',
+      tokenId: 'tok-1',
     });
 
     forgetInviteToken();
@@ -33,19 +33,20 @@ describe('rappel local du token d’invitation', () => {
     expect(recallInviteToken()).toBeNull();
     localStorage.setItem('ensemble-organises-invite-token', JSON.stringify({ token: '', householdId: 'foyer-a' }));
     expect(recallInviteToken()).toBeNull();
+    localStorage.setItem('ensemble-organises-invite-token', JSON.stringify({ token: 'x', householdId: 'foyer-a' }));
+    expect(recallInviteToken()).toBeNull();
     forgetInviteToken();
   });
 
-  it('ne vaut que pour le token actif désigné par le résumé', () => {
-    const saved = { token: 'token-secret', householdId: 'foyer-a', createdAt: '2026-09-30T10:00:00.000Z' };
-    expect(isRecallValid(saved, summary())).toBe(true);
-    expect(isRecallValid(saved, null)).toBe(false);
-    expect(isRecallValid(null, summary())).toBe(false);
-    // Révoqué, expiré côté résumé ou régénéré ailleurs : le rappel se tait.
-    expect(isRecallValid(saved, summary({ isActive: false }))).toBe(false);
-    expect(isRecallValid(saved, summary({ householdId: 'foyer-b' }))).toBe(false);
-    expect(isRecallValid(saved, summary({ createdAt: '2026-09-30T11:00:00.000Z' }))).toBe(false);
+  it('ne vaut que pour un token actif présent dans la liste (modèle liste, Pitfall 5)', () => {
+    const saved = { token: 'token-secret', householdId: 'foyer-a', tokenId: 'tok-1' };
+    expect(isRecallValid(saved, [summary()])).toBe(true);
+    expect(isRecallValid(saved, [])).toBe(false);
+    expect(isRecallValid(null, [summary()])).toBe(false);
+    // Révoqué, épuisé de la liste active, ou régénéré ailleurs : le rappel se tait.
+    expect(isRecallValid(saved, [summary({ isActive: false })])).toBe(false);
+    expect(isRecallValid(saved, [summary({ tokenId: 'tok-2' })])).toBe(false);
     // Les utilisations, elles, évoluent : le rappel reste valable.
-    expect(isRecallValid(saved, summary({ useCount: 3 }))).toBe(true);
+    expect(isRecallValid(saved, [summary({ useCount: 3 })])).toBe(true);
   });
 });

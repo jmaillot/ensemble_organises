@@ -13,10 +13,10 @@ describe('Paramètres du foyer', () => {
     renderWithProviders(<ParametresPage />);
 
     await user.click(screen.getByRole('tab', { name: 'Invitations' }));
-    expect(screen.getByRole('button', { name: 'Générer un nouveau token' })).toBeInTheDocument();
-    expect(screen.getByText(/Générer un nouveau token invalide le précédent/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Générer un nouveau lien' })).toBeInTheDocument();
+    expect(screen.getByText(/La liste ci-dessous suit tous les liens actifs/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Générer un nouveau token' }));
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
 
     const token = await screen.findByText(/^[A-Za-z0-9_-]{22}$/);
     expect(token.textContent).toHaveLength(22);
@@ -24,7 +24,7 @@ describe('Paramètres du foyer', () => {
     expect(screen.getByRole('button', { name: 'QR' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'QR' }));
-    expect(await screen.findByRole('img', { name: 'QR code du token d’invitation' })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'QR code du lien d’invitation' })).toBeInTheDocument();
   });
 
   it('réaffiche le dernier token actif sans en générer un nouveau', async () => {
@@ -32,7 +32,7 @@ describe('Paramètres du foyer', () => {
     const first = renderWithProviders(<ParametresPage />);
 
     await user.click(screen.getByRole('tab', { name: 'Invitations' }));
-    await user.click(screen.getByRole('button', { name: 'Générer un nouveau token' }));
+    await user.click(screen.getByRole('button', { name: 'Générer un nouveau lien' }));
     const token = await screen.findByText(/^[A-Za-z0-9_-]{22}$/);
     const value = token.textContent ?? '';
     expect(value).toHaveLength(22);
@@ -55,7 +55,7 @@ describe('Paramètres du foyer', () => {
     });
 
     await user.click(screen.getByRole('tab', { name: 'Invitations' }));
-    expect(screen.queryByRole('button', { name: 'Générer un nouveau token' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Générer un nouveau lien' })).not.toBeInTheDocument();
     expect(screen.getByText(/Seul un administrateur/)).toBeInTheDocument();
   });
 

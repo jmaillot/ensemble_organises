@@ -5,65 +5,146 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Panel } from '@/components/shared/module-shell';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { QrCode } from '@/components/shared/qr-code';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
-import { createInviteToken, forgetInviteToken, getInviteTokenSummary, isRecallValid, recallInviteToken, rememberInviteToken, revokeInviteToken } from '@/lib/invites';
+import { createInviteToken, forgetInviteToken, isRecallValid, listInviteTokens, recallInviteToken, rememberInviteToken, revokeInviteToken, revokeInviteTokenById } from '@/lib/invites';
 import { addDays, formatMediumDate, pluralize, todayIso } from '@/lib/utils';
 import { useHouseholdStore, useIsAdmin } from '@/stores/household-store';
 import type { InviteTokenSummary } from '@/types';
 
 const inviteKeys = { all: ['parametres', 'invitations'] as const };
 
+// Pitfall 6 : la base clampe l'expiration à 90 jours — la contrainte est
+// affichée et validée côté client plutôt que clampée en silence.
+const MAX_EXPIRY_DAYS = 90;
+const MAX_USES = 100;
+// Valeur sentinelle de `confirmRevokeId` : la révocation GLOBALE existante
+// (action `revoke`) partage la modale des révocations individuelles (D-16).
+const REVOKE_ALL = 'all';
+
+/** « Actif » seulement si réellement utilisable : révoqué, épuisé ou expiré se dit « Révoqué ». */
+function statusOf(token: InviteTokenSummary): 'Actif' | 'Révoqué' {
+  const expired = token.expiresAt ? new Date(token.expiresAt).getTime() <= Date.now() : false;
+  return token.isActive && token.useCount < token.maxUses && !expired ? 'Actif' : 'Révoqué';
+}
+
+/** Tri par création décroissante : le lien le plus récent en tête. */
+function byCreationDesc(a: InviteTokenSummary, b: InviteTokenSummary) {
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
 export function InvitationsPanel() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const isAdmin = useIsAdmin();
+  const householdId = useHouseholdStore((state) => state.householdId);
   const householdName = useHouseholdStore((state) => state.householdName);
   const qrId = useId();
   const [expiresOn, setExpiresOn] = useState(() => addDays(todayIso(), 30));
   const [maxUses, setMaxUses] = useState(10);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expiresError, setExpiresError] = useState<string | null>(null);
+  const [usesError, setUsesError] = useState<string | null>(null);
   const [recallBump, setRecallBump] = useState(0);
   const [showQr, setShowQr] = useState(false);
-  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
 
-  const summaryQuery = useQuery({
+  const tokensQuery = useQuery({
     queryKey: inviteKeys.all,
-    queryFn: getInviteTokenSummary,
+    queryFn: listInviteTokens,
   });
 
-  const summary: InviteTokenSummary | null = summaryQuery.data ?? null;
+  const tokens: InviteTokenSummary[] = useMemo(
+    () => [...(tokensQuery.data ?? [])].sort(byCreationDesc),
+    [tokensQuery.data],
+  );
 
-  // Le brut n'existe côté serveur qu'à la génération : le rappel local
-  // permet de le réafficher tant que le résumé désigne le même token actif.
-  const recalled = useMemo(() => recallInviteToken(), [summary, recallBump]);
-  const displayed = recalled && isRecallValid(recalled, summary) ? recalled : null;
+  // Le brut n'existe côté serveur qu'à la génération : le rappel local permet
+  // de le réafficher tant que le lien est encore actif dans la liste (match
+  // par `tokenId`, modèle liste — Pitfall 5).
+  const recalled = useMemo(() => recallInviteToken(), [tokens, recallBump]);
+  const displayed =
+    recalled && isRecallValid(recalled, tokens) && recalled.householdId === householdId ? recalled : null;
+
+  const validateForm = (): boolean => {
+    const today = todayIso();
+    let valid = true;
+    if (!expiresOn || expiresOn < today) {
+      setExpiresError('Choisissez une date dans le futur.');
+      valid = false;
+    } else if (expiresOn > addDays(today, MAX_EXPIRY_DAYS)) {
+      setExpiresError(`Le lien expire au plus tard dans ${MAX_EXPIRY_DAYS} jours.`);
+      valid = false;
+    } else {
+      setExpiresError(null);
+    }
+    if (!Number.isInteger(maxUses) || maxUses < 1) {
+      setUsesError('Indiquez au moins 1 utilisation.');
+      valid = false;
+    } else if (maxUses > MAX_USES) {
+      setUsesError(`Indiquez au plus ${MAX_USES} utilisations.`);
+      valid = false;
+    } else {
+      setUsesError(null);
+    }
+    return valid;
+  };
 
   const generate = async () => {
+    if (!validateForm()) return;
     setPending(true);
     setError(null);
     try {
       const preview = await createInviteToken({
-        expiresAt: expiresOn ? `${expiresOn}T23:59:00.000Z` : null,
+        expiresAt: `${expiresOn}T23:59:00.000Z`,
         maxUses,
       });
       await queryClient.invalidateQueries({ queryKey: inviteKeys.all });
-      // Le résumé frais porte la création du token qui vient de naître : le
-      // rappel est ancré dessus, pas sur l'instant local. `refetch` renvoie
-      // les données ; le cache seul peut encore être vide à cet instant.
-      const { data: fresh } = await summaryQuery.refetch();
-      if (preview.token && fresh?.createdAt) {
-        rememberInviteToken({ token: preview.token, householdId: fresh.householdId, createdAt: fresh.createdAt });
+      // La liste fraîche porte le lien qui vient de naître : le rappel est
+      // ancré sur son `tokenId` (le plus récent), pas sur l'instant local.
+      const { data: fresh } = await tokensQuery.refetch();
+      const newest = [...(fresh ?? [])].sort(byCreationDesc)[0];
+      if (preview.token && newest) {
+        rememberInviteToken({
+          token: preview.token,
+          householdId: preview.householdId || householdId || '',
+          tokenId: newest.tokenId,
+        });
       }
       setRecallBump((bump) => bump + 1);
       setShowQr(false);
-      toast('Nouveau token généré. Le précédent est invalidé.');
+      toast('Nouveau lien généré. Les liens précédents sont invalidés.');
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : 'Génération impossible.');
     } finally {
       setPending(false);
+    }
+  };
+
+  const confirmRevoke = async () => {
+    const target = confirmRevokeId;
+    if (!target) return;
+    try {
+      if (target === REVOKE_ALL) {
+        await revokeInviteToken();
+        forgetInviteToken();
+        toast('Tous les liens sont révoqués.');
+      } else {
+        await revokeInviteTokenById(target);
+        // Le lien révoqué n'est plus rappelable : on nettoie le stockage local.
+        if (recalled?.tokenId === target) forgetInviteToken();
+        toast('Lien révoqué.');
+      }
+      setRecallBump((bump) => bump + 1);
+      setShowQr(false);
+      await queryClient.invalidateQueries({ queryKey: inviteKeys.all });
+    } catch (revokeError) {
+      toast(revokeError instanceof Error ? revokeError.message : 'Révocation impossible.', 'error');
+    } finally {
+      setConfirmRevokeId(null);
     }
   };
 
@@ -86,8 +167,8 @@ export function InvitationsPanel() {
       <Panel title="Inviter un membre" description="Les invitations sont gérées par les administrateurs du foyer.">
         <div className="grid gap-3 rounded-[20px] border border-dashed border-accent/40 bg-accent-faint p-4">
           <p className="m-0 text-xs text-muted">
-            Seul un administrateur peut générer, régénérer ou révoquer un token d’invitation. Demandez-le-lui depuis son
-            téléphone ou son ordinateur : le token n’est affiché qu’au moment de sa création.
+            Seul un administrateur peut générer, régénérer ou révoquer un lien d’invitation. Demandez-le-lui depuis son
+            téléphone ou son ordinateur : le lien n’est affiché qu’au moment de sa création.
           </p>
         </div>
       </Panel>
@@ -97,23 +178,40 @@ export function InvitationsPanel() {
   return (
     <Panel
       title="Inviter un membre"
-      description="Un token d’accès au foyer, à transmettre en privé. Générer un nouveau token invalide le précédent."
+      description="Un lien d’accès au foyer, à transmettre en privé. La liste ci-dessous suit tous les liens actifs du foyer."
     >
       <div className="grid gap-4">
         <div className="grid gap-3.5 sm:grid-cols-2">
-          <Field label="Expiration du token" hint="Laissez vide pour un token sans date de fin." optional>
+          <Field label="Expire le" hint={`Au plus ${MAX_EXPIRY_DAYS} jours.`} error={expiresError ?? undefined}>
             {(props) => (
-              <Input type="date" min={todayIso()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} {...props} />
+              <Input
+                type="date"
+                min={todayIso()}
+                value={expiresOn}
+                onChange={(event) => {
+                  setExpiresOn(event.target.value);
+                  setExpiresError(null);
+                }}
+                {...props}
+              />
             )}
           </Field>
-          <Field label="Nombre maximal d’utilisations" hint="Le foyer compte 5 membres : laissez de la marge pour les invités.">
+          <Field
+            label="Utilisations maximum"
+            hint="Le foyer compte 5 membres : laissez de la marge pour les invités."
+            error={usesError ?? undefined}
+          >
             {(props) => (
               <Input
                 type="number"
                 min={1}
-                max={50}
+                max={MAX_USES}
                 value={maxUses}
-                onChange={(event) => setMaxUses(Math.max(1, Number(event.target.value) || 1))}
+                onChange={(event) => {
+                  const next = event.target.valueAsNumber;
+                  setMaxUses(Number.isNaN(next) ? 0 : next);
+                  setUsesError(null);
+                }}
                 {...props}
               />
             )}
@@ -126,24 +224,29 @@ export function InvitationsPanel() {
         ) : null}
         <div className="flex flex-wrap gap-2">
           <Button icon="key" disabled={pending} onClick={() => void generate()}>
-            {pending ? 'Génération…' : 'Générer un nouveau token'}
+            {pending ? 'Génération…' : 'Générer un nouveau lien'}
           </Button>
-          <Button variant="secondary" icon="trash" disabled={pending || !summary?.isActive} onClick={() => setConfirmRevoke(true)}>
-            Révoquer le token
+          <Button
+            variant="secondary"
+            icon="trash"
+            disabled={pending || tokens.length === 0}
+            onClick={() => setConfirmRevokeId(REVOKE_ALL)}
+          >
+            Révoquer tous les liens
           </Button>
         </div>
 
         {displayed ? (
           <div className="grid gap-4 rounded-[20px] border border-border bg-bg p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div>
-              <p className="eyebrow mb-2">Token d’invitation</p>
+              <p className="eyebrow mb-2">Lien d’invitation</p>
               <p className="mb-4 font-mono text-lg tracking-[0.12em] break-all">{displayed.token}</p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   icon="copy"
                   onClick={async () => {
                     await navigator.clipboard?.writeText(displayed.token);
-                    toast('Token copié dans le presse-papiers.');
+                    toast('Lien copié dans le presse-papiers.');
                   }}
                 >
                   Copier
@@ -162,63 +265,67 @@ export function InvitationsPanel() {
                 </Button>
               </div>
               <p className="mt-4 mb-0 text-[11px] text-muted">
-                Maximum {pluralize(summary?.maxUses ?? 10, 'utilisation')}
-                {summary?.expiresAt ? ` · valide jusqu’au ${formatMediumDate(summary.expiresAt.slice(0, 10))}` : ' · sans date d’expiration'}. La
-                base n’en conserve que l’empreinte : ce token est rappelé depuis cet appareil et ne sera plus
+                La base n’en conserve que l’empreinte : ce lien est rappelé depuis cet appareil et ne sera plus
                 affichable ailleurs.
               </p>
             </div>
             {showQr ? (
               <div id={qrId} className="rounded-[20px] border border-border bg-surface p-3">
-                <QrCode value={displayed.token} size={168} label="QR code du token d’invitation" />
+                <QrCode value={displayed.token} size={168} label="QR code du lien d’invitation" />
               </div>
             ) : null}
           </div>
         ) : null}
 
-        <div className="rounded-[20px] border border-border p-4">
-          <p className="eyebrow mb-3">Token en cours</p>
-          <div className="grid gap-0">
-            <div className="flex items-center justify-between gap-2.5 py-[11px] text-xs">
-              <span className="text-muted">État</span>
-              <strong>{summary ? (summary.isActive ? 'Actif' : 'Inactif') : 'Aucun token'}</strong>
+        {tokensQuery.data && tokens.length === 0 ? (
+          <EmptyState
+            icon="key"
+            title="Aucun lien d’invitation actif"
+            description="Générez un lien pour inviter un nouveau membre."
+            actionLabel="Générer un lien"
+            onAction={() => void generate()}
+          />
+        ) : tokens.length > 0 ? (
+          <div className="rounded-[20px] border border-border p-4">
+            <p className="eyebrow mb-3">Liens actifs</p>
+            <div className="grid gap-0">
+              {tokens.map((token) => (
+                <div
+                  key={token.tokenId}
+                  className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border py-[11px] text-[13px] first:border-t-0"
+                >
+                  <span className="text-muted">Créé le {formatMediumDate(token.createdAt.slice(0, 10))}</span>
+                  <span className="text-muted">
+                    Expire le {token.expiresAt ? formatMediumDate(token.expiresAt.slice(0, 10)) : '—'}
+                  </span>
+                  <span>{`${token.useCount} / ${token.maxUses} ${pluralize(token.useCount, 'utilisation').replace(/^\d+ /, '')}`}</span>
+                  <strong>{statusOf(token)}</strong>
+                  <Button variant="secondary" icon="trash" onClick={() => setConfirmRevokeId(token.tokenId)}>
+                    Révoquer
+                  </Button>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between gap-2.5 border-t border-border py-[11px] text-xs">
-              <span className="text-muted">Utilisations</span>
-              <strong>{summary ? `${summary.useCount} / ${summary.maxUses}` : '—'}</strong>
-            </div>
-            <div className="flex items-center justify-between gap-2.5 border-t border-border py-[11px] text-xs">
-              <span className="text-muted">Expiration</span>
-              <strong>{summary?.expiresAt ? formatMediumDate(summary.expiresAt.slice(0, 10)) : 'Aucune'}</strong>
-            </div>
+            <p className="mt-3 mb-0 flex items-start gap-1.5 text-[11px] text-muted">
+              <Icon name="info" size="sm" className="mt-px" />
+              La rotation de la clé `INVITE_TOKEN_HMAC_SECRET` invalide tous les liens actifs et impose leur
+              régénération.
+            </p>
           </div>
-          <p className="mt-3 mb-0 flex items-start gap-1.5 text-[11px] text-muted">
-            <Icon name="info" size="sm" className="mt-px" />
-            La rotation de la clé `INVITE_TOKEN_HMAC_SECRET` invalide tous les tokens actifs et impose leur régénération.
-          </p>
-        </div>
+        ) : null}
       </div>
 
       <ConfirmDialog
-        open={confirmRevoke}
-        onOpenChange={setConfirmRevoke}
-        title="Révoquer le token d’invitation ?"
-        description="Le token devient immédiatement inutilisable. Les membres qui l’ont déjà utilisé restent dans le foyer."
+        open={confirmRevokeId !== null}
+        onOpenChange={(open) => setConfirmRevokeId(open ? confirmRevokeId : null)}
+        title={confirmRevokeId === REVOKE_ALL ? 'Révoquer tous les liens ?' : 'Révoquer ce lien ?'}
+        description={
+          confirmRevokeId === REVOKE_ALL
+            ? 'Chaque lien devient immédiatement inutilisable. Les membres qui les ont déjà utilisés restent dans le foyer.'
+            : 'Plus personne ne pourra rejoindre le foyer avec ce lien, y compris ceux qui l’ont déjà.'
+        }
         confirmLabel="Révoquer"
-        onConfirm={async () => {
-          try {
-            await revokeInviteToken();
-            forgetInviteToken();
-            setRecallBump((bump) => bump + 1);
-            setShowQr(false);
-            await queryClient.invalidateQueries({ queryKey: inviteKeys.all });
-            toast('Token révoqué.');
-          } catch (revokeError) {
-            toast(revokeError instanceof Error ? revokeError.message : 'Révocation impossible.', 'error');
-          } finally {
-            setConfirmRevoke(false);
-          }
-        }}
+        onConfirm={() => void confirmRevoke()}
       />
     </Panel>
   );

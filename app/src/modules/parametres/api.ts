@@ -1,5 +1,5 @@
 import { data } from '@/lib/data';
-import { getInviteTokenSummary, isRecallValid, recallInviteToken } from '@/lib/invites';
+import { listInviteTokens, isRecallValid, recallInviteToken } from '@/lib/invites';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { randomId } from '@/lib/utils';
 import type {
@@ -342,8 +342,8 @@ export async function linkChildToAccount(childMemberId: string, accountMemberId:
 export async function giveChildAccess(householdId: string): Promise<string | null> {
   const saved = recallInviteToken();
   if (!saved || saved.householdId !== householdId) return null;
-  const summary = await getInviteTokenSummary();
-  if (!isRecallValid(saved, summary)) return null;
+  const tokens = await listInviteTokens();
+  if (!isRecallValid(saved, tokens)) return null;
   return `${window.location.origin}/foyer/rejoindre?token=${encodeURIComponent(saved.token)}`;
 }
 
