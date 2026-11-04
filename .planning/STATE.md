@@ -4,11 +4,11 @@ milestone: v1.1
 current_phase: 33
 current_phase_name: Cache de lecture offline
 status: complete_phase_32
-stopped_at: Phase 32 exécutée et validée en UAT (7/8, test 7 à rejouer au prochain déploiement)
-last_updated: "2026-11-04T17:30:00.000Z"
+stopped_at: Phase 33 context gathered
+last_updated: "2026-11-04T16:35:09.874Z"
 last_activity: 2026-11-04
 last_activity_desc: Phase 32 clôturée — UAT 7 passées, 1 bloquée (release-build), défauts corrigés en session
-state_head: f54c4a68d955512381992b1976e26e2f625bd0b5
+state_head: eea795fb9196976a43edf8c1f99a052e49901212
 progress:
   total_phases: 4
   completed_phases: 1
@@ -74,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-04T11:15:18.829Z
-Stopped at: Phase 32 context gathered
-Resume file: .planning/phases/32-install-raccourcis/32-CONTEXT.md
+Last session: 2026-11-04T16:35:09.845Z
+Stopped at: Phase 33 context gathered
+Resume file: .planning/phases/33-cache-de-lecture-offline/33-CONTEXT.md
