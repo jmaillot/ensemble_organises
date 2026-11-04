@@ -1,6 +1,6 @@
 import { persistQueryClient, persistQueryClientSave, type PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { createStore, del, get, set } from 'idb-keyval';
+import { createStore, del, entries, get, set } from 'idb-keyval';
 import { hydrate as hydrateState } from '@tanstack/react-query';
 import type { Query, QueryClient } from '@tanstack/react-query';
 import { OFFLINE_FAMILIES } from '@/lib/query-policy';
@@ -67,14 +67,20 @@ export function buildPersister(
   throttleTime = 1000,
 ) {
   const key = cacheKey(userId, householdId);
-  return createAsyncStoragePersister({
+  // La garde `cancelled` neutralise la traîne du throttle en vol (Pitfall 6) :
+  // voir `stopPersisting`, qui la déclenche au désabonnement.
+  let cancelled = false;
+  const persister = createAsyncStoragePersister({
     storage: {
       // Les méthodes reçoivent (key, value) de l'interface AsyncStorage ; on
       // ignore l'argument key passé par le persister (son défaut
       // `REACT_QUERY_OFFLINE_CACHE`) pour imposer la clé composée : le
       // namespacing (D-03) est structurel, pas disciplinaire.
       getItem: () => get<string>(key, cacheStore),
-      setItem: (_key, value) => set(key, value, cacheStore),
+      setItem: (_key, value) => {
+        if (cancelled) return Promise.resolve(); // persister désabonné : muet
+        return set(key, value, cacheStore);
+      },
       removeItem: () => del(key, cacheStore),
     },
     // Défaut doc (1000 ms) : une écriture survenue moins d'une seconde avant
@@ -84,7 +90,14 @@ export function buildPersister(
     // TanStack ferait sinon tomber l'écriture 1 s après la fin du test).
     throttleTime,
   });
+  persisterCancels.set(persister, () => {
+    cancelled = true;
+  });
+  return persister;
 }
+
+/** Persister désabonné : sa traîne de throttle en vol devient muette (Pitfall 6). */
+const persisterCancels = new WeakMap<object, () => void>();
 
 /**
  * Souscription de sauvegarde courante, conservée en état module.
@@ -100,9 +113,63 @@ export function buildPersister(
  */
 let activeUnsubscribe: (() => void) | null = null;
 
+/**
+ * Marque d'annulation du persister courant (voir `stopPersisting`) : une
+ * sauvegarde throttlée en vol au moment du désabonnement devient un no-op.
+ */
+let activeCancel: (() => void) | null = null;
+
 /** Purge la clé d'un couple (utilisateur, foyer) — lecture directe, sans persister. */
 export async function purgeCache(userId: string, householdId: string): Promise<void> {
   await del(cacheKey(userId, householdId), cacheStore);
+}
+
+/**
+ * Purge TOUTES les clés d'un utilisateur, tous foyers confondus (D-03, T-33-10) —
+ * c'est la purge de la déconnexion : un utilisateur peut appartenir à plusieurs
+ * foyers, et chacun de ses caches contient des données personnelles qui ne
+ * doivent pas survivre à sa session sur un appareil partagé (D-06).
+ *
+ * Le préfixe est construit par `cacheKey(userId, '')` : la forme
+ * `eo-query-cache:<userId>:` reste la propriété exclusive de `cacheKey` (source
+ * unique, garde de classe §2.7 E — aucun littéral recopié ici).
+ *
+ * `userId` null (mode démo, Pitfall 7) : no-op explicitement commenté. En démo,
+ * il n'y a ni compte Supabase ni cache offline — purger « tous les foyers de
+ * personne » n'a pas de sens et ne doit rien casser.
+ *
+ * Les erreurs sont propagées, jamais avalées (§2.7 F) : l'appelant (le goulot
+ * `session-store.signOut`) en bloque la déconnexion.
+ */
+export async function purgeUserCache(userId: string | null): Promise<void> {
+  if (!userId) return; // mode démo : no-op assumé (Pitfall 7)
+  const prefix = cacheKey(userId, '');
+  const all = await entries<string>(cacheStore);
+  await Promise.all(
+    all
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key]) => del(key, cacheStore)),
+  );
+}
+
+/**
+ * Désabonne la souscription de sauvegarde courante et rend son persister
+ * inoffensif (Pitfall 6, T-33-13). Deux temps :
+ *
+ *  1. l'unsubscribe arrête les futurs déclenchements de sauvegarde ;
+ *  2. la marque interne neutralise une sauvegarde throttlée DÉJÀ EN VOL —
+ *     le throttle de TanStack exécute sa traîne indépendamment des
+ *     événements de cache, et sans cette garde elle réécrirait la clé APRÈS
+ *     la purge, ressuscitant les données de l'utilisateur parti.
+ *
+ * À appeler AVANT toute purge (déconnexion comme changement de foyer) :
+ * c'est cet ordre qui rend la preuve D-06 reproductible.
+ */
+export function stopPersisting(): void {
+  activeUnsubscribe?.();
+  activeUnsubscribe = null;
+  activeCancel?.();
+  activeCancel = null;
 }
 
 /**
@@ -153,6 +220,10 @@ export async function persistNow(
   // persisté immédiatement, pas à la prochaine écriture.
   const [unsubscribe, promise] = persistQueryClient(persistProps);
   activeUnsubscribe = unsubscribe;
+  // Le persister vient d'être recréé : sa garde d'annulation devient la
+  // courante (l'ancienne a été invoquée par le `persistNow` de départ).
+  const cancel = persisterCancels.get(persister as unknown as object) ?? null;
+  activeCancel = cancel;
   await promise;
   await persistQueryClientSave(persistProps);
 }
