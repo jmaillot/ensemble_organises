@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 current_phase: 32
-current_phase_name: jalon v1.1, 4 phases
-status: planning
+current_phase_name: Install & raccourcis
+status: executing
 stopped_at: Phase 32 context gathered
-last_updated: "2026-11-04T11:15:18.849Z"
+last_updated: "2026-11-04T12:42:47.374Z"
 last_activity: 2026-11-04
-last_activity_desc: Roadmap v1.1 créé (17 exigences mappées, 100% couverture)
-state_head: a47223ed5437388f21f506c05f02b7fd8d24aaf9
+last_activity_desc: Phase 32 execution started
+state_head: f54c4a68d955512381992b1976e26e2f625bd0b5
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** v1.1 « PWA durcie mobile-first » — Phase 32 : Install & raccourcis
+**Current focus:** Phase 32 — Install & raccourcis
 
 ## Current Position
 
-Phase: 32 of 35 (Install & raccourcis) — jalon v1.1, 4 phases (32-35)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-11-04 — Roadmap v1.1 créé (17 exigences mappées, 100% couverture)
+Phase: 32 (Install & raccourcis) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 32
+Last activity: 2026-11-04 — Phase 32 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
