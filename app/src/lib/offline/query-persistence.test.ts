@@ -6,9 +6,11 @@ import {
   persistNow,
   pruneExpiredFamilies,
   purgeCache,
+  purgeUserCache,
   restoreOfflineCache,
+  stopPersisting,
 } from './query-persistence';
-import { createStore, get } from 'idb-keyval';
+import { createStore, entries, get } from 'idb-keyval';
 
 // La base de test est isolée par fichier : ce module écrit dans la même base
 // `eo-offline-cache` que le code de prod, mais fake-indexeddb reçoit un nom
@@ -144,5 +146,78 @@ describe('query-persistence (tracer OFFR-01)', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     const raw = await get<string>(cacheKey('user-a', 'h1'), probeStore);
     expect(raw).toContain('Nouvelle');
+  });
+});
+
+/**
+ * OFFR-04 (plan 33-04) : purge utilisateur et preuve appareil partagé (D-06).
+ * Les assertions lisent le stockage BRUT (entries du store de cache), bornées
+ * à ce store (§2.7 D) — c'est la lecture brute qui distingue une purge réelle
+ * d'une purge supposée.
+ */
+describe('purgeUserCache (OFFR-04, D-03/D-06)', () => {
+  it('aucune donnée de A ne survit à la déconnexion attendue (appareil partagé simulé, D-06)', async () => {
+    // 1. User A consulte : seed + sauvegarde immédiate.
+    const clientA = buildQueryClient({ queries: { retry: false } });
+    clientA.setQueryData(['tasks', 'h1', {}, null], [{ id: 't1', name: 'marque-A' }]);
+    await persistNow(clientA, 'userA', 'h1', { throttleTime: 0 });
+    await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toContain('marque-A');
+
+    // 2. Déconnexion ATTENDUE (await) — le contrat D-05.
+    await purgeUserCache('userA');
+
+    // 3. Lecture BRUTE du store : aucune clé de A ne survit (tous foyers, D-03).
+    const restantes = (await entries<string>(probeStore)).filter(([key]) => key.startsWith(cacheKey('userA', '')));
+    expect(restantes).toEqual([]);
+
+    // 4. Et le restore de B ne voit rien de A (assertion bornée au cache).
+    const clientB = buildQueryClient({ queries: { retry: false } });
+    await restoreOfflineCache(clientB, 'userB', 'h1');
+    expect(clientB.getQueryData(['tasks', 'h1', {}, null])).toBeUndefined();
+  });
+
+  it('la purge de A ne supprime AUCUNE clé de B (deux utilisateurs coexistants)', async () => {
+    const clientA = buildQueryClient({ queries: { retry: false } });
+    clientA.setQueryData(['tasks', 'h1', {}, null], LINES);
+    await persistNow(clientA, 'userA', 'h1', { throttleTime: 0 });
+
+    const clientB = buildQueryClient({ queries: { retry: false } });
+    clientB.setQueryData(['tasks', 'h2', {}, null], LINES);
+    await persistNow(clientB, 'userB', 'h2', { throttleTime: 0 });
+
+    await purgeUserCache('userA');
+
+    await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toBeUndefined();
+    await expect(get(cacheKey('userB', 'h2'), probeStore)).resolves.toContain('"tasks"');
+  });
+
+  it('purgeUserCache(null) est un no-op toléré (mode démo, Pitfall 7)', async () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h1', {}, null], LINES);
+    await persistNow(client, 'userA', 'h1', { throttleTime: 0 });
+
+    await expect(purgeUserCache(null)).resolves.toBeUndefined();
+
+    // Rien n'a bougé : en démo, il n'y a ni utilisateur ni cache à purger.
+    await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toContain('"tasks"');
+  });
+
+  it('après stopPersisting, une sauvegarde throttlée en vol ne recrée pas la clé purgée (Pitfall 6)', async () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h1', {}, null], LINES);
+    await persistNow(client, 'userA', 'h1', { throttleTime: 0 });
+
+    // Écriture post-souscription : la sauvegarde throttlée (1 s par défaut)
+    // est maintenant EN VOL.
+    client.setQueryData(['tasks', 'h1', {}, null], [...LINES, { id: 't3', name: 'en-vol', position: 2 }]);
+
+    // Ordre imposé (Pitfall 6) : unsubscribe AVANT la purge.
+    stopPersisting();
+    await purgeUserCache('userA');
+
+    // La sauvegarde en vol devait partir ~1 s après l'évènement : elle ne
+    // doit PAS recréer la clé. La fenêtre d'observation couvre son échéance.
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toBeUndefined();
   });
 });
