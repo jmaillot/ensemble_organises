@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { BannerSlot } from '@/components/banners/banner-slot';
+import { InstallBannerGate } from '@/components/banners/install-banner';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
 import { NotificationsDialog } from '@/components/shared/notifications-dialog';
@@ -387,6 +388,9 @@ export function AppShell() {
           </div>
         </header>
 
+        {/* Contrôleur d'éligibilité install : monté ici et non DANS la
+            bannière, qui n'est rendue par le slot que si l'entrée existe. */}
+        <InstallBannerGate />
         <BannerSlot />
 
         <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(92px+env(safe-area-inset-bottom))]">

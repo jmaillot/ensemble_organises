@@ -29,21 +29,17 @@ export function detectIosUa(): boolean {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-interface InstallBannerProps {
-  /** Test uniquement : force la branche iOS sans dépendre de l'UA du navigateur. */
-  isIosOverride?: boolean;
-}
-
 /**
- * Bannière d'installation (D-01) : premier niveau de découvrabilité, sous le
- * bandeau sw-update (priorité 2). Conditions d'affichage TOUTES requises
- * (D-02, D-03) : non installée, non enterrée, et un moyen d'installer existe.
- * Le pas-à-pas iOS vit DANS la bannière dépliable — pas de page dédiée.
+ * Contrôleur d'éligibilité, monté UNE fois dans app-shell (hors du slot) :
+ * c'est lui qui pousse/retire l'entrée `install` du store. La bannière
+ * visible, elle, est rendue par le slot seulement si l'entrée existe —
+ * si le push vivait dans la bannière elle-même, le composant qui doit créer
+ * l'entrée ne serait jamais monté (défaut trouvé en UAT du 04/11/2026).
  */
-export function InstallBanner({ isIosOverride = false }: InstallBannerProps) {
+export function InstallBannerGate() {
   const installed = usePwaInstalled();
-  const { canInstall, install } = useInstallPrompt();
-  const isIos = isIosOverride || detectIosUa();
+  const { canInstall } = useInstallPrompt();
+  const isIos = detectIosUa();
 
   const push = useBannerStore((s) => s.push);
   const dismiss = useBannerStore((s) => s.dismiss);
@@ -55,7 +51,25 @@ export function InstallBanner({ isIosOverride = false }: InstallBannerProps) {
     else dismiss('install');
   }, [eligible, push, dismiss]);
 
-  if (!eligible) return null;
+  return null;
+}
+
+interface InstallBannerProps {
+  /** Test uniquement : force la branche iOS sans dépendre de l'UA du navigateur. */
+  isIosOverride?: boolean;
+}
+
+/**
+ * Bannière d'installation (D-01) : premier niveau de découvrabilité, sous le
+ * bandeau sw-update (priorité 2). Présentation seule — l'éligibilité et le
+ * push sont le travail d'`InstallBannerGate`. Le pas-à-pas iOS vit DANS la
+ * bannière dépliable — pas de page dédiée.
+ */
+export function InstallBanner({ isIosOverride = false }: InstallBannerProps) {
+  const { canInstall, install } = useInstallPrompt();
+  const isIos = isIosOverride || detectIosUa();
+
+  const dismiss = useBannerStore((s) => s.dismiss);
 
   const bury = () => {
     localStorage.setItem(DISMISS_KEY, String(Date.now()));
