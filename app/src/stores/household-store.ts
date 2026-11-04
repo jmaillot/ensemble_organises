@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { QueryClient } from '@tanstack/react-query';
+import { purgeCache, stopPersisting } from '@/lib/offline/query-persistence';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { HouseholdMemberRow, HouseholdRow, Role } from '@/types';
 
@@ -23,6 +25,19 @@ interface HouseholdState {
   setHousehold: (household: HouseholdRow, members: HouseholdMemberRow[], currentMemberId?: string) => void;
   setDisabledModules: (disabledModules: string[]) => void;
   switchHousehold: (householdId: string, householdName: string) => void;
+  /**
+   * Changement de foyer avec purge du foyer quitté (OFFR-04, D-04, Pitfall 5).
+   * Le setter sync `switchHousehold` reste la dernière étape — jamais
+   * asynchronisé ; c'est cette action async encapsulante que le sélecteur de
+   * foyer doit awaiter. `client` est le queryClient de l'app (`router.tsx`),
+   * passé par l'appelant pour éviter un cycle d'import.
+   */
+  switchWithPurge: (
+    householdId: string,
+    householdName: string,
+    client: QueryClient,
+    userId?: string | null,
+  ) => Promise<void>;
   setMembers: (members: HouseholdMemberRow[]) => void;
   reset: () => void;
 }
@@ -50,7 +65,7 @@ const vivantes = (members: HouseholdMemberRow[]): HouseholdMemberRow[] => member
 
 export const useHouseholdStore = create<HouseholdState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
       setHousehold: (household, members, currentMemberId) =>
         set({
@@ -66,6 +81,21 @@ export const useHouseholdStore = create<HouseholdState>()(
         }),
       setDisabledModules: (disabledModules) => set({ disabledModules }),
       switchHousehold: (householdId, householdName) => set({ householdId, householdName }),
+      switchWithPurge: async (householdId, householdName, client, userId) => {
+        // D-04, Pitfall 5 (T-33-12) : ordre STRICT — purge du foyer quitté
+        // (await) → clear du cache mémoire → seulement ensuite le switch.
+        // Les lectures du nouveau foyer partent APRÈS le clear : aucune ligne
+        // de l'ancien foyer ne peut répondre un instant sous le nouveau
+        // householdId. Le désabonnement précède la purge (Pitfall 6, T-33-13) :
+        // sans lui, une sauvegarde throttlée en vol ressusciterait la clé.
+        const previousId = get().householdId;
+        if (previousId && previousId !== householdId) {
+          stopPersisting();
+          if (userId) await purgeCache(userId, previousId);
+        }
+        client.clear();
+        get().switchHousehold(householdId, householdName);
+      },
       // D-04 : ingestion filtrée des membres — voir `vivantes`.
       setMembers: (members) => set({ members: vivantes(members) }),
       setCity: (city) => set({ city }),
