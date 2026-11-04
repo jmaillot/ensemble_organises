@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildQueryClient } from '@/lib/query-policy';
 import {
   cacheKey,
+  connectOfflineCache,
   persistNow,
+  pruneExpiredFamilies,
   purgeCache,
   restoreOfflineCache,
 } from './query-persistence';
@@ -68,5 +70,79 @@ describe('query-persistence (tracer OFFR-01)', () => {
 
     await purgeCache('user-a', 'h1');
     await expect(get(cacheKey('user-a', 'h1'), probeStore)).resolves.toBeUndefined();
+  });
+
+  it('hors allowlist, une famille n\'est PAS sérialisée : filtrage à l\'écriture (D-01, T-33-06)', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', 'h1', {}, null], LINES);
+    // Famille Tier 2 (notes) : ne doit JAMAIS toucher le disque.
+    source.setQueryData(['notes', 'h1', {}, null], [{ id: 'n1', content: 'privé' }]);
+
+    await persistNow(source, 'user-a', 'h1', { throttleTime: 0 });
+
+    const raw = await get<string>(cacheKey('user-a', 'h1'), probeStore);
+    expect(raw).toBeTruthy();
+    expect(raw).toContain('"tasks"');
+    expect(raw).not.toContain('"notes"');
+  });
+
+  it('pruneExpiredFamilies écarte une famille vivante de plus de 24 h et garde la fraîche (D-09, T-33-07)', async () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h1', {}, null], LINES);
+    client.setQueryData(['shopping_lists', 'h1', {}, null], [{ id: 'l1', name: 'Courses' }]);
+    // Le maxAge s'évalue sur dataUpdatedAt : on vieillit artificiellement la
+    // famille tasks de 25 h, shopping_lists reste à maintenant.
+    const day = 24 * 60 * 60 * 1000;
+    const aged = client.getQueryCache().find({ queryKey: ['tasks', 'h1', {}, null] });
+    expect(aged).not.toBeNull();
+    aged!.setState({ dataUpdatedAt: Date.now() - day - 60 * 60 * 1000 });
+
+    pruneExpiredFamilies(client);
+
+    expect(client.getQueryData(['tasks', 'h1', {}, null])).toBeUndefined();
+    expect(client.getQueryData(['shopping_lists', 'h1', {}, null])).toEqual([{ id: 'l1', name: 'Courses' }]);
+  });
+
+  it('pruneExpiredFamilies garde une annexe à 6 jours, l\'écarte à 8 jours (D-10)', async () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['profiles', 'h1', {}, null], [{ id: 'p1', display_name: 'Marie' }]);
+    const day = 24 * 60 * 60 * 1000;
+    const sixDays = client.getQueryCache().find({ queryKey: ['profiles', 'h1', {}, null] })!;
+    sixDays.setState({ dataUpdatedAt: Date.now() - 6 * day });
+    pruneExpiredFamilies(client);
+    expect(client.getQueryData(['profiles', 'h1', {}, null])).toBeDefined();
+
+    const eightDays = client.getQueryCache().find({ queryKey: ['profiles', 'h1', {}, null] })!;
+    eightDays.setState({ dataUpdatedAt: Date.now() - 8 * day });
+    pruneExpiredFamilies(client);
+    expect(client.getQueryData(['profiles', 'h1', {}, null])).toBeUndefined();
+  });
+
+  it('pruneExpiredFamilies ne touche pas aux familles hors allowlist', () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['notes', 'h1', {}, null], [{ id: 'n1' }]);
+    const notes = client.getQueryCache().find({ queryKey: ['notes', 'h1', {}, null] })!;
+    notes.setState({ dataUpdatedAt: Date.now() - 30 * 24 * 60 * 60 * 1000 });
+
+    pruneExpiredFamilies(client);
+
+    // Hors allowlist : jamais hydratée de toute façon — la prune ne dit rien.
+    expect(client.getQueryData(['notes', 'h1', {}, null])).toEqual([{ id: 'n1' }]);
+  });
+
+  it('connectOfflineCache restaure, élagué, puis souscrit le persist (OFFR-01)', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', 'h1', {}, null], LINES);
+    await persistNow(source, 'user-a', 'h1', { throttleTime: 0 });
+
+    const fresh = buildQueryClient({ queries: { retry: false } });
+    await connectOfflineCache(fresh, 'user-a', 'h1', { throttleTime: 0 });
+    // Restore a eu lieu (OFFR-01) et la souscription est prise : la donnée
+    // est là, et un évènement de cache postérieur repart en écriture.
+    expect(fresh.getQueryData(['tasks', 'h1', {}, null])).toEqual(LINES);
+    fresh.setQueryData(['tasks', 'h1', {}, null], [...LINES, { id: 't3', name: 'Nouvelle', position: 2 }]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const raw = await get<string>(cacheKey('user-a', 'h1'), probeStore);
+    expect(raw).toContain('Nouvelle');
   });
 });

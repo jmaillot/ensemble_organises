@@ -3,6 +3,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { createStore, del, get, set } from 'idb-keyval';
 import { hydrate as hydrateState } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
+import { OFFLINE_FAMILIES } from '@/lib/query-policy';
 
 /**
  * Persistance offline du cache de lecture TanStack Query — socle de la
@@ -29,10 +30,30 @@ export function cacheKey(userId: string, householdId: string): string {
 /**
  * Version du format de cache persisté. `buster` est comparé par TanStack au
  * moment du restore : une valeur différente jette le cache plutôt que de
- * réinjecter une forme d'un autre build (T-33-02). Pour ce tracer, c'est une
- * constante ; le branchement au hash de build vient au plan 03.
+ * réinjecter une forme d'un autre build (T-33-08).
+ *
+ * POURQUOI UNE CONSTANTE ET PAS L'ESTAMPILLE `/version.json` (hypothèse A3
+ * écartée). L'estampille existe côté serveur (`build-app.sh`, header
+ * `X-App-Version`), mais la lire au runtime imposerait un aller-réseau au
+ * bootstrap — et, HORS LIGNE précisément, ce fetch échoue : le fallback
+ * constant mismatcherait le buster persisté par le build précédent et jetterait
+ * un cache parfaitement sain au seul moment où il sert (l'asymétrie inverse
+ * de D-09). Le fallback honnête documenté au plan est donc retenu : constante
+ * bumpée à chaque changement de FORME du cache persisté (clés, hydratation,
+ * filtrage). Un simple redéploiement sans changement de forme conserve le
+ * cache — ce qui est le comportement voulu.
  */
 export const OFFLINE_CACHE_BUSTER = 'v1';
+
+/**
+ * Retrouve la famille offline d'un préfixe de table — premier élément de clé
+ * produit par `queryKeys.table` / `queryKeys.tableAll` (useResource.ts). La
+ * source unique des familles est OFFLINE_FAMILIES (D-07) : ce fichier ne
+ * recopie aucun préfixe, il lit la politique.
+ */
+function familyOf(prefix: string): { prefix: string; maxAgeMs: number } | undefined {
+  return OFFLINE_FAMILIES.find((family) => family.prefix === prefix);
+}
 
 /**
  * Construit le persister AsyncStorage pour un couple (utilisateur, foyer).
@@ -110,8 +131,17 @@ export async function persistNow(
     // réécrit ce prédicat). Aucune mutation en vol n'est sérialisée :
     // `shouldDehydrateMutation` est absent, la phase 33 reste lecture seule
     // (l'outbox est le périmètre de la phase 34).
+    // POURQUOI `maxAge: Infinity` EST ABSENT (Pitfall 3) : le `maxAge` global
+    // de `persistQueryClient` jette TOUT le cache silencieusement (« silently
+    // discarded », doc) dès qu'il est dépassé — jamais d'état honnête, jamais
+    // de granularité par famille. Il ne peut PAS servir D-08/D-09. La fraîcheur
+    // est évaluée PAR FAMILLE au restore, par `pruneExpiredFamilies`.
     dehydrateOptions: {
-      shouldDehydrateQuery: () => true,
+      // Allowlist D-01/D-07 : la frontière Allowlist → IndexedDB (T-33-06).
+      // Une query dont le préfixe n'est pas dans OFFLINE_FAMILIES n'est PAS
+      // sérialisée — les données Tier 2 (notes, ardoise, cadeaux…) ne
+      // quittent jamais la mémoire.
+      shouldDehydrateQuery: (query) => familyOf(String(query.queryKey[0])) !== undefined,
     },
     ...persistOptions,
   };
@@ -143,4 +173,52 @@ export async function restoreOfflineCache(
   if (!persisted) return; // rien de persisté : état vide honnête, rien à réinjecter
   if (persisted.buster !== OFFLINE_CACHE_BUSTER) return; // forme d'un autre build : jetée
   hydrateState(client, persisted.clientState);
+}
+
+/**
+ * Écarte du cache les familles allowlistées dont le maxAge est dépassé
+ * (D-09, T-33-07) — à appeler immédiatement après le restore, AVANT que le
+ * routeur ne monte. Une donnée trop vieille est RETIRÉE, jamais rendue comme
+ * fraîche : hors ligne, la page voit l'état vide honnête.
+ *
+ * POURQUOI UN PRÉDICATE ET PAS LE maxAge GLOBAL (Pitfall 3) : voir le
+ * commentaire de `persistNow`. POURQUOI LE PRÉDICATE LAISSE PASSER LES
+ * FAMILLES HORS ALLOWLIST : elles ne sont jamais hydratées (filtre à
+ * l'écriture, D-01) — la prune ne leur dit rien, les toucher serait un
+ * comportement qu'aucun test ne réclame. L'horloge est `dataUpdatedAt` au
+ * moment du restore : la sémantique d'expiration n'est PAS re-évaluée en
+ * continu (OFFR-03, hypothèse flaggée).
+ */
+export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): void {
+  client.removeQueries({
+    predicate: (query) => {
+      const family = familyOf(String(query.queryKey[0]));
+      if (!family) return false; // hors allowlist : jamais hydraté de toute façon
+      return now - query.state.dataUpdatedAt > family.maxAgeMs;
+    },
+  });
+}
+
+/**
+ * Branche le cache offline pour un couple (utilisateur, foyer) : restore du
+ * persisté, élagage des familles périmées (D-09), puis souscription du persist
+ * (Pitfall 6 : l'ancienne souscription est désabonnée d'abord, via
+ * `persistNow`). C'est la fonction qu'appelle `useAuthBootstrap` entre
+ * `applySession` et `setReady(true)` (OFFR-01) — extraite ici pour être
+ * prouvée par test (AGENTS.md §2.7 D) : le branchement lui-même vit dans le
+ * hook, la mécanique vit dans le module.
+ *
+ * L'ordre impose restore AVANT prune AVANT souscription : la souscription
+ * garde un cache déjà élagué, et aucune donnée périmée n'a le temps d'être
+ * rendue entre le hydrate et la prune (même micro-tâche, `await` séquentiel).
+ */
+export async function connectOfflineCache(
+  client: QueryClient,
+  userId: string,
+  householdId: string,
+  options: Partial<PersistQueryClientOptions> & { throttleTime?: number } = {},
+): Promise<void> {
+  await restoreOfflineCache(client, userId, householdId);
+  pruneExpiredFamilies(client);
+  await persistNow(client, userId, householdId, options);
 }
