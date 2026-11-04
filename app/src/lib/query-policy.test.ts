@@ -3,7 +3,12 @@ import { dirname, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { onlineManager } from '@tanstack/react-query';
 import { QUERY_POLICY, buildQueryClient } from './query-policy';
+import { OFFLINE_FAMILIES } from './query-policy';
 import { queryClient as appQueryClient } from '@/app/router';
+import { SHOPPING_LISTS_TABLE, SHOPPING_ITEMS_TABLE } from '@/modules/courses/api';
+import { PRODUCTS_TABLE } from '@/modules/courses/products-api';
+import { TASKS_TABLE, TASK_LISTS_TABLE } from '@/modules/taches/api';
+import { ROUTINES_TABLE, ROUTINE_FOLDERS_TABLE, ROUTINE_COMPLETIONS_TABLE } from '@/modules/routines/api';
 
 /**
  * Garde de classe : l'invariant de politique réseau, et la preuve que le client
@@ -145,6 +150,98 @@ describe('aucun QueryClient écrit à la main hors de la politique (garde de dé
       offenders,
       `client écrit à la main hors de la politique partagée : ${offenders.join(', ')} — ` +
         'dériver de `buildQueryClient` (@/lib/query-policy) plutôt que recopier les options',
+    ).toEqual([]);
+  });
+});
+
+describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () => {
+  it('F. gcTime couvre l’horizon de persistance (≥ 7 jours)', () => {
+    // Pitfall 1 : sans gcTime ≥ maxAge annexe, une query hydratée serait
+    // collectée (5 min par défaut) avant la prochaine sauvegarde — le cache
+    // persisterait un état déjà vidé.
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    expect(QUERY_POLICY.queries?.gcTime ?? 0).toBeGreaterThanOrEqual(sevenDays);
+    const options = appQueryClient.getDefaultOptions();
+    expect(options.queries?.gcTime ?? 0).toBeGreaterThanOrEqual(sevenDays);
+  });
+
+  it('G. OFFLINE_FAMILIES contient exactement les 8 familles vivantes et les 2 annexes', () => {
+    const byAge = (prefix: string) => OFFLINE_FAMILIES.find((family) => family.prefix === prefix)?.maxAgeMs;
+    const day = 24 * 60 * 60 * 1000;
+    for (const prefix of [
+      'shopping_lists',
+      'shopping_list_items',
+      'products',
+      'task_lists',
+      'tasks',
+      'routine_folders',
+      'routines',
+      'routine_completions',
+    ]) {
+      expect(byAge(prefix), `famille vivante ${prefix} absente`).toBe(day);
+    }
+    for (const prefix of ['household_members', 'profiles']) {
+      expect(byAge(prefix), `annexe ${prefix} absente`).toBe(7 * day);
+    }
+    // Exactement ces dix-là : rien de plus, rien de moins (D-07 — la liste
+    // EST la frontière de ce qui quitte la mémoire).
+    expect(OFFLINE_FAMILIES).toHaveLength(10);
+  });
+
+  it('H. les préfixes correspondent aux constantes réelles des hooks Tier 1', () => {
+    // Test D/E de la politique réseau, transposé : la liste pourrait rester
+    // juste pendant qu’un hook Tier 1 renomme sa table. On importe les
+    // CONSTANTES exportées des hooks (AGENTS.md §2.7 I : une absence affirmée
+    // est une affirmation) et on refuse toute divergence.
+    const byAge = (prefix: string) => OFFLINE_FAMILIES.find((family) => family.prefix === prefix);
+    for (const table of [
+      SHOPPING_LISTS_TABLE,
+      SHOPPING_ITEMS_TABLE,
+      PRODUCTS_TABLE,
+      TASKS_TABLE,
+      TASK_LISTS_TABLE,
+      ROUTINE_FOLDERS_TABLE,
+      ROUTINES_TABLE,
+      ROUTINE_COMPLETIONS_TABLE,
+    ]) {
+      expect(byAge(table), `table Tier 1 ${table} absente de l’allowlist`).toBeDefined();
+    }
+    // Les constantes tier 1 portent bien les valeurs attendues — sinon la
+    // correspondance ci-dessus serait vide de sens (les deux côtés auraient
+    // pu dériver ensemble).
+    expect(TASKS_TABLE).toBe('tasks');
+    expect(SHOPPING_LISTS_TABLE).toBe('shopping_lists');
+    expect(ROUTINES_TABLE).toBe('routines');
+    expect(PRODUCTS_TABLE).toBe('products');
+    expect(TASK_LISTS_TABLE).toBe('task_lists');
+    expect(ROUTINE_FOLDERS_TABLE).toBe('routine_folders');
+    expect(ROUTINE_COMPLETIONS_TABLE).toBe('routine_completions');
+    expect(SHOPPING_ITEMS_TABLE).toBe('shopping_list_items');
+  });
+
+  it('I. aucune allowlist de famille recopiée hors de query-policy.ts (garde de classe)', () => {
+    // Garde de classe §2.7 E : `prefix: '…'` est la marque d’une déclaration
+    // d’allowlist. Hors du fichier source unique, elle serait une seconde
+    // liste qui divergerait. L’aiguille porte sur la FORME de déclaration
+    // (`prefix: 'x'`), pas sur les noms de tables : les api.ts définissent
+    // légitimement `*_TABLE = 'tasks'`, et les tests sement des clés de query.
+    const root = findSourceRoot();
+    expect(root).not.toBeNull();
+    const allowed = resolve(root!, 'lib/query-policy.ts');
+    // Preuve que l'aiguille sait reconnaître une déclaration réelle : ce
+    // fichier de garde en porte une (§2.7 F — un contrôle qui ne voit rien
+    // ne dit rien). Sinon le contrôle serait vert sans rien regarder.
+    const needle = /prefix:\s*['"]/;
+    expect(needle.test(readFileSync(resolve(root!, 'lib/query-policy.test.ts'), 'utf8'))).toBe(true);
+    const offenders = collectSourceFiles(root!)
+      // Le garde s'exclut lui-même (l'aiguille y vit) comme query-policy.ts,
+      // la déclaration autorisée.
+      .filter((file) => file !== allowed && file !== resolve(root!, 'lib/query-policy.test.ts'))
+      .filter((file) => needle.test(readFileSync(file, 'utf8')))
+      .map((file) => file.slice(root!.length + 1));
+    expect(
+      offenders,
+      `allowlist de famille hors de la source unique : ${offenders.join(', ')} — importer OFFLINE_FAMILIES (@/lib/query-policy) plutôt que recopier`,
     ).toEqual([]);
   });
 });

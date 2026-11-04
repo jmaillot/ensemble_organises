@@ -28,7 +28,12 @@ import { QueryClient, type DefaultOptions } from '@tanstack/react-query';
 export const QUERY_POLICY: DefaultOptions = {
   queries: {
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    // Pitfall 1 (RESEARCH phase 33) : le gcTime doit couvrir l'horizon de
+    // persistance offline — l'horizon le plus long est le maxAge des annexes
+    // (7 jours, OFFLINE_FAMILIES). À 5 minutes, une query hydratée serait
+    // collectée avant la prochaine sauvegarde : le cache persisterait un
+    // état déjà vidé.
+    gcTime: 7 * 24 * 60 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
     // `networkMode: 'always'` : TanStack ne met plus AUCUNE requête en pause.
@@ -48,6 +53,42 @@ export const QUERY_POLICY: DefaultOptions = {
   // jamais une mise en file silencieuse.
   mutations: { retry: 0, networkMode: 'always' },
 };
+
+/**
+ * Allowlist offline par famille de table (D-07) — SOURCE UNIQUE.
+ *
+ * POURQUOI À LA SÉRIALISATION, ET POURQUOI ICI. Le filtre d'écriture vit dans
+ * `shouldDehydrateQuery` au moment où le cache part vers IndexedDB : hors de
+ * cette liste, AUCUNE donnée ne quitte la mémoire (T-33-06). Sans allowlist,
+ * TOUT le cache mémoire serait persisté — données Tier 2 (notes, ardoise,
+ * cadeaux…), personnelles et volumineuses. `query-policy.ts` porte déjà la
+ * politique réseau du dépôt : la frontière offline est une politique de cache
+ * au même titre, elle vit au même endroit, et `familyOf` la lit d'ici.
+ *
+ * POURQUOI UN maxAge PAR FAMILLE (D-08, D-09). Les données vivantes (Tier 1)
+ * se périment en 24 h : au-delà, le restore les écarte (pruneExpiredFamilies)
+ * plutôt que de rendre un périmètre comme frais. Les annexes de rendu
+ * (membres, profils — avatars et noms d'assignés, D-10) changent rarement :
+ * 7 jours. Cette horloge est évaluée au restore, pas en continu (OFFR-03,
+ * hypothèse flaggée).
+ *
+ * Les préfixes sont les tables réelles des hooks Tier 1 (constantes exportées
+ * des api.ts) ; le test H de `query-policy.test.ts` refuse toute divergence.
+ */
+export const OFFLINE_FAMILIES: ReadonlyArray<{ prefix: string; maxAgeMs: number }> = [
+  // Tier 1 — données vivantes (D-08 : horizon 24 h)
+  { prefix: 'shopping_lists', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'shopping_list_items', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'products', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'task_lists', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'tasks', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'routine_folders', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'routines', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'routine_completions', maxAgeMs: 24 * 60 * 60 * 1000 },
+  // Annexes de rendu (D-10) : sans elles, avatars et noms d'assignés manquent
+  { prefix: 'household_members', maxAgeMs: 7 * 24 * 60 * 60 * 1000 },
+  { prefix: 'profiles', maxAgeMs: 7 * 24 * 60 * 60 * 1000 },
+];
 
 /**
  * Fabrique le `QueryClient` à partir de `QUERY_POLICY`, en fusionnant par
