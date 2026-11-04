@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { QueryCache, QueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -64,8 +64,17 @@ export function useOfflineStaleBanner(): string | null {
   const isOnline = useOnlineStatus();
   const queryClient = useQueryClient();
 
+  // WR-05 (revue 33) : le `subscribe` est mémoïsé — inline, sa nouvelle
+  // identité à chaque rendu du shell forçait React à se désabonner puis
+  // réabonner au cache (churn sur un composant très rendu). `queryClient`
+  // est stable (contexte), la dépendance ne retrigger donc jamais.
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => queryClient.getQueryCache().subscribe(onStoreChange),
+    [queryClient],
+  );
+
   const minDataUpdatedAt = useSyncExternalStore(
-    (onStoreChange) => queryClient.getQueryCache().subscribe(onStoreChange),
+    subscribe,
     () => minDataUpdatedAtOf(queryClient),
     () => 0,
   );

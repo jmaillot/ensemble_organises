@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { onlineManager } from '@tanstack/react-query';
@@ -136,4 +136,35 @@ describe('useOfflineStaleBanner', () => {
     });
     expect(useBannerStore.getState().entries.some((e) => e.kind === 'offline-stale')).toBe(false);
   });
+
+  it('la souscription au cache est mémoïsée : aucun réabonnement sur re-rendu (WR-05)', async () => {
+    const client = createClient();
+    const { rerender } = renderHook(() => useOfflineStaleBanner(), { wrapper: wrapperFor(client) });
+    // Espion posé APRÈS le montage initial : deux re-rendus ne doivent
+    // provoquer AUCUNE resouscription au QueryCache (le `subscribe` inline
+    // du défaut, lui, resouscrivait à chaque rendu — churn sur le shell).
+    const lireSouscriptions = compteSouscriptions(client);
+    await act(async () => {
+      rerender();
+      rerender();
+    });
+    // Aucune resouscription : deux re-rendus, zéro appel au `subscribe` du cache.
+    expect(lireSouscriptions()).toBe(0);
+  });
 });
+
+/**
+ * Espion sur `cache.subscribe` : installe un compteur UNE fois et rend un
+ * lecteur de ce compteur — chaque appel à `compteSouscriptions` crée un
+ * compteur neuf, la lecture doit donc passer par la fonction rendue.
+ */
+function compteSouscriptions(client: QueryClient): () => number {
+  let appels = 0;
+  const cache = client.getQueryCache();
+  const reel = cache.subscribe.bind(cache);
+  cache.subscribe = ((cb: () => void) => {
+    appels += 1;
+    return reel(cb);
+  }) as typeof cache.subscribe;
+  return () => appels;
+}
