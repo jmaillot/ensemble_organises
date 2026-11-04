@@ -1,12 +1,19 @@
 ---
-gsd_state_version: '1.0'
+gsd_state_version: "1.0"
+milestone: v1.1
+current_phase: 32
+current_phase_name: jalon v1.1, 4 phases
 status: planning
+stopped_at: Phase 32 context gathered
+last_updated: "2026-11-04T11:15:18.849Z"
+last_activity: 2026-11-04
+last_activity_desc: Roadmap v1.1 créé (17 exigences mappées, 100% couverture)
+state_head: a47223ed5437388f21f506c05f02b7fd8d24aaf9
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -67,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-04
-Stopped at: Roadmap v1.1 écrit, en attente d'approbation orchestrator
-Resume file: None
+Last session: 2026-11-04T11:15:18.829Z
+Stopped at: Phase 32 context gathered
+Resume file: .planning/phases/32-install-raccourcis/32-CONTEXT.md
