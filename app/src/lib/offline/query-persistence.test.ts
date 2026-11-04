@@ -220,4 +220,31 @@ describe('purgeUserCache (OFFR-04, D-03/D-06)', () => {
     await new Promise((resolve) => setTimeout(resolve, 1400));
     await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toBeUndefined();
   });
+
+  /**
+   * WR-01 (revue 33) : le rebranchement par `persistNow` SEUL (sans
+   * `stopPersisting` explicite) doit lui aussi rendre muette la traîne du
+   * throttle de l'ANCIEN persister — sinon elle réécrit l'ancienne clé avec
+   * l'état courant du client partagé, éventuellement après sa purge.
+   */
+  it('persistNow rend muette la traîne du throttle de l\'ANCIEN persister (WR-01)', async () => {
+    const { del } = await import('idb-keyval');
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h1', {}, null], LINES);
+    // throttleTime par défaut (1 s) : l'écriture ci-dessous met une sauvegarde
+    // en vol pour l'ANCIEN persister.
+    await persistNow(client, 'userA', 'h1');
+    client.setQueryData(['tasks', 'h1', {}, null], [...LINES, { id: 't3', name: 'en-vol', position: 2 }]);
+
+    // Simulation d'une purge de l'ancienne clé, puis rebranchement direct par
+    // `persistNow` sans passer par `stopPersisting` (ex. reprise du bootstrap).
+    await del(cacheKey('userA', 'h1'), probeStore);
+    await persistNow(client, 'userB', 'h2');
+
+    // La traîne de l'ANCIEN persister échoit dans la fenêtre : elle ne doit
+    // PAS ressusciter la clé de userA.
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toBeUndefined();
+    await expect(get(cacheKey('userB', 'h2'), probeStore)).resolves.toContain('"tasks"');
+  });
 });

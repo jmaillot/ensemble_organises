@@ -184,8 +184,15 @@ export async function persistNow(
   options: Partial<PersistQueryClientOptions> & { throttleTime?: number } = {},
 ): Promise<void> {
   // Ordre imposé (Pitfall 6) : unsubscribe AVANT toute purge/rebranchement.
+  // WR-01 (revue 33) : l'annulation accompagne le désabonnement — le cancel
+  // de l'ANCIEN persister est invoqué ICI, jamais par un autre chemin de
+  // `persistNow` : la traîne du throttle en vol de l'ancien persister devient
+  // muette (elle ne réécrirait plus l'ancienne clé avec l'état courant du
+  // client partagé).
   activeUnsubscribe?.();
+  activeCancel?.();
   activeUnsubscribe = null;
+  activeCancel = null;
 
   const { throttleTime, ...persistOptions } = options;
   const persister = buildPersister(userId, householdId, throttleTime);
@@ -230,7 +237,8 @@ export async function persistNow(
   const [unsubscribe, promise] = persistQueryClient(persistProps);
   activeUnsubscribe = unsubscribe;
   // Le persister vient d'être recréé : sa garde d'annulation devient la
-  // courante (l'ancienne a été invoquée par le `persistNow` de départ).
+  // courante (l'ancienne a été invoquée au début de cette fonction, avec le
+  // désabonnement — WR-01).
   const cancel = persisterCancels.get(persister as unknown as object) ?? null;
   activeCancel = cancel;
   await promise;
