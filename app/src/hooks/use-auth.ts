@@ -338,6 +338,12 @@ export async function signOut() {
   } finally {
     // La session locale tombe dans tous les cas : un échec réseau ne doit
     // jamais laisser l'utilisateur connecté en apparence seulement.
+    // La purge vit dans le goulot `session-store.signOut` (D-05, Pitfall 4) —
+    // elle n'est PAS dupliquée ici. Son échec se propage à l'appelant, qui
+    // toast la copy UI-SPEC portée par l'erreur et NE déconnecte PAS
+    // l'utilisateur localement (profile-form : pas de navigation en cas
+    // d'erreur) — jamais de déconnexion « réussie » qui laisserait les
+    // données de l'utilisateur derrière elle (T-33-11).
     await useSessionStore.getState().signOut();
   }
 }

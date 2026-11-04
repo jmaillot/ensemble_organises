@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { demoProfile, demoHousehold, demoMembers, DEMO_MEMBERS } from '@/lib/data/seed';
 import { data } from '@/lib/data';
+import { purgeUserCache, stopPersisting } from '@/lib/offline/query-persistence';
 import { useHouseholdStore } from './household-store';
 import type { HouseholdMemberRow, HouseholdRow, SessionStatus, SessionUser } from '@/types';
 
@@ -33,7 +34,7 @@ interface SessionState {
 
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       status: 'initialising',
       user: null,
       householdLoaded: false,
@@ -44,6 +45,27 @@ export const useSessionStore = create<SessionState>()(
         await loadHousehold();
       },
       signOut: async () => {
+        // D-05 (OFFR-04, T-33-10) : le goulot unique de purge. TOUS les chemins
+        // de déconnexion passent ici — `use-auth.signOut`, le listener
+        // `SIGNED_OUT`, les branches bootstrap sans session, le mode local —
+        // c'est la classe corrigée (Pitfall 4), pas une instance.
+        // Ordre imposé (Pitfall 6, T-33-13) : désabonnement de la sauvegarde
+        // AVANT la purge — sinon une sauvegarde throttlée en vol ressuscite
+        // la clé purgée. L'identifiant est lu AVANT tout effacement d'état.
+        const userId = get().user?.id ?? null;
+        stopPersisting();
+        try {
+          await purgeUserCache(userId); // tous foyers de l'utilisateur (D-03)
+        } catch (cause) {
+          // D-05 : un échec de purge BLOQUE la déconnexion — jamais de
+          // déconnexion « réussie » qui laisserait les données derrière elle
+          // (§2.7 F). Le message porte la copy UI-SPEC : les appelants qui
+          // toastent `error.message` (profile-form) l'affichent tel quel.
+          throw new Error(
+            'Impossible de vider les données locales : la déconnexion est bloquée pour protéger vos données. Réessayez.',
+            { cause },
+          );
+        }
         set({ user: null, status: 'guest', householdLoaded: false });
         useHouseholdStore.getState().reset();
       },
