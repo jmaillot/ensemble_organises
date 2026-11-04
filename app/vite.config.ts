@@ -64,7 +64,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'assets/*.jpg'],
       // `injectManifest` et non `generateSW` : le second génère un service
       // worker auquel on ne peut ajouter aucun écouteur, et l'API Push en exige

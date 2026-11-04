@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
+// L'enregistrement du SW (mode prompt, D-09) est extrait dans sw-register :
+// il pousse le bandeau de mise à jour via le store, accessible hors-React.
+import '@/lib/sw-register';
 import { AppRouter } from '@/app/router';
 import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
@@ -13,8 +15,6 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/fraunces/wght-italic.css';
 import '@fontsource-variable/inter-tight';
 import '@/styles/app.css';
-
-registerSW({ immediate: true });
 
 // L'état réseau est amorcé ICI, au niveau module, avant le premier rendu : le
 // bandeau hors ligne doit dire la vérité dès la première peinture, et l'état
