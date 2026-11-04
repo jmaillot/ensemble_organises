@@ -21,7 +21,7 @@
 - [x] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles *(2026-10-29 — verifier passed 4/5 must-haves ; OPS-02 exercice de restauration non joué, absence déclarée opérateur, re-diligence phase 31 porte OUV-07 ; CR-01/H-01/H-02 corrigés 6f2054d/097fe1a/0e70d74)*
 - [x] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message *(2026-10-30 — 6/6 plans dont gap G-29-1 ; UAT verte : push delivered sur appareil, payload sans contenu, rappel collant consommé ; VERIFICATION PASSED)*
 - [x] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles (clôturée le 2026-11-03 : UAT 4/4 pass, preuves cron 0175/jobid=25 à 05:05 Paris, gap G-30-2 corrigé par 30-06)
-- [ ] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures
+- [x] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures (completed 2026-11-03)
 
 ## Phase Details
 
@@ -225,7 +225,7 @@ Plans:
   4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
   5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
 
-**Plans**: 8/8 plans executed
+**Plans**: 8/8 plans complete
 Plans:
 **Wave 1**
 - [x] 31-01-PLAN.md — migration 0176 : modèle liste de tokens + RPC preview no-consume + tests SQL (OUV-05)
@@ -252,10 +252,10 @@ Plans:
 | 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
 | 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
 | 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
-| 28. Exploitation | 2/5 | In Progress|  |
-| 29. Messagerie v2 | 5/5 | In Progress|  |
-| 30. Hygiène du jalon | 5/5 | In Progress|  |
-| 31. Inscriptions ouvertes | 8/8 | In Progress|  |
+| 28. Exploitation | 5/5 | Complete | 2026-10-29 |
+| 29. Messagerie v2 | 5/5 | Complete | 2026-10-30 |
+| 30. Hygiène du jalon | 6/6 | Complete | 2026-11-03 |
+| 31. Inscriptions ouvertes | 8/8 | Complete    | 2026-11-03 |
 
 ## Couverture v1.0
 

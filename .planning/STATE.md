@@ -2,28 +2,29 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Mise en ligne publique (phases 25-31)
-current_phase: 31
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 31 complete — all phases complete
-last_updated: "2026-11-03T16:39:12.154Z"
-state_head: 0d4daf038ad46f7eb87c01b5862c3f0d8a1c81de
+last_updated: "2026-11-04T06:26:41.564Z"
+last_activity: 2026-11-04
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: c14b3257b04c3a9da655be08b7aefe39879740e3
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 44
   completed_plans: 44
   percent: 100
-last_activity: 2026-10-27
+current_phase: 31
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: 31
-Plan: Not started
-Status: All phases complete
-Progress: [██████████] 100% du jalon — phases 25-31 complètes (31 clôturée le 2026-11-03)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-04 — Milestone v1.0 completed and archived
 
 ## Références du jalon v1.0
 
@@ -226,3 +227,7 @@ Statut historique (v0.9.0 clôturé le 2026-10-24) : audit PASSED, phases 16-24
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | [261103-pym](./quick/261103-pym-fix-b-1-audit-v1-0-expiration-obligatoir/) Fix B-1 audit v1.0 : expiration obligatoire du token d'invitation manquant à la création de foyer + rattrapage MSG-04 Done + W-1 doc cron UTC | 2026-11-03 | 39b4fee | .planning/quick/261103-pym-fix-b-1-audit-v1-0-expiration-obligatoir/ |
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
