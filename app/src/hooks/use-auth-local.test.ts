@@ -65,9 +65,16 @@ describe('amorçage en mode local (sans backend)', () => {
     const { result } = renderHook(() => useAuthBootstrap());
     await waitFor(() => expect(result.current.ready).toBe(true));
 
-    expect(useHouseholdStore.getState().householdId).toBeNull();
+    // CR-01 (revue 33) : `signOut` vide AUSSI le client mémoire via un import
+    // dynamique de `@/app/router` (lourd : ~1 s d'évaluation en test) — la
+    // déconnexion n'est donc plus réglée en microtâches. La branche bootstrap
+    // est fire-and-forget par design : on attend l'ÉTAT FINAL, pas `ready`
+    // qui précède la fin de la déconnexion.
+    await waitFor(() => {
+      expect(useSessionStore.getState().status).toBe('guest');
+      expect(useHouseholdStore.getState().householdId).toBeNull();
+    });
     expect(useSessionStore.getState().user).toBeNull();
-    expect(useSessionStore.getState().status).toBe('guest');
   });
 
   it('pose le foyer de démonstration quand une session est persistée', async () => {
