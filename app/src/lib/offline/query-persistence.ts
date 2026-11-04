@@ -283,6 +283,11 @@ export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): voi
     predicate: (query: Query) => {
       const family = familyOf(String(query.queryKey[0]));
       if (!family) return false; // hors allowlist : jamais hydraté de toute façon
+      // WR-04 (revue 33) : une query JAMAIS chargée (`dataUpdatedAt` = 0,
+      // en attente ou en erreur) n'est pas périmée — la traiter comme telle
+      // (`now - 0 > maxAgeMs`) la ferait retirer au rebranchement, annulant
+      // une lecture en vol ou réinitialisant une query déjà montée.
+      if (query.state.dataUpdatedAt <= 0) return false;
       return now - query.state.dataUpdatedAt > family.maxAgeMs;
     },
   });

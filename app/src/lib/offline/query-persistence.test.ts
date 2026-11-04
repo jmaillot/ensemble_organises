@@ -132,6 +132,21 @@ describe('query-persistence (tracer OFFR-01)', () => {
     expect(client.getQueryData(['notes', 'h1', {}, null])).toEqual([{ id: 'n1' }]);
   });
 
+  it('pruneExpiredFamilies ne traite pas une query jamais chargée comme périmée (WR-04)', () => {
+    const client = buildQueryClient({ queries: { retry: false } });
+    // Query montée mais jamais chargée (en attente ou en erreur) :
+    // `dataUpdatedAt` vaut 0, ce n'est PAS une donnée périmée.
+    client.getQueryCache().build(client, { queryKey: ['tasks', 'h1', {}, null] });
+    expect(client.getQueryData(['tasks', 'h1', {}, null])).toBeUndefined();
+
+    const q: any = client.getQueryCache().find({ queryKey: ['tasks', 'h1', {}, null] });
+    if (q.state.dataUpdatedAt !== 0) throw new Error('setup: dataUpdatedAt attendu à 0, lu ' + q.state.dataUpdatedAt);
+    pruneExpiredFamilies(client);
+    const apres = client.getQueryCache().find({ queryKey: ['tasks', 'h1', {}, null] });
+    if (apres === null) throw new Error('WR-04 non corrigé : query jamais chargée (dataUpdatedAt=0) supprimée par la prune');
+    expect(apres).not.toBeNull();
+  });
+
   it('connectOfflineCache restaure, élagué, puis souscrit le persist (OFFR-01)', async () => {
     const source = buildQueryClient({ queries: { retry: false } });
     source.setQueryData(['tasks', 'h1', {}, null], LINES);
