@@ -66,6 +66,17 @@ export const useSessionStore = create<SessionState>()(
             { cause },
           );
         }
+        // CR-01 (D-03/T-33-01) : la frontière mémoire. La purge IndexedDB
+        // ci-dessus ne vide pas le client mémoire PARTAGÉ (`router.tsx`) :
+        // les queries Tier 1 de l'utilisateur resteraient en mémoire et la
+        // prochaine sauvegarde du client les ré-sérialiserait dans la clé du
+        // couple suivant — la fuite inter-comptes exacte que D-06 devait
+        // empêcher, par la voie mémoire → sérialisation. On vide le client
+        // APRÈS la purge disque, AVANT l'effacement d'état. Import DYNAMIQUE :
+        // `router.tsx` importe ce store (via use-auth), un import statique
+        // créerait un cycle de modules ; au runtime le module est chargé.
+        const { queryClient } = await import('@/app/router');
+        queryClient.clear();
         set({ user: null, status: 'guest', householdLoaded: false });
         useHouseholdStore.getState().reset();
       },

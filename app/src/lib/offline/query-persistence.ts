@@ -208,8 +208,17 @@ export async function persistNow(
       // Une query dont le préfixe n'est pas dans OFFLINE_FAMILIES n'est PAS
       // sérialisée — les données Tier 2 (notes, ardoise, cadeaux…) ne
       // quittent jamais la mémoire.
-      shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) =>
-        familyOf(String(query.queryKey[0])) !== undefined,
+      // Défense en profondeur (CR-01, revue 33) : une clé qui porte un
+      // householdId ÉTRANGER (2e élément de `queryKeys.table`) n'est jamais
+      // sérialisée — un client mémoire non nettoyé ne peut pas contaminer la
+      // clé persistée du couple courant. Les clés sans foyer (`null` : lignes
+      // liées `useLinkedRows`, D-10) restent éligibles — les exclure priverait
+      // le restore hors ligne des avatars/noms d'assignés.
+      shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) => {
+        if (familyOf(String(query.queryKey[0])) === undefined) return false;
+        const second = query.queryKey[1];
+        return second === undefined || second === null || second === householdId;
+      },
     },
     ...persistOptions,
   };

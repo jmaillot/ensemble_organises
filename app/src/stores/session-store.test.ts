@@ -186,4 +186,45 @@ describe('signOut — goulot unique de purge (OFFR-04, D-05)', () => {
 
     expect(ordre).toEqual(['stop', 'purge']);
   });
+
+  /**
+   * CR-01 (revue 33, D-03/T-33-01) : la frontière mémoire. La purge IndexedDB
+   * ne suffit pas — les queries Tier 1 de l'utilisateur restent dans le client
+   * mémoire PARTAGÉ (`router.tsx`), et la prochaine sauvegarde du client les
+   * ré-sérialise dans la clé du couple suivant. Le goulot `signOut` doit donc
+   * vider aussi le client mémoire, et la sérialisation doit refuser toute clé
+   * portant un householdId étranger (défense en profondeur).
+   */
+  it('vide le client mémoire, et la clé persistée de B ne contient rien du foyer de A (CR-01)', async () => {
+    const { queryClient } = await import('@/app/router');
+    const { persistNow, cacheKey } = await import('@/lib/offline/query-persistence');
+    const probeStore = createStore('eo-offline-cache', 'query');
+    queryClient.clear(); // isoler le client partagé de l'application
+
+    // 1. A consulte ses tâches → `['tasks', 'hA', …]` en mémoire sur le
+    //    client partagé, puis A se déconnecte par le goulot.
+    queryClient.setQueryData(['tasks', 'hA', {}, null], [{ id: 't1', name: 'marque-A' }]);
+    useSessionStore.setState({
+      status: 'authenticated',
+      householdLoaded: true,
+      user: { id: 'uA', email: 'a@example.fr', displayName: 'A', avatarUrl: null, provider: 'email' },
+    });
+    await useSessionStore.getState().signOut();
+
+    // 2. La mémoire est vidée : aucune query de A ne survit côté client.
+    expect(queryClient.getQueryData(['tasks', 'hA', {}, null])).toBeUndefined();
+
+    // 3. B se connecte et persiste SUR LE MÊME client.
+    queryClient.setQueryData(['tasks', 'hB', {}, null], [{ id: 't2', name: 'de-B' }]);
+    await persistNow(queryClient, 'uB', 'hB', { throttleTime: 0 });
+
+    // 4. La clé persistée de B ne contient aucune donnée du foyer de A.
+    const raw = await get<string>(cacheKey('uB', 'hB'), probeStore);
+    expect(raw).toBeTruthy();
+    expect(raw).toContain('"tasks"');
+    expect(raw).not.toContain('marque-A');
+    expect(raw).not.toContain('"hA"');
+
+    queryClient.clear(); // laisser le client partagé propre pour les autres suites
+  });
 });
