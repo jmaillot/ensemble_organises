@@ -1,10 +1,29 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { HouseholdMemberRow, HouseholdRow } from '@/types';
 import * as householdStore from './household-store';
 import { DEMO_MEMBERS, demoMembers } from '@/lib/data/seed';
 
 const { useHouseholdStore } = householdStore;
+
+/**
+ * OFFR-04 (plan 33-04) : espions d'ordre sur le module de persistance —
+ * délégation à l'implémentation réelle (fake-indexeddb actif), avec journal
+ * pour prouver l'ordre stop → purge → clear (Pitfall 5/6).
+ */
+const { purgeCacheSpy, stopPersistingSpy } = vi.hoisted(() => ({
+  purgeCacheSpy: vi.fn(),
+  stopPersistingSpy: vi.fn(),
+}));
+
+vi.mock('@/lib/offline/query-persistence', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/offline/query-persistence')>();
+  return {
+    ...actual,
+    purgeCache: (...args: Parameters<typeof actual.purgeCache>) => purgeCacheSpy(...args),
+    stopPersisting: () => stopPersistingSpy(),
+  };
+});
 
 /**
  * D-01/D-04 : le store est le point d'ingestion unique des membres. Le hook
@@ -154,5 +173,101 @@ describe('seed démo (Noé, socle D-06)', () => {
     expect(noe).toBeDefined();
     expect(noe?.deleted_at).toBeNull();
     expect(noe?.managed_modules).toEqual(['taches', 'routines', 'anniversaires', 'menu']);
+  });
+});
+
+/**
+ * OFFR-04, D-04 (plan 33-04, Pitfall 5) : le changement de foyer purge le
+ * foyer quitté AVANT toute lecture du nouveau — ordre strict purge (await) →
+ * queryClient.clear() → switchHousehold. L'ordre est prouvé par un espion sur
+ * `clear` : au moment où il s'exécute, la clé IndexedDB du foyer quitté est
+ * DÉJÀ supprimée et le householdId du store est ENCORE l'ancien.
+ */
+describe('switchWithPurge — ordre purge → clear → switch (OFFR-04, D-04)', () => {
+  beforeEach(() => {
+    purgeCacheSpy.mockReset();
+    stopPersistingSpy.mockReset();
+    purgeCacheSpy.mockImplementation(
+      async (...args: Parameters<typeof import('@/lib/offline/query-persistence')['purgeCache']>) => {
+        const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+          '@/lib/offline/query-persistence',
+        );
+        return actual.purgeCache(...args);
+      },
+    );
+    stopPersistingSpy.mockImplementation(async () => {
+      const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+        '@/lib/offline/query-persistence',
+      );
+      actual.stopPersisting();
+    });
+  });
+
+  it('purge la clé du foyer quitté, vide le cache mémoire, PUIS pose le nouveau foyer', async () => {
+    const { persistNow, cacheKey } = await import('@/lib/offline/query-persistence');
+    const { createStore, get } = await import('idb-keyval');
+    const { buildQueryClient } = await import('@/lib/query-policy');
+    const probeStore = createStore('eo-offline-cache', 'query');
+
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h-old', {}, null], [{ id: 't1', name: 'ancien-foyer' }]);
+    await persistNow(client, 'u1', 'h-old', { throttleTime: 0 });
+
+    useHouseholdStore.setState({ householdId: 'h-old', householdName: 'Ancien' });
+
+    // Espion d'ordre : le clear doit voir l'ancien foyer ENCORE posé (le
+    // switch vient après) ; la purge elle-même est vérifiée par la relecture
+    // IndexedDB après coup + l'ordre stop→purge→clear du test suivant.
+    const clearRéel = client.clear.bind(client);
+    client.clear = () => {
+      expect(useHouseholdStore.getState().householdId).toBe('h-old'); // switch APRÈS clear
+      clearRéel();
+    };
+
+    await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, 'u1');
+
+    expect(client.getQueryCache().getAll()).toEqual([]); // mémoire vidée
+    expect(useHouseholdStore.getState().householdId).toBe('h-new');
+    expect(useHouseholdStore.getState().householdName).toBe('Nouveau Foyer');
+    // Lecture brute : la clé du foyer quitté a disparu du stockage.
+    await expect(get(cacheKey('u1', 'h-old'), probeStore)).resolves.toBeUndefined();
+  });
+
+  it('suit strictement l\'ordre stopPersisting → purge → clear (Pitfall 5/6)', async () => {
+    const ordre: string[] = [];
+    const { persistNow } = await import('@/lib/offline/query-persistence');
+    const { buildQueryClient } = await import('@/lib/query-policy');
+    const client = buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h-old', {}, null], [{ id: 't1' }]);
+    await persistNow(client, 'u1', 'h-old', { throttleTime: 0 });
+    const clearRéel = client.clear.bind(client);
+    client.clear = () => {
+      ordre.push('clear');
+      clearRéel();
+    };
+    stopPersistingSpy.mockImplementation(() => {
+      ordre.push('stop');
+    });
+    purgeCacheSpy.mockImplementation(async () => {
+      ordre.push('purge');
+    });
+
+    useHouseholdStore.setState({ householdId: 'h-old' });
+    await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, 'u1');
+
+    expect(ordre).toEqual(['stop', 'purge', 'clear']);
+  });
+
+  it('sans utilisateur connu (démo), le switch reste un simple changement de foyer', async () => {
+    const { buildQueryClient } = await import('@/lib/query-policy');
+    const client = buildQueryClient({ queries: { retry: false } });
+    useHouseholdStore.setState({ householdId: 'h-old', householdName: 'Ancien' });
+
+    await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, null);
+
+    expect(useHouseholdStore.getState().householdId).toBe('h-new');
+    // En démo il n'y a rien à purger, mais le cache mémoire est vidé par
+    // prudence : aucune ligne résiduelle ne peut répondre sous le nouveau foyer.
+    expect(client.getQueryCache().getAll()).toEqual([]);
   });
 });
