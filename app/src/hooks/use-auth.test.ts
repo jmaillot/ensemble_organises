@@ -359,7 +359,8 @@ describe("chemin d'authentification", () => {
   it('déconnecte sur SIGNED_OUT', async () => {
     await applySession(user);
 
-    useSessionStore.getState().signOut();
+    // La purge (OFFR-04) est awaitée : l'effacement d'état ne suit qu'après.
+    await useSessionStore.getState().signOut();
 
     expect(useSessionStore.getState().status).toBe('guest');
     expect(useSessionStore.getState().user).toBeNull();
@@ -417,7 +418,9 @@ describe("chemin d'authentification", () => {
       for (const listener of listeners) listener('SIGNED_OUT', null);
     });
 
-    expect(useHouseholdStore.getState().householdId).toBeNull();
+    // La purge (OFFR-04) est awaitée dans le goulot : les assertions attendent
+    // l'issue asynchrone plutôt que l'ordre synchrone d'avant.
+    await waitFor(() => expect(useHouseholdStore.getState().householdId).toBeNull());
     expect(useSessionStore.getState().user).toBeNull();
     unmount();
   });
