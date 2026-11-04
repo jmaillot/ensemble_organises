@@ -1,139 +1,67 @@
-# Requirements : v1.0 — Mise en ligne publique
+# Milestone v1.1 — PWA durcie mobile-first
 
-**Défini :** 2026-10-25
-**Core Value :** la vie quotidienne du foyer tenue en prod, sans que les données de la famille ne sortent du serveur auto-hébergé.
+**Goal :** la PWA installée devient une vraie app de poche — fiable hors-ligne, joignable en un tap depuis l'écran d'accueil, sans aucun store.
 
-## Exigences v1.0
+**Thème :** PWA durcie (offline lecture + file d'écriture, raccourcis web, installabilité). Aucun store, aucun APK, aucun wrapper natif — arbitrages du 2026-11-04.
 
-### Profils enfants gérés par le parent
+**Source de vérité recherche :** `.planning/research/SUMMARY.md` (+ STACK/FEATURES/ARCHITECTURE/PITFALLS).
 
-- [x] **ENF-01** : Un admin crée, modifie et supprime un profil enfant géré dans le foyer (aucun compte d'authentification autonome créé)
-- [x] **ENF-02** : Un parent agit au nom de l'enfant (assigner une tâche, cocher une routine) via des opérations serveur explicitement validées (`actor_member_id` vérifié côté SQL/Edge, jamais un CRUD générique) ; le parent ne publie jamais au nom de l'enfant dans le Cercle — seule la modération y est admise : un adulte peut modérer le Cercle (supprimer/masquer tout contenu — post, commentaire, réaction — attribué à un profil enfant du foyer, y compris l'historique issu des anciens comptes enfant) — 0146 gardes + 0148 fusion + D-12 prouvée par 0047/0052 verts (25-04)
-- [x] **ENF-03** : Les traces d'activité gardent l'enfant comme attributaire et le parent comme acteur (filiation auditable)
-- [x] **ENF-04** : RLS strict vérifiée par tests négatifs SQL : un profil enfant n'a ni session ni moyen d'agir lui-même ; toutes les politiques existantes auditées (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) — audits 0145/0146/0148/0149 ; suite complète **83/83 verte** (les 16 tests pré-0145 réécrits vers la vérité 0145, commits 555ab79…b904caf)
-- [x] **ENF-05** : L'enfant apparaît par défaut dans les sélecteurs (tâches, routines, anniversaires, menu — socle D-06) comme membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
-
-### Export RGPD
-
-- [x] **RGEX-01** : Un membre demande l'export complet de ses données (JSON structuré + médias, archive ZIP) via un lien signé sur bucket privé, URL expirée ≤ 24 h
-- [x] **RGEX-02** : L'export est asynchrone (statut visible, notification à l'achèvement) pour supporter un foyer de plusieurs centaines de Mo
-- [x] **RGEX-03** : L'export est borné à la seule donnée du demandeur (cas multi-foyers tranchée dans la spec produit ; tests SQL négatifs inter-foyers obligatoires)
-- [x] **RGEX-04** : Le contenu du bucket `gdpr-exports` est purgé à 7 jours par le pg_cron existant
-
-### Suppression de compte RGPD
-
-- [x] **RGDP-01** : Un utilisateur demande la suppression de son compte — sessions tuées immédiatement, surface publique anonymisée
-- [x] **RGDP-02** : La demande de suppression est annulable pendant 30 jours (réversibilité), via confirmation email
-- [x] **RGDP-03** : Un email d'alerte est envoyé à J-7 avant la purge effective
-- [x] **RGDP-04** : La purge J+30 est purement SQL/pg_cron (médias revalidés depuis un manifest construit à la demande ; jamais de purge HTTP fragile depuis cron — frontière HTTP non couverte par test-db.sh)
-- [x] **RGDP-05** : Les FK vers `auth.users` sont auditées avant toute migration : les données partagées au foyer sont anonymisées/réattribuées, jamais cascadées ; les règles sont décidées dans la spec (y compris médias co-possédés) *(audit FK + conversions set null en 0166, plan 27-01)*
-- [x] **RGDP-06** : Les profils enfants portés par le parent sont purgés en même temps que lui, avec règle produit annoncée en phase
-- [x] **RGDP-07** : L'Edge `household-delete` existante est consolidée avec la nouvelle chaîne (une seule voie de suppression)
-
-### Messagerie v2
-
-- [x] **MSG-01** : Un membre démarre une conversation directe avec un autre membre via RPC serveur avec garde anti-doublon
-- [x] **MSG-02** : Les badges non-lus s'appuient sur un watermark par membre sur la conversation (jamais une écriture par message)
-- [x] **MSG-03** : L'accusé de lecture est visible côté émetteur
-- [x] **MSG-04** : Les notifications push sont groupées par conversation (« 2 nouveaux messages de X »), sans contenu du message, chaîne `dispatch_messages`→`push-notify` existante réutilisée
-- [x] **MSG-05** : La publication Realtime (publication `supabase_realtime` self-hosted complétée) est testée par souscription avant d'être annoncée
-
-### Exploitation
-
-- [x] **OPS-01** *(réécrite le 2026-10-28 en discussion de phase — « restic » retiré, décision verrouillée D-02 : les fichiers chiffrés existants de `scripts/backup.sh` sont répliqués tels quels, pas de nouvel outil de backup)* : Sauvegardes nocturnes : pg_dump chiffré + réplication des fichiers chiffrés de `scripts/backup.sh` (volumes `storage`, `functions` et `db-config`) vers une machine tierce auto-hébergée (clé pgsodium sauvegardée séparément du dump, en deux copies disjointes — D-03)
-- [x] **OPS-02** *(amendement du protocole de preuve du 2026-11-03 : l'exercice est attesté exécuté par l'opérateur ; la valeur RTO n'a jamais été consignée et reste honnêtement « non mesurée » dans docs/EXPLOITATION.md — jamais inventée)* : Exercice de restauration joué sur un Compose isolé (jamais sur la prod) avec RTO mesuré et consigné + runbook exploitable
-- [x] **OPS-03** *(réécrite le 2026-10-28 en discussion de phase — la pile Prometheus/Grafana/Loki est retirée au profit d'alertes mail simples)* : Alertes par mail pour disque / certificats / pg_cron / erreurs Edge, chacune prouvée par un déclenchement réel, pas une promesse de configuration
-- [x] **OPS-04** : `check-cron-health.sh` valide les jobs pg_cron et attrape une rotation ratée de secret
-- [x] **OPS-05** : RPO, RTO et politique de rétention arbitrés et documentés dans `docs/`
-
-### Ouverture des inscriptions
-
-- [x] **OUV-01** *(reformulée tour 1 discuss 2026-11-03, alignée sur ROADMAP : le relais Gmail (D-10) rend Stalwart/SPF/DKIM/DMARC sans objet)* : Preuve de réception réelle des emails de confirmation via le relais Gmail existant (alias FROM contact@jeremymaillot.fr), en boîte de réception sur Gmail ET Outlook — pas de MTA à déployer
-- [x] **OUV-02** : Confirmations email obligatoires ; SMTP de GoTrue durci (limites de débit applicatives activées)
-- [x] **OUV-03** : Un rate-limit Traefik filtre `/auth/v1/signup` et `/auth/v1/token` contre les abus d'inscription
-- [x] **OUV-04** : Un étranger arrivant sur un lien d'invitation voit un pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer
-- [x] **OUV-05** : L'administration du token de foyer expose une gouvernance : expiration obligatoire (défaut 30 j), nombre max d'utilisations (défaut 10), révocation à tout moment
-- [x] **OUV-06** : Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
-- [x] **OUV-07** : L'ouverture passe les portes dures : voie de suppression vivante + exercice de restauration consigné + preuve SMTP (séquence roadmap, pas une promesse)
-
-### Dettes et résidus
-
-- [x] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences) — jobid=25 `5 4 * * *` UTC (06:05 Paris été / 05:05 hiver, 0175 : le suffixe fuseau de 0173 est ignoré par le bgworker, mesure prod 2026-11-02/03 : run succeeded à 05:05 Paris ; preuve fraîche 2026-11-04 : jobid 25 active, run succeeded 04:05:00 UTC, DB up en continu depuis 2026-10-27 17:42 UTC)
-- [x] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 ») — constat humain approuvé le 2026-10-31, todos 13/14/15 fermés avec preuve datée dans docs/TODO.md
-- [x] **DET-03** : Les semis démo embarquent des photos de recette
-- [x] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
-- [x] **DET-05** : Feuilles mobiles : césures « Anniver-saires » corrigées et animations de sortie sans régression (arbitrage forceMount tranché)
-
-## Exigences v1.1 (hors roadmap actuel)
-
-### Messagerie avancée
-
-- **MSG2-01** : Conversations de groupe constituées librement
-- **MSG2-02** : Médias en un clic (photos/réactions) dans la conversation
-
-### Comptes
-
-- **CMPT-01** : Compte enfant autonome avec accès restreint (revisiter AGENTS.md §9, seulement si légitimité confirmée post-v1.0)
-
-## Hors portée
-
-| Fonctionnalité | Raison |
-|---------|--------|
-| Threads et fils par message | Anti-feature ressortie ; complexité hors proportion pour une messagerie de foyer |
-| Chiffrement de bout en bout | Sur-ingénierie self-hosted, aucune demande |
-| Accusés de lecture désactivables | Convention du marché ; le watermark est déjà discret, un interrupteur double la surface produit |
-| Suppression partielle du compte | Anti-feature RGPD (une suppression à moitié ne vaut rien) |
-| Captcha anti-bot self-hosted | Rate-limit Traefik suffisant en v1.0 ; revisiter en cas d'abus constaté |
-| SaaS SMTP (Brevo/Mailgun) | Contredit la décision self-hosted/RGPD du projet |
-| Réversibilité « tout intact à J+30 » | Le foyer continue de vivre ; seul le compte et ses droits sont restaurés selon les règles de la spec |
-
-## Traçabilité
-
-| Exigence | Phase | Statut |
-|-------------|-------|--------|
-| ENF-01 | Phase 25 | Done (25-05, panneau Foyer : créer/modifier/archiver un profil enfant) |
-| ENF-02 | Phase 25 | Done (25-04) |
-| ENF-03 | Phase 25 | Done (25-04, colonnes d'acteur 0146 + traces essayées par 0047/0052) |
-| ENF-04 | Phase 25 | Done (25-04, suite complète 83/83 verte) |
-| ENF-05 | Phase 25 | Done (25-07 : garde D-06 en un point unique — member-eligibility.ts — branchée aux quatre pickers : un enfant hors-fiche est absent des sélecteurs tâches/routines/menu/ardoise, le serveur 0146 revalide) |
-| RGEX-01 | Phase 26 | Complete |
-| RGEX-02 | Phase 26 | Complete |
-| RGEX-03 | Phase 26 | Complete |
-| RGEX-04 | Phase 26 | Complete |
-| RGDP-01 | Phase 27 | Complete (27-03 : signOut global + déshumanisation RPC à la demande) |
-| RGDP-02 | Phase 27 | Complete (27-03 : e-mail de confirmation + lien d'annulation APP) |
-| RGDP-03 | Phase 27 | Complete (27-03 : e-mail J-7 envoyé par l'Edge depuis le cron) |
-| RGDP-04 | Phase 27 | Complete (27-02 : purge J+30 SQL pur, manifest médias) |
-| RGDP-05 | Phase 27 | Complete (27-01) |
-| RGDP-06 | Phase 27 | Complete (27-02 : enfants purgés avec le foyer orphelin, transférés D-08 sinon) |
-| RGDP-07 | Phase 27 | Complete (27-03 : Edge unifiée, panneau admin inchangé) |
-| OPS-01 | Phase 28 | Complete | 2026-10-29 |
-| OPS-02 | Phase 28 | Exercice attesté exécuté par l'opérateur (amendement protocole de preuve 2026-11-03, UAT 28-UAT.md 8/8, 28-VERIFICATION passed 5/5 avec override OPS-02) ; RTO non consigné, « non mesuré » honnête dans docs/EXPLOITATION.md | 2026-11-04 |
-| OPS-03 | Phase 28 | Complete (4 alertes mail prouvées rouge→vert sur prod, mails reçus 2026-10-29 — runbook § Preuves des alertes, 89e5645) |
-| OPS-04 | Phase 28 | Complete (check-cron-health.sh 3 axes, rotation ratée attrapée par job de test 15-36 failed, prod 2026-10-29) |
-| OPS-05 | Phase 28 | Complete (28-04 : RPO ≤ 24 h / RTO cible ≤ 4 h avec « RTO constaté » réservé à l'exercice 28-05 / rétention GFS dans docs/EXPLOITATION.md ; commandes cron livrées D-05 dans docs/DEPLOIEMENT-PROD.md) |
-| MSG-01 | Phase 29 | Done (29-01 RPC 0171 + 29-05 picker « À qui écrire ? », un tap démarre/rouvre) |
-| MSG-02 | Phase 29 | Done (29-04) |
-| MSG-03 | Phase 29 | Done (29-04) |
-| MSG-04 | Phase 29 | Done (push groupé câblé : 0172 compteur au titre + consommation par push-notify ; attestation HV-5) |
-| MSG-05 | Phase 29 | Done (29-03 preuve Realtime + 29-05 invalidation fil/liste côté app, D-08) |
-| DET-01 | Phase 30 | Done (30-01 + 0173/0175, preuve cron 2026-11-03 ; re-preuve fraîche 2026-11-04 04:05 UTC jobid 25 succeeded) |
-| DET-02 | Phase 30 | Done (30-02, constat 2026-10-31) |
-| DET-03 | Phase 30 | Done (30-03, constat démo 2026-10-31) |
-| DET-04 | Phase 30 | Done (30-04) |
-| DET-05 | Phase 30 | Done (30-05, constat mouvement 2026-10-31) |
-| OUV-01 | Phase 31 | Done (HV-1 passée — attestation opérateur 2026-11-03, amendement du protocole de preuve ; VERIFICATION 39/39) |
-| OUV-02 | Phase 31 | Done (HV-1 + HV-2 passées — attestation opérateur 2026-11-03 ; preuve non consignée) |
-| OUV-03 | Phase 31 | Done (HV-3 passée — attestation opérateur 2026-11-03 ; preuve non consignée) |
-| OUV-04 | Phase 31 | Done (code-verified + HV-6 attestée 2026-11-03 — état de prod opérateur) |
-| OUV-05 | Phase 31 | Complete |
-| OUV-06 | Phase 31 | Done (pages légales en ligne, routes publiques vérifiées au code ; mention human HV passée par attestation) |
-| OUV-07 | Phase 31 | Done (HV-4 restaur. + HV-5 push attestées 2026-11-03 — valeur RTO non consignée, dette documentée) |
-
-**Couverture :**
-- v1.0 : 38 exigences totales (5 ENF + 4 RGEX + 7 RGDP + 5 OPS + 5 MSG + 5 DET + 7 OUV)
-- Mappées : 38 ✓ (Phases 25-31 — numérotation continue depuis v0.9.0)
-- Non mappées : 0 ✓
+**Philosophie directrice (D-10, réaffirmée) :** l'offline est un cache de la vérité du serveur avec un overlay d'écritures en attente, jamais une seconde base. Donnée cachée = toujours étiquetée stale, jamais présentée comme fraîche. Le service worker ne cache jamais les réponses API.
 
 ---
-*Exigences définies : 2026-10-25*
+
+## Requirements (v1.1)
+
+### Offline lecture (OFFR)
+
+- [ ] **OFFR-01** : La dernière vue consultée d'un module offline-éligible reste lisible en avion (données rendues depuis le cache persisté, restauré au démarrage avant le premier rendu des routes protégées)
+- [ ] **OFFR-02** : Toute donnée rendue depuis le cache porte un bandeau « dernier état connu le [horodatage] » — jamais présentée comme fraîche (D-10)
+- [ ] **OFFR-03** : Une allowlist nomme les modules offline-éligibles avec un maxAge par famille de données (Tier 1 : Courses, Tâches, Routines) — les modules hors allowlist affichent l'erreur d'origine honnête, pas du cache
+- [ ] **OFFR-04** : Le cache est namespacé par utilisateur et purgé de manière synchrone (attendue) à la déconnexion et au changement de foyer — aucune donnée d'un utilisateur ne survit pour un autre sur un appareil partagé
+- [ ] **OFFR-05** : Le service worker ne met jamais en cache les réponses API (`/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/`) — contrôle statique prouvé sur un cas qui doit échouer (§2.7)
+
+### File d'écriture (WRQ)
+
+- [ ] **WRQ-01** : Migration SQL d'idempotence : clé client UUID sur les écritures Tier 1 (upsert/unicité) avec tests SQL négatifs §2.7 — prérequis de toute écriture en file
+- [ ] **WRQ-02** : Une écriture simple effectuée hors-ligne sur un module Tier 1 (ajout/coche Courses, Tâches, Routines) est enfilée localement et rejouée automatiquement au retour du réseau (foreground)
+- [ ] **WRQ-03** : La file est une liste blanche : toute écriture sur un module hors liste (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client avec un test qui le prouve
+- [ ] **WRQ-04** : Un rejeu qui bute sur un refus RLS ou une ligne supprimée est classé terminal (surfacer à l'utilisateur, retirer de la file) vs retryable (réseau) — jamais de retry en boucle, jamais d'effacement silencieux
+- [ ] **WRQ-05** : Un badge « N en attente » est visible (offline-banner) avec la liste consultable des écritures pendantes ; il retombe à zéro après rejeu complet
+- [ ] **WRQ-06** : Le rejeu est réconcilié avec Realtime : une écriture rejouée ne crée jamais de doublon (réconciliation par clé client, Realtime/invalidation priment sur l'overlay optimiste)
+
+### Raccourcis & deep links (DLNK)
+
+- [ ] **DLNK-01** : Le manifest déclare des raccourcis « Tâches du jour » et « Courses » vers des URLs existantes (Android/Chrome natifs ; vues restant atteignables in-app pour iOS qui ignore le champ)
+- [ ] **DLNK-02** : Un deep link ouvert pendant une session expirée mène au login puis revient à la vue cible (redirect-after-login, e2e dédié)
+- [ ] **DLNK-03** : Une vue « Tâches du jour » dédiée existe comme cible du raccourci (à vérifier en plan ; créer si absente)
+
+### Installabilité (INST)
+
+- [ ] **INST-01** : Le manifest est complet : icônes maskable + raccourcis générées (`@vite-pwa/assets-generator`), `display_override`, balises `apple-*` iOS — installabilité vérifiée desktop/Android
+- [ ] **INST-02** : L'utilisateur dispose d'une UX d'installation claire : cap `beforeinstallprompt` (Chromium) et guide d'installation iOS dans l'app
+- [ ] **INST-03** : Les mises à jour du service worker sont sûres : `registerType: prompt` avec gate « file vide » — jamais de reload pendant un rejeu, état SW/version visible
+
+---
+
+## Future Requirements (différés)
+
+- Tier 2 offline (Notes, Frigo) — après retour d'usage du Tier 1
+- Background Sync API (rejeu « app fermée » sur Android) — enrichissement Chromium v1.x, jamais le mécanisme principal
+- Widgets d'écran d'accueil natifs — sortis du périmètre (arbitrage 2026-11-04 : raccourcis web)
+- Push iOS installée sur appareil — la chaîne serveur existe (v1.0), le test on-device reste à faire
+
+## Out of Scope (exclusions explicites)
+
+- **Store / APK / wrapper natif (Capacitor)** — arbitrage produit 2026-11-04 : PWA pure, tous OS
+- **Retour du mode démo Dexie en prod (D-10)** — l'offline v1.1 est cache + overlay, jamais une seconde base ; la file n'emprunte jamais le chemin de données du mode démo
+- **Écritures hors-ligne sur modules à logique serveur** (Ardoise : répartition calculée serveur ; Cadeaux : surprise serveur ; Messages : push groupées ; invitations/tokens : transactionnels) — la cohérence vient du serveur, pas du client
+- **Résolution de conflits collaboratifs avancée** (merge multi-éditeurs) — LWW par ligne suffit pour le Tier 1
+
+---
+
+## Traceability
+
+*(remplie par le roadmap : chaque exigence mappée à exactement une phase)*
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
