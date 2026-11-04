@@ -30,9 +30,8 @@ result: pass
 
 ### 4. Bannière d'installation (premier niveau)
 expected: Sur un navigateur où l'app n'est pas installée, une bannière discrète apparaît en haut sous l'en-tête, proposant « Installer » (Chromium) ou le guide iOS dépliable (Safari iOS : Partager → Sur l'écran d'accueil).
-result: issue
-reported: "je vois la barre mais celle-ci n'est pas terrible niveau UI"
-severity: cosmetic
+result: pass
+note: "issue cosmétique initiale corrigée (b02fde7) et re-validée visuellement"
 
 ### 5. Dismiss bannière enterrée 30 jours
 expected: Après un clic sur « Plus tard », la bannière disparaît et ne revient pas au rechargement ; le bouton « Installer » de la barre supérieure, lui, reste disponible (Chromium).
@@ -55,8 +54,8 @@ result: pass
 ## Summary
 
 total: 8
-passed: 6
-issues: 1
+passed: 7
+issues: 0
 pending: 0
 skipped: 0
 
@@ -73,9 +72,10 @@ skipped: 0
   resolved_by: 32-03 fix 6d78688 (contrôleur séparé de la présentation)
 - gap_id: G-32-4b
   truth: "La bannière d'installation est visuellement soignée, cohérente avec l'UI de l'app."
-  status: failed
+  status: resolved
   reason: "User reported: je vois la barre mais celle-ci n'est pas terrible niveau UI"
   severity: cosmetic
   test: 4
   artifacts: [app/src/components/banners/install-banner.tsx]
   missing: []
+  resolved_by: fix b02fde7 (pastille icône, titre+sous-titre, boutons sm), re-validé en UAT
