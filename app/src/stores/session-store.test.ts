@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { createStore, get } from 'idb-keyval';
 import type { HouseholdMemberRow, HouseholdRow } from '@/types';
 
 /**
@@ -26,6 +27,26 @@ const listMock = vi.fn(async (table: string) => {
 vi.mock('@/lib/data', () => ({
   data: { list: listMock, create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }));
+
+/**
+ * OFFR-04 (plan 33-04) : le goulot signOut. La purge passe par
+ * `purgeUserCache`, espionnée ici — délégation à l'implémentation réelle par
+ * défaut (fake-indexeddb est actif : les assertions lisent le stockage brut),
+ * et rejet contrôlé pour le test de blocage (D-05).
+ */
+const { purgeUserCacheSpy, stopPersistingSpy } = vi.hoisted(() => ({
+  purgeUserCacheSpy: vi.fn(),
+  stopPersistingSpy: vi.fn(),
+}));
+
+vi.mock('@/lib/offline/query-persistence', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/offline/query-persistence')>();
+  return {
+    ...actual,
+    purgeUserCache: (...args: Parameters<typeof actual.purgeUserCache>) => purgeUserCacheSpy(...args),
+    stopPersisting: () => stopPersistingSpy(),
+  };
+});
 
 const { loadHousehold } = await import('./session-store');
 const { useHouseholdStore } = await import('./household-store');
@@ -78,5 +99,93 @@ describe('loadHousehold et membre courant', () => {
     await loadHousehold();
 
     expect(useHouseholdStore.getState().currentMemberId).toBe('m2');
+  });
+});
+
+/**
+ * OFFR-04, D-05 (plan 33-04) : la purge de déconnexion vit dans le goulot
+ * `useSessionStore.signOut()` — le SEUL chemin par lequel passent les quatre
+ * débranchements (use-auth signOut, listener SIGNED_OUT, branches bootstrap
+ * sans session, mode local). La lire ICI corrige la classe, pas l'instance
+ * (Pitfall 4).
+ */
+describe('signOut — goulot unique de purge (OFFR-04, D-05)', () => {
+  beforeEach(() => {
+    purgeUserCacheSpy.mockReset();
+    stopPersistingSpy.mockReset();
+    // Défaut : délégation à l'implémentation réelle (fake-indexeddb actif).
+    purgeUserCacheSpy.mockImplementation(
+      async (userId: string | null) => {
+        const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+          '@/lib/offline/query-persistence',
+        );
+        return actual.purgeUserCache(userId);
+      },
+    );
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+  });
+
+  it('purge les clés de l\'utilisateur AVANT d\'effacer son état, puis remet le foyer', async () => {
+    const { persistNow } = await import('@/lib/offline/query-persistence');
+    const { cacheKey } = await import('@/lib/offline/query-persistence');
+    const { get } = await import('idb-keyval');
+    const client = (await import('@/lib/query-policy')).buildQueryClient({ queries: { retry: false } });
+    client.setQueryData(['tasks', 'h1', {}, null], [{ id: 't1', name: 'de-u1' }]);
+    await persistNow(client, 'u1', 'h1', { throttleTime: 0 });
+
+    useSessionStore.setState({
+      status: 'authenticated',
+      householdLoaded: true,
+      user: { id: 'u1', email: 'alice@example.fr', displayName: 'Alice', avatarUrl: null, provider: 'email' },
+    });
+    useHouseholdStore.setState({ householdId: 'h1' });
+
+    await useSessionStore.getState().signOut();
+
+    // Lecture brute du stockage (bornée au store de cache, §2.7 D) : les clés
+    // de u1 ont disparu, et l'état session est effacé.
+    const probeStore = createStore('eo-offline-cache', 'query');
+    await expect(get(cacheKey('u1', 'h1'), probeStore)).resolves.toBeUndefined();
+    expect(useSessionStore.getState().user).toBeNull();
+    expect(useSessionStore.getState().status).toBe('guest');
+    expect(useHouseholdStore.getState().householdId).toBeNull();
+  });
+
+  it('une purge qui rejette BLOQUE la déconnexion : l\'état utilisateur reste posé', async () => {
+    purgeUserCacheSpy.mockRejectedValue(new Error('IndexedDB indisponible'));
+    useSessionStore.setState({
+      status: 'authenticated',
+      householdLoaded: true,
+      user: { id: 'u1', email: 'alice@example.fr', displayName: 'Alice', avatarUrl: null, provider: 'email' },
+    });
+
+    await expect(useSessionStore.getState().signOut()).rejects.toThrow('Impossible de vider les données locales');
+
+    // D-05 : l'utilisateur n'est PAS déconnecté — jamais de déconnexion
+    // « réussie » qui laisserait ses données derrière elle.
+    expect(useSessionStore.getState().user?.id).toBe('u1');
+  });
+
+  it('désabonne la sauvegarde AVANT de purger (Pitfall 6 — ordre prouvé)', async () => {
+    const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+      '@/lib/offline/query-persistence',
+    );
+    const ordre: string[] = [];
+    stopPersistingSpy.mockImplementation(() => {
+      ordre.push('stop');
+      actual.stopPersisting();
+    });
+    purgeUserCacheSpy.mockImplementation(async () => {
+      ordre.push('purge');
+    });
+
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: 'u1', email: 'alice@example.fr', displayName: 'Alice', avatarUrl: null, provider: 'email' },
+    });
+    await useSessionStore.getState().signOut();
+
+    expect(ordre).toEqual(['stop', 'purge']);
   });
 });
