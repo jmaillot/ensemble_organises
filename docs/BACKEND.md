@@ -1230,6 +1230,23 @@ python3 scripts/check-sql-statique.py            # migrations et tests
 python3 scripts/check-sql-statique.py 0019       # un seul fichier
 ```
 
+Côté service worker (33-02, OFFR-05), deux contrôles sur le bundle construit,
+dans la même grammaire « contrôle + contre-preuve vue rouge » :
+
+```bash
+sh scripts/test-check-sw-api-cache.sh   # contre-preuve : fixture mauvaise refusée, fixture bonne acceptée
+cd app && npm run build && sh ../scripts/check-sw-api-cache.sh
+```
+
+`check-sw-api-cache.sh` prouve que `dist/sw.js` garde la denylist navigation
+intacte (`/rest/`, `/auth/`, `/functions/`, `/realtime/`, `/storage/`) et ne
+contient aucune stratégie cacheable (`CacheFirst`,
+`StaleWhileRevalidate`, `NetworkFirst`, `CacheableResponsePlugin`) — le SW ne
+cache jamais une réponse API, le cache de lecture passe par TanStack/IndexedDB.
+Son homologue `check-precache-coverage.sh` prouve de son côté la couverture du
+précache (D-09). Le contrôle prouve le bundle construit, pas le comportement
+runtime du SW.
+
 Cette campagne ne remplace pas `test-db.sh` : elle ne connaît pas le schéma, et
 ne remplacera jamais un test exécuté. Elle existe parce que cinq défauts de la
 même famille ont franchi la migration, le test de contrat **et** la relecture,
