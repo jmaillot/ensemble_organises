@@ -2,7 +2,7 @@ import { persistQueryClient, persistQueryClientSave, type PersistQueryClientOpti
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { createStore, del, get, set } from 'idb-keyval';
 import { hydrate as hydrateState } from '@tanstack/react-query';
-import type { QueryClient } from '@tanstack/react-query';
+import type { Query, QueryClient } from '@tanstack/react-query';
 import { OFFLINE_FAMILIES } from '@/lib/query-policy';
 
 /**
@@ -141,7 +141,8 @@ export async function persistNow(
       // Une query dont le préfixe n'est pas dans OFFLINE_FAMILIES n'est PAS
       // sérialisée — les données Tier 2 (notes, ardoise, cadeaux…) ne
       // quittent jamais la mémoire.
-      shouldDehydrateQuery: (query) => familyOf(String(query.queryKey[0])) !== undefined,
+      shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) =>
+        familyOf(String(query.queryKey[0])) !== undefined,
     },
     ...persistOptions,
   };
@@ -191,7 +192,7 @@ export async function restoreOfflineCache(
  */
 export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): void {
   client.removeQueries({
-    predicate: (query) => {
+    predicate: (query: Query) => {
       const family = familyOf(String(query.queryKey[0]));
       if (!family) return false; // hors allowlist : jamais hydraté de toute façon
       return now - query.state.dataUpdatedAt > family.maxAgeMs;

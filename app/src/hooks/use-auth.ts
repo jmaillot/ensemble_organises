@@ -5,6 +5,7 @@ import { data } from '@/lib/data';
 import { useSessionStore } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
+import { connectOfflineCache } from '@/lib/offline/query-persistence';
 import type { HouseholdMemberRow, HouseholdRow, ProfileRow, SessionUser } from '@/types';
 
 export function useIsAuthenticated() {
@@ -186,10 +187,37 @@ export function useAuthBootstrap(): AuthBootstrap {
           return;
         }
         if (!active) return;
+        // Le cache offline est restauré puis élagué AVANT `setReady(true)`
+        // (OFFR-01) : le routeur ne monte jamais sans cache restauré. Les
+        // identités viennent des stores, posés par `applySession` juste
+        // au-dessus — jamais des arguments de la closure, qui seraient
+        // obsolètes à la reprise. Import DYNAMIQUE du client : `router.tsx`
+        // importe déjà `use-auth` statiquement, un import statique inverse
+        // créerait un cycle de modules ; au runtime, le module est chargé
+        // (`main.tsx` importe `AppRouter`) et l'import se résout du cache.
+        // ÉCHEC BEST-EFFORT (T-33-09, asymétrie volontaire) : un IndexedDB
+        // corrompu ou indisponible NE bloque pas le démarrage — on journalise
+        // (§2.7 F : un succès muet est un échec inexpliqué) et on continue
+        // avec un cache vide, la source de vérité reste le serveur. Inverse
+        // de la purge (D-05), qui, elle, bloque la déconnexion : ici la
+        // disponibilité prime sur la lecture offline.
+        const { queryClient } = await import('@/app/router');
+        const userId = useSessionStore.getState().user?.id;
+        const householdId = useHouseholdStore.getState().householdId;
+        if (userId && householdId) {
+          try {
+            await connectOfflineCache(queryClient, userId, householdId);
+          } catch (cause) {
+            console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', cause);
+          }
+        }
+        if (!active) return;
         // La session ET le foyer sont posés avant le premier rendu : `setReady`
         // sans attendre laissait `status` à `initialising` pendant que le
         // routeur affichait déjà les routes, et la garde renvoyait vers
-        // `/connexion` un utilisateur pourtant connecté (rechargement).
+        // `/connexion` un utilisateur pourtant connecté (rechargement). Le
+        // contrat est étendu au cache offline : restore + prune sont faits
+        // avant ce point (OFFR-01, commentaire au-dessus).
         setReady(true);
       })
       .catch(fail);
