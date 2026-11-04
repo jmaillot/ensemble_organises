@@ -7,10 +7,19 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useOfflineStaleBanner } from './use-offline-stale-banner';
 import { useBannerStore } from '@/components/banners/banner-store';
-import { createTestQueryClient } from '@/test/render';
+import { buildQueryClient } from '@/lib/query-policy';
 import type { QueryClient } from '@tanstack/react-query';
 
 type TestClient = QueryClient;
+
+/**
+ * Client de test avec gcTime par défaut (politique réelle) : `gcTime: 0` du
+ * harnais collecterait les queries semées pendant le test et ferait
+ * disparaître le bandeau (le MIN tomberait à 0 après la GC).
+ */
+function createClient(): TestClient {
+  return buildQueryClient({ queries: { retry: false } });
+}
 
 /**
  * Tests du hook useOfflineStaleBanner (OFFR-02, D-12, D-13).
@@ -49,7 +58,7 @@ afterEach(() => {
 
 describe('useOfflineStaleBanner', () => {
   it('hors ligne, pousse le bandeau avec le MIN des dataUpdatedAt (jamais la moyenne ni le max)', async () => {
-    const client = createTestQueryClient();
+    const client = createClient();
     const ancien = Date.now() - 3 * 60 * 60 * 1000;
     const tresAncien = Date.now() - 5 * 60 * 60 * 1000;
     seedQuery(client, 'tasks', ancien);
@@ -69,7 +78,7 @@ describe('useOfflineStaleBanner', () => {
   });
 
   it('une annexe profiles très ancienne PARTICIPE au MIN (D-12 lettre, D-10) — horodatage prudent, jamais flatteur', async () => {
-    const client = createTestQueryClient();
+    const client = createClient();
     const recent = Date.now() - 10 * 60 * 1000;
     const annexeAncienne = Date.now() - 4 * 24 * 60 * 60 * 1000;
     seedQuery(client, 'tasks', recent);
@@ -87,7 +96,7 @@ describe('useOfflineStaleBanner', () => {
   });
 
   it('en ligne : jamais de push (D-13)', async () => {
-    const client = createTestQueryClient();
+    const client = createClient();
     seedQuery(client, 'tasks', Date.now() - 60 * 1000);
     // En ligne (état par défaut du beforeEach) — aucun bandeau ne doit apparaître.
     renderHook(() => useOfflineStaleBanner(), { wrapper: wrapperFor(client) });
@@ -98,7 +107,7 @@ describe('useOfflineStaleBanner', () => {
   });
 
   it('retour en ligne pendant l’affichage : dismiss effecté (D-13)', async () => {
-    const client = createTestQueryClient();
+    const client = createClient();
     seedQuery(client, 'tasks', Date.now() - 60 * 1000);
 
     onlineManager.setOnline(false);
@@ -116,7 +125,7 @@ describe('useOfflineStaleBanner', () => {
   });
 
   it('hors ligne sans aucune donnée Tier 1 rendue (dataUpdatedAt = 0 partout) : pas de bandeau', async () => {
-    const client = createTestQueryClient();
+    const client = createClient();
     // Une query Tier 2 (hors allowlist) avec dataUpdatedAt ne compte pas.
     seedQuery(client, 'notes', Date.now() - 60 * 1000);
 
