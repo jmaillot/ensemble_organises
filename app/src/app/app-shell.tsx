@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useInstallPrompt } from '@/hooks/use-pwa';
 import { BannerSlot } from '@/components/banners/banner-slot';
+import { OfflineStaleBanner } from '@/components/banners/offline-stale';
 import { InstallBannerGate } from '@/components/banners/install-banner';
 import { preloadRouteChunks } from './route-preload';
 import { useNotifications, type NotificationItem } from '@/hooks/use-notifications';
@@ -392,6 +393,11 @@ export function AppShell() {
             bannière, qui n'est rendue par le slot que si l'entrée existe. */}
         <InstallBannerGate />
         <BannerSlot />
+        {/* Bandeau ambre « dernier état connu le … » (OFFR-02, D-11) : le
+            hook de calcul MIN est monté au niveau shell, à côté du slot. Le
+            composant lit l'entrée `offline-stale` du même store — le mapping
+            kind → composant de BannerSlot reste inchangé. */}
+        <OfflineStaleBanner />
 
         <main id="contenu-principal" className="mx-auto w-[min(1480px,100%)] px-[38px] pt-9 pb-16 max-[1180px]:px-[26px] max-[920px]:px-5 max-[920px]:pt-7 max-[650px]:px-3 max-[650px]:pt-[14px] max-[650px]:pb-[calc(92px+env(safe-area-inset-bottom))]">
           <ModuleGate disabledModules={disabledModules} isAdmin={isAdmin} />

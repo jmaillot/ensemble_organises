@@ -2,7 +2,13 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { QueryCache, QueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+// Sous-module direct, PAS le baril `date-fns/locale` : le baril évalue ~600
+// modules de locales, et cette latence d'évaluation fait basculer en échec le
+// test de reprise d'`use-auth.test.ts` (« ne relit pas à la reprise »),
+// sensible au délai entre `householdLoaded` et `setReady` (prouvé : un délai
+// synchrone de 500 ms en évaluation de module le reproduit). Le sous-module
+// `date-fns/locale/fr` n'évalue que la locale française.
+import { fr } from 'date-fns/locale/fr';
 import { useOnlineStatus } from './use-online-status';
 import { useBannerStore } from '@/components/banners/banner-store';
 import { OFFLINE_FAMILIES } from '@/lib/query-policy';

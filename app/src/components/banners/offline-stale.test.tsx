@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+// Sous-module direct, PAS le baril `date-fns/locale` : le baril évalue ~600
+// modules de locales et fait basculer en échec le test de reprise d'
+// `use-auth.test.ts`, sensible au délai d'évaluation de module (voir le
+// commentaire de `use-offline-stale-banner.ts`).
+import { fr } from 'date-fns/locale/fr';
 import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
 import { OfflineStaleBanner } from './offline-stale';
 import { useBannerStore } from './banner-store';
-import { BannerSlot } from './banner-slot';
 import { buildQueryClient } from '@/lib/query-policy';
 
 /**
