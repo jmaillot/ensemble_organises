@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/shared/icon';
 import { useBannerStore } from './banner-store';
 import { useInstallPrompt, usePwaInstalled } from '@/hooks/use-pwa';
 
@@ -79,17 +80,30 @@ export function InstallBanner({ isIosOverride = false }: InstallBannerProps) {
   return (
     <div
       role="status"
-      className="border-b border-border bg-surface px-[inherit] py-3 text-sm"
+      className="border-b border-border bg-surface px-[inherit] py-3.5 text-sm"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="m-0 font-[650]">Installez Ensemble sur cet appareil</p>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Pastille icône : le même geste visuel que les tuiles du tableau de
+            bord, pour que la bannière parle le langage de l'app. */}
+        <span
+          aria-hidden="true"
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong"
+        >
+          <Icon name="download" size="md" />
+        </span>
+        <div className="grid min-w-0 flex-1 justify-items-start gap-0.5">
+          <p className="m-0 font-[650]">Installez Ensemble sur cet appareil</p>
+          <p className="m-0 text-xs text-muted">
+            Accès direct depuis votre écran d’accueil, sans magasin d’applications.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {canInstall ? (
-            <Button variant="primary" onClick={() => void install()}>
+            <Button variant="primary" size="sm" icon="download" onClick={() => void install()}>
               Installer
             </Button>
           ) : null}
-          <Button variant="quiet" onClick={bury}>
+          <Button variant="quiet" size="sm" onClick={bury}>
             Plus tard
           </Button>
         </div>
@@ -103,17 +117,17 @@ export function InstallBanner({ isIosOverride = false }: InstallBannerProps) {
 function IosSteps() {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="mt-2">
+    <div className="mt-3 border-t border-border pt-2">
       <button
         type="button"
-        className="cursor-pointer text-[13px] text-accent-strong"
+        className="cursor-pointer text-[13px] font-[650] text-accent-strong"
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        Comment installer sur iPhone / iPad
+        {expanded ? 'Masquer les étapes' : 'Comment installer sur iPhone / iPad'}
       </button>
       <ol
-        className="mb-0 mt-2 grid gap-1 pl-5 text-[13px] text-muted"
+        className="mb-0 mt-2 grid gap-1.5 pl-5 text-[13px] text-muted"
         hidden={!expanded}
       >
         <li>Dans Safari, touchez le bouton Partager (le carré avec une flèche).</li>
