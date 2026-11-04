@@ -40,10 +40,10 @@ Plans:
   4. Après déconnexion (ou changement de foyer), l'appareil ne garde aucune donnée de l'utilisateur pour un autre : cache namespacé par utilisateur, purge synchrone attendue avant navigation — prouvé par un test sur un appareil partagé simulé
   5. Le contrôle statique §2.7 prouve que le service worker ne met jamais en cache `/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/` — et il a été vu rouge sur un cas qui doit échouer
 **Plans**: 5 plans
-- [ ] 33-01-PLAN.md — Checkpoint légitimité + install épinglé + allowlist/maxAge/prune (OFFR-01, OFFR-03)
-- [ ] 33-02-PLAN.md — Restore avant premier rendu + partition honnête des rendus Tier 1 (OFFR-01, OFFR-03)
-- [ ] 33-03-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
-- [ ] 33-04-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
+- [ ] 33-01-PLAN.md — Socle persistance : dépendances épinglées (checkpoint légitimité) + tracer seed → persist IndexedDB → restore → lecture (OFFR-01, OFFR-04)
+- [ ] 33-02-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
+- [ ] 33-03-PLAN.md — Allowlist Tier 1/maxAge/prune + restore avant premier rendu (OFFR-01, OFFR-03)
+- [ ] 33-04-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
 - [ ] 33-05-PLAN.md — Bandeau « dernier état connu le… » (OFFR-02)
 
 ### Phase 34: File d'écriture & rejeu
