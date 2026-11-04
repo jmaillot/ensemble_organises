@@ -51,6 +51,15 @@ export default defineConfig({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Raccourcis vers des routes existantes du routeur — AUCUN paramètre
+        // d'URL (D-05, DLNK-01) ; la vue dédiée vient en phase 35.
+        shortcuts: [
+          { name: 'Tâches du jour', url: '/taches', icons: [{ src: 'shortcut-taches-96.png', sizes: '96x96', type: 'image/png' }] },
+          { name: 'Courses', url: '/courses', icons: [{ src: 'shortcut-courses-96.png', sizes: '96x96', type: 'image/png' }] },
+        ],
+        // Ordre imposé par D-06 : WCO d'abord, fallback minimal-ui puis standalone.
+        display_override: ['window-controls-overlay', 'minimal-ui', 'standalone'],
+        categories: ['productivity', 'lifestyle'],
       },
       injectManifest: {
         // Le service worker versionné est écrit dans `dist/`, donc très proche
