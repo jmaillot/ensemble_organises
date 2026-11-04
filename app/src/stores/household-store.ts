@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { QueryClient } from '@tanstack/react-query';
-import { purgeCache, stopPersisting } from '@/lib/offline/query-persistence';
+import { connectOfflineCache, purgeCache, stopPersisting } from '@/lib/offline/query-persistence';
 import { DEMO_HOUSEHOLD_ID, DEMO_MEMBERS } from '@/lib/data/seed';
 import type { HouseholdMemberRow, HouseholdRow, Role } from '@/types';
 
@@ -30,7 +30,11 @@ interface HouseholdState {
    * Le setter sync `switchHousehold` reste la dernière étape — jamais
    * asynchronisé ; c'est cette action async encapsulante que le sélecteur de
    * foyer doit awaiter. `client` est le queryClient de l'app (`router.tsx`),
-   * passé par l'appelant pour éviter un cycle d'import.
+   * passé par l'appelant pour éviter un cycle d'import. L'appelant DOIT
+   * awaiter la fonction (WR-03, revue 33) : le contrat complet est purge →
+   * clear → switch → rétablissement du persist + restore du cache du nouveau
+   * couple — l'app ne se retrouve jamais sans souscription de sauvegarde ni
+   * sans cache restauré après le switch.
    */
   switchWithPurge: (
     householdId: string,
@@ -95,6 +99,13 @@ export const useHouseholdStore = create<HouseholdState>()(
         }
         client.clear();
         get().switchHousehold(householdId, householdName);
+        // WR-03 (revue 33) : le persist est RÉTABLI sur le nouveau couple —
+        // sans cet appel, `stopPersisting()` ci-dessus laissait l'app sans
+        // souscription de sauvegarde ni cache restauré jusqu'au prochain
+        // bootstrap. Restore → prune → souscription, même mécanique que le
+        // branchement initial (`connectOfflineCache`). Pas de branchement en
+        // démo (userId null) : le mode démo ne persiste jamais (Pitfall 7).
+        if (userId) await connectOfflineCache(client, userId, householdId);
       },
       // D-04 : ingestion filtrée des membres — voir `vivantes`.
       setMembers: (members) => set({ members: vivantes(members) }),

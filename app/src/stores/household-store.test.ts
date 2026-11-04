@@ -270,4 +270,32 @@ describe('switchWithPurge — ordre purge → clear → switch (OFFR-04, D-04)',
     // prudence : aucune ligne résiduelle ne peut répondre sous le nouveau foyer.
     expect(client.getQueryCache().getAll()).toEqual([]);
   });
+
+  /**
+   * WR-03 (revue 33) : après le switch, la persistance est RÉTABLIE sur le
+   * nouveau couple (utilisateur, foyer) — sans cela l'app vivrait sans
+   * souscription de sauvegarde ni cache restauré jusqu'au prochain bootstrap.
+   * Prouvé en lisant le stockage brut : une écriture post-switch part bien
+   * vers la clé du NOUVEAU foyer.
+   */
+  it('rétablit la persistance sur le nouveau couple après le switch (WR-03)', async () => {
+    const { cacheKey } = await import('@/lib/offline/query-persistence');
+    const { buildQueryClient } = await import('@/lib/query-policy');
+    const { createStore, get } = await import('idb-keyval');
+    const probeStore = createStore('eo-offline-cache', 'query');
+    const client = buildQueryClient({ queries: { retry: false } });
+
+    useHouseholdStore.setState({ householdId: 'h-old', householdName: 'Ancien' });
+    await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, 'u1');
+
+    // Écriture post-switch : elle doit partir vers la clé du NOUVEAU foyer —
+    // la souscription de sauvegarde a bien repris. Le throttle par défaut du
+    // persister est 1 s : la fenêtre couvre son échéance.
+    client.setQueryData(['tasks', 'h-new', {}, null], [{ id: 't1', name: 'post-switch' }]);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await expect(get(cacheKey('u1', 'h-new'), probeStore)).resolves.toContain('post-switch');
+    // Le restore du nouveau foyer a eu lieu avant la souscription : vide ici,
+    // mais l'appel est passé (aucune erreur, cache cohérent).
+    expect(client.getQueryData(['tasks', 'h-new', {}, null])).toEqual([{ id: 't1', name: 'post-switch' }]);
+  });
 });
