@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Master pour @vite-pwa/assets-generator (A2) : glyphe à 80 % centré,
+       ~20 % de marge pour la safe-zone maskable. Fond plein jusqu'au bord. -->
+  <rect width="512" height="512" fill="oklch(20% 0.02 240)"/>
+  <g transform="translate(256 256) scale(0.8) translate(-256 -256)">
+    <path d="M137 172 211 118l74 54 74-54 61 61-74 74 74 74-61 61-74-54-74 54-74-74-74 74-61-61 74-74-74-74 61-61 74 54Z" fill="none" stroke="oklch(56% 0.12 170)" stroke-width="24" stroke-linejoin="round"/>
+    <circle cx="380" cy="384" r="52" fill="oklch(64% 0.15 32)"/>
+  </g>
+</svg>
