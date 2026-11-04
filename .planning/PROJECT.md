@@ -18,37 +18,39 @@ sapin/pastel, docs/OBJETS-TUILES-GEN.md), menu mobile unifié (feuille
 basse animée depuis la barre basse), notifications, contraste vérifié,
 e2e 147/147. PWA installable validée sur Android.
 
-## Current Milestone: v1.0 — Mise en ligne publique
+## État courant — jalon v1.0 clôturé le 2026-11-04
 
-**Goal :** absorber dettes et hors-ligne, arbitrer les décisions produit
-restantes, outiller l'exploitation et préparer l'ouverture publique.
+Le jalon v1.0 « Mise en ligne publique » (phases 25-31) est livré et taggé :
+profils enfants gérés, export RGPD, suppression de compte, exploitation
+(sauvegardes répliquées, alertes prouvées, exercice de restauration attesté),
+messagerie v2 (directes, accusés de lecture, push groupées), hygiène du jalon,
+et inscriptions ouvertes (SMTP durci, invitations pré-auth, modèle liste de
+tokens 0176). Audit passed 38/38 exigences, 7/7 phases vérifiées. La prod
+reçoit des étrangers : le foyer est désormais son unité d'organisation en
+production.
+
+## Current Milestone: v1.1 — PWA durcie mobile-first
+
+**Goal :** la PWA installée devient une vraie app de poche — fiable
+hors-ligne, joignable en un tap depuis l'écran d'accueil, sans aucun store.
 
 **Target features :**
-- Comptes enfants = profils gérés par un parent (pas de compte autonome mineur)
-- Messages de foyer évolue : conversations directes, accusés de lecture, notifications
-- Dettes : Edge generate-routine-occurrences branchée, semis démo avec photos,
-  panneau de version sans estampille, UI mineures (feuilles mobiles)
-- Hors-ligne : 3 todos résorbés (état hors-ligne à tort, amorçage réseau,
-  compteur)
-- RGPD : export complet du foyer + suppression de compte (purge médias,
-  réversibilité 30 j)
-- Token de foyer : réutilisable, expiration obligatoire (défaut 30 j),
-  max d'utilisations configurable (défaut 10), révocation admin
-- Inscriptions ouvertes, confirmation email obligatoire, SMTP durci
-- Exploitation : sauvegardes exercées (restauration testée), supervision,
-  RPO/RTO documenté, mentions légales / confidentialité
+- Offline réel : lecture depuis le cache (dernier état connu, horodaté) +
+  file d'attente d'écriture rejouée à la reconnexion
+- Raccourcis web : vues dédiées (tâches du jour, courses) en deep links
+- Durcissement PWA : installabilité vérifiée tous OS (desktop, Android, iOS),
+  manifest et service worker au niveau
+
+**Arbitrages d'ouverture (2026-11-04) :** aucun store, aucun APK, aucun
+wrapper natif — les widgets natifs sont sortis du périmètre au profit des
+raccourcis web ; l'offline v1.1 n'est pas le retour du mode démo Dexie
+(retiré du prod en phase 09, D-10).
 
 ### Active requirements
 
-ENF-01 → ENF-05 validés par la phase 25 (2026-10-26) : profils enfants gérés
-par le parent, sans compte d'authentification, redirection push vers les
-adultes. RGEX-01 → RGEX-04 validés par la phase 26 (2026-10-27) : export RGPD
-asynchrone borné au demandeur (portée A « ce qui me concerne », fusion
-multi-foyers, 22 modules), lien signé ≤ 24 h, purge 7 jours auditée en base.
-Reste du jalon dans REQUIREMENTS.md (jalon v1.0). Différé nommé : livraison
-push réelle à la phase 31 (OUV-07, 0 abonnement sur l'instance) ; backlog
-review phase 26 dans 26-REVIEW-DISPOSITION.md (dont HR-01 double dispatch
-push `export`).
+Voir REQUIREMENTS.md (jalon v1.1, en cours de définition). Le v1.0 a livré
+toutes ses exigences (38/38, audit passed) : voir
+.planning/milestones/v1.0-REQUIREMENTS.md pour l'historique.
 
 ## État v0.9.0 (historique)
 
@@ -73,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-27 après transition phase 26 → 27*
+*Last updated: 2026-11-04 — démarrage jalon v1.1*

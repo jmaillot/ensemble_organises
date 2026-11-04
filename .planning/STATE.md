@@ -1,30 +1,26 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.0
-milestone_name: Mise en ligne publique (phases 25-31)
-status: Awaiting next milestone
-stopped_at: Phase 31 complete — all phases complete
-last_updated: "2026-11-04T06:26:41.564Z"
+milestone: v1.1
+milestone_name: PWA durcie mobile-first
+status: planning
+last_updated: "2026-11-04T08:55:43.407Z"
 last_activity: 2026-11-04
-last_activity_desc: Milestone v1.0 completed and archived
-state_head: c14b3257b04c3a9da655be08b7aefe39879740e3
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 44
-  completed_plans: 44
-  percent: 100
-current_phase: 31
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE — jalon v1.0 « Mise en ligne publique »
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-11-04 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-11-04 — Milestone v1.1 started
 
 ## Références du jalon v1.0
 
