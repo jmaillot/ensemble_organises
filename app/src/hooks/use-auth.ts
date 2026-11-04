@@ -146,8 +146,14 @@ export function useAuthBootstrap(): AuthBootstrap {
         // Ce n'est pas `setStatus('guest')` : le statut seul laissait
         // l'utilisateur ET le foyer persistés, et les deux stores étant
         // persistés, ils revenaient au rechargement suivant. `signOut()` est le
-        // seul chemin qui vide réellement les deux (D-07).
-        void useSessionStore.getState().signOut();
+        // seul chemin qui vide réellement les deux (D-07). Depuis la 33-04,
+        // `signOut` peut rejeter (échec de purge, D-05) : le rejet est
+        // journalisé (§2.7 F — un échec muet est un échec inexpliqué), pas
+        // avalé ; au bootstrap sans session, il n'y a pas d'utilisateur pour
+        // toast.
+        void useSessionStore.getState().signOut().catch((cause) => {
+          console.error('[auth] purge de déconnexion impossible au bootstrap (mode local) :', cause);
+        });
         setReady(true);
       }
       return;
@@ -174,7 +180,11 @@ export function useAuthBootstrap(): AuthBootstrap {
           // l'utilisateur et le foyer persistés, donc une session expirée ou
           // révoquée côté serveur laissait l'application *paraître* connectée
           // au rechargement suivant. `signOut()` vide les deux stores (D-07).
-          void useSessionStore.getState().signOut();
+          // Depuis la 33-04, `signOut` peut rejeter (échec de purge, D-05) :
+          // rejet journalisé, pas avalé (§2.7 F).
+          void useSessionStore.getState().signOut().catch((cause) => {
+            console.error('[auth] purge de déconnexion impossible au bootstrap (session absente) :', cause);
+          });
           setReady(true);
           return;
         }
@@ -224,7 +234,12 @@ export function useAuthBootstrap(): AuthBootstrap {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        void useSessionStore.getState().signOut();
+        // Depuis la 33-04, `signOut` peut rejeter (échec de purge, D-05) :
+        // le rejet est journalisé (§2.7 F), pas avalé — logger suffit ici,
+        // l'utilisateur est déjà parti côté serveur.
+        void useSessionStore.getState().signOut().catch((cause) => {
+          console.error('[auth] purge de déconnexion impossible (événement SIGNED_OUT) :', cause);
+        });
         return;
       }
       // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED : tous portent
