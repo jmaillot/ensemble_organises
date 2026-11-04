@@ -20,7 +20,12 @@
   2. Un appui long sur l'icône installée (Android/Chrome) propose les raccourcis « Tâches du jour » et « Courses » qui ouvrent directement les vues correspondantes (vues restant atteignables in-app sur iOS, qui ignore le champ shortcuts)
   3. Le manifest déclare les icônes maskable 192/512 (générées via `@vite-pwa/assets-generator`), `display_override` et les balises `apple-*` — l'installabilité est vérifiée on-device desktop et Android
   4. Quand une mise à jour du service worker est disponible, l'utilisateur la voit (état SW/version visible) et le rechargement attend que la file d'écriture soit vide — jamais de reload pendant un rejeu (`registerType: prompt`, gate file vide posée pour la phase 34)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 32-01-PLAN.md — Manifest durci : icônes any/maskable générées (assets-generator), raccourcis /taches et /courses, display_override, categories, screenshots, balises apple-*
+- [ ] 32-02-PLAN.md — Mises à jour SW sûres : registerType prompt, slot de bandeaux hauts, bandeau de mise à jour avec gate stub file vide, panneau offline enrichi
+- [ ] 32-03-PLAN.md — UX d'installation : bannière deux niveaux (invite Chromium + guide iOS dépliable), enterrement 30 jours, détection à la volée
 
 ### Phase 33: Cache de lecture offline
 **Goal** : En avion, l'utilisateur relit le dernier état connu de ses données avec la certitude honnête de quand elles datent — sans qu'aucune donnée d'un utilisateur ne survive à un autre sur l'appareil, et sans que le service worker cache jamais une réponse API.
