@@ -4,7 +4,7 @@
 
 ## Phases
 
-- [ ] **Phase 32: Install & raccourcis** - Manifest durci (icônes maskable, display_override, apple-*), UX d'installation par OS, raccourcis « Tâches du jour » et « Courses », mises à jour SW sûres
+- [x] **Phase 32: Install & raccourcis** - Manifest durci (icônes maskable, display_override, apple-*), UX d'installation par OS, raccourcis « Tâches du jour » et « Courses », mises à jour SW sûres *(UAT 7 passées, 1 bloquée — re-test au prochain déploiement, cf. 32-UAT.md)*
 - [ ] **Phase 33: Cache de lecture offline** - Cache persisté TanStack Query (restauré avant premier rendu), bandeau stale horodaté, allowlist Tier 1, cache namespacé par utilisateur, SW denylist API prouvée
 - [ ] **Phase 34: File d'écriture & rejeu** - Idempotence serveur d'abord, outbox Tier 1 (Courses/Tâches/Routines) rejoué en foreground, classification terminal/retryable, badge « N en attente », réconciliation Realtime
 - [ ] **Phase 35: Deep links & validation multi-OS** - Deep link déconnecté → login → retour à la cible, vue « Tâches du jour » dédiée, validation e2e de bout en bout sur desktop/Android/iOS
@@ -23,9 +23,11 @@
 **Plans**: 3 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — Manifest durci : icônes any/maskable générées (assets-generator), raccourcis /taches et /courses, display_override, categories, screenshots, balises apple-*
-- [ ] 32-02-PLAN.md — Mises à jour SW sûres : registerType prompt, slot de bandeaux hauts, bandeau de mise à jour avec gate stub file vide, panneau offline enrichi
-- [ ] 32-03-PLAN.md — UX d'installation : bannière deux niveaux (invite Chromium + guide iOS dépliable), enterrement 30 jours, détection à la volée
+- [x] 32-01-PLAN.md — Manifest durci : icônes any/maskable générées (assets-generator), raccourcis /taches et /courses, display_override, categories, screenshots, balises apple-*
+- [x] 32-02-PLAN.md — Mises à jour SW sûres : registerType prompt, slot de bandeaux hauts, bandeau de mise à jour avec gate stub file vide, panneau offline enrichi
+- [x] 32-03-PLAN.md — UX d'installation : bannière deux niveaux (invite Chromium + guide iOS dépliable), enterrement 30 jours, détection à la volée
+
+**Suivi UAT (2026-11-04)** : 7/8 passés. Deux défauts trouvés et corrigés en session (bannière jamais montée → `6d78688` ; UI brute → `b02fde7`), re-validés. Test 7 (bandeau de mise à jour réel) bloqué sur `release-build` : à rejouer au prochain déploiement — voir `32-UAT.md` § Tests.
 
 ### Phase 33: Cache de lecture offline
 **Goal** : En avion, l'utilisateur relit le dernier état connu de ses données avec la certitude honnête de quand elles datent — sans qu'aucune donnée d'un utilisateur ne survive à un autre sur l'appareil, et sans que le service worker cache jamais une réponse API.

@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.1
-current_phase: 32
-current_phase_name: Install & raccourcis
-status: executing
-stopped_at: Phase 32 context gathered
-last_updated: "2026-11-04T12:42:47.374Z"
+current_phase: 33
+current_phase_name: Cache de lecture offline
+status: complete_phase_32
+stopped_at: Phase 32 exécutée et validée en UAT (7/8, test 7 à rejouer au prochain déploiement)
+last_updated: "2026-11-04T17:30:00.000Z"
 last_activity: 2026-11-04
-last_activity_desc: Phase 32 execution started
+last_activity_desc: Phase 32 clôturée — UAT 7 passées, 1 bloquée (release-build), défauts corrigés en session
 state_head: f54c4a68d955512381992b1976e26e2f625bd0b5
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 3
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 32 (Install & raccourcis) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 32
-Last activity: 2026-11-04 — Phase 32 execution started
+Phase: 32 (Install & raccourcis) — COMPLETE (UAT 7/8, test 7 à rejouer au prochain déploiement)
+Plan: 3 of 3
+Status: Phase 32 clôturée — prochaine : 33 (Cache de lecture offline)
+Last activity: 2026-11-04 — UAT complète, défauts corrigés (6d78688, b02fde7)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
 ## Performance Metrics
 
