@@ -1,5 +1,6 @@
 import { useBannerStore } from './banner-store';
 import { UpdateBanner } from './update-banner';
+import { InstallBanner } from './install-banner';
 import { updateSW } from '@/lib/sw-register';
 
 /**
@@ -11,6 +12,7 @@ import { updateSW } from '@/lib/sw-register';
 
 const banners: Record<string, () => React.ReactNode> = {
   'sw-update': () => <UpdateBanner updateSW={updateSW} />,
+  install: () => <InstallBanner />,
 };
 
 export function BannerSlot() {

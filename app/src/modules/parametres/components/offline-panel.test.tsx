@@ -14,8 +14,9 @@
 // - `unknown` stubbé explicitement (7 caractères < 8) : s'affiche en entier
 //   avec `title` égal à la valeur — le panneau ne prétend jamais à un SHA
 //   qu'il n'a pas.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const SHA_40 = '42b76a163b845c6f29c196ea3852172063583fb1';
 // D-11 : sans estampille, le libellé écran est une déclaration honnête —
@@ -96,5 +97,93 @@ describe('OfflinePanel — estampille de build', () => {
     const ligneVersion = screen.getByText('Version').parentElement;
     const affichee = within(ligneVersion as HTMLElement).getByText('abc');
     expect(affichee).toHaveAttribute('title', 'abc');
+  });
+});
+
+// --- D-12 : point d'observation unique de l'état du service worker ----------
+
+const swState = vi.hoisted(() => ({
+  registration: null as ServiceWorkerRegistration | null,
+  needsRefresh: false,
+  outboxEmpty: true,
+}));
+
+vi.mock('@/lib/sw-register', () => ({
+  useSwState: () => swState,
+  updateSW: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-outbox-gate', () => ({
+  useOutboxGate: () => ({ isEmpty: swState.outboxEmpty }),
+}));
+
+const MOCK_SW_VERSION = 'precache-push-v2';
+const MOCK_REGISTRATION = {
+  active: { postMessage: () => {} },
+} as unknown as ServiceWorkerRegistration;
+
+describe('OfflinePanel — état du service worker (D-12)', () => {
+  let repondre: (data: unknown) => void;
+
+  beforeEach(() => {
+    const listeners = new Set<(e: MessageEvent) => void>();
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      serviceWorker: {
+        addEventListener: (_: string, cb: (e: MessageEvent) => void) => listeners.add(cb),
+        removeEventListener: (_: string, cb: (e: MessageEvent) => void) => listeners.delete(cb),
+      },
+    });
+    repondre = (data) => listeners.forEach((cb) => cb(new MessageEvent('message', { data })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    swState.registration = null;
+    swState.needsRefresh = false;
+    swState.outboxEmpty = true;
+  });
+
+  it('affiche la version du worker actif (réponse au ping EO_VERSION)', async () => {
+    swState.registration = MOCK_REGISTRATION;
+    await rendreAvecVersion(SHA_40);
+    repondre({ type: 'EO_VERSION_REPLY', version: MOCK_SW_VERSION });
+    await waitFor(() => {
+      expect(screen.getByText('Version du service worker').parentElement?.textContent).toContain(MOCK_SW_VERSION);
+    });
+  });
+
+  it('repli honnête sans registration (SW absent, dev) — pas de version fictive', async () => {
+    swState.registration = null;
+    await rendreAvecVersion(SHA_40);
+    const ligne = screen.getByText('Version du service worker').parentElement;
+    expect(ligne?.textContent).toContain('Service worker indisponible');
+    expect(ligne?.textContent).not.toContain(MOCK_SW_VERSION);
+  });
+
+  it('worker en attente → « Mise à jour en attente » + bouton Appliquer maintenant qui appelle updateSW', async () => {
+    swState.registration = MOCK_REGISTRATION;
+    swState.needsRefresh = true;
+    await rendreAvecVersion(SHA_40);
+    const bouton = screen.getByRole('button', { name: 'Appliquer maintenant' });
+    await userEvent.click(bouton);
+    const swModule = await import('@/lib/sw-register');
+    expect(vi.mocked(swModule.updateSW)).toHaveBeenCalled();
+  });
+
+  it('bouton Appliquer maintenant désactivé si le gate répond file non vide', async () => {
+    swState.outboxEmpty = false;
+    swState.needsRefresh = true;
+    await rendreAvecVersion(SHA_40);
+    const bouton = screen.getByRole('button', { name: 'Mise à jour en préparation…' });
+    expect(bouton).toBeDisabled();
+  });
+
+  it('sans mise à jour en attente : ni message ni bouton (Pitfall 7)', async () => {
+    swState.registration = MOCK_REGISTRATION;
+    swState.needsRefresh = false;
+    await rendreAvecVersion(SHA_40);
+    expect(screen.queryByText('Mise à jour en attente')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Appliquer maintenant' })).toBeNull();
   });
 });

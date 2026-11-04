@@ -12,11 +12,14 @@ import { useBannerStore } from '@/components/banners/banner-store';
  */
 interface SwState {
   registration: ServiceWorkerRegistration | null;
+  /** Un worker en attente existe : mise à jour prête à appliquer (D-12). */
+  needsRefresh: boolean;
   setRegistration: (registration: ServiceWorkerRegistration | null) => void;
 }
 
 export const useSwState = create<SwState>()((set) => ({
   registration: null,
+  needsRefresh: false,
   setRegistration: (registration) => set({ registration }),
 }));
 
@@ -25,6 +28,7 @@ export const updateSW = registerSW({
   onNeedRefresh() {
     // Dédupliqué par le store (Pitfall 4) — un push répété ne duplique pas.
     useBannerStore.getState().push({ kind: 'sw-update', priority: 1 });
+    useSwState.setState({ needsRefresh: true });
   },
   onRegisteredSW(_, registration) {
     useSwState.getState().setRegistration(registration ?? null);

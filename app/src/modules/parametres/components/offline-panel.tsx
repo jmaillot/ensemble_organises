@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/shared/module-shell';
@@ -7,6 +7,8 @@ import { useToast } from '@/components/ui/toast';
 import { clearDatabase } from '@/lib/data/dexie';
 import { isLocalMode } from '@/lib/data';
 import { useInstallPrompt } from '@/hooks/use-pwa';
+import { useOutboxGate } from '@/hooks/use-outbox-gate';
+import { useSwState, updateSW } from '@/lib/sw-register';
 import { dataModeLabel } from '../types';
 
 // `unknown` signale « construit hors pipeline estampillé » (D-02) : sans
@@ -47,6 +49,31 @@ export function OfflinePanel() {
   const { canInstall, install } = useInstallPrompt();
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  // D-12 : point d'observation unique de l'état SW. `useSwState` renvoie l'objet
+  // de test mocké (vi.hoisted) ou le store zustand réel.
+  const sw = useSwState();
+  const { isEmpty } = useOutboxGate();
+  const [swVersion, setSwVersion] = useState<string | null>(null);
+
+  // Ping EO_VERSION (sw.ts) vers le worker actif : la réponse reporte la
+  // version du SW en service. Repli honnête si pas de registration ni d'API
+  // serviceWorker (dev sans SW, navigateurs exotiques).
+  useEffect(() => {
+    const active = sw.registration?.active;
+    // La référence API est capturée ICI : le cleanup doit retirer l'écouteur
+    // sur le MÊME objet, même si l'environnement change après coup (tests).
+    const swApi = typeof navigator !== 'undefined' ? navigator.serviceWorker : undefined;
+    if (!active || !swApi) return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; version?: string } | null;
+      if (data?.type === 'EO_VERSION_REPLY' && typeof data.version === 'string') {
+        setSwVersion(data.version);
+      }
+    };
+    swApi.addEventListener('message', onMessage);
+    active.postMessage({ type: 'EO_VERSION' });
+    return () => swApi.removeEventListener('message', onMessage);
+  }, [sw.registration]);
 
   return (
     <div className="grid gap-[18px] max-[920px]:grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
@@ -60,6 +87,24 @@ export function OfflinePanel() {
             <span className="text-muted">Version</span>
             <strong title={titleEcran}>{versionEcran}</strong>
           </div>
+          {/* D-12 : la version du worker est une source DISTINCTE de la
+              version app (Pitfall 7) — deux lignes, jamais fusionnées. */}
+          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+            <span className="text-muted">Version du service worker</span>
+            <strong>{swVersion ?? 'Service worker indisponible'}</strong>
+          </div>
+          {sw.needsRefresh ? (
+            <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+              <span className="text-muted">Mise à jour en attente</span>
+              <Button
+                variant="secondary"
+                disabled={!isEmpty}
+                onClick={() => void updateSW()}
+              >
+                {isEmpty ? 'Appliquer maintenant' : 'Mise à jour en préparation…'}
+              </Button>
+            </div>
+          ) : null}
         </div>
         {isLocalMode ? (
           <p className="mt-4 mb-4 text-[11px] text-muted">

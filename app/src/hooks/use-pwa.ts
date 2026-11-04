@@ -16,8 +16,7 @@ if (typeof window !== 'undefined') {
 }
 
 /** Proposition d'installation de la PWA (bouton de la barre supérieure). */
-export function useInstallPrompt() {
-  const [canInstall, setCanInstall] = useState(() => deferredPrompt !== null);
+export function useInstallPrompt() {  const [canInstall, setCanInstall] = useState(() => deferredPrompt !== null);
 
   useEffect(() => {
     const onAvailable = () => setCanInstall(true);
@@ -39,4 +38,34 @@ export function useInstallPrompt() {
   }, []);
 
   return { canInstall, install };
+}
+
+/**
+ * « L'app est installée » (D-03) : mode standalone détecté par matchMedia
+ * (Chromium/Android/desktop) ou `navigator.standalone` (iOS Safari, qui
+ * n'expose pas display-mode). Patron module-scope : l'état initial est lu
+ * avant le premier rendu pour éviter un flash de la bannière install.
+ */
+function readInstalled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const standaloneQuery = window.matchMedia('(display-mode: standalone)').matches;
+  const iosStandalone = (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return standaloneQuery || iosStandalone;
+}
+
+export function usePwaInstalled(): boolean {
+  const [installed, setInstalled] = useState(readInstalled);
+
+  useEffect(() => {
+    const query = window.matchMedia('(display-mode: standalone)');
+    const onChange = () => setInstalled(readInstalled());
+    query.addEventListener('change', onChange);
+    window.addEventListener('appinstalled', onChange);
+    return () => {
+      query.removeEventListener('change', onChange);
+      window.removeEventListener('appinstalled', onChange);
+    };
+  }, []);
+
+  return installed;
 }
