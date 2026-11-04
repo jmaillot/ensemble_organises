@@ -65,3 +65,20 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| OFFR-01 | Phase 33 | Pending |
+| OFFR-02 | Phase 33 | Pending |
+| OFFR-03 | Phase 33 | Pending |
+| OFFR-04 | Phase 33 | Pending |
+| OFFR-05 | Phase 33 | Pending |
+| WRQ-01 | Phase 34 | Pending |
+| WRQ-02 | Phase 34 | Pending |
+| WRQ-03 | Phase 34 | Pending |
+| WRQ-04 | Phase 34 | Pending |
+| WRQ-05 | Phase 34 | Pending |
+| WRQ-06 | Phase 34 | Pending |
+| DLNK-01 | Phase 32 | Pending |
+| DLNK-02 | Phase 35 | Pending |
+| DLNK-03 | Phase 35 | Pending |
+| INST-01 | Phase 32 | Pending |
+| INST-02 | Phase 32 | Pending |
+| INST-03 | Phase 32 | Pending |

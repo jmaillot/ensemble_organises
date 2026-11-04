@@ -1,272 +1,68 @@
 # Roadmap: Ensemble & Organisés
 
-## Milestone: v1.0 — Mise en ligne publique (phases 25-31)
-
-> Jalon v1.0 : profils enfants gérés, RGPD (export + suppression de compte),
-> exploitation (sauvegardes/supervision/restauration), messagerie v2,
-> hygiène des dettes, puis inscriptions ouvertes en dernier.
-> Les phases 1-24 relèvent du jalon v0.9.0 (archivé dans
-> .planning/milestones/v0.9.0-ROADMAP.md).
-> **Portes dures de séquence :** le renversement d'identité (Phase 25) précède
-> toute mécanique de suppression (26-27) ; l'exercice de restauration consigné
-> (Phase 28) et la voie de suppression vivante (27) précèdent l'ouverture
-> publique (Phase 31 — OUV-07, dernière exigence du jalon).
-> *Constraints: phases ordered by dependency gates, not calendar.*
+> **Jalon actif : v1.1 — PWA durcie mobile-first** (phases 32-35). Les phases 1-31 du v1.0 et des jalons précédents sont archivées dans `.planning/milestones/`.
 
 ## Phases
 
-- [x] **Phase 25: Profils enfants gérés par le parent** - Renverser l'identité : un enfant du foyer agit par la médiation d'un parent, sans aucune session (completed 2026-10-26)
-- [x] **Phase 26: Export RGPD** - Un membre récupère l'archive complète de ses données (JSON + médias) via un lien signé à durée limitée (completed 2026-10-27)
-- [x] **Phase 27: Suppression de compte RGPD** - Une demande de suppression vivante : sessions tuées, réversibilité 30 j, purge J+30 en SQL pur (completed 2026-10-28)
-- [x] **Phase 28: Exploitation — sauvegardes, restauration, supervision** - Un sinistre est récupérable et observable : sauvegardes nocturnes, exercice de restauration consigné, alertes fonctionnelles *(2026-10-29 — verifier passed 4/5 must-haves ; OPS-02 exercice de restauration non joué, absence déclarée opérateur, re-diligence phase 31 porte OUV-07 ; CR-01/H-01/H-02 corrigés 6f2054d/097fe1a/0e70d74)*
-- [x] **Phase 29: Messagerie v2** - Conversations directes avec watermark de lecture et notifications groupées, sans écriture par message *(2026-10-30 — 6/6 plans dont gap G-29-1 ; UAT verte : push delivered sur appareil, payload sans contenu, rappel collant consommé ; VERIFICATION PASSED)*
-- [x] **Phase 30: Hygiène du jalon — dettes et résidus** - Les dettes connues fermées avant l'ouverture : Edge occurrences, hors-ligne, semis démo, estampille, feuilles mobiles (clôturée le 2026-11-03 : UAT 4/4 pass, preuves cron 0175/jobid=25 à 05:05 Paris, gap G-30-2 corrigé par 30-06)
-- [x] **Phase 31: Inscriptions ouvertes** - Le serveur reçoit des étrangers en sécurité : SMTP livrable, confirmations, rate-limit, invitation pré-auth — derrière les portes dures (completed 2026-11-03)
+- [ ] **Phase 32: Install & raccourcis** - Manifest durci (icônes maskable, display_override, apple-*), UX d'installation par OS, raccourcis « Tâches du jour » et « Courses », mises à jour SW sûres
+- [ ] **Phase 33: Cache de lecture offline** - Cache persisté TanStack Query (restauré avant premier rendu), bandeau stale horodaté, allowlist Tier 1, cache namespacé par utilisateur, SW denylist API prouvée
+- [ ] **Phase 34: File d'écriture & rejeu** - Idempotence serveur d'abord, outbox Tier 1 (Courses/Tâches/Routines) rejoué en foreground, classification terminal/retryable, badge « N en attente », réconciliation Realtime
+- [ ] **Phase 35: Deep links & validation multi-OS** - Deep link déconnecté → login → retour à la cible, vue « Tâches du jour » dédiée, validation e2e de bout en bout sur desktop/Android/iOS
 
 ## Phase Details
 
-### Phase 25: Profils enfants gérés par le parent
-
-**Goal**: Un enfant du foyer existe comme membre (sélecteurs, attributions, traces) sans jamais posséder de compte d'authentification : un parent agit au nom de l'enfant par des opérations serveur explicitement validées, et la filiation le parent → l'enfant reste auditable. C'est le renversement d'identité du jalon : tout ce qui change « qui peut agir » précède toute mécanique de suppression.
-**Depends on**: Rien (première phase du jalon v1.0 ; s'appuie sur les contrats 0113-0116 de v0.9.0)
-**Requirements**: ENF-01, ENF-02, ENF-03, ENF-04, ENF-05
+### Phase 32: Install & raccourcis
+**Goal** : L'app installée est joignable en un tap depuis l'écran d'accueil sur les trois OS, avec des raccourcis web vers les vues du quotidien, et un service worker dont les mises à jour ne détruisent jamais une session en cours.
+**Depends on** : Nothing (first phase of v1.1)
+**Requirements** : INST-01, INST-02, INST-03, DLNK-01
 **Success Criteria** (what must be TRUE):
-  1. Un admin crée, modifie et supprime un profil enfant du foyer depuis l'écran du foyer, et aucun compte d'authentification n'apparaît à la création
-  2. Un parent assigne une tâche et coche une routine au nom de l'enfant, et modère le Cercle (suppression/masquage de tout contenu — post, commentaire, réaction — attribué à un profil enfant du foyer, y compris l'historique issu des anciens comptes enfant ; le parent ne publie jamais au nom de l'enfant), et la trace porte l'enfant comme attributaire et le parent comme acteur
-  3. Un enfant apparaît par défaut dans les sélecteurs de tâches, de routines, d'anniversaires et de menu (socle D-06), comme tout autre membre du foyer ; tout autre espace refuse l'attribution tant qu'il n'est pas activé sur sa fiche
-  4. Les tests SQL négatifs prouvent qu'aucun profil enfant n'a de session ni de moyen d'agir par lui-même, et toutes les politiques existantes (tâches, routines, courses, cercle, cadeaux, anniversaires, messages) passent l'audit de la clause « parent du même foyer »
+  1. Sur Android et desktop, l'utilisateur peut installer la PWA depuis l'app via l'invite native (cap `beforeinstallprompt`) ; sur iOS, un guide d'installation dans l'app lui montre les gestes Safari — aucun des trois ne se retrouve bloqué par des icônes ou du manifest incomplet
+  2. Un appui long sur l'icône installée (Android/Chrome) propose les raccourcis « Tâches du jour » et « Courses » qui ouvrent directement les vues correspondantes (vues restant atteignables in-app sur iOS, qui ignore le champ shortcuts)
+  3. Le manifest déclare les icônes maskable 192/512 (générées via `@vite-pwa/assets-generator`), `display_override` et les balises `apple-*` — l'installabilité est vérifiée on-device desktop et Android
+  4. Quand une mise à jour du service worker est disponible, l'utilisateur la voit (état SW/version visible) et le rechargement attend que la file d'écriture soit vide — jamais de reload pendant un rejeu (`registerType: prompt`, gate file vide posée pour la phase 34)
+**Plans**: TBD
 
-**Plans**: 8/7 plans complete
+### Phase 33: Cache de lecture offline
+**Goal** : En avion, l'utilisateur relit le dernier état connu de ses données avec la certitude honnête de quand elles datent — sans qu'aucune donnée d'un utilisateur ne survive à un autre sur l'appareil, et sans que le service worker cache jamais une réponse API.
+**Depends on** : Phase 32
+**Requirements** : OFFR-01, OFFR-02, OFFR-03, OFFR-04, OFFR-05
+**Success Criteria** (what must be TRUE):
+  1. Passage en mode avion après consultation d'un module Tier 1 (Courses, Tâches, Routines) : la dernière vue reste lisible, rendue depuis le cache persisté restauré au démarrage avant le premier rendu des routes protégées — pas d'écran vide ni de page d'erreur réseau
+  2. Toute donnée rendue depuis le cache porte un bandeau « dernier état connu le [horodatage] » — jamais présentée comme fraîche (D-10)
+  3. Un module hors allowlist (ex. Ardoise, Messages) en mode avion affiche l'erreur d'origine honnête, jamais des données cachées ; l'allowlist porte un maxAge par famille de données
+  4. Après déconnexion (ou changement de foyer), l'appareil ne garde aucune donnée de l'utilisateur pour un autre : cache namespacé par utilisateur, purge synchrone attendue avant navigation — prouvé par un test sur un appareil partagé simulé
+  5. Le contrôle statique §2.7 prouve que le service worker ne met jamais en cache `/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/` — et il a été vu rouge sur un cas qui doit échouer
+**Plans**: TBD
 
-Plans:
-- [x] 25-04-PLAN.md
+### Phase 34: File d'écriture & rejeu
+**Goal** : Une écriture simple effectuée hors-ligne sur un module Tier 1 atteint malgré tout le serveur — exactement une fois, sans doublon ni perte silencieuse — et l'utilisateur voit toujours combien d'écritures sont en attente et ce qui a échoué.
+**Depends on** : Phase 33
+**Requirements** : WRQ-01, WRQ-02, WRQ-03, WRQ-04, WRQ-05, WRQ-06
+**Success Criteria** (what must be TRUE):
+  1. La migration SQL d'idempotence (clé client UUID, upsert/unicité sur les écritures Tier 1) est posée avec tests SQL négatifs §2.7 — rejouer deux fois la même écriture client ne crée pas de doublon en base
+  2. Un ajout/coche hors-ligne sur Courses, Tâches ou Routines est enfilé localement et rejoué automatiquement au retour du réseau (foreground : `online` + `visibilitychange`) — l'utilisateur retrouve son écriture appliquée sans rien refaire
+  3. Toute écriture sur un module hors liste blanche (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client — prouvé par un test qui fait échouer une tentative hors liste
+  4. Un rejeu butant sur un refus RLS ou une ligne supprimée est classé terminal et surfacé à l'utilisateur (échec visible avec réessayer/abandonner, retrait de la file) ; seuls les échecs réseau/5xx sont rejoués — jamais de retry en boucle, jamais d'effacement silencieux
+  5. Le badge « N en attente » est visible pendant la déconnexion et retombe à zéro après un rejeu complet ; une écriture rejouée ne crée jamais de doublon face à Realtime (réconciliation par clé client, Realtime/invalidation priment sur l'overlay optimiste)
+**Plans**: TBD
 
-**Wave 1**
-- [x] 25-01-PLAN.md — Migration 0144 : socle schématique PAR MEMBRE (managed_modules D-05/D-06 + birth_date + deleted_at D-04) avec tests SQL
-- [x] 25-06-PLAN.md — Correction documentaire : alignement REQUIREMENTS.md/ROADMAP.md sur D-12 (modération, critère #2) et D-06 (sélecteurs du socle, critère #3)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 25-02-PLAN.md — Migration 0145 : conversion RPC des comptes enfants (checkpoint D-18), invariant chk_members_managed_child, fermeture des chemins 0006/0036, migrate [BLOCKING]
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [x] 25-03-PLAN.md — Migration 0146 (`0146_child_behavior_guards.sql`) : helpers par membre, RPC de fiche D-01 (create/update/archive deleted_at, périmètre D-06 des cinq espaces gardés), gardes de module (replace_*), colonnes d'acteur ENF-03 en text, RPC complete_routine_occurrence (refus adulte→adulte D-13), Cercle DELETE modération adulte (D-12), clauses D-06 (conversations, birthdays, meal_entries)
-
-**Wave 4** *(blocked on Wave 3 completion)*
-- [x] 25-04-PLAN.md — Migrations 0147/0148+0149 : push D-23 (rouge→vert), fusion link_managed_child (D-19/D-20/D-18bis), barrière [BLOCKING] complète clôturée le 2026-10-26 (suite entière verte ; ensuite 90/90 avec les migrations 0150–0156 de la campagne de correctifs) ; D-01 storage tranchée : le parent dépose pour l'enfant (décision utilisateur du 2026-10-26)
-
-**Wave 5** *(blocked on Wave 4 completion)*
-- [x] 25-05-PLAN.md — Frontend : useIsAdult (D-01), CRUD enfants DANS la liste des membres via RPC (D-01/D-02), filtre deleted_at unique dans household-store (D-04), espaces par membre (D-05), modération Cercle (D-12), CTA « Donner accès » (D-21), tests Vitest Wave-0 + fixture Playwright
-
-**Wave 6** *(blocked on Wave 5 completion)*
-- [x] 25-07-PLAN.md — Garde UI D-06 : member-eligibility.ts (fonction pure), quatre pickers inline branchés, « Cocher pour » sur la carte de routine (D-08/D-11), rebranchage markOccurrenceDone → RPC complete_routine_occurrence
-- [x] 25-08-GAP-SUMMARY.md — Clôture d'écart (2026-10-26) : Voyages rejoint « Fermer la porte » (migration 0157 : périmètre RPC élargi + garde 42501 sur trip_add_member ; pickers via eligibleMembersForModule ; décision utilisateur) ; avertissements UI-REVIEW corrigés selon 25-UI-SPEC (couleur éditable, copie D-04, « Enfant » filtré du sélecteur de rôle, modération Cercle conditionnelle) ; chaîne §2.7 verte (1628 tests unitaires, 155 e2e, 91/91 SQL) — test-dispatch-push.sh non exécuté (pas d'appareil abonné)
-
+### Phase 35: Deep links & validation multi-OS
+**Goal** : Un raccourci tapé en cold-start déconnecté mène toujours à la bonne vue après reconnexion, et l'expérience offline complète est validée de bout en bout sur les trois OS — l'app de poche est prête, prouvée, pas supposée.
+**Depends on** : Phases 32, 33, 34
+**Requirements** : DLNK-02, DLNK-03
+**Success Criteria** (what must be TRUE):
+  1. Un deep link de raccourci ouvert pendant une session expirée mène à l'écran de connexion, puis ramène l'utilisateur exactement à la vue cible (redirect-after-login) — prouvé par un e2e dédié
+  2. La vue « Tâches du jour » dédiée existe comme cible du raccourci (créée si absente) et rend correctement depuis le cache persisté en cold-start hors-ligne
+  3. La matrice de validation est passée sur desktop, Android et iOS réels : install, raccourcis, lecture hors-ligne avec bandeau, rejeu foreground, purge inter-utilisateurs — chaque résultat (y compris les quirks iOS ITP/éviction) est consigné, rien n'est marqué vérifié à tort
+  4. La checklist « looks done but isn't » des PITFALLS est passée en revue et le gate de mise à jour SW « file vide » est vérifié : aucune mise à jour ne recharge pendant un rejeu
+**Plans**: TBD
 **UI hint**: yes
 
-### Phase 26: Export RGPD
-
-**Goal**: Un membre demande et obtient l'archive complète de ses données personnelles (JSON structuré + médias, ZIP) par un lien signé sur bucket privé qui expire, sans bloquer l'application et sans jamais livrer la donnée d'un autre membre — la définition de la portée multi-foyers est tranchée en SPEC produit avant toute requête SQL.
-**Depends on**: Phase 25 (le périmètre d'identité doit être stabilisé avant de définir « à qui correspond la donnée »)
-**Requirements**: RGEX-01, RGEX-02, RGEX-03, RGEX-04
-**Success Criteria** (what must be TRUE):
-  1. Un membre déclenche son export depuis l'application, voit le statut du job d'export et reçoit une notification à l'achèvement
-  2. L'archive téléchargée contient le JSON structuré et les médias du demandeur, via une URL signée sur `gdpr-exports` expirée au plus tard 24 h après l'émission
-  3. Les tests SQL négatifs prouvent qu'un export ne déborde jamais sur un autre foyer ni sur la donnée des autres membres du foyer
-  4. Le contenu du bucket `gdpr-exports` disparaît au bout de 7 jours par le pg_cron existant — vérifié en base, pas par un pari HTTP
-
-**Plans**: 7/7 plans complete
-
-Plans:
-**Wave 1**
-- [x] 26-01-PLAN.md — Portée multi-foyers tranchée en SPEC (checkpoint produit) + spike Deno streaming (A1/A2/A3)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 26-02-PLAN.md — Migration 0158 : bucket gdpr-exports, table gdpr_export_jobs (D-06 index partiel), RPC acteur + extraction bornée, cron run/purge + tests SQL négatifs [BLOCKING]
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [x] 26-03-PLAN.md — Edge gdpr-export-run : job multipasse (extraction via RPC bornée, médias cross-bucket, ZIP streaming fflate), crash/reprise prouvés
-- [x] 26-05-PLAN.md — Panneau « Mes données (RGPD) » : déclencheur, 3 états + durée (D-03), historique (D-07), téléchargement signé ≤ 24 h (D-04)
-
-**Wave 4** *(blocked on Wave 3 completion)*
-- [x] 26-04-PLAN.md — Edge gdpr-export-purge : purge 7 j via API Storage + audit en base (RGEX-04), preuve en base
-
-**Wave 5** *(blocked on Wave 4 completion)*
-- [x] 26-06-PLAN.md — Notification push à l'achèvement (0164, patron 0147/0042) : succès comme échec (D-01/D-02), push-notify scope « export », notified_push après distribution — preuve réseau déclarée absente (0 appareil abonné, refaire phase 31)
-
-**Wave 6** *(blocked on Wave 5 completion)*
-- [x] 26-07-PLAN.md — Barrière [BLOCKING] : chaîne §2.7 complète verte + preuves réseau observées (contenu ZIP, purge, push)
-
-**UI hint**: yes
-
-### Phase 27: Suppression de compte RGPD
-
-**Goal**: La voie de suppression de compte existe et est annulable : sessions tuées immédiatement, surface publique anonymisée, réversibilité 30 j par email de confirmation, alerte à J-7, purge effective J+30 purement SQL/pg_cron — et l'Edge `household-delete` consolidée en une seule voie. L'audit des FK vers `auth.users` et les règles produit (médias co-possédés, profils enfants portés par le parent) sont tranchés en SPEC avant migration.
-**Depends on**: Phase 26 (l'export est proposé avant de offrir la suppression) ; Phase 25 (les profils enfant sautent avec le parent : RGDP-06)
-**Requirements**: RGDP-01, RGDP-02, RGDP-03, RGDP-04, RGDP-05, RGDP-06, RGDP-07
-**Success Criteria** (what must be TRUE):
-  1. Un utilisateur demande la suppression : ses sessions meurent immédiatement, sa surface publique est anonymisée, et un email de confirmation permet d'annuler la demande
-  2. La demande annulée pendant 30 jours restaure le compte selon les règles de la spec, et un email d'alerte part à J-7 avant la purge
-  3. La purge J+30 s'exécute en SQL/pg_cron depuis un manifest de médias construit à la demande — aucun envoi HTTP depuis le cron — et les données partagées au foyer sont anonymisées ou réattribuées, jamais cascadées (audit FK consigné en SPEC)
-  4. Les profils enfants portés par le compte supprimé disparaissent avec lui selon la règle produit annoncée dans la phase, et la chaîne passe par la consolidation de `household-delete` (une seule voie de suppression vivante)
-
-**Plans**: 5/5 plans complete, +2 gap-closure plans (27-04, 27-05) from 27-VERIFICATION.md
-
-Plans:
-**Wave 1**
-- [x] 27-01-PLAN.md — Socle SQL : tables demande/instantané, audit FK vers auth.users (RGDP-05), RPC demande/annulation + tests SQL
-- [x] 27-04-PLAN.md — Gap closure : CR-02 instantané par ligne membre (multi-foyer), manifest bucket_id (WR-02), commentaires véridiques (WR-01/WR-03)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 27-02-PLAN.md — Purge J+30 SQL, enfants/foyer orphelin (D-08/D-09), cron J-7/J+30 idempotents + tests SQL
-- [x] 27-05-PLAN.md — Gap closure : CR-01 signOut scope chaîne + test, purge par bucket côté Edge (WR-02), panneau honnête (WR-04/IN-02), e-mails (IN-01/IN-03)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [x] 27-03-PLAN.md — Edge unifiée household-delete (modes foyer/compte), signOut global, emails nodemailer, panneau RGPD + chaîne §2.7
-
-### Phase 28: Exploitation — sauvegardes, restauration, supervision
-
-**Goal** *(annoté le 2026-10-29 : « restic » retiré par la décision verrouillée D-02 — les fichiers chiffrés existants de backup.sh sont répliqués tels quels, cf. OPS-01 réécrite dans REQUIREMENTS.md)* : Un sinistre n'est plus une loterie : sauvegardes nocturnes chiffrées (pg_dump + réplication des fichiers chiffrés existants sur les volumes et la clé pgsodium sauvegardée séparément), un exercice de restauration complet joué sur un Compose isolé avec RTO mesuré et consigné, alertes par mail (disque/certificats/pg_cron/erreurs Edge) chacune prouvée par un déclenchement réel — et l'arbitrage RPO/RTO/rétention écrit dans `docs/`. **Livrable de porte : c'est l'exercice de restauration consigné (OPS-02) qui conditionne l'ouverture publique (Phase 31).**
-**Depends on**: Phase 25 (les migrations peuvent s'appliquer sur la pile restaurée ; orthogonale aux phases 26-27)
-**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
-**Tests UAT hérités de la phase 27** (reportés le 2026-10-28, à passer pendant cette phase — le SMTP réel du serveur docker est le lieu d'exécution) :
-- UAT-27.5 — Annulation : restauration nom/photo dans CHAQUE foyer (multi-foyer), page honnête sans promesse de sessions
-- UAT-27.6 — Données partagées du foyer survivent à la suppression d'un membre (tâches, courses, notes)
-- UAT-27.7 — E-mail de rappel J-7 réellement livré (simulation J-7 par SQL + lecture boîte mail)
-
-**Plans**:
-- Wave 1 : 28-01 (tracer — backup.sh étendu + send-mail.sh + sonde SMTP, OPS-01) ∥ 28-02 (backup-replicate.sh — rsync tierce + purge GFS + pgsodium disjointe, OPS-01)
-- Wave 2 *(bloquée sur Wave 1)* : 28-03 (check-cron-health.sh rouge→vert + 4 checks d'alerte mail + preuves réelles, OPS-03/OPS-04)
-- Wave 3 *(bloquée sur Wave 2)* : 28-04 (RPO/RTO/rétention + runbook + commandes cron, OPS-05)
-- Wave 4 *(bloquée sur Wave 3)* : 28-05 (exercice de restauration isolé + RTO consigné + UAT-27.5/6/7, OPS-02)
-
-**Success Criteria** (what must be TRUE):
-  1. Une sauvegarde nocturne produite automatiquement contient le dump chiffré, les volumes `storage`/`functions` et `db-config`, la clé pgsodium étant sauvegardée séparément du dump
-  2. Un exercice de restauration est joué sur un Compose isolé (jamais la prod), le RTO est mesuré et consigné, et le runbook de restauration permet à une autre session de rejouer sans deviner
-  3. Une alerte disque, une alerte certificat, une alerte pg_cron et une alerte erreurs Edge se déclenchent et arrivent par mail — chacune prouvée par un test déclenché, pas par une promesse de configuration (OPS-03 réécrite le 2026-10-28 : alertes mail, pas de pile Prometheus/Grafana/Loki)
-  4. `check-cron-health.sh` valide les jobs pg_cron et attrape effectivement une rotation de secret ratée (prouvé rouge→vert)
-  5. RPO, RTO et politique de rétention sont arbitrés et documentés dans `docs/`
-
-**Plans**: 5 plans
-
-Plans:
-**Wave 1**
-- [x] 28-01-PLAN.md — Tracer : backup.sh étendu (tar functions, vérif D-07, mail) + send-mail.sh (OPS-01)
-- [x] 28-02-PLAN.md — Réplication tierce rsync + purge GFS + pgsodium disjointe (OPS-01)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 28-03-PLAN.md — check-cron-health + 3 checks d'alerte, preuves rouge→vert (OPS-03, OPS-04)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [x] 28-04-PLAN.md — RPO/RTO/rétention + runbook restauration + commandes cron (OPS-05)
-
-**Wave 4** *(blocked on Wave 3 completion)*
-- [x] 28-05-PLAN.md — Exercice de restauration isolé + RTO consigné + UAT-27 sur prod (OPS-02) *(clos par absence déclarée opérateur 2026-10-29 : runbook livré, exercice non joué, RTO non mesuré — re-diligence phase 31)*
-
-### Phase 29: Messagerie v2
-
-**Goal**: La messagerie évolue en v2 humainement utilisable : conversations directes démarrées par RPC avec garde anti-doublon, accusé de lecture par watermark par membre (aucune écriture par message — décision de migration, pas un retrofit), notifications groupées sans contenu de message réutilisant la chaîne push existante, et Realtime dont la publication self-hosted est testée par souscription avant d'être annoncée. La phase bénéficie de la Phase 25 : le member-picker rend les profils enfants correctement.
-**Depends on**: Phase 25 (sélecteur de membres incluant les enfants gérés)
-**Requirements**: MSG-01, MSG-02, MSG-03, MSG-04, MSG-05
-**Success Criteria** (what must be TRUE):
-  1. Un membre démarre une conversation directe depuis un autre membre, un second essai avec le même membre rouvre la conversation existante au lieu d'en créer un doublon
-  2. L'émetteur voit l'accusé de lecture, alimenté par un watermark par membre — aucune écriture par message dans la base
-  3. Les notifications push sont groupées par conversation (« 2 nouveaux messages de X ») sans jamais contenir le contenu du message, via la chaîne `dispatch_messages`→`push-notify` existante
-  4. La publication `supabase_realtime` self-hosted est complétée et prouvée par une souscription réelle qui reçoit un événement à l'insertion
-
-**Plans**: 5/5 plans executed + 1 plan de clôture de gap (29-06, G-29-1 UAT)
-
-Plans:
-**Wave 1**
-- [x] 29-01-PLAN.md — Migration 0171 : RPC open_direct_conversation (anti-doublon, verrou consultatif) + RPC conversation_read_receipts + tests SQL (MSG-01/03) — exécuté (commits 6f10c40, 668d40d ; SUMMARY 29-01)
-- [x] 29-02-PLAN.md — Migration 0172 : push groupé sans contenu (fuite 0042 corrigée) + Edge push-notify reminder_ids + preuve attribuable étendue (MSG-04)
-- [x] 29-03-PLAN.md — Preuve Realtime par souscription réelle (D-09) : scripts/test-realtime-subscription.sh (MSG-05)
-
-**Wave 2** *(blocked on Wave 1)*
-- [x] 29-04-PLAN.md — Frontend watermark : markRead à l'ouverture/focus (D-01), accusés avatars + horodatage (D-02), migration localStorage (D-03) (MSG-02/03) — exécuté (commits 3f6e490, ce02fec, 16478cf ; SUMMARY 29-04)
-
-**Wave 3** *(blocked on Waves 1-2)*
-- [x] 29-05-PLAN.md — Frontend démarrage directe via member-picker (D-04/D-05) + invalidation Realtime fil/liste (D-08) + chaîne §2.7 app (MSG-01/05)
-
-**Wave 4** *(gap closure — G-29-1, UAT blocker)*
-- [x] 29-06-PLAN.md — Sonde push-notify prévoluble (recreate vs set-push-secrets) + docs recreate≠restart + re-passage UAT 1 (G-29-1) *(exécuté 2026-10-30 : commits 8d49c22, b592759, 1e48b16 ; UAT 1 verte sur serveur réel — delivered=4/consumed=1 rappel, delivered=4/consumed=3 groupe, notifications reçues sur appareil ; SUMMARY 29-06)*
-
-### Phase 30: Hygiène du jalon — dettes et résidus
-
-**Goal**: Les dettes et résidus connus sont fermés avant le go-live public : l'Edge `generate-routine-occurrences` alimente enfin les routines au quotidien, les trois todos hors-ligne tombent (amorçage réseau, compteur, faux état hors-ligne), les semis démo portent des photos de recette, le panneau de version dit quelque chose de crédible sans estampille, et les feuilles mobiles ne césurent plus « Anniver-saires » ni ne régressent visuellement (arbitrage forceMount tranché).
-**Depends on**: Phase 29 (orthogonale ; placée avant la porte d'ouverture pour ne pas livrer un public sur une dette connue)
-**Requirements**: DET-01, DET-02, DET-03, DET-04, DET-05
-**Success Criteria** (what must be TRUE):
-  1. Chaque matin, une occurrence de routine est créée automatiquement (Edge branchée au pg_cron) et visible dans la vue du jour
-  2. L'amorçage d'état réseau fonctionne dès la première navigation, le compteur hors-ligne affiche une valeur juste, et le faux état hors-ligne « 15 » ne réapparaît plus
-  3. Les semis démo embarquent des recettes avec photos illustrant les tuiles et fiches
-  4. Sans estampille de build, le panneau de version affiche un message crédible (jamais « 0.1.0 » inventé) — complément des findings de la phase 24
-  5. Les feuilles mobiles rendent « Anniversaires » sans césure disgracieuse et avec animations de sortie cohérentes, e2e au vert (arbitrage forceMount consigné)
-
-**Plans:** 5/5 plans executed
-
-Plans:
-- [x] 30-01-PLAN.md — DET-01 : diagnostic prod du job `eo-routine-maintenance` (D-02), correction cause racine + migration [BLOCKING], test SQL rouge-avant-vert, mesure prod + constat d'usage (D-01/D-03/D-04)
-- [x] 30-02-PLAN.md — DET-02 : rejouement des preuves des todos hors-ligne 13/14/15 (D-05/D-06), balayage de classe (D-07), clôture avec preuve fraîche
-- [x] 30-03-PLAN.md — DET-03 : photo du semis recette (chemin public /assets/recettes/, D-08/D-09/D-10), test de contrat rouge-avant-vert, crédits ATTRIBUTION.md
-- [x] 30-04-PLAN.md — DET-04 : libellé « Version de développement » sans estampille (D-11/D-12), test deux familles (D-13)
-- [x] 30-05-PLAN.md — DET-05 : césure « Anniversaires » corrigée (D-14), mécanisme partagé forceMount + animation de sortie (D-15/D-16), e2e 390 px au vert (D-17)
-
-**UI hint**: yes
-
-### Phase 31: Inscriptions ouvertes
-
-**Goal** *(reformulée tour 1 discuss 2026-11-03 : le relais Gmail (D-13) rend Stalwart/SPF/DKIM/DMARC sans objet — OUV-01 porte sur la preuve de réception via le relais existant, pas sur un MTA à déployer)* : Le serveur accueille des étrangers en sécurité et avec une voie de sortie : inscriptions publiques avec confirmations email réellement délivrées en boîte de réception (relais Gmail, alias FROM contact@jeremymaillot.fr), rate-limit durci (Traefik + GoTrue), invitation pré-auth traversant l'inscription, gouvernance complète du token de foyer, pages légales en ligne — portes dures OUV-07 prouvées (suppression vivante, restauration exécutée, SMTP et push réels).
-**Depends on**: Phase 27 (porte : voie de suppression vivante) ; Phase 28 (porte : exercice de restauration + supervision consignés) ; Phase 30 (aucune dette connue au go-live)
-**Requirements**: OUV-01, OUV-02, OUV-03, OUV-04, OUV-05, OUV-06, OUV-07
-**Success Criteria** (what must be TRUE):
-  1. Un email de confirmation envoyé par la stack (relais Gmail, alias FROM contact@jeremymaillot.fr) est réellement reçu et délivré en boîte de réception sur Gmail ET Outlook — preuve de réception consignée, pas supposée
-  2. Une inscription sans confirmation d'email ne parvient pas à se connecter, et le rate-limit Traefik bloque effectivement les rafales sur `/auth/v1/signup` et `/auth/v1/token` (prouvé par test)
-  3. Un étranger arrivant sur un lien d'invitation voit le pré-écran pré-auth (« Vous avez été invité au foyer X ») et son token traverse l'inscription jusqu'au foyer ; un admin peut définir l'expiration et le max d'utilisations du token, et le révoquer à tout moment
-  4. Les pages mentions légales et confidentialité sont en ligne, avec la politique de purge et de sauvegarde rédigée en langue claire
-  5. Les portes dures OUV-07 sont vérifiées sur le jalon : voie de suppression vivante + exercice de restauration consigné + preuve SMTP — séquence prouvée par l'état des phases 27-28, pas par un engagement
-
-**Plans**: 8/8 plans complete
-Plans:
-**Wave 1**
-- [x] 31-01-PLAN.md — migration 0176 : modèle liste de tokens + RPC preview no-consume + tests SQL (OUV-05)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 31-02-PLAN.md — Edge preview dédiée + summary-liste + révocation individuelle (OUV-04/05)
-- [x] 31-03-PLAN.md — pré-écran pré-auth + traversée sessionStorage + messages D-17 (OUV-04)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [x] 31-04-PLAN.md — panneau invitations enrichi : défauts 30 j/10, liste, révocation modale (OUV-05)
-- [x] 31-05-PLAN.md — /mentions-legales + middlewares Traefik rateLimit + preuves 429 (OUV-03/06)
-- [x] 31-06-PLAN.md — transport SMTP + GOTRUE_RATE_LIMIT_* + portes opérateur (RTO, push) (OUV-01/02/07)
-
-**Gap closure** *(2026-11-03, verification gaps_found)*
-- [x] 31-07-PLAN.md — G-31-1 : libellés d'invalidation faux corrigés (panneau + pré-écran) + assertion de test (OUV-05)
-- [x] 31-08-PLAN.md — G-31-2 : scaffold 31-UAT.md HV-1..HV-6 + docs/EXPLOITATION.md véridique, routage /gsd-verify-work 31 (OUV-01/02/03/07)
-
-**UI hint**: yes
-
-## Progress
+## Progress Table
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Profils enfants gérés | 8/7 | Complete    | 2026-10-26 |
-| 26. Export RGPD | 7/7 | Complete    | 2026-10-27 |
-| 27. Suppression de compte RGPD | 5/5 | Complete    | 2026-10-28 |
-| 28. Exploitation | 5/5 | Complete | 2026-10-29 |
-| 29. Messagerie v2 | 5/5 | Complete | 2026-10-30 |
-| 30. Hygiène du jalon | 6/6 | Complete | 2026-11-03 |
-| 31. Inscriptions ouvertes | 8/8 | Complete    | 2026-11-03 |
-
-## Couverture v1.0
-
-38/38 exigences v1.0 mappées (ENF 25, RGEX 26, RGDP 27, OPS 28, MSG 29, DET 30, OUV 31) — aucun orphelin, aucun doublon.
-
-## Portes de séquence (rappel)
-
-- **25 → 26/27** : le renversement d'identité (enfants sans session) précède toute mécanique de suppression.
-- **26 → 27** : l'export est proposé avant l'offre de suppression.
-- **28 → 31** : l'exercice de restauration consigné (OPS-02) conditionne l'ouverture publique.
-- **27 + 28 + 30 → 31** : la porte dure OUV-07 — suppression vivante, restauration consignée, preuve SMTP.
-- **29 ∥ 26/27/28** : la messagerie est orthogonale mais s'appuie sur la Phase 25 (member-picker).
-
-*(Le fichier `REQUIREMENTS.md` porte la table de traçabilité correspondante ; ces fichiers de planification vivent sur le disque uniquement, conformément à la politique du dépôt.)*
+| 32. Install & raccourcis | 0/? | Not started | - |
+| 33. Cache de lecture offline | 0/? | Not started | - |
+| 34. File d'écriture & rejeu | 0/? | Not started | - |
+| 35. Deep links & validation multi-OS | 0/? | Not started | - |
