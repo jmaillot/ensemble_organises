@@ -39,7 +39,12 @@ Plans:
   3. Un module hors allowlist (ex. Ardoise, Messages) en mode avion affiche l'erreur d'origine honnête, jamais des données cachées ; l'allowlist porte un maxAge par famille de données
   4. Après déconnexion (ou changement de foyer), l'appareil ne garde aucune donnée de l'utilisateur pour un autre : cache namespacé par utilisateur, purge synchrone attendue avant navigation — prouvé par un test sur un appareil partagé simulé
   5. Le contrôle statique §2.7 prouve que le service worker ne met jamais en cache `/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/` — et il a été vu rouge sur un cas qui doit échouer
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 33-01-PLAN.md — Checkpoint légitimité + install épinglé + allowlist/maxAge/prune (OFFR-01, OFFR-03)
+- [ ] 33-02-PLAN.md — Restore avant premier rendu + partition honnête des rendus Tier 1 (OFFR-01, OFFR-03)
+- [ ] 33-03-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
+- [ ] 33-04-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
+- [ ] 33-05-PLAN.md — Bandeau « dernier état connu le… » (OFFR-02)
 
 ### Phase 34: File d'écriture & rejeu
 **Goal** : Une écriture simple effectuée hors-ligne sur un module Tier 1 atteint malgré tout le serveur — exactement une fois, sans doublon ni perte silencieuse — et l'utilisateur voit toujours combien d'écritures sont en attente et ce qui a échoué.
