@@ -41,7 +41,7 @@
 ### Exploitation
 
 - [x] **OPS-01** *(réécrite le 2026-10-28 en discussion de phase — « restic » retiré, décision verrouillée D-02 : les fichiers chiffrés existants de `scripts/backup.sh` sont répliqués tels quels, pas de nouvel outil de backup)* : Sauvegardes nocturnes : pg_dump chiffré + réplication des fichiers chiffrés de `scripts/backup.sh` (volumes `storage`, `functions` et `db-config`) vers une machine tierce auto-hébergée (clé pgsodium sauvegardée séparément du dump, en deux copies disjointes — D-03)
-- [ ] **OPS-02** : Exercice de restauration joué sur un Compose isolé (jamais sur la prod) avec RTO mesuré et consigné + runbook exploitable
+- [x] **OPS-02** *(amendement du protocole de preuve du 2026-11-03 : l'exercice est attesté exécuté par l'opérateur ; la valeur RTO n'a jamais été consignée et reste honnêtement « non mesurée » dans docs/EXPLOITATION.md — jamais inventée)* : Exercice de restauration joué sur un Compose isolé (jamais sur la prod) avec RTO mesuré et consigné + runbook exploitable
 - [x] **OPS-03** *(réécrite le 2026-10-28 en discussion de phase — la pile Prometheus/Grafana/Loki est retirée au profit d'alertes mail simples)* : Alertes par mail pour disque / certificats / pg_cron / erreurs Edge, chacune prouvée par un déclenchement réel, pas une promesse de configuration
 - [x] **OPS-04** : `check-cron-health.sh` valide les jobs pg_cron et attrape une rotation ratée de secret
 - [x] **OPS-05** : RPO, RTO et politique de rétention arbitrés et documentés dans `docs/`
@@ -58,7 +58,7 @@
 
 ### Dettes et résidus
 
-- [x] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences) — jobid=25 `5 4 * * *` UTC (06:05 Paris été / 05:05 hiver, 0175 : le suffixe fuseau de 0173 est ignoré par le bgworker, mesure prod 2026-11-02/03 : run succeeded à 05:05 Paris)
+- [x] **DET-01** : L'Edge `generate-routine-occurrences` est branchée au pg_cron quotidien (routines alimentent les occurrences) — jobid=25 `5 4 * * *` UTC (06:05 Paris été / 05:05 hiver, 0175 : le suffixe fuseau de 0173 est ignoré par le bgworker, mesure prod 2026-11-02/03 : run succeeded à 05:05 Paris ; preuve fraîche 2026-11-04 : jobid 25 active, run succeeded 04:05:00 UTC, DB up en continu depuis 2026-10-27 17:42 UTC)
 - [x] **DET-02** : Les 3 todos hors-ligne clôturés (amorçage état réseau, compteur juste, faux état hors-ligne « 15 ») — constat humain approuvé le 2026-10-31, todos 13/14/15 fermés avec preuve datée dans docs/TODO.md
 - [x] **DET-03** : Les semis démo embarquent des photos de recette
 - [x] **DET-04** : Le panneau de version affiche un message crédible quand l'estampille manque
@@ -108,7 +108,7 @@
 | RGDP-06 | Phase 27 | Complete (27-02 : enfants purgés avec le foyer orphelin, transférés D-08 sinon) |
 | RGDP-07 | Phase 27 | Complete (27-03 : Edge unifiée, panneau admin inchangé) |
 | OPS-01 | Phase 28 | Complete | 2026-10-29 |
-| OPS-02 | Phase 28 | Non joué (absence déclarée opérateur 2026-10-29, « pass » — edda816) : runbook livré mais exercice réel non exécuté, RTO non mesuré ; re-diligence obligatoire phase 31 (porte OUV-07) |
+| OPS-02 | Phase 28 | Exercice attesté exécuté par l'opérateur (amendement protocole de preuve 2026-11-03, UAT 28-UAT.md 8/8, 28-VERIFICATION passed 5/5 avec override OPS-02) ; RTO non consigné, « non mesuré » honnête dans docs/EXPLOITATION.md | 2026-11-04 |
 | OPS-03 | Phase 28 | Complete (4 alertes mail prouvées rouge→vert sur prod, mails reçus 2026-10-29 — runbook § Preuves des alertes, 89e5645) |
 | OPS-04 | Phase 28 | Complete (check-cron-health.sh 3 axes, rotation ratée attrapée par job de test 15-36 failed, prod 2026-10-29) |
 | OPS-05 | Phase 28 | Complete (28-04 : RPO ≤ 24 h / RTO cible ≤ 4 h avec « RTO constaté » réservé à l'exercice 28-05 / rétention GFS dans docs/EXPLOITATION.md ; commandes cron livrées D-05 dans docs/DEPLOIEMENT-PROD.md) |
@@ -117,7 +117,7 @@
 | MSG-03 | Phase 29 | Done (29-04) |
 | MSG-04 | Phase 29 | Done (push groupé câblé : 0172 compteur au titre + consommation par push-notify ; attestation HV-5) |
 | MSG-05 | Phase 29 | Done (29-03 preuve Realtime + 29-05 invalidation fil/liste côté app, D-08) |
-| DET-01 | Phase 30 | Done (30-01 + 0173/0175, preuve cron 2026-11-03) |
+| DET-01 | Phase 30 | Done (30-01 + 0173/0175, preuve cron 2026-11-03 ; re-preuve fraîche 2026-11-04 04:05 UTC jobid 25 succeeded) |
 | DET-02 | Phase 30 | Done (30-02, constat 2026-10-31) |
 | DET-03 | Phase 30 | Done (30-03, constat démo 2026-10-31) |
 | DET-04 | Phase 30 | Done (30-04) |
