@@ -40,10 +40,16 @@ export default defineConfig({
         orientation: 'portrait-primary',
         theme_color: 'oklch(98% 0.004 240)',
         background_color: 'oklch(98% 0.004 240)',
+        // Icônes générées une fois par `npx @vite-pwa/assets-generator
+        // --preset minimal-2023 public/icon.svg` (D-13) — sorties commitées
+        // dans `public/`, JAMAIS régénérées au build (pas d'option `pwaAssets`).
+        // Chromium exige les deux tailles `any` 192 ET 512 pour l'installabilité,
+        // en plus de la variante `maskable` (Pitfall 1, 32-RESEARCH.md).
         icons: [
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       injectManifest: {
