@@ -127,9 +127,7 @@ describe('signOut — goulot unique de purge (OFFR-04, D-05)', () => {
   });
 
   it('purge les clés de l\'utilisateur AVANT d\'effacer son état, puis remet le foyer', async () => {
-    const { persistNow } = await import('@/lib/offline/query-persistence');
-    const { cacheKey } = await import('@/lib/offline/query-persistence');
-    const { get } = await import('idb-keyval');
+    const { persistNow, cacheKey } = await import('@/lib/offline/query-persistence');
     const client = (await import('@/lib/query-policy')).buildQueryClient({ queries: { retry: false } });
     client.setQueryData(['tasks', 'h1', {}, null], [{ id: 't1', name: 'de-u1' }]);
     await persistNow(client, 'u1', 'h1', { throttleTime: 0 });
