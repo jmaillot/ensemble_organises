@@ -11,10 +11,11 @@ import { useHouseholdStore } from '@/stores/household-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile, removeHouseholdFile, replacedMediaPath, storedValueOf } from '@/lib/storage';
-import { createShoppingItem, SHOPPING_ITEMS_TABLE, SHOPPING_LISTS_TABLE } from '../api';
+import { buildShoppingItemValues, SHOPPING_LISTS_TABLE } from '../api';
 import { isQueryableEan, type OffProduct } from '../off-client';
 import { offCategoriesToRayon } from '../off-rayon';
 import * as productsApi from '../products-api';
+import type { ItemMutators } from '../products-api';
 import { normalizeRayon, RAYONS, guessRayon } from '../types';
 
 const schema = z.object({
@@ -36,6 +37,16 @@ export interface ProductSheetProps {
   /** Enrichissement en échec (réseau/timeout/5xx) : réessayer, pas créer en double (WR-04). */
   offError?: boolean;
   onRetry?: () => void;
+  /**
+   * Mutateurs d'article Tier 1 (G-34-1), portés par le parent depuis
+   * `useCourses().itemMutators` : la fiche garde l'orchestration du dépôt
+   * photo, mais TOUTE écriture d'article passe par la couche mutation —
+   * identité client (`id` + `client_key`), overlay, marque D-02 pour
+   * l'enfilage hors-ligne. La fiche n'instancie jamais son propre `useCourses`
+   * : deux instances = deux caches de mutation, l'overlay et l'enfilage
+   * divergeraient.
+   */
+  itemMutators: ItemMutators;
 }
 
 /** Types bitmap explicites : le SVG (conteneur actif) est refusé (WR-10). */
@@ -49,7 +60,7 @@ const PHOTO_MAX_BYTES = 15_000_000;
  * n'est qu'un affichage transitoire avec crédit : `photo_url` reste réservé
  * à la photo locale signée (D-05, T-04-06) — assertion dédiée en test.
  */
-export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offError = false, onRetry }: ProductSheetProps) {
+export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offError = false, onRetry, itemMutators }: ProductSheetProps) {
   const toast = useToast();
   const householdId = useHouseholdStore((state) => state.householdId);
   const currentMemberId = useHouseholdStore((state) => state.currentMemberId);
@@ -219,6 +230,7 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
                   listId: targetListId,
                   addedBy: currentMemberId,
                 },
+            itemMutators,
           );
           // Produit déjà connu : la photo fournie ici n'est pas dans l'écriture
           // unique ci-dessus. On la pose si la RLS le permet (tout admin/membre
@@ -243,23 +255,25 @@ export function ProductSheet({ open, onOpenChange, offProduct, ean, lists, offEr
           throw resolveError;
         }
       } else {
-        // Code non interrogeable (T-04-05) : pas d'appel OFF, article simple.
-        await createShoppingItem({
-          householdId,
-          listId: targetListId,
-          name,
-          quantity: null,
-          unit: null,
-          rayon,
-          addedBy: currentMemberId,
-        });
+        // Code non interrogeable (T-04-05) : pas d'appel OFF, article simple —
+        // écrit via les mutateurs Tier 1 (G-34-1), pas d'appel adaptateur brut.
+        await itemMutators.createItem(
+          buildShoppingItemValues({
+            householdId,
+            listId: targetListId,
+            name,
+            quantity: null,
+            unit: null,
+            rayon,
+            addedBy: currentMemberId,
+          }),
+        );
         toast(`« ${name} » ajouté à la liste`, 'success');
       }
-      // La résolution écrit via `data.*` hors hook : invalider ici, comme
-      // `useCourses`, sinon l'article n'apparaît qu'au rechargement.
+      // La résolution écrit via les mutateurs Tier 1 : l'invalidation items
+      // est portée par itemResource ; celle-ci couvre listes et produits.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [SHOPPING_LISTS_TABLE] }),
-        queryClient.invalidateQueries({ queryKey: [SHOPPING_ITEMS_TABLE] }),
         queryClient.invalidateQueries({ queryKey: [productsApi.PRODUCTS_TABLE] }),
       ]);
       onOpenChange(false);

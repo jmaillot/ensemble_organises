@@ -23,6 +23,17 @@ import { KNOWN_EAN, UNKNOWN_EAN, offHandlers } from '@/test/mocks/off-handlers';
 
 const server = setupServer(...offHandlers);
 
+/**
+ * Mutateurs d'article adossés à l'adaptateur local : même interface que la
+ * couche mutation Tier 1 du hook (G-34-1), dont la fiche produit dépend.
+ */
+const itemMutators = {
+  createItem: (values: Partial<ShoppingListItemRow>) =>
+    data.create<ShoppingListItemRow>('shopping_list_items', values),
+  updateItem: (id: string, values: Partial<ShoppingListItemRow>) =>
+    data.update<ShoppingListItemRow>('shopping_list_items', id, values),
+};
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
@@ -54,7 +65,7 @@ function ScanHarness({ listId }: { listId: string }) {
         }}
       />
       {sheet ? (
-        <ProductSheet open onOpenChange={() => undefined} offProduct={sheet.off} ean={sheet.ean} lists={[{ id: listId, name: 'Fresque' }]} />
+        <ProductSheet open onOpenChange={() => undefined} offProduct={sheet.off} ean={sheet.ean} lists={[{ id: listId, name: 'Fresque' }]} itemMutators={itemMutators} />
       ) : null}
     </>
   );

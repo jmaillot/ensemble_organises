@@ -135,7 +135,11 @@ export function useResource<T = Row>(
   // meta { table, operation } : la marque que lit le MutationCache central
   // (D-02) pour enfiler l'écriture en cas d'échec réseau — aucun composant de
   // vue ne change. assertWriteAllowed (D-07) refuse AVANT tout départ réseau
-  // une écriture hors liste quand l'app est hors ligne.
+  // une écriture hors liste quand l'app est hors ligne. La copie posée dans
+  // l'adaptateur (supabase-adapter.ts) est un filet de sécurité de classe
+  // (§2.7 E) ; celle-ci, AVANT prepareCreate, protège l'overlay optimiste :
+  // sans elle, une écriture refusée peindrait puis dépeindrait une ligne
+  // fantôme dans le cache.
   const createMutation = useMutation({
     mutationFn: (values: Partial<T>) => {
       assertWriteAllowed(table);

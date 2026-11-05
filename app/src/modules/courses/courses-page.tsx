@@ -83,6 +83,7 @@ export default function CoursesPage() {
     editItem,
     products,
     productPhotoUrls,
+    itemMutators,
   } = useCourses();
 
   const [grouping, setGrouping] = useState<Grouping>('rayon');
@@ -535,6 +536,7 @@ export default function CoursesPage() {
           lists={lists.map((list) => ({ id: list.id, name: list.name }))}
           offError={scanError}
           onRetry={() => void resolveOff(scanEan)}
+          itemMutators={itemMutators}
         />
       ) : null}
 

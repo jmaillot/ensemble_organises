@@ -1,6 +1,5 @@
-import { MutationCache, QueryClient, onlineManager, type DefaultOptions } from '@tanstack/react-query';
+import { MutationCache, QueryClient, type DefaultOptions } from '@tanstack/react-query';
 import { enqueueOutbox, isNetworkFailure, type MutationMarker } from './offline/outbox';
-import { DataError } from '@/lib/data/adapter';
 
 /**
  * Politique de cache et de réseau du dépôt — SOURCE UNIQUE.
@@ -93,49 +92,14 @@ export const OFFLINE_FAMILIES: ReadonlyArray<{ prefix: string; maxAgeMs: number 
 ];
 
 /**
- * Liste blanche d'ÉCRITURE (D-06, WRQ-03) — les 5 tables de D-14 exactement.
- *
- * POURQUOI À CÔTÉ DE OFFLINE_FAMILIES, ET POURQUOI PAS LES MÊMES TABLES.
- * `query-policy.ts` porte déjà la frontière offline de LECTURE (D-07 phase
- * 33) : l'écriture est la même politique, elle vit au même endroit — un seul
- * fichier nomme ce qui est offline-éligible, en lecture ET en écriture. La
- * liste d'écriture est PLUS ÉTROITE que la lecture : ni `products`, ni
- * `shopping_lists` elles-mêmes, ni les annexes (`household_members`,
- * `profiles`) — seules les tables portant `client_key` (0177) peuvent être
- * enfilées et rejouées de façon idempotente.
- *
- * La liste est consultée à DEUX endroits (T-34-05) : la garde de mutation
- * `assertWriteAllowed` (refus upfront D-07) et le filtre du MutationCache
- * (défense en profondeur contre un chemin oublié).
+ * Liste blanche d'ÉCRITURE — SOURCE UNIQUE désormais dans
+ * `data/write-policy.ts`. Le bloc a été descendu là (T-34-05) pour que
+ * `supabase-adapter.ts` puisse poser la garde sans importer ce fichier
+ * (qui tire la fabrique TanStack et la file d'écriture). Ce fichier
+ * ré-exporte : les consommateurs existants ne bougent pas.
  */
-export const WRITE_ALLOWLIST = [
-  'shopping_list_items',
-  'tasks',
-  'task_assignees',
-  'routines',
-  'routine_completions',
-] as const;
-
-export function isWriteAllowed(table: string): boolean {
-  return (WRITE_ALLOWLIST as readonly string[]).includes(table);
-}
-
-/** Message utilisateur d'un refus upfront (D-07) — le module appelant le toast tel quel. */
-export const OFFLINE_WRITE_REFUSED_MESSAGE = 'Ce module n’est pas disponible hors-ligne.';
-
-/**
- * Garde upfront (D-07) : une écriture sur un module hors liste est rejetée
- * AVANT tout départ réseau quand l'app est hors ligne — la requête échouerait
- * de toute façon, autant porter un message clair plutôt qu'une TypeError
- * fetch. EN LIGNE, la garde ne dit rien : les modules hors liste (ardoise,
- * notes, cadeaux…) fonctionnent normalement — refuser, ce serait casser
- * l'app entière ; la liste blanche borne le HORS-LIGNE, pas le général.
- */
-export function assertWriteAllowed(table: string): void {
-  if (isWriteAllowed(table)) return;
-  if (onlineManager.isOnline()) return;
-  throw new DataError(OFFLINE_WRITE_REFUSED_MESSAGE);
-}
+export { WRITE_ALLOWLIST, isWriteAllowed, OFFLINE_WRITE_REFUSED_MESSAGE, assertWriteAllowed } from './data/write-policy';
+import { isWriteAllowed } from './data/write-policy';
 
 /**
  * Fabrique le `QueryClient` à partir de `QUERY_POLICY`, en fusionnant par

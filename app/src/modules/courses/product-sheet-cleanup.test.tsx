@@ -5,9 +5,20 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
-import type { ShoppingListRow } from '@/types';
+import type { ShoppingListItemRow, ShoppingListRow } from '@/types';
 import { ProductSheet } from './components/product-sheet';
 import type { OffProduct } from './off-client';
+
+/**
+ * Mutateurs d'article adossés à l'adaptateur local : même interface que la
+ * couche mutation Tier 1 du hook (G-34-1), dont la fiche produit dépend.
+ */
+const itemMutators = {
+  createItem: (values: Partial<ShoppingListItemRow>) =>
+    data.create<ShoppingListItemRow>('shopping_list_items', values),
+  updateItem: (id: string, values: Partial<ShoppingListItemRow>) =>
+    data.update<ShoppingListItemRow>('shopping_list_items', id, values),
+};
 import { removeHouseholdFile } from '@/lib/storage';
 
 /**
@@ -75,6 +86,7 @@ describe('ProductSheet — nettoyage après échec (CR-05)', () => {
         offProduct: off,
         ean: off.ean,
         lists: [{ id: list.id, name: 'Hebdo' }],
+        itemMutators,
       }),
     );
 

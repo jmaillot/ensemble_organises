@@ -13,6 +13,19 @@ export const SHOPPING_ITEMS_TABLE = 'shopping_list_items';
  * cache et l'invalidation ; seules les écritures propres au domaine sont ici.
  * `household_id` est renseigné explicitement : la RLS reste la seule barrière
  * d'autorisation côté serveur.
+ *
+ * POURQUOI LES ARTICLES NE S'ÉCRIVENT PLUS ICI (G-34-1). `buildShoppingItemValues`
+ * est le payload PUR de l'article : le hook `use-courses.ts` le transmet à
+ * `itemResource.create/update` (couche mutation Tier 1) — c'est là que
+ * l'identité client (`id` + `client_key` via prepareCreate), l'overlay
+ * optimiste, la marque D-02 pour l'enfilage hors-ligne et la garde D-07 sont
+ * posés. Un appel `data.*` brut ici contournerait toute la chaîne.
+ *
+ * POURQUOI LES LISTES RESTENT BRUTES. `shopping_lists` est HORS liste
+ * blanche (WRITE_ALLOWLIST, write-policy.ts) : hors ligne, la garde
+ * adaptateur les refuse avec `OFFLINE_WRITE_REFUSED_MESSAGE` — c'est un
+ * choix assumé de D-07, pas un oubli : seul l'article (table `client_key`)
+ * est rejouable de façon idempotente.
  */
 
 export async function createShoppingList(input: ShoppingListInput): Promise<ShoppingListRow> {
@@ -96,13 +109,24 @@ async function searchOffProxy(query: string, limit: number): Promise<OffSearchHi
   }
 }
 
-/** Supprime une liste puis ses articles : les deux écritures sont liées. */
-export async function deleteShoppingList(id: string, householdId: string): Promise<void> {
+/** Supprime une liste puis ses articles : les deux écritures sont liées.
+ *
+ * `removeItem` est le mutateur Tier 1 (`itemResource.remove`) injecté par
+ * `use-courses.ts` : la suppression des ARTICLES passe par la couche
+ * mutation (marque D-02, enfilage) comme leurs autres écritures. La liste
+ * elle-même reste un appel brut (`shopping_lists` hors liste blanche, voir
+ * le commentaire d'en-tête).
+ */
+export async function deleteShoppingList(
+  id: string,
+  householdId: string,
+  removeItem: (itemId: string) => Promise<void>,
+): Promise<void> {
   const items = await data.list<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, {
     household_id: householdId,
     list_id: id,
   });
-  await Promise.all(items.map((item) => data.remove(SHOPPING_ITEMS_TABLE, item.id)));
+  await Promise.all(items.map((item) => removeItem(item.id)));
   await data.remove(SHOPPING_LISTS_TABLE, id);
 }
 
@@ -114,8 +138,13 @@ export async function listShoppingItems(listId: string, householdId: string): Pr
   });
 }
 
-export async function createShoppingItem(input: ShoppingItemInput): Promise<ShoppingListItemRow> {
-  return data.create<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, {
+/**
+ * Payload PUR d'un article : aucune écriture. Le consommateur (hook
+ * `use-courses.ts`, mutateurs injectés dans `products-api.ts`) le transmet à
+ * la couche mutation Tier 1 — voir le commentaire d'en-tête du module.
+ */
+export function buildShoppingItemValues(input: ShoppingItemInput): Partial<ShoppingListItemRow> {
+  return {
     household_id: input.householdId,
     list_id: input.listId,
     name: input.name.trim(),
@@ -129,25 +158,25 @@ export async function createShoppingItem(input: ShoppingItemInput): Promise<Shop
     // qui sont déjà là. Sans ce rang, il se retrouverait au premier rang.
     position: input.position ?? 0,
     created_at: new Date().toISOString(),
-  });
+  };
 }
 
 /**
- * Persiste le réordonnancement manuel issu du glisser-déposer.
+ * VOIES BRUTES CONSERVÉES HORS PÉRIMÈTRE 34-05 — NE PAS EN AJOUTER.
  *
- * Seuls les rangs CHANGÉS sont écrits : un glisser sur une liste de trente
- * articles n'écrit pas trente lignes, mais les deux ou trois qui bougent.
+ * Ces trois aides écrivent un article par un appel adaptateur brut, sans
+ * couche mutation : aucune `client_key` posée par prepareCreate, aucun
+ * enfilage D-02, aucun overlay. Elles ne restent que pour les appelants qui
+ * ne possèdent PAS de couche hook (`sendRecipeIngredientsToCourses` côté
+ * recettes, onglet voyage `trip-courses-tab`), dont le routage Tier 1 est un
+ * chantier distinct. Hors ligne, la garde adaptateur (write-policy.ts,
+ * T-34-05) laisse passer ces tables allowlistées et l'échec réseau remonte
+ * tel quel à leur toast — comportement inchangé, refus clair seulement pour
+ * les tables hors liste. Les chemins Courses du FOYER passent tous par
+ * `use-courses.ts` (Tier 1) : ne pas rattacher de nouveau chemin ici.
  */
-export async function updateShoppingItemPositions(orders: Record<string, number>): Promise<void> {
-  await Promise.all(
-    Object.entries(orders).map(([id, position]) =>
-      data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, id, { position }),
-    ),
-  );
-}
-
-export async function deleteShoppingItem(id: string): Promise<void> {
-  await data.remove(SHOPPING_ITEMS_TABLE, id);
+export async function createShoppingItem(input: ShoppingItemInput): Promise<ShoppingListItemRow> {
+  return data.create<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, buildShoppingItemValues(input));
 }
 
 export interface ShoppingItemUpdate {
@@ -165,4 +194,8 @@ export async function updateShoppingItem(id: string, input: ShoppingItemUpdate):
     unit: input.unit?.trim() || null,
     category: normalizeRayon(input.rayon),
   });
+}
+
+export async function deleteShoppingItem(id: string): Promise<void> {
+  await data.remove(SHOPPING_ITEMS_TABLE, id);
 }

@@ -8,13 +8,10 @@ import { isHouseholdMediaPath, resolveHouseholdMediaUrls } from '@/lib/storage';
 import { daysBetween, toIsoDate, toLocalDate, todayIso } from '@/lib/utils';
 import type { EventRow, ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 import {
-  createShoppingItem,
+  buildShoppingItemValues,
   createShoppingList,
-  deleteShoppingItem,
   deleteShoppingList,
   renameShoppingList,
-  updateShoppingItem,
-  updateShoppingItemPositions,
   SHOPPING_ITEMS_TABLE,
   SHOPPING_LISTS_TABLE,
 } from '../api';
@@ -26,6 +23,7 @@ import {
   resolveScannedProduct,
   scanAddedToast,
   updateProduct,
+  type ItemMutators,
   type ScanResolution,
 } from '../products-api';
 import { isQueryableEan } from '../off-client';
@@ -84,6 +82,12 @@ export interface UseCoursesResult {
   /** Photos affichables du catalogue, forgées à la lecture (D-01) — clé = id produit. */
   productPhotoUrls: Record<string, string>;
   editProduct: (id: string, values: { name: string; brand: string; category: string; ean: string; photoUrl?: string | null }) => Promise<void>;
+  /**
+   * Mutateurs d'article Tier 1 à transmettre à la fiche produit (G-34-1) :
+   * toute écriture d'article issue d'un scan passe par la couche mutation,
+   * y compris quand la fiche orchestre elle-même son dépôt photo.
+   */
+  itemMutators: ItemMutators;
 }
 
 /**
@@ -100,6 +104,21 @@ export function useCourses(): UseCoursesResult {
   const itemResource = useResource<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE);
   const eventResource = useResource<EventRow>('events');
   const productResource = useResource<ProductRow>(PRODUCTS_TABLE);
+
+  /**
+   * Mutateurs d'article injectés dans `products-api.ts` (resolveScannedProduct,
+   * resolveManualOffProduct) : toute écriture d'article — y compris née d'un
+   * scan — passe par la couche mutation Tier 1 (client_key, overlay, marque
+   * D-02 pour l'enfilage hors-ligne, G-34-1). `useMemo` : une identité stable
+   * évite de re-recréer les closures des callbacks qui les portent.
+   */
+  const itemMutators = useMemo(
+    () => ({
+      createItem: (values: Partial<ShoppingListItemRow>) => itemResource.create(values),
+      updateItem: (id: string, values: Partial<ShoppingListItemRow>) => itemResource.update(id, values),
+    }),
+    [itemResource],
+  );
 
   // Les lignes produits portent des CHEMINS de bucket (D-01, WR-08) : on forge
   // les photos affichables à la lecture, en échec fermé (annulation stricte).
@@ -313,31 +332,42 @@ export function useCourses(): UseCoursesResult {
       // Résultat OFF choisi : la fiche catalogue est créée (ou retrouvée) et
       // l'article est lié, comme après un scan. Sinon, article simple.
       if (values.off && isQueryableEan(values.off.ean)) {
-        await resolveManualOffProduct({
-          householdId,
-          listId,
-          name: values.name.trim(),
-          quantity,
-          unit: values.unit.trim() || null,
-          rayon: values.rayon,
-          off: values.off,
-          addedBy: currentMemberId || null,
-        });
+        await resolveManualOffProduct(
+          {
+            householdId,
+            listId,
+            name: values.name.trim(),
+            quantity,
+            unit: values.unit.trim() || null,
+            rayon: values.rayon,
+            off: values.off,
+            addedBy: currentMemberId || null,
+          },
+          itemMutators,
+        );
       } else {
-        await createShoppingItem({
-          householdId,
-          listId,
-          name: values.name.trim(),
-          quantity,
-          unit: values.unit.trim() || null,
-          rayon: normalizeRayon(values.rayon),
-          addedBy: currentMemberId || null,
-          position: nextPosition(listId),
-        });
+        // Couche mutation Tier 1 (G-34-1) : identité client (id + client_key),
+        // overlay optimiste, marque D-02 — l'écriture hors ligne s'enfile
+        // au lieu de lever une TypeError. L'invalidation items est portée
+        // par itemResource ; l'appel local reste pour la liste éventuelle.
+        await itemResource.create(
+          buildShoppingItemValues({
+            householdId,
+            listId,
+            name: values.name.trim(),
+            quantity,
+            unit: values.unit.trim() || null,
+            rayon: normalizeRayon(values.rayon),
+            addedBy: currentMemberId || null,
+            position: nextPosition(listId),
+          }),
+        );
       }
       await invalidate();
     },
-    [currentMemberId, householdId, invalidate],
+    // `itemMutators` est un objet recréé à chaque rendu à partir de
+    // `itemResource` : le recouvrir explicitement garde la closure à jour.
+    [currentMemberId, householdId, invalidate, itemMutators, itemResource, nextPosition],
   );
 
   /** Ajout au clavier : nom seul, rayon repris de l'historique quand il existe. */
@@ -351,19 +381,21 @@ export function useCourses(): UseCoursesResult {
         productEntries.find((entry) => entry.name.toLowerCase() === trimmed.toLowerCase());
       const rawQuantity =
         options?.quantity != null && options.quantity.trim() !== '' ? Number(options.quantity) : null;
-      await createShoppingItem({
-        householdId,
-        listId,
-        name: trimmed,
-        quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null,
-        unit: null,
-        rayon: options?.rayon ? normalizeRayon(options.rayon) : (known ? normalizeRayon(known.rayon) : guessRayon(trimmed)),
-        addedBy: currentMemberId || null,
-        position: nextPosition(listId),
-      });
-      await invalidate();
+      // Tier 1 (G-34-1) : l'invalidation items est portée par itemResource.
+      await itemResource.create(
+        buildShoppingItemValues({
+          householdId,
+          listId,
+          name: trimmed,
+          quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : null,
+          unit: null,
+          rayon: options?.rayon ? normalizeRayon(options.rayon) : (known ? normalizeRayon(known.rayon) : guessRayon(trimmed)),
+          addedBy: currentMemberId || null,
+          position: nextPosition(listId),
+        }),
+      );
     },
-    [currentMemberId, householdId, history, invalidate, productEntries],
+    [currentMemberId, householdId, history, itemResource, nextPosition, productEntries],
   );
 
   /**
@@ -378,25 +410,29 @@ export function useCourses(): UseCoursesResult {
       const siblings = await data.list<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, { household_id: householdId, list_id: listId });
       const current = siblings.find((item) => item.product_id === productId);
       if (current) {
-        await data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, current.id, {
+        // Tier 1 (G-34-1) : la mise à jour passe par la couche mutation —
+        // marque D-02 et enfilage hors-ligne, plus d'appel adaptateur brut.
+        await itemResource.update(current.id, {
           quantity: (current.quantity ?? 1) + 1,
           checked: false,
         });
       } else {
-        await createShoppingItem({
-          householdId,
-          listId,
-          name: product.name,
-          quantity: null,
-          unit: null,
-          rayon: normalizeRayon(product.category),
-          addedBy: currentMemberId || null,
-          productId: product.id,
-        });
+        await itemResource.create(
+          buildShoppingItemValues({
+            householdId,
+            listId,
+            name: product.name,
+            quantity: null,
+            unit: null,
+            rayon: normalizeRayon(product.category),
+            addedBy: currentMemberId || null,
+            productId: product.id,
+          }),
+        );
       }
       await invalidate();
     },
-    [currentMemberId, householdId, invalidate, productResource.rows],
+    [currentMemberId, householdId, invalidate, itemResource, productResource.rows],
   );
 
   /**
@@ -408,22 +444,29 @@ export function useCourses(): UseCoursesResult {
       if (!householdId) throw new Error('Aucun foyer actif : reconnectez-vous.');
       const known = await findProductByEan(householdId, ean.trim());
       if (!known) throw new Error('Produit inconnu : créez-le depuis la fiche.');
-      const resolution = await resolveScannedProduct({
-        householdId,
-        listId,
-        ean: known.ean,
-        name: known.name,
-        brand: known.brand,
-        category: known.category,
-        offData: known.off_data,
-        createdBy: currentMemberId,
-        addedBy: addedBy ?? currentMemberId,
-      });
+      // Mutateurs Tier 1 injectés : l'article naît dans la couche mutation
+      // (client_key, overlay, enfilage), même quand il vient d'un scan.
+      const resolution = await resolveScannedProduct(
+        {
+          householdId,
+          listId,
+          ean: known.ean,
+          name: known.name,
+          brand: known.brand,
+          category: known.category,
+          offData: known.off_data,
+          createdBy: currentMemberId,
+          addedBy: addedBy ?? currentMemberId,
+        },
+        itemMutators,
+      );
       await invalidate();
       toast(scanAddedToast(resolution.product.name, resolution.incremented), 'success');
       return resolution;
     },
-    [currentMemberId, householdId, invalidate, toast],
+    // `itemMutators` dérive de `itemResource` (useMemo) : une seule entrée
+    // suffit, l'identité de l'objet suit celle des mutateurs.
+    [currentMemberId, householdId, invalidate, itemMutators, toast],
   );
 
   const addList = useCallback(
@@ -446,33 +489,36 @@ export function useCourses(): UseCoursesResult {
 
   const removeItem = useCallback(
     async (id: string) => {
-      await deleteShoppingItem(id);
-      await invalidate();
+      // Tier 1 (G-34-1) : l'invalidation items est portée par itemResource.
+      await itemResource.remove(id);
     },
-    [invalidate],
+    [itemResource],
   );
 
   const editItem = useCallback(
     async (id: string, values: { name: string; quantity: string; unit: string; rayon: string }) => {
       const rawQuantity = values.quantity.trim() === '' ? null : Number(values.quantity);
-      await updateShoppingItem(id, {
+      // Tier 1 (G-34-1) : payload d'édition reconstruit sur place (les anciens
+      // updateShoppingItem/deleteShoppingItem de api.ts ne servent plus ici).
+      await itemResource.update(id, {
         name: values.name.trim(),
         quantity: typeof rawQuantity === 'number' && Number.isFinite(rawQuantity) ? rawQuantity : null,
         unit: values.unit.trim() || null,
-        rayon: values.rayon,
+        category: normalizeRayon(values.rayon),
       });
-      await invalidate();
     },
-    [invalidate],
+    [itemResource],
   );
 
   const removeList = useCallback(
     async (id: string) => {
       if (!householdId) return;
-      await deleteShoppingList(id, householdId);
+      // Les ARTICLES partent par le mutateur Tier 1 ; la liste elle-même
+      // reste un appel brut (hors liste blanche — refus D-07 assumé).
+      await deleteShoppingList(id, householdId, itemResource.remove);
       await invalidate();
     },
-    [householdId, invalidate],
+    [householdId, invalidate, itemResource],
   );
 
   const editProduct = useCallback(
@@ -507,10 +553,12 @@ export function useCourses(): UseCoursesResult {
         Object.entries(ranks).filter(([id, rank]) => items.find((item) => item.id === id)?.position !== rank),
       );
       if (Object.keys(changed).length === 0) return;
-      await updateShoppingItemPositions(changed);
-      await invalidate();
+      // Sémantique de l'ancien updateShoppingItemPositions conservée : seuls
+      // les rangs changés sont écrits, en parallèle — mais via la couche
+      // mutation Tier 1 (G-34-1), donc enfilables un par un hors ligne.
+      await Promise.all(Object.entries(changed).map(([id, position]) => itemResource.update(id, { position })));
     },
-    [invalidate, lists],
+    [itemResource, lists],
   );
 
   return {
@@ -542,5 +590,6 @@ export function useCourses(): UseCoursesResult {
     productUsage,
     productPhotoUrls,
     editProduct,
+    itemMutators,
   };
 }
