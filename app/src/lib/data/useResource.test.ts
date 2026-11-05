@@ -33,7 +33,7 @@ const { useResource } = await import('./useResource');
 
 // WR-02 : dépendances du bloc overlay optimiste — importées au niveau module
 // (un `await` n'est pas permis dans une fonction de rappel `describe`).
-const dataModule = (await import('@/lib/data')) as { data: { update: ReturnType<typeof vi.fn> } };
+const dataModule = await import('@/lib/data');
 const { onlineManager } = await import('@tanstack/react-query');
 const { useSessionStore } = await import('@/stores/session-store');
 const { useHouseholdStore } = await import('@/stores/household-store');
@@ -120,11 +120,9 @@ describe('useResource — `rows` a une identité stable quand la requête est d�
 
 describe('useResource — overlay optimiste de l’update (WR-02)', () => {
   const updateMock = vi.fn();
-  const { data } = dataModule;
-
   beforeEach(() => {
     updateMock.mockReset();
-    data.update = updateMock;
+    vi.mocked(dataModule.data.update).mockImplementation(updateMock);
     useSessionStore.setState({
       status: 'authenticated',
       user: { id: 'u-1', email: 'a@b.c', displayName: 'A', avatarUrl: null, provider: 'email' },
