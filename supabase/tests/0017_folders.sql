@@ -49,8 +49,8 @@ begin
   insert into public.task_lists (id, household_id, name, visibility, owner_member_id)
   values (private.new_id('task-list'), home_a, 'Perso Bob Aaaa', 'perso', bob_m)
   returning id into perso_bob;
-  insert into public.tasks (id, household_id, folder_id, name, created_by)
-  values (task_perso, home_a, perso_bob, 'Perso Tâche Aaaa', bob_m);
+  insert into public.tasks (id, household_id, folder_id, name, created_by, client_key) 
+  values(task_perso, home_a, perso_bob, 'Perso Tâche Aaaa', bob_m, gen_random_uuid());
 
   -- 1. Isolation inter-foyer : Carol ne voit ni dossiers ni items de A.
   perform testkit.as_user(carol, 'fold-b-carol@example.fr');
@@ -62,7 +62,7 @@ begin
     testkit.count('select 1 from public.tasks where household_id = ''' || home_a || ''''),
     0::bigint, 'foyer B ne lit aucune tâche de A');
   perform testkit.expect_denied(format(
-    'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
+    'insert into public.tasks (id, household_id, name, client_key) values (%L, %L, %L, gen_random_uuid())',
     private.new_id('task'), home_a, 'Cross Aaaa'),
     'écriture inter-foyer refusée');
   reset role;
@@ -106,7 +106,7 @@ begin
     home_a, 'Kid Aaaa', 'foyer', kid_m),
     'enfant ne crée pas de dossier');
   perform testkit.expect_denied(format(
-    'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
+    'insert into public.tasks (id, household_id, name, client_key) values (%L, %L, %L, gen_random_uuid())',
     private.new_id('task'), home_a, 'Kid Task Aaaa'),
     'enfant ne crée pas de tâche');
   reset role;
@@ -123,17 +123,17 @@ begin
   insert into public.task_lists (household_id, name, visibility, owner_member_id)
   values (home_b, 'Dossier Baaa', 'foyer', carol_m);
   begin
-    insert into public.tasks (id, household_id, folder_id, name)
-    values (private.new_id('task'), home_a,
+    insert into public.tasks (id, household_id, folder_id, name, client_key) 
+    values(private.new_id('task'), home_a,
       (select id from public.task_lists where household_id = home_b and name = 'Dossier Baaa'),
-      'Cross Folder Aaaa');
+      'Cross Folder Aaaa', gen_random_uuid());
     perform testkit.ok(false, 'dossier inter-foyer aurait dû lever 23514');
   exception when check_violation then
     perform testkit.ok(true, 'dossier inter-foyer refusé 23514');
   end;
   begin
-    insert into public.tasks (id, household_id, folder_id, name)
-    values (private.new_id('task'), home_a, 'task-list_00000000-0000-0000-0000-000000000000', 'Ghost Aaaa');
+    insert into public.tasks (id, household_id, folder_id, name, client_key) 
+    values(private.new_id('task'), home_a, 'task-list_00000000-0000-0000-0000-000000000000', 'Ghost Aaaa', gen_random_uuid());
     perform testkit.ok(false, 'dossier absent aurait dû lever 23503');
   exception when foreign_key_violation then
     -- FK d'abord (23503) : le trigger ne voit jamais la ligne.

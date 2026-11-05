@@ -33,8 +33,8 @@ begin
   insert into public.products (id, household_id, ean, name, brand, created_by)
   values (prod_a, home_a, '3017620422003', 'Nutella', 'Ferrero', alice_m);
 
-  insert into public.shopping_list_items (id, list_id, household_id, name, product_id, added_by)
-  values (item_a, list_a, home_a, 'Nutella', prod_a, alice_m);
+  insert into public.shopping_list_items (id, list_id, household_id, name, product_id, added_by, client_key) 
+  values(item_a, list_a, home_a, 'Nutella', prod_a, alice_m, gen_random_uuid());
 
   insert into testkit.fx (key, user_id, household_id, row_id) values
     ('alice', alice, home_a, alice_m),
@@ -83,7 +83,7 @@ select testkit.expect_denied(format(
   'prod_b', (select household_id from testkit.fx where key = 'carol'), '3017620422003', 'Nutella de Carol'),
   'Alice ne peut pas ecrire dans le foyer B meme avec un EAN partage');
 select testkit.expect_denied(format(
-  'insert into public.shopping_list_items (id, list_id, household_id, name, product_id, added_by) values (%L, %L, %L, %L, %L, %L)',
+  'insert into public.shopping_list_items (id, list_id, household_id, name, product_id, added_by, client_key) values (%L, %L, %L, %L, %L, %L, gen_random_uuid())',
   'item_piege', (select row_id from testkit.fx where key = 'list_a'),
   (select household_id from testkit.fx where key = 'alice'), 'Piege', 'prod_b_0022',
   (select row_id from testkit.fx where key = 'alice')),

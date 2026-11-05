@@ -89,9 +89,9 @@ begin
   select row_id into v_lea from testkit.fx where key = 't150-lea_m';
   select row_id into v_alice_m from testkit.fx where key = 't150-alice_m';
 
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values ('t150-task', v_home, 'Tache de Lea', 'a_faire', v_alice_m);
-  insert into public.task_assignees (task_id, member_id) values ('t150-task', v_lea);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values('t150-task', v_home, 'Tache de Lea', 'a_faire', v_alice_m, gen_random_uuid());
+  insert into public.task_assignees (task_id, member_id, client_key)  values('t150-task', v_lea, gen_random_uuid());
 
   insert into public.posts (id, household_id, author_id, text)
   values ('t150-post', v_home, v_lea, 'Message de Lea');

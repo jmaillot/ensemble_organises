@@ -49,16 +49,14 @@ begin
   insert into public.routine_folders (id, household_id, name, visibility, owner_member_id)
   values ('rfolder_t134_perso', home, 'Routines de Bob', 'perso', bob_m);
 
-  insert into public.tasks (id, household_id, name, created_by, folder_id)
-  values ('task_t134_a', home, 'Tâche privée A', bob_m, 'list_t134_perso'),
-         ('task_t134_b', home, 'Tâche privée B', bob_m, 'list_t134_perso'),
-         ('task_t134_foyer', home, 'Tâche du foyer', alice_m, 'list_t134_foyer');
+  insert into public.tasks (id, household_id, name, created_by, folder_id, client_key) 
+  values('task_t134_a', home, 'Tâche privée A', bob_m, 'list_t134_perso', gen_random_uuid()),('task_t134_b', home, 'Tâche privée B', bob_m, 'list_t134_perso', gen_random_uuid()),('task_t134_foyer', home, 'Tâche du foyer', alice_m, 'list_t134_foyer', gen_random_uuid());
 
   insert into public.notes (id, household_id, title, created_by, folder_id)
   values ('note_t134', home, 'Note privée', bob_m, 'nfolder_t134_perso');
 
-  insert into public.routines (id, household_id, name, created_by, folder_id)
-  values ('routine_t134', home, 'Routine privée', bob_m, 'rfolder_t134_perso');
+  insert into public.routines (id, household_id, name, created_by, folder_id, client_key) 
+  values('routine_t134', home, 'Routine privée', bob_m, 'rfolder_t134_perso', gen_random_uuid());
 
   -- Les dossiers Général naissent avec le foyer par `create_household` (0052),
   -- pas par un trigger : la fixture les pose elle-même, comme le fait le RPC.

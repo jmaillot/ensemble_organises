@@ -130,9 +130,9 @@ begin
   select row_id into v_noe from testkit.fx where key = 't147-noe_m';
   select row_id into v_alice_m from testkit.fx where key = 't147-alice_m';
 
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values (v_task, v_home, 'Tache enfant t147', 'a_faire', v_alice_m);
-  insert into public.task_assignees (task_id, member_id) values (v_task, v_noe);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values(v_task, v_home, 'Tache enfant t147', 'a_faire', v_alice_m, gen_random_uuid());
+  insert into public.task_assignees (task_id, member_id, client_key) values (v_task, v_noe, gen_random_uuid());
   insert into public.task_reminders (id, task_id, remind_at)
   values (private.new_id('task-reminder'), v_task, now() - interval '10 minutes');
 
@@ -192,9 +192,9 @@ begin
   select row_id into v_bob_m from testkit.fx where key = 't147-bob_m';
   select row_id into v_alice_m from testkit.fx where key = 't147-alice_m';
 
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values (v_task2, v_home, 'Tache adulte t147', 'a_faire', v_alice_m);
-  insert into public.task_assignees (task_id, member_id) values (v_task2, v_bob_m);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values(v_task2, v_home, 'Tache adulte t147', 'a_faire', v_alice_m, gen_random_uuid());
+  insert into public.task_assignees (task_id, member_id, client_key) values (v_task2, v_bob_m, gen_random_uuid());
   insert into public.task_reminders (id, task_id, remind_at)
   values (private.new_id('task-reminder'), v_task2, now() - interval '5 minutes');
 

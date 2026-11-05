@@ -91,10 +91,10 @@ begin
   select row_id into v_bob_m from testkit.fx where key = 't153-bob_m';
   select row_id into v_noe_m from testkit.fx where key = 't153-noe_m';
 
-  insert into public.routines (id, household_id, name, recurrence_rule, created_by)
-  values ('t153-routine', v_home, 'Routine CCT', 'FREQ=DAILY', v_bob_m);
-  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, completed_by, actor_member_id)
-  values ('t153-completion', 't153-routine', v_home, current_date, v_noe_m, v_noe_m);
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, client_key) 
+  values('t153-routine', v_home, 'Routine CCT', 'FREQ=DAILY', v_bob_m, gen_random_uuid());
+  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, completed_by, actor_member_id, client_key) 
+  values('t153-completion', 't153-routine', v_home, current_date, v_noe_m, v_noe_m, gen_random_uuid());
 end;
 $t153$;
 

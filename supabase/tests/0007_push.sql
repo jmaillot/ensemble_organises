@@ -279,16 +279,16 @@ declare
   -- revendique celles qui sont adressées à ses propres membres.
   v_membres uuid[] := array[v_alice, v_bob, v_kid];
 begin
-  insert into public.tasks (id, household_id, name, description, due_date, status, created_by)
-  values (v_task, v_home, 'Sortir le chien', 'Avant 20 h', current_date, 'a_faire', v_alice_m);
+  insert into public.tasks (id, household_id, name, description, due_date, status, created_by, client_key) 
+  values(v_task, v_home, 'Sortir le chien', 'Avant 20 h', current_date, 'a_faire', v_alice_m, gen_random_uuid());
   v_task_id := v_task;
 
   insert into public.events (id, household_id, title, start_at, created_by)
   values (v_event, v_home, 'Médecin', now() + interval '2 hours', v_alice_m);
   v_event_id := v_event;
 
-  insert into public.routines (id, household_id, name, recurrence_rule, created_by)
-  values (v_routine, v_home, 'Poubelle', 'FREQ=WEEKLY;BYDAY=WE', v_alice_m);
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, client_key) 
+  values(v_routine, v_home, 'Poubelle', 'FREQ=WEEKLY;BYDAY=WE', v_alice_m, gen_random_uuid());
   v_routine_id := v_routine;
 
   -- Rappel dû il y a dix minutes : dans la fenêtre.
@@ -363,7 +363,7 @@ begin
 
   -- Un assignataire reçoit le rappel, et le créateur ne le reçoit pas une
   -- seconde fois pour la même tâche.
-  insert into public.task_assignees (task_id, member_id) values (v_task_id, v_bob_m);
+  insert into public.task_assignees (task_id, member_id, client_key) values (v_task_id, v_bob_m, gen_random_uuid());
   perform testkit.eq(
     (select count(*) from private.push_reminder_notifications(now())
       where url = '/taches' and user_id = any (v_membres)),

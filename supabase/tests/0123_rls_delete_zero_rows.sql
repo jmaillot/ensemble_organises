@@ -37,9 +37,8 @@ begin
 
   -- Deux tâches distinctes : la négative (non admin) et la positive (admin),
   -- pour que le succès de l'une ne consomme pas la ligne de l'autre.
-  insert into public.tasks (id, household_id, name, created_by, status)
-  values ('task_t23_non_admin', home, 'Tâche non admin', alice_m, 'a_faire'),
-         ('task_t23_admin', home, 'Tâche admin', alice_m, 'a_faire');
+  insert into public.tasks (id, household_id, name, created_by, status, client_key) 
+  values('task_t23_non_admin', home, 'Tâche non admin', alice_m, 'a_faire', gen_random_uuid()),('task_t23_admin', home, 'Tâche admin', alice_m, 'a_faire', gen_random_uuid());
 end;
 $$;
 

@@ -286,10 +286,10 @@ begin
   select household_id into v_home_a from testkit.fx where key = 't146-home-a';
   select row_id into v_alice_m from testkit.fx where key = 't146-alice_m';
 
-  insert into public.tasks (id, household_id, name, created_by)
-  values ('t146-task', v_home_a, 'Tâche t146', v_alice_m);
-  insert into public.routines (id, household_id, name, created_by)
-  values ('t146-routine', v_home_a, 'Routine t146', v_alice_m);
+  insert into public.tasks (id, household_id, name, created_by, client_key) 
+  values('t146-task', v_home_a, 'Tâche t146', v_alice_m, gen_random_uuid());
+  insert into public.routines (id, household_id, name, created_by, client_key) 
+  values('t146-routine', v_home_a, 'Routine t146', v_alice_m, gen_random_uuid());
 end;
 $t146$;
 

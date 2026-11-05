@@ -159,12 +159,12 @@ begin
   update public.household_members set user_id = kid where id = kid_m;
 
   with ins as (
-    insert into public.tasks (household_id, name, created_by)
-    values (home_a, 'Ranger la chambre t145', alice_m)
+    insert into public.tasks (household_id, name, created_by, client_key) 
+    values(home_a, 'Ranger la chambre t145', alice_m, gen_random_uuid())
     returning id
   )
-  insert into public.task_assignees (task_id, member_id)
-  select id, kid_m from ins;
+  insert into public.task_assignees (task_id, member_id, client_key) 
+  select id, kid_m , gen_random_uuid() from ins;
 
   insert into testkit.fx (key, user_id) values ('t145-kid', kid);
   insert into testkit.fx (key, row_id)

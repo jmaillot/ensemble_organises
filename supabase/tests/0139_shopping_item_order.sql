@@ -42,13 +42,11 @@ begin
   list_z := 'list_t139_z';
 
   -- Trois articles, trois dates distinctes : l'ordre de création est net.
-  insert into public.shopping_list_items (id, list_id, household_id, name, created_at)
-  values ('item_t139_1', list_a, home, 'Premier',  '2026-01-01T08:00:00'),
-         ('item_t139_2', list_a, home, 'Deuxième', '2026-01-02T08:00:00'),
-         ('item_t139_3', list_a, home, 'Troisième', '2026-01-03T08:00:00');
+  insert into public.shopping_list_items (id, list_id, household_id, name, created_at, client_key) 
+  values('item_t139_1', list_a, home, 'Premier',  '2026-01-01T08:00:00', gen_random_uuid()),('item_t139_2', list_a, home, 'Deuxième', '2026-01-02T08:00:00', gen_random_uuid()),('item_t139_3', list_a, home, 'Troisième', '2026-01-03T08:00:00', gen_random_uuid());
 
-  insert into public.shopping_list_items (id, list_id, household_id, name, created_at)
-  values ('item_t139_z', list_z, home2, 'Étranger', '2026-01-01T08:00:00');
+  insert into public.shopping_list_items (id, list_id, household_id, name, created_at, client_key) 
+  values('item_t139_z', list_z, home2, 'Étranger', '2026-01-01T08:00:00', gen_random_uuid());
 
   -- Les appartenances : sans elles, Bob n'est PAS membre du foyer et ses
   -- écritures seraient filtrées en silence (0 ligne, aucune erreur) — un

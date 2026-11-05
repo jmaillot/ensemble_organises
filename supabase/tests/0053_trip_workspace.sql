@@ -81,9 +81,8 @@ begin
          (list_a2, home_a, 'Courses Rome', dave_m, trip_a2);
   insert into public.notes (id, household_id, title, created_by, trip_id)
   values (note_a1, home_a, 'Carnet Lisbonne', bob_m, trip_a1);
-  insert into public.tasks (id, household_id, name, created_by, trip_id, folder_id)
-  values (task_a1, home_a, 'Valises Lisbonne', bob_m, trip_a1, null),
-         (task_foyer, home_a, 'Tache foyer', bob_m, null, null);
+  insert into public.tasks (id, household_id, name, created_by, trip_id, folder_id, client_key) 
+  values(task_a1, home_a, 'Valises Lisbonne', bob_m, trip_a1, null, gen_random_uuid()),(task_foyer, home_a, 'Tache foyer', bob_m, null, null, gen_random_uuid());
   insert into public.places (id, household_id, type, name, trip_id)
   values (place_a1, home_a, 'restaurant', 'Cantine Lisbonne', trip_a1);
 
@@ -405,7 +404,7 @@ select testkit.expect_denied(format(
   'le foyer d''un voyage ne change pas');
 
 select testkit.expect_denied(format(
-  'insert into public.tasks (household_id, name, trip_id, folder_id) values (%L, %L, %L, %L)',
+  'insert into public.tasks (household_id, name, trip_id, folder_id, client_key) values (%L, %L, %L, %L, gen_random_uuid())',
   (select household_id from testkit.fx where key = 'home_a'),
   'Tache dossier voyage',
   (select row_id from testkit.fx where key = 'trip_a1'),
@@ -415,19 +414,19 @@ select testkit.expect_denied(format(
 reset role;
 
 select testkit.expect_denied(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_a1'),
   (select row_id from testkit.fx where key = 'dave_m')),
   'l''assigne d''une tache de voyage est membre du voyage');
 
 select testkit.eq(testkit.affected(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_a1'),
   (select row_id from testkit.fx where key = 'bob_m'))), 1::bigint,
   'un membre du voyage est assignable');
 
 select testkit.eq(testkit.affected(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_foyer'),
   (select row_id from testkit.fx where key = 'dave_m'))), 1::bigint,
   'une tache de foyer garde son regime d''assignation');

@@ -37,11 +37,11 @@ begin
   bob_m   := testkit.member(home, bob, 'Bob Remplace', 'membre');
   zoe_m   := testkit.member(home2, zoe, 'Zoe Ailleurs', 'admin');
 
-  insert into public.tasks (id, household_id, name, created_by)
-  values ('task_t133', home, 'Tâche remplacement', alice_m);
+  insert into public.tasks (id, household_id, name, created_by, client_key) 
+  values('task_t133', home, 'Tâche remplacement', alice_m, gen_random_uuid());
 
-  insert into public.routines (id, household_id, name, created_by)
-  values ('routine_t133', home, 'Routine remplacement', alice_m);
+  insert into public.routines (id, household_id, name, created_by, client_key) 
+  values('routine_t133', home, 'Routine remplacement', alice_m, gen_random_uuid());
 
   insert into public.recipes (id, household_id, title)
   values ('recipe_t133', home, 'Recette remplacement');

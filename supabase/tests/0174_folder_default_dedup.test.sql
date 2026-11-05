@@ -115,11 +115,11 @@ select 'gen_doublon', id from public.routine_folders
    and is_default
    and id <> (select row_id from testkit.fx where key = 'gen_survivant');
 
-insert into public.routines (id, household_id, name, created_by)
-values (private.new_id('routine'),
+insert into public.routines (id, household_id, name, created_by, client_key) 
+values(private.new_id('routine'),
         (select household_id from testkit.fx where key = 'home'),
         'MARQUEDEDUPE routine sur le doublon',
-        (select row_id from testkit.fx where key = 'alice_m'));
+        (select row_id from testkit.fx where key = 'alice_m'), gen_random_uuid());
 update public.routines
    set folder_id = (select row_id from testkit.fx where key = 'gen_doublon')
  where name = 'MARQUEDEDUPE routine sur le doublon';

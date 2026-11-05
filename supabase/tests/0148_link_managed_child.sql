@@ -117,14 +117,14 @@ begin
   select row_id into v_noe from testkit.fx where key = 't148-noe_m';
   select row_id into v_alice_m from testkit.fx where key = 't148-alice_m';
 
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values ('t148-task', v_home, 'Tache de Noe', 'a_faire', v_alice_m);
-  insert into public.task_assignees (task_id, member_id) values ('t148-task', v_noe);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values('t148-task', v_home, 'Tache de Noe', 'a_faire', v_alice_m, gen_random_uuid());
+  insert into public.task_assignees (task_id, member_id, client_key)  values('t148-task', v_noe, gen_random_uuid());
 
-  insert into public.routines (id, household_id, name, recurrence_rule, created_by)
-  values ('t148-routine', v_home, 'Routine t148', 'FREQ=DAILY', v_alice_m);
-  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, completed_by, actor_member_id)
-  values ('t148-completion', 't148-routine', v_home, current_date, v_noe, v_noe);
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, client_key) 
+  values('t148-routine', v_home, 'Routine t148', 'FREQ=DAILY', v_alice_m, gen_random_uuid());
+  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, completed_by, actor_member_id, client_key) 
+  values('t148-completion', 't148-routine', v_home, current_date, v_noe, v_noe, gen_random_uuid());
 
   insert into public.posts (id, household_id, author_id, text)
   values ('t148-post', v_home, v_noe, 'Message de Noe');
@@ -267,10 +267,10 @@ begin
   select row_id into v_bob_m from testkit.fx where key = 't148-bob_m';
   select row_id into v_paule_m from testkit.fx where key = 't148-paule_m';
 
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values ('t148-task2', v_home, 'Tache collision', 'a_faire', v_bob_m);
-  insert into public.task_assignees (task_id, member_id)
-  values ('t148-task2', v_paule_m), ('t148-task2', v_bob_m);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values('t148-task2', v_home, 'Tache collision', 'a_faire', v_bob_m, gen_random_uuid());
+  insert into public.task_assignees (task_id, member_id, client_key) 
+  values('t148-task2', v_paule_m, gen_random_uuid()),('t148-task2', v_bob_m, gen_random_uuid());
 end;
 $t148$;
 

@@ -54,14 +54,12 @@ declare
   -- jour trop tôt par rapport à l'assertion (deferred-items.md §14).
   v_today date := (now() at time zone 'Europe/Paris')::date;
 begin
-  insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at)
-  values
-    (daily, home_a, 'Sortie canine', 'FREQ=DAILY', alice_m, now() - interval '30 days'),
-    (weekly, home_a, 'Poubelle', 'FREQ=WEEKLY;BYDAY=WE', alice_m, now() - interval '30 days');
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at, client_key) 
+  values(daily, home_a, 'Sortie canine', 'FREQ=DAILY', alice_m, now() - interval '30 days', gen_random_uuid()),(weekly, home_a, 'Poubelle', 'FREQ=WEEKLY;BYDAY=WE', alice_m, now() - interval '30 days', gen_random_uuid());
 
   -- Une occurrence déjà validée ne doit jamais être écrasée.
-  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, status, completed_by, completed_at)
-  values (private.new_id('routine-completion'), daily, home_a, v_today - 20, 'fait', alice_m, now());
+  insert into public.routine_completions (id, routine_id, household_id, occurrence_date, status, completed_by, completed_at, client_key) 
+  values(private.new_id('routine-completion'), daily, home_a, v_today - 20, 'fait', alice_m, now(), gen_random_uuid());
 
   perform testkit.eq(private.generate_routine_occurrences(current_date - 14, current_date) >= 15, true,
     'les occurrences des 14 derniers jours sont générées');
@@ -80,7 +78,7 @@ begin
 
   -- Occurrences dupliquées impossibles.
   perform testkit.expect_denied(format(
-    'insert into public.routine_completions (id, routine_id, household_id, occurrence_date) values (%L, %L, %L, current_date)',
+    'insert into public.routine_completions (id, routine_id, household_id, occurrence_date, client_key) values (%L, %L, %L, current_date, gen_random_uuid())',
     private.new_id('routine-completion'), daily, home_a));
 end;
 $$;
@@ -150,8 +148,8 @@ declare
   daily_b text := private.new_id('routine');
   v_today date := (now() at time zone 'Europe/Paris')::date;
 begin
-  insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at)
-  values (daily_b, home_b, 'Arrosage 30', 'FREQ=DAILY', bob_m, now() - interval '5 days');
+  insert into public.routines (id, household_id, name, recurrence_rule, created_by, created_at, client_key) 
+  values(daily_b, home_b, 'Arrosage 30', 'FREQ=DAILY', bob_m, now() - interval '5 days', gen_random_uuid());
 
   -- La fonction de maintenance, exactement ce que le job pg_cron appelle.
   perform private.run_daily_routine_maintenance();

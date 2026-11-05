@@ -17,8 +17,8 @@ declare
   task_a text := private.new_id('task');
   note_a text := private.new_id('note');
 begin
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values (task_a, home_a, 'Tache Alice Uuuu', 'a_faire', alice_m);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values(task_a, home_a, 'Tache Alice Uuuu', 'a_faire', alice_m, gen_random_uuid());
   insert into public.notes (id, household_id, title, content, created_by)
   values (note_a, home_a, 'Note Alice Uuuu', 'contenu', alice_m);
 
@@ -54,7 +54,7 @@ begin
   perform testkit.as_user(bob, 'upd-bob@example.fr');
   set local role authenticated;
   perform testkit.expect_denied(format(
-    'insert into public.tasks (id, household_id, name, created_by) values (%L, %L, %L, %L)',
+    'insert into public.tasks (id, household_id, name, created_by, client_key) values (%L, %L, %L, %L, gen_random_uuid())',
     private.new_id('task'), home_a, 'Au nom d''Alice Uuuu', alice_m),
     'impossible d''ecrire au nom d''un autre membre');
   reset role;

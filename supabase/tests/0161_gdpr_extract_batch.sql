@@ -44,22 +44,22 @@ begin
 
   -- Tâches : chacune créée par son membre (created_by porte l'ID DE MEMBRE,
   -- texte — motif vérifié en base : jamais l'uuid utilisateur).
-  insert into public.tasks (household_id, name, status, created_by)
-  values (home_a, 'Tâche Alice 161', 'a_faire', alice_m)
+  insert into public.tasks (household_id, name, status, created_by, client_key) 
+  values(home_a, 'Tâche Alice 161', 'a_faire', alice_m, gen_random_uuid())
   returning id into alice_task;
-  insert into public.tasks (household_id, name, status, created_by)
-  values (home_a, 'Tâche Bob 161', 'a_faire', bob_m)
+  insert into public.tasks (household_id, name, status, created_by, client_key) 
+  values(home_a, 'Tâche Bob 161', 'a_faire', bob_m, gen_random_uuid())
   returning id into bob_task;
-  insert into public.tasks (household_id, name, status, created_by)
-  values (home_b, 'Tâche Charlie 161', 'a_faire', charlie_m)
+  insert into public.tasks (household_id, name, status, created_by, client_key) 
+  values(home_b, 'Tâche Charlie 161', 'a_faire', charlie_m, gen_random_uuid())
   returning id into charlie_task;
 
   -- Tâche créée par BOB mais ASSIGNÉE à ALICE (MR-02) : elle concerne Alice
   -- par le chemin `task_assignees`, pas par `created_by`.
-  insert into public.tasks (household_id, name, status, created_by)
-  values (home_a, 'Tâche partagée Bob→Alice 161', 'a_faire', bob_m)
+  insert into public.tasks (household_id, name, status, created_by, client_key) 
+  values(home_a, 'Tâche partagée Bob→Alice 161', 'a_faire', bob_m, gen_random_uuid())
   returning id into shared_task;
-  insert into public.task_assignees (task_id, member_id) values (shared_task, alice_m);
+  insert into public.task_assignees (task_id, member_id, client_key) values (shared_task, alice_m, gen_random_uuid());
 
   -- Note d'Alice avec une pièce jointe chemin-bucket ET une valeur héritée.
   insert into public.notes (household_id, title, content, created_by)
@@ -233,10 +233,8 @@ begin
   select id into bob_m from public.household_members
    where user_id = bob and household_id = home_a;
 
-  insert into public.tasks (household_id, name, status, created_by)
-  values (home_a, 'Tâche Bob extra 1', 'a_faire', bob_m),
-         (home_a, 'Tâche Bob extra 2', 'a_faire', bob_m),
-         (home_a, 'Tâche Bob extra 3', 'a_faire', bob_m);
+  insert into public.tasks (household_id, name, status, created_by, client_key) 
+  values(home_a, 'Tâche Bob extra 1', 'a_faire', bob_m, gen_random_uuid()),(home_a, 'Tâche Bob extra 2', 'a_faire', bob_m, gen_random_uuid()),(home_a, 'Tâche Bob extra 3', 'a_faire', bob_m, gen_random_uuid());
 
   insert into public.gdpr_export_jobs (user_id) values (bob)
   returning id into bob_job;

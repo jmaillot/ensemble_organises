@@ -81,8 +81,8 @@ begin
          (react_b3, post_a, home_a, alice_m, 'coeur');
   insert into public.post_media (id, post_id, household_id, media_type, url)
   values (media_a1, post_a, home_a, 'photo', 'https://example.fr/auteur.jpg');
-  insert into public.tasks (id, household_id, name, status, created_by)
-  values (task_a, home_a, 'Tache Alice Auteur', 'a_faire', alice_m);
+  insert into public.tasks (id, household_id, name, status, created_by, client_key) 
+  values(task_a, home_a, 'Tache Alice Auteur', 'a_faire', alice_m, gen_random_uuid());
   insert into public.notes (id, household_id, title, content, created_by)
   values (note_a, home_a, 'Note Alice Auteur', 'contenu', alice_m);
 end;

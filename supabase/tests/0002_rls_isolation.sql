@@ -48,13 +48,11 @@ begin
   insert into public.shopping_lists (id, household_id, name, created_by)
   values (list_a, home_a, 'Fresque', alice_m), (list_b, home_b, 'Fresque', carol_m);
 
-  insert into public.shopping_list_items (id, list_id, household_id, name, added_by)
-  values (private.new_id('item'), list_a, home_a, 'Yaourts', alice_m),
-         (private.new_id('item'), list_b, home_b, 'Papier toilette', carol_m);
+  insert into public.shopping_list_items (id, list_id, household_id, name, added_by, client_key) 
+  values(private.new_id('item'), list_a, home_a, 'Yaourts', alice_m, gen_random_uuid()),(private.new_id('item'), list_b, home_b, 'Papier toilette', carol_m, gen_random_uuid());
 
-  insert into public.tasks (id, household_id, name, due_date, status, created_by)
-  values (task_a, home_a, 'Valider le carnet', current_date, 'a_faire', alice_m),
-         (task_b, home_b, 'Acheter du pain', current_date, 'a_faire', carol_m);
+  insert into public.tasks (id, household_id, name, due_date, status, created_by, client_key) 
+  values(task_a, home_a, 'Valider le carnet', current_date, 'a_faire', alice_m, gen_random_uuid()),(task_b, home_b, 'Acheter du pain', current_date, 'a_faire', carol_m, gen_random_uuid());
 
   insert into public.events (id, household_id, title, start_at, created_by)
   values (event_a, home_a, 'Rendez-vous médecin', current_date + time '19:30', alice_m),
@@ -160,7 +158,7 @@ select testkit.eq(testkit.count('select 1 from public.dashboard_widgets'), 1::bi
 
 -- --- Écriture inter-foyer : refusée -----------------------------------------
 select testkit.expect_denied(format(
-  'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
+  'insert into public.tasks (id, household_id, name, client_key) values (%L, %L, %L, gen_random_uuid())',
   'task_x', (select household_id from testkit.fx where key = 'carol'), 'Intruse'));
 select testkit.eq(testkit.affected(format(
   'update public.tasks set name = %L where id = %L', 'Détournée', (select row_id from testkit.fx where key = 'task_b'))), 0::bigint,
@@ -201,14 +199,14 @@ select testkit.ok(
 
 -- --- Tables enfants : accès dérivé du parent ---------------------------------
 select testkit.expect_denied(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_b'), (select row_id from testkit.fx where key = 'alice')));
 select testkit.expect_denied(format(
   'insert into public.expense_participants (id, expense_id, participant_type, member_id, share_amount)'
   ' values (%L, %L, ''membre'', %L, 1)',
   'ep_x', (select row_id from testkit.fx where key = 'expense_b'), (select row_id from testkit.fx where key = 'alice')));
 select testkit.expect_denied(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_a'), (select row_id from testkit.fx where key = 'carol')),
   'un assignataire doit appartenir au foyer de la tâche');
 
@@ -219,11 +217,11 @@ select testkit.expect_denied(format(
 -- le rôle propriétaire, hors RLS. Ces assertions sont les seules qui auraient
 -- vu la régression : une assignation même foyer DOIT passer en authenticated.
 select testkit.eq(testkit.affected(format(
-  'insert into public.task_assignees (task_id, member_id) values (%L, %L)',
+  'insert into public.task_assignees (task_id, member_id, client_key) values (%L, %L, gen_random_uuid())',
   (select row_id from testkit.fx where key = 'task_a'), (select row_id from testkit.fx where key = 'bob'))), 1::bigint,
   'Alice assigne Bob à une tâche de son foyer');
 select testkit.eq(testkit.affected(format(
-  'insert into public.routines (id, household_id, name, created_by) values (%L, %L, %L, %L)',
+  'insert into public.routines (id, household_id, name, created_by, client_key) values (%L, %L, %L, %L, gen_random_uuid())',
   'routine_a', (select household_id from testkit.fx where key = 'alice'), 'Vaisselle', (select row_id from testkit.fx where key = 'alice'))), 1::bigint,
   'Alice crée une routine de son foyer');
 select testkit.eq(testkit.affected(format(
@@ -240,14 +238,14 @@ select testkit.eq(testkit.affected(format(
 
 -- --- Intégrité des colonnes dénormalisées et références ---------------------
 select testkit.expect_denied(format(
-  'insert into public.shopping_list_items (id, list_id, household_id, name) values (%L, %L, %L, %L)',
+  'insert into public.shopping_list_items (id, list_id, household_id, name, client_key) values (%L, %L, %L, %L, gen_random_uuid())',
   'item_x', (select row_id from testkit.fx where key = 'list_a'), (select household_id from testkit.fx where key = 'carol'), 'Yaourt'));
 select testkit.expect_denied(format(
   'insert into public.expenses (id, household_id, title, amount, paid_by, expense_date)'
   ' values (%L, %L, %L, 10, %L, current_date)',
   'expense_x', (select household_id from testkit.fx where key = 'alice'), 'Interfoyer', (select row_id from testkit.fx where key = 'carol')));
 select testkit.expect_denied(format(
-  'insert into public.tasks (id, household_id, name, created_by) values (%L, %L, %L, %L)',
+  'insert into public.tasks (id, household_id, name, created_by, client_key) values (%L, %L, %L, %L, gen_random_uuid())',
   'task_y', (select household_id from testkit.fx where key = 'alice'), 'Au nom de Bob', (select row_id from testkit.fx where key = 'bob')),
   'impossible d''écrire au nom d''un autre membre');
 
@@ -404,7 +402,7 @@ set local role authenticated;
 select testkit.eq(testkit.count('select 1 from public.tasks'), 0::bigint,
   'un uid sans membre résolu ne lit aucune tâche du foyer (0145)');
 select testkit.expect_denied(format(
-  'insert into public.tasks (id, household_id, name) values (%L, %L, %L)',
+  'insert into public.tasks (id, household_id, name, client_key) values (%L, %L, %L, gen_random_uuid())',
   'task_kid', (select household_id from testkit.fx where key = 'alice'), 'Tâche d''enfant'),
   'un uid sans membre résolu n''écrit pas de tâche');
 select testkit.eq(testkit.affected(format(
