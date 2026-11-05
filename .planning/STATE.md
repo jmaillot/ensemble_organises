@@ -4,10 +4,10 @@ milestone: v1.1
 current_phase: 34
 current_phase_name: File d'écriture & rejeu
 status: executing
-stopped_at: Completed 34-01-PLAN.md
-last_updated: "2026-11-05T10:57:01.693Z"
+stopped_at: Completed 34-02-PLAN.md
+last_updated: "2026-11-05T11:35:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 34 execution started
+last_activity_desc: Plan 34-02 exécuté (outbox, enfilage, liste blanche, persistance)
 state_head: e6b0c89517f743961728034c0e513075baaeb93a
 progress:
   total_phases: 4
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 34 (File d'écriture & rejeu) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-11-05 — Phase 34 execution started
+Last activity: 2026-11-05 — Plan 34-02 exécuté (outbox, enfilage, liste blanche, persistance)
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -55,6 +55,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 34 P01 | 50min | 3 tasks | 25 files |
 | Phase 34 P01 | 50min | 3 tasks | 25 files |
 | Phase 34 P01 | 50min | 3 tasks | 25 files |
+| Phase 34 P02 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
 - [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
 - [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
+- [Phase 34]: 34-02 : outbox = query TanStack persistée dans le persister 33 (D-01), enfilage par MutationCache.onError central (D-02, pas de resumePausedMutations) ; WRITE_ALLOWLIST = les 5 tables D-14 exactement ; la garde upfront D-07 ne refuse que HORS LIGNE (en ligne, les modules hors liste fonctionnent) ; portée outbox via setOutboxScopeProvider enregistré par session-store (cycle d'imports évité) ; buster cache v2
 
 ### Pending Todos
 
@@ -84,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-05T10:57:01.641Z
-Stopped at: Completed 34-01-PLAN.md
+Last session: 2026-11-05T11:35:00.000Z
+Stopped at: Completed 34-02-PLAN.md
 Resume file: None

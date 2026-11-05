@@ -23,8 +23,8 @@
 ### File d'écriture (WRQ)
 
 - [x] **WRQ-01** : Migration SQL d'idempotence : clé client UUID sur les écritures Tier 1 (upsert/unicité) avec tests SQL négatifs §2.7 — prérequis de toute écriture en file
-- [ ] **WRQ-02** : Une écriture simple effectuée hors-ligne sur un module Tier 1 (ajout/coche Courses, Tâches, Routines) est enfilée localement et rejouée automatiquement au retour du réseau (foreground)
-- [ ] **WRQ-03** : La file est une liste blanche : toute écriture sur un module hors liste (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client avec un test qui le prouve
+- [ ] **WRQ-02** : Une écriture simple effectuée hors-ligne sur un module Tier 1 (ajout/coche Courses, Tâches, Routines) est enfilée localement et rejouée automatiquement au retour du réseau (foreground) — ENFILAGE livré (34-02), rejeu au plan 34-03
+- [x] **WRQ-03** : La file est une liste blanche : toute écriture sur un module hors liste (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client avec un test qui le prouve
 - [ ] **WRQ-04** : Un rejeu qui bute sur un refus RLS ou une ligne supprimée est classé terminal (surfacer à l'utilisateur, retirer de la file) vs retryable (réseau) — jamais de retry en boucle, jamais d'effacement silencieux
 - [ ] **WRQ-05** : Un badge « N en attente » est visible (offline-banner) avec la liste consultable des écritures pendantes ; il retombe à zéro après rejeu complet
 - [ ] **WRQ-06** : Le rejeu est réconcilié avec Realtime : une écriture rejouée ne crée jamais de doublon (réconciliation par clé client, Realtime/invalidation priment sur l'overlay optimiste)
@@ -71,8 +71,8 @@
 | OFFR-04 | Phase 33 | Complete (33-04) |
 | OFFR-05 | Phase 33 | Pending |
 | WRQ-01 | Phase 34 | Complete |
-| WRQ-02 | Phase 34 | Pending |
-| WRQ-03 | Phase 34 | Pending |
+| WRQ-02 | Phase 34 | In Progress (enfilage 34-02, rejeu 34-03) |
+| WRQ-03 | Phase 34 | Complete (34-02) |
 | WRQ-04 | Phase 34 | Pending |
 | WRQ-05 | Phase 34 | Pending |
 | WRQ-06 | Phase 34 | Pending |

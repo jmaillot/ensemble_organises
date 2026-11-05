@@ -72,7 +72,7 @@ Plans:
 - [x] 34-01-PLAN.md — Migration SQL d'idempotence : client_key uuid + backfill + NOT NULL + unicité sur les 5 tables Tier 1, tests SQL négatifs §2.7 (WRQ-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 34-02-PLAN.md — Outbox : enfilage central MutationCache (D-02), liste blanche d'écriture + refus upfront (WRQ-02/03), fusion D-04, annulation D-05, persistance dans le persister 33
+- [x] 34-02-PLAN.md — Outbox : enfilage central MutationCache (D-02), liste blanche d'écriture + refus upfront (WRQ-02/03), fusion D-04, annulation D-05, persistance dans le persister 33
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 34-03-PLAN.md — Rejeu foreground FIFO creates-d'abord via upsert idempotent, classification terminal/retryable sans boucle (WRQ-02/04), réconciliation Realtime par clé client (WRQ-06)
@@ -100,5 +100,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 32. Install & raccourcis | 0/? | Not started | - |
 | 33. Cache de lecture offline | 4/5 (33-05 termine la vague 3) | Executing | 2026-11-04 |
-| 34. File d'écriture & rejeu | 1/4 | In Progress|  |
+| 34. File d'écriture & rejeu | 2/4 | In Progress|  |
 | 35. Deep links & validation multi-OS | 0/? | Not started | - |
