@@ -120,8 +120,11 @@ export async function findOrCreateProduct(input: FindProductInput): Promise<Prod
 }
 
 /**
- * Retrouve le produit (foyer, EAN) sans jamais toucher au réseau : lecture
- * Dexie pure, donc utilisable hors ligne pour un EAN déjà connu (D-06).
+ * Retrouve le produit (foyer, EAN) : lecture directe via l'adaptateur — un
+ * appel réseau depuis le retrait du mode offline (D-10, phase 09/33). Elle
+ * n'est PAS utilisable hors ligne : un re-scan d'EAN connu lève une
+ * DataError réseau hors ligne ; l'horizon offline du scan dépend du restore
+ * du cache de lecture (phase 33), pas de cette fonction (D-06).
  */
 export async function findProductByEan(householdId: string, ean: string): Promise<ProductRow | null> {
   const rows = await data.list<ProductRow>(PRODUCTS_TABLE, {
@@ -261,10 +264,12 @@ export async function resolveManualOffProduct(
  * liste courante. Re-scan d'un produit deja present : quantite +1 sur
  * l'article existant (decoché au passage), zero nouvelle ligne (D-04).
  *
- * Le refus hors-ligne porte sur la CRÉATION DE FICHE seulement : produit
- * DÉJÀ CONNU (lecture par EAN, jamais un appel réseau quand le magasin est
- * le magasin local), l'article est écrit via les mutateurs Tier 1 et
- * s'enfile hors ligne — c'est le D-06 qu'aucun refus ne doit casser.
+ * Hors ligne, la RECHERCHE du produit lève une DataError réseau (lecture
+ * directe depuis le retrait du mode offline, D-10 phase 09/33) : le re-scan
+ * d'un produit connu n'échappe à ce refus que si le cache de lecture a été
+ * restauré (phase 33) — l'horizon offline du scan dépend de ce restore, pas
+ * de cette fonction (D-06). Quand la lecture passe, l'article est écrit via
+ * les mutateurs Tier 1 et s'enfile hors ligne.
  */
 export async function resolveScannedProduct(
   input: ResolveScanInput,

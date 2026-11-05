@@ -436,8 +436,11 @@ export function useCourses(): UseCoursesResult {
   );
 
   /**
-   * Re-scan d'un EAN déjà connu du foyer (D-04, D-06) : lecture Dexie pure,
-   * aucun appel réseau. Produit inconnu → erreur vers la fiche manuelle.
+   * Re-scan d'un EAN déjà connu du foyer (D-04, D-06) : lecture directe via
+   * l'adaptateur — un appel réseau depuis le retrait du mode offline (D-10,
+   * phase 09/33). Hors ligne, un produit connu lève une DataError réseau
+   * AVANT toute écriture d'article : l'horizon offline du scan dépend du
+   * restore du cache de lecture (phase 33), pas de cette fonction.
    */
   const addScannedToList = useCallback(
     async (listId: string, ean: string, addedBy?: string | null): Promise<ScanResolution> => {
