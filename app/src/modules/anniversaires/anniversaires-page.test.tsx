@@ -65,9 +65,11 @@ describe('AnniversairesPage', () => {
       screen.getByRole('heading', { level: 2, name: new RegExp(escape(formatMonthLabel(new Date()))) }),
     ).toBeInTheDocument();
 
-    // Maya annivire le 7 octobre : la pastille apparaît au mois suivant.
+    // Maya annivire le 7 octobre : la pastille apparaît au mois de sa
+    // prochaine occurrence, qui peut être loin devant selon la date courante —
+    // on avance de mois en mois, borné à un an (même mécanique que le test D-13).
     const mayaDot = () => screen.queryByRole('button', { name: 'Modifier l’anniversaire de Maya Martin' });
-    for (let attempt = 0; attempt < 2 && !mayaDot(); attempt += 1) {
+    for (let attempt = 0; attempt < 12 && !mayaDot(); attempt += 1) {
       await user.click(screen.getByRole('button', { name: 'Mois suivant' }));
     }
     await user.click(mayaDot() as HTMLElement);
@@ -116,9 +118,10 @@ describe('AnniversairesPage', () => {
 
     // Maya Martin (07/10) reste d'origine anniversaire : son point est un
     // bouton qui ouvre l'édition — c'est le comportement que la bifurcation ne
-    // doit pas casser.
+    // doit pas casser. Occurrence prochaine bornée à un an (novembre 2026 :
+    // octobre est déjà passé, la pastille est à octobre 2027).
     const mayaDot = () => screen.queryByRole('button', { name: 'Modifier l’anniversaire de Maya Martin' });
-    for (let attempt = 0; attempt < 2 && !mayaDot(); attempt += 1) {
+    for (let attempt = 0; attempt < 12 && !mayaDot(); attempt += 1) {
       await user.click(screen.getByRole('button', { name: 'Mois suivant' }));
     }
     const dot = mayaDot();
