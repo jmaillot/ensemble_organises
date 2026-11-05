@@ -1,6 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from './index';
+import { assertWriteAllowed, isWriteAllowed } from '@/lib/query-policy';
+import { isNetworkFailure, newClientKey } from '@/lib/offline/outbox';
+import { isKeylessTable } from './keys';
+import { randomId } from '@/lib/utils';
 import { useHouseholdStore } from '@/stores/household-store';
 import type { Row, RowFilter } from '@/types';
 
@@ -61,6 +65,24 @@ export type UseResourceOptions =
 const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'string';
 
 /**
+ * Prépare une création sur table allowlistée (Pitfall 7, RESEARCH 34).
+ *
+ * L'identité est générée CÔTÉ CLIENT d'emblée : l'`id` texte (l'adaptateur le
+ * transmet tel quel) et la `client_key` uuid (D-05/D-14 — clé d'idempotence
+ * du rejeu). Injectés pour TOUTE création allowlistée, en ligne comme hors
+ * ligne : depuis 0177, la base refuse (NOT NULL sans défaut) toute insertion
+ * sans `client_key`. Pour une jointure sans `id` (ex. `task_assignees`), la
+ * `client_key` seule est injectée. Hors liste : comportement inchangé.
+ */
+function prepareCreate<T>(table: string, values: Partial<T>): { values: Partial<T>; overlay: Partial<T> | null } {
+  if (!isWriteAllowed(table)) return { values, overlay: null };
+  const withKey = { ...values, client_key: newClientKey() } as Partial<T>;
+  if (isKeylessTable(table)) return { values: withKey, overlay: withKey };
+  const row = { ...withKey, id: randomId(table) } as Partial<T>;
+  return { values: row, overlay: row };
+}
+
+/**
  * Repli de `rows` quand la requête est désactivée ou n'a rien rendu.
  *
  * Constante de MODULE, jamais un littéral sur place : `query.data ?? []`
@@ -104,16 +126,63 @@ export function useResource<T = Row>(
     await queryClient.invalidateQueries({ queryKey: [table] });
   }, [queryClient, table]);
 
-  const createMutation = useMutation({ mutationFn: (values: Partial<T>) => data.create<T>(table, values) });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: Partial<T> }) => data.update<T>(table, id, values),
+  // meta { table, operation } : la marque que lit le MutationCache central
+  // (D-02) pour enfiler l'écriture en cas d'échec réseau — aucun composant de
+  // vue ne change. assertWriteAllowed (D-07) refuse AVANT tout départ réseau
+  // une écriture hors liste quand l'app est hors ligne.
+  const createMutation = useMutation({
+    mutationFn: (values: Partial<T>) => {
+      assertWriteAllowed(table);
+      return data.create<T>(table, values);
+    },
+    meta: { table, operation: 'create' },
   });
-  const removeMutation = useMutation({ mutationFn: (id: string) => data.remove(table, id) });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: Partial<T> }) => {
+      assertWriteAllowed(table);
+      return data.update<T>(table, id, values);
+    },
+    meta: { table, operation: 'update' },
+  });
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => {
+      assertWriteAllowed(table);
+      return data.remove(table, id);
+    },
+    meta: { table, operation: 'remove' },
+  });
+
+  const create = useCallback(
+    async (values: Partial<T>) => {
+      const prepared = prepareCreate(table, values);
+      // Overlay optimiste (Pitfall 7) : la ligne est peinte immédiatement
+      // avec l'identité client (id + client_key). Au refus MÉTIER (RLS,
+      // check) elle est retirée — l'écriture n'aura jamais lieu ; à l'échec
+      // RÉSEAU elle RESTE peinte : l'écriture vient d'être enfilée dans
+      // l'outbox et le rejeu la réconciliera. `isNetworkFailure` distingue
+      // les deux (Pitfall 2).
+      const snapshot = queryClient.getQueryData<T[]>(key);
+      if (prepared.overlay) {
+        queryClient.setQueryData<T[]>(key, (previous) => [...(previous ?? []), prepared.overlay as T]);
+      }
+      try {
+        const result = await createMutation.mutateAsync(prepared.values);
+        await invalidate();
+        return result;
+      } catch (error) {
+        if (prepared.overlay && !isNetworkFailure(error)) queryClient.setQueryData<T[]>(key, snapshot);
+        throw error;
+      }
+    },
+    [createMutation, invalidate, key, queryClient, table],
+  );
 
   const mutate = useCallback(
     async (id: string | null, values: Partial<T>) => {
       if (!optimistic || !id) {
-        const result = id ? await updateMutation.mutateAsync({ id, values }) : await createMutation.mutateAsync(values);
+        // La branche create passe par `create` : mêmes identité client
+        // (id + client_key) et overlay optimiste que la voie directe.
+        const result = id ? await updateMutation.mutateAsync({ id, values }) : await create(values);
         await invalidate();
         return result;
       }
@@ -131,16 +200,7 @@ export function useResource<T = Row>(
         throw error;
       }
     },
-    [createMutation, invalidate, key, optimistic, queryClient, updateMutation],
-  );
-
-  const create = useCallback(
-    async (values: Partial<T>) => {
-      const result = await createMutation.mutateAsync(values);
-      await invalidate();
-      return result;
-    },
-    [createMutation, invalidate],
+    [create, invalidate, key, optimistic, queryClient, updateMutation],
   );
 
   const update = useCallback(async (id: string, values: Partial<T>) => mutate(id, values), [mutate]);
@@ -190,8 +250,23 @@ export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): L
     queryFn: async () => data.list<T>(table, filter),
   });
 
-  const addMutation = useMutation({ mutationFn: (values: Partial<T>) => data.create<T>(table, values) });
-  const removeMutation = useMutation({ mutationFn: (values: RowFilter) => data.removeWhere(table, values) });
+  // Mêmes marque meta et même garde upfront que useResource (Pitfall 6 :
+  // useLinkedRows est un DEUXIÈME chemin de mutation — `task_assignees` et
+  // `routine_assignees` passent ici, pas par les 3 mutations de useResource).
+  const addMutation = useMutation({
+    mutationFn: (values: Partial<T>) => {
+      assertWriteAllowed(table);
+      return data.create<T>(table, values);
+    },
+    meta: { table, operation: 'create' },
+  });
+  const removeMutation = useMutation({
+    mutationFn: (values: RowFilter) => {
+      assertWriteAllowed(table);
+      return data.removeWhere(table, values);
+    },
+    meta: { table, operation: 'removeWhere' },
+  });
 
   const invalidate = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: [table] });
@@ -199,11 +274,14 @@ export function useLinkedRows<T = Row>(table: string, filter: RowFilter = {}): L
 
   const add = useCallback(
     async (values: Partial<T>) => {
-      const result = await addMutation.mutateAsync(values);
+      // Identité client (`client_key`) injectée comme dans useResource —
+      // depuis 0177 la base refuse une jointure Tier 1 sans client_key.
+      const prepared = prepareCreate(table, values);
+      const result = await addMutation.mutateAsync(prepared.values);
       await invalidate();
       return result;
     },
-    [addMutation, invalidate],
+    [addMutation, invalidate, table],
   );
 
   const remove = useCallback(

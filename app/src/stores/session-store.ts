@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { demoProfile, demoHousehold, demoMembers, DEMO_MEMBERS } from '@/lib/data/seed';
 import { data } from '@/lib/data';
 import { purgeUserCache, stopPersisting } from '@/lib/offline/query-persistence';
+import { setOutboxScopeProvider } from '@/lib/offline/outbox';
 import { useHouseholdStore } from './household-store';
 import type { HouseholdMemberRow, HouseholdRow, SessionStatus, SessionUser } from '@/types';
 
@@ -206,3 +207,19 @@ export async function joinHouseholdLocal(): Promise<HouseholdRow> {
   useHouseholdStore.getState().setHousehold(demoHousehold as HouseholdRow, members, DEMO_MEMBERS.camille);
   return demoHousehold as HouseholdRow;
 }
+
+/**
+ * Portée de l'outbox (phase 34, D-02) : le MutationCache de `buildQueryClient`
+ * enfile les écritures en échec réseau dans la query
+ * `['outbox', userId, householdId]`. La portée est lue AU MOMENT de
+ * l'enfilage via un fournisseur — `query-policy` ne peut pas importer ce
+ * store (cycle : session-store → household-store → query-persistence →
+ * query-policy). Lire l'état courant ici fait suivre naturellement les
+ * changements de session et de foyer ; à la déconnexion (`user` null) le
+ * fournisseur rend `null` et plus rien ne s'enfile.
+ */
+setOutboxScopeProvider(() => {
+  const user = useSessionStore.getState().user;
+  const householdId = useHouseholdStore.getState().householdId;
+  return user?.id && householdId ? { userId: user.id, householdId } : null;
+});

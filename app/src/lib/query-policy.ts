@@ -1,4 +1,6 @@
-import { QueryClient, type DefaultOptions } from '@tanstack/react-query';
+import { MutationCache, QueryClient, onlineManager, type DefaultOptions } from '@tanstack/react-query';
+import { enqueueOutbox, isNetworkFailure, type MutationMarker } from './offline/outbox';
+import { DataError } from '@/lib/data/adapter';
 
 /**
  * Politique de cache et de réseau du dépôt — SOURCE UNIQUE.
@@ -91,15 +93,84 @@ export const OFFLINE_FAMILIES: ReadonlyArray<{ prefix: string; maxAgeMs: number 
 ];
 
 /**
+ * Liste blanche d'ÉCRITURE (D-06, WRQ-03) — les 5 tables de D-14 exactement.
+ *
+ * POURQUOI À CÔTÉ DE OFFLINE_FAMILIES, ET POURQUOI PAS LES MÊMES TABLES.
+ * `query-policy.ts` porte déjà la frontière offline de LECTURE (D-07 phase
+ * 33) : l'écriture est la même politique, elle vit au même endroit — un seul
+ * fichier nomme ce qui est offline-éligible, en lecture ET en écriture. La
+ * liste d'écriture est PLUS ÉTROITE que la lecture : ni `products`, ni
+ * `shopping_lists` elles-mêmes, ni les annexes (`household_members`,
+ * `profiles`) — seules les tables portant `client_key` (0177) peuvent être
+ * enfilées et rejouées de façon idempotente.
+ *
+ * La liste est consultée à DEUX endroits (T-34-05) : la garde de mutation
+ * `assertWriteAllowed` (refus upfront D-07) et le filtre du MutationCache
+ * (défense en profondeur contre un chemin oublié).
+ */
+export const WRITE_ALLOWLIST = [
+  'shopping_list_items',
+  'tasks',
+  'task_assignees',
+  'routines',
+  'routine_completions',
+] as const;
+
+export function isWriteAllowed(table: string): boolean {
+  return (WRITE_ALLOWLIST as readonly string[]).includes(table);
+}
+
+/** Message utilisateur d'un refus upfront (D-07) — le module appelant le toast tel quel. */
+export const OFFLINE_WRITE_REFUSED_MESSAGE = 'Ce module n’est pas disponible hors-ligne.';
+
+/**
+ * Garde upfront (D-07) : une écriture sur un module hors liste est rejetée
+ * AVANT tout départ réseau quand l'app est hors ligne — la requête échouerait
+ * de toute façon, autant porter un message clair plutôt qu'une TypeError
+ * fetch. EN LIGNE, la garde ne dit rien : les modules hors liste (ardoise,
+ * notes, cadeaux…) fonctionnent normalement — refuser, ce serait casser
+ * l'app entière ; la liste blanche borne le HORS-LIGNE, pas le général.
+ */
+export function assertWriteAllowed(table: string): void {
+  if (isWriteAllowed(table)) return;
+  if (onlineManager.isOnline()) return;
+  throw new DataError(OFFLINE_WRITE_REFUSED_MESSAGE);
+}
+
+/**
  * Fabrique le `QueryClient` à partir de `QUERY_POLICY`, en fusionnant par
  * dessus les surcharges de `queries` et `mutations` (fusion à un niveau : une
  * surcharge n'efface que les clés qu'elle nomme, jamais tout le bloc).
  *
  * Le harnais de test s'en sert pour ses valeurs courtes (`retry: false`,
  * `gcTime: 0`) sans cesser d'exercer la politique réelle de l'application.
+ *
+ * D-02 : le `MutationCache` central est installé ICI, une fois, par la
+ * fabrique — aucun branchement par vue (garde de classe §2.7 E). La closure
+ * référence `client` avant sa création : `onError` ne s'exécute qu'après
+ * coup, la zone morte n'est jamais traversée.
  */
 export function buildQueryClient(overrides: DefaultOptions = {}): QueryClient {
-  return new QueryClient({
+  const client = new QueryClient({
+    mutationCache: new MutationCache({
+      // Pitfall 1 : on n'utilise PAS le chemin TanStack « paused mutations »
+      // (`setMutationDefaults` + `resumePausedMutations`) — sous
+      // `networkMode: 'always'` une mutation ne se met JAMAIS en pause, elle
+      // ÉCHOUE. C'est donc ici, sur l'échec, que l'enfilage se décide.
+      onError: (error, variables, _onMutateResult, mutation) => {
+        const marker = mutation.options.meta as MutationMarker | undefined;
+        // Une mutation non marquée (aucune table) ne concerne pas la file.
+        if (!marker?.table || !marker.operation) return;
+        // Défense en profondeur (T-34-05) : la garde upfront (D-07) est la
+        // voie normale du refus ; ce filtre ferme tout chemin oublié
+        // (ex. useLinkedRows, Pitfall 6).
+        if (!isWriteAllowed(marker.table)) return;
+        // Pitfall 2 : seul un échec réseau/5xx part en file — un refus RLS
+        // ou de validation en ligne échoue devant l'utilisateur, point.
+        if (!isNetworkFailure(error)) return;
+        enqueueOutbox(client, marker, variables);
+      },
+    }),
     defaultOptions: {
       ...QUERY_POLICY,
       ...overrides,
@@ -107,4 +178,5 @@ export function buildQueryClient(overrides: DefaultOptions = {}): QueryClient {
       mutations: { ...QUERY_POLICY.mutations, ...overrides.mutations },
     },
   });
+  return client;
 }
