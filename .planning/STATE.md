@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 33
 current_phase_name: Cache de lecture offline
 status: executing
-stopped_at: Completed 33-01-PLAN.md
-last_updated: "2026-11-04T22:21:00Z"
+stopped_at: Completed 33-05-PLAN.md
+last_updated: "2026-11-04T22:45:00Z"
 last_activity: 2026-11-04
-last_activity_desc: Phase 33 execution started
+last_activity_desc: Plan 33-05 completed (bandeau offline-stale OFFR-02, MIN prudent D-12)
 state_head: 2b3c841cc84f81321c27e43c43c78c894f587e3b
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 7
 ---
 
 # Project State
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 33 (Cache de lecture offline) — EXECUTING
-Plan: 2 of 5
+Plan: 5 of 5
 Status: Executing Phase 33
-Last activity: 2026-11-04 — Plan 33-01 completed (socle persistance offline)
+Last activity: 2026-11-04 — Plan 33-05 completed (bandeau offline-stale OFFR-02, MIN prudent D-12)
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -45,7 +45,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 32 | 0 | - | - |
-| 33 | 1 | - | - |
+| 33 | 4 | - | - |
 | 34 | 0 | - | - |
 | 35 | 0 | - | - |
 
@@ -74,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-04T18:44:06.182Z
-Stopped at: Phase 33 UI-SPEC approved
-Resume file: .planning/phases/33-cache-de-lecture-offline/33-UI-SPEC.md
+Last session: 2026-11-04T22:45:00Z
+Stopped at: Plan 33-05 completed (OFFR-02)
+Resume file: .planning/phases/33-cache-de-lecture-offline/33-05-SUMMARY.md

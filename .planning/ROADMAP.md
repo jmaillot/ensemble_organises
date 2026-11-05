@@ -43,8 +43,8 @@ Plans:
 - [x] 33-01-PLAN.md — Socle persistance : dépendances épinglées (checkpoint légitimité) + tracer seed → persist IndexedDB → restore → lecture (OFFR-01, OFFR-04)
 - [ ] 33-02-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
 - [ ] 33-03-PLAN.md — Allowlist Tier 1/maxAge/prune + restore avant premier rendu (OFFR-01, OFFR-03)
-- [ ] 33-04-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
-- [ ] 33-05-PLAN.md — Bandeau « dernier état connu le… » (OFFR-02)
+- [x] 33-04-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
+- [x] 33-05-PLAN.md — Bandeau « dernier état connu le… » (OFFR-02)
 
 ### Phase 34: File d'écriture & rejeu
 **Goal** : Une écriture simple effectuée hors-ligne sur un module Tier 1 atteint malgré tout le serveur — exactement une fois, sans doublon ni perte silencieuse — et l'utilisateur voit toujours combien d'écritures sont en attente et ce qui a échoué.
@@ -75,6 +75,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 32. Install & raccourcis | 0/? | Not started | - |
-| 33. Cache de lecture offline | 0/? | Not started | - |
+| 33. Cache de lecture offline | 4/5 (33-05 termine la vague 3) | Executing | 2026-11-04 |
 | 34. File d'écriture & rejeu | 0/? | Not started | - |
 | 35. Deep links & validation multi-OS | 0/? | Not started | - |

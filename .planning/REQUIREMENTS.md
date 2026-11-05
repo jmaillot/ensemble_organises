@@ -15,9 +15,9 @@
 ### Offline lecture (OFFR)
 
 - [ ] **OFFR-01** : La dernière vue consultée d'un module offline-éligible reste lisible en avion (données rendues depuis le cache persisté, restauré au démarrage avant le premier rendu des routes protégées)
-- [ ] **OFFR-02** : Toute donnée rendue depuis le cache porte un bandeau « dernier état connu le [horodatage] » — jamais présentée comme fraîche (D-10)
+- [x] **OFFR-02** : Toute donnée rendue depuis le cache porte un bandeau « dernier état connu le [horodatage] » — jamais présentée comme fraîche (D-10)
 - [ ] **OFFR-03** : Une allowlist nomme les modules offline-éligibles avec un maxAge par famille de données (Tier 1 : Courses, Tâches, Routines) — les modules hors allowlist affichent l'erreur d'origine honnête, pas du cache
-- [ ] **OFFR-04** : Le cache est namespacé par utilisateur et purgé de manière synchrone (attendue) à la déconnexion et au changement de foyer — aucune donnée d'un utilisateur ne survit pour un autre sur un appareil partagé
+- [x] **OFFR-04** : Le cache est namespacé par utilisateur et purgé de manière synchrone (attendue) à la déconnexion et au changement de foyer — aucune donnée d'un utilisateur ne survit pour un autre sur un appareil partagé
 - [ ] **OFFR-05** : Le service worker ne met jamais en cache les réponses API (`/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/`) — contrôle statique prouvé sur un cas qui doit échouer (§2.7)
 
 ### File d'écriture (WRQ)
@@ -66,9 +66,9 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | OFFR-01 | Phase 33 | Pending |
-| OFFR-02 | Phase 33 | Pending |
+| OFFR-02 | Phase 33 | Complete |
 | OFFR-03 | Phase 33 | Pending |
-| OFFR-04 | Phase 33 | Pending |
+| OFFR-04 | Phase 33 | Complete (33-04) |
 | OFFR-05 | Phase 33 | Pending |
 | WRQ-01 | Phase 34 | Pending |
 | WRQ-02 | Phase 34 | Pending |
