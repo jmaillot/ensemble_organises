@@ -79,7 +79,13 @@ function prepareCreate<T>(table: string, values: Partial<T>): { values: Partial<
   const withKey = { ...values, client_key: newClientKey() } as Partial<T>;
   if (isKeylessTable(table)) return { values: withKey, overlay: withKey };
   const row = { ...withKey, id: randomId(table) } as Partial<T>;
-  return { values: row, overlay: row };
+  // Les champs d'audit sont posés par le serveur (défauts SQL) : l'overlay
+  // les simule, sinon la chaîne de select des vues (ex. buildRoutines lit
+  // `row.created_at`) crashe sur la ligne optimiste. D-16 : Realtime /
+  // invalidation remplaceront l'overlay par la ligne serveur.
+  const now = new Date().toISOString();
+  const overlay = { ...row, created_at: now, updated_at: now } as Partial<T>;
+  return { values: row, overlay };
 }
 
 /**

@@ -17,6 +17,11 @@ import {
   outboxKeyFor,
   setOutboxScopeProvider,
 } from './outbox';
+import { cacheKey, persistNow, pruneExpiredFamilies, restoreOfflineCache } from './query-persistence';
+import { createStore, get as idbGet, set as idbSet } from 'idb-keyval';
+
+/** Lecture brute de la base persistée (§2.7 D : on prouve la présence, pas l'absence d'erreur). */
+const probeStore = createStore('eo-offline-cache', 'query');
 
 /**
  * Preuves de la file d'écriture hors-ligne (phase 34, WRQ-02/WRQ-03).
@@ -301,5 +306,80 @@ describe('enfilage direct par le MutationCache (D-02, forme buildEntry)', () => 
     const entries = outboxEntries(client);
     expect(entries[0]).toMatchObject({ table: 'tasks', operation: 'remove', id: 't9', status: 'pending' });
     expect(entries[0].key).toBe('tasks:t9');
+  });
+});
+
+describe('persistance de l’outbox (D-01, Pitfall 5)', () => {
+  it('l’outbox survit au reload : enfilage → persist → nouveau client → restore → entrée PRÉSENTE', async () => {
+    const source = makeClient();
+    enqueueOutbox(source, { table: 'tasks', operation: 'create' }, { id: 't9', name: 'Pain', client_key: 'ck-1' });
+    expect(outboxEntries(source)).toHaveLength(1);
+
+    await persistNow(source, SCOPE.userId, SCOPE.householdId, { throttleTime: 0 });
+    const raw = await idbGet<string>(cacheKey(SCOPE.userId, SCOPE.householdId), probeStore);
+    expect(raw, 'la file est bien écrite dans le persister existant (D-01)').toContain('"outbox"');
+
+    const restored = makeClient();
+    await restoreOfflineCache(restored, SCOPE.userId, SCOPE.householdId);
+    const entries = restored.getQueryData<OutboxEntry[]>(outboxKeyFor(SCOPE.userId, SCOPE.householdId));
+    expect(entries, 'succès muet interdit : les entrées sont relues, pas supposées').toHaveLength(1);
+    expect(entries?.[0]).toMatchObject({ table: 'tasks', operation: 'create', id: 't9', clientKey: 'ck-1' });
+  });
+
+  it('l’outbox d’un foyer ÉTRANGER n’est jamais sérialisée dans la clé du couple (CR-01)', async () => {
+    const source = makeClient();
+    enqueueOutbox(source, { table: 'tasks', operation: 'create' }, { id: 't9', name: 'du-foyer-h1', client_key: 'ck-1' });
+    source.setQueryData<OutboxEntry[]>(outboxKeyFor(SCOPE.userId, 'h2'), [
+      { key: 'tasks:t8', table: 'tasks', operation: 'create', id: 't8', enqueuedAt: 1, status: 'pending', values: { name: 'marque-etrangere' } },
+    ]);
+
+    await persistNow(source, SCOPE.userId, SCOPE.householdId, { throttleTime: 0 });
+    const raw = await idbGet<string>(cacheKey(SCOPE.userId, SCOPE.householdId), probeStore);
+    expect(raw).toContain('du-foyer-h1');
+    expect(raw).not.toContain('marque-etrangere');
+
+    const restored = makeClient();
+    await restoreOfflineCache(restored, SCOPE.userId, SCOPE.householdId);
+    expect(restored.getQueryData(outboxKeyFor(SCOPE.userId, 'h2'))).toBeUndefined();
+  });
+
+  it('pruneExpiredFamilies laisse l’outbox intacte, même au-delà du maxAge des données vivantes', () => {
+    const client = makeClient();
+    enqueueOutbox(client, { table: 'tasks', operation: 'create' }, { id: 't9', name: 'en-attente', client_key: 'ck-2' });
+    client.setQueryData(['tasks', 'h1', {}, null], [{ id: 't1', name: 'vivante' }]);
+    const aged = client.getQueryCache().find({ queryKey: ['tasks', 'h1', {}, null] })!;
+    aged.setState({ dataUpdatedAt: Date.now() - 30 * 24 * 60 * 60 * 1000 });
+
+    pruneExpiredFamilies(client);
+
+    expect(client.getQueryData(['tasks', 'h1', {}, null])).toBeUndefined();
+    expect(outboxEntries(client), 'une entrée de file attend son rejeu, pas 24 h (Pitfall 5)').toHaveLength(1);
+  });
+
+  it('un cache persisté avec le buster v1 est jeté au restore — le bump v2 est effectif', async () => {
+    await idbSet(
+      cacheKey(SCOPE.userId, SCOPE.householdId),
+      JSON.stringify({
+        timestamp: Date.now(),
+        buster: 'v1',
+        clientState: {
+          mutations: [],
+          queries: [
+            {
+              queryKey: [...outboxKeyFor(SCOPE.userId, SCOPE.householdId)],
+              state: { data: [{ key: 'tasks:t9', table: 'tasks', operation: 'create', enqueuedAt: 1, status: 'pending' }], dataUpdatedAt: Date.now() },
+            },
+          ],
+        },
+      }),
+      probeStore,
+    );
+
+    const restored = makeClient();
+    await restoreOfflineCache(restored, SCOPE.userId, SCOPE.householdId);
+    expect(
+      restored.getQueryData(outboxKeyFor(SCOPE.userId, SCOPE.householdId)),
+      'la forme d’un ancien build est jetée, jamais mixée (T-33-08)',
+    ).toBeUndefined();
   });
 });

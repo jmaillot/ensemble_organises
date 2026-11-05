@@ -43,7 +43,11 @@ export function cacheKey(userId: string, householdId: string): string {
  * filtrage). Un simple redéploiement sans changement de forme conserve le
  * cache — ce qui est le comportement voulu.
  */
-export const OFFLINE_CACHE_BUSTER = 'v1';
+export const OFFLINE_CACHE_BUSTER = 'v2';
+// v2 (phase 34, Pitfall 5) : l'outbox — la file d'écritures — entre dans le
+// cache persisté (D-01). C'est un changement de FORME du cache : un ancien
+// build en v1 ne doit jamais mixer sa forme avec celle-ci, TanStack jettera
+// le persisté v1 au restore.
 
 /**
  * Retrouve la famille offline d'un préfixe de table — premier élément de clé
@@ -222,6 +226,13 @@ export async function persistNow(
       // liées `useLinkedRows`, D-10) restent éligibles — les exclure priverait
       // le restore hors ligne des avatars/noms d'assignés.
       shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) => {
+        // Cas particulier OUTBOX (phase 34, Pitfall 5, option (a)) : la file
+        // n'est PAS une famille OFFLINE_FAMILIES — elle n'a aucun maxAge
+        // (une entrée de file attend le rejeu, pas 24 h) et doit être traitée
+        // AVANT l'appel à `familyOf`. La défense CR-01 s'y applique pareil :
+        // l'outbox d'un foyer ÉTRANGER (3e élément de la clé) n'est jamais
+        // sérialisée dans la clé du couple courant.
+        if (String(query.queryKey[0]) === 'outbox') return query.queryKey[2] === householdId;
         if (familyOf(String(query.queryKey[0])) === undefined) return false;
         const second = query.queryKey[1];
         return second === undefined || second === null || second === householdId;
@@ -281,6 +292,11 @@ export async function restoreOfflineCache(
 export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): void {
   client.removeQueries({
     predicate: (query: Query) => {
+      // Phase 34 (Pitfall 5) : l'outbox est EXEMPTE de la prune — une entrée
+      // de file attend son rejeu (des jours, si la coupure dure), pas le
+      // maxAge de 24 h des données vivantes. La purge de la file passe par
+      // les chemins de session (D-17), jamais par l'expiration.
+      if (String(query.queryKey[0]) === 'outbox') return false;
       const family = familyOf(String(query.queryKey[0]));
       if (!family) return false; // hors allowlist : jamais hydraté de toute façon
       // WR-04 (revue 33) : une query JAMAIS chargée (`dataUpdatedAt` = 0,
