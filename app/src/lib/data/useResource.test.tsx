@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe('useResource — cloisonnement erreur/données', () => {
   const CACHED_ROWS = [{ id: 'a', household_id: DEMO_HOUSEHOLD_ID, name: 'ligne en cache' }];
-  const key = queryKeys.table('exemples', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID }, null);
+  const key = queryKeys.table('exemples', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID });
 
   function wrapperFor(queryClient: ReturnType<typeof createTestQueryClient>) {
     return function Wrapper({ children }: { children: ReactNode }) {

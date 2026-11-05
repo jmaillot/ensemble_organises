@@ -63,7 +63,7 @@ describe('Courses hors ligne (#15)', () => {
       },
     ];
     queryClient.setQueryData(
-      queryKeys.table('shopping_lists', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID }, null),
+      queryKeys.table('shopping_lists', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID }),
       listeEnCache,
     );
     // `use-courses` compose l'isError des listes ET des items : une cache
@@ -71,7 +71,7 @@ describe('Courses hors ligne (#15)', () => {
     // (D-09/D-10) et masquerait les lignes — la liste vide définie dit au
     // contraire « donnée connue, rien à afficher ».
     queryClient.setQueryData(
-      queryKeys.table('shopping_list_items', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID }, null),
+      queryKeys.table('shopping_list_items', DEMO_HOUSEHOLD_ID, { household_id: DEMO_HOUSEHOLD_ID }),
       [],
     );
 

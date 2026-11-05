@@ -157,8 +157,12 @@ export function useResource<T = Row>(
     rows: query.data ?? NO_ROWS,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
-    isError: query.isError,
-    error: (query.error as Error | null) ?? null,
+    // Après un refetch échoué hors ligne, TanStack v5 garde `data` et pose
+    // `status: "error"` — l'erreur n'est honnête que SANS données en cache
+    // (D-09) ; les lignes rendues restent signalées périmées par le bandeau
+    // ambre (D-12/D-13).
+    isError: query.isError && query.data === undefined,
+    error: query.isError && query.data === undefined ? ((query.error as Error | null) ?? null) : null,
     refetch: () => void query.refetch(),
     create,
     update,
