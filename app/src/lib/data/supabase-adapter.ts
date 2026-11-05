@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { DataError, REMOVE_MISSING_MESSAGE, REMOVE_WHERE_MISSING_MESSAGE, type DataAdapter, type RemoveOptions } from './adapter';
 import { isKeylessTable } from './keys';
+import { assertWriteAllowed } from './write-policy';
 import { SET_TABLES, type SetTable } from './set-tables';
 import type { FolderKind } from './folder-kinds';
 import { randomId } from '@/lib/utils';
@@ -122,6 +123,11 @@ export class SupabaseAdapter implements DataAdapter {
   }
 
   async create<T = Row>(table: string, values: Partial<T>): Promise<T> {
+    // Filet de sécurité de classe (§2.7 E) : la garde vit déjà dans les hooks
+    // Tier 1 (useResource) et dans le MutationCache — ici elle couvre TOUT
+    // chemin d'écriture qui passerait outre. Un refus jette AVANT tout appel
+    // réseau ; l'enfilage n'est pas le rôle de l'adaptateur.
+    assertWriteAllowed(table);
     const client = this.client();
     const givenId = (values as { id?: string }).id;
     const payload = isKeylessTable(table) ? { ...values } : { ...values, id: givenId ?? randomId(table) };
@@ -182,6 +188,9 @@ export class SupabaseAdapter implements DataAdapter {
   }
 
   async update<T = Row>(table: string, id: string, values: Partial<T>): Promise<T> {
+    // Même filet de classe que `create` : la garde refuse hors ligne avant
+    // tout appel réseau, sans jamais enfiler elle-même.
+    assertWriteAllowed(table);
     const client = this.client();
     const { data: row, error } = await client.from(table).update(values as never).eq('id', id).select('*').single();
     if (error) throw new DataError(error.message, error);
@@ -197,6 +206,9 @@ export class SupabaseAdapter implements DataAdapter {
    * compte, et une seconde requête de comptage serait une fenêtre de course.
    */
   async remove(table: string, id: string, options?: RemoveOptions) {
+    // Même filet de classe que `create` : la garde refuse hors ligne avant
+    // tout appel réseau, sans jamais enfiler elle-même.
+    assertWriteAllowed(table);
     const client = this.client();
     const { data: removed, error } = await client.from(table).delete().eq('id', id).select();
     if (error) throw new DataError(error.message, error);
@@ -211,6 +223,9 @@ export class SupabaseAdapter implements DataAdapter {
    * ne pas porter d'`id`, et un `select('id')` y échouerait.
    */
   async removeWhere(table: string, filter: RowFilter, options?: RemoveOptions) {
+    // Même filet de classe que `create` : la garde refuse hors ligne avant
+    // tout appel réseau, sans jamais enfiler elle-même.
+    assertWriteAllowed(table);
     const client = this.client();
     let query = client.from(table).delete();
     for (const [key, value] of Object.entries(filter)) {
