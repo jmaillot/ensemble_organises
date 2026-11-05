@@ -65,9 +65,11 @@ Plans:
   4. Un rejeu butant sur un refus RLS ou une ligne supprimée est classé terminal et surfacé à l'utilisateur (échec visible avec réessayer/abandonner, retrait de la file) ; seuls les échecs réseau/5xx sont rejoués — jamais de retry en boucle, jamais d'effacement silencieux
   5. Le badge « N en attente » est visible pendant la déconnexion et retombe à zéro après un rejeu complet ; une écriture rejouée ne crée jamais de doublon face à Realtime (réconciliation par clé client, Realtime/invalidation priment sur l'overlay optimiste)
 
-**Plans**: 4/4 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
+- [x] 34-05-PLAN.md
+
 **Wave 1**
 - [x] 34-01-PLAN.md — Migration SQL d'idempotence : client_key uuid + backfill + NOT NULL + unicité sur les 5 tables Tier 1, tests SQL négatifs §2.7 (WRQ-01)
 
@@ -100,5 +102,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 32. Install & raccourcis | 0/? | Not started | - |
 | 33. Cache de lecture offline | 4/5 (33-05 termine la vague 3) | Executing | 2026-11-04 |
-| 34. File d'écriture & rejeu | 4/4 | In Progress|  |
+| 34. File d'écriture & rejeu | 5/5 | In Progress|  |
 | 35. Deep links & validation multi-OS | 0/? | Not started | - |
