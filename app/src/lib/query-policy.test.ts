@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { onlineManager } from '@tanstack/react-query';
-import { QUERY_POLICY, buildQueryClient } from './query-policy';
+import { QUERY_POLICY, WRITE_ALLOWLIST, assertWriteAllowed, buildQueryClient, isWriteAllowed, OFFLINE_WRITE_REFUSED_MESSAGE } from './query-policy';
 import { OFFLINE_FAMILIES } from './query-policy';
 import { queryClient as appQueryClient } from '@/app/router';
 import { SHOPPING_LISTS_TABLE, SHOPPING_ITEMS_TABLE } from '@/modules/courses/api';
@@ -150,6 +150,58 @@ describe('aucun QueryClient écrit à la main hors de la politique (garde de dé
       offenders,
       `client écrit à la main hors de la politique partagée : ${offenders.join(', ')} — ` +
         'dériver de `buildQueryClient` (@/lib/query-policy) plutôt que recopier les options',
+    ).toEqual([]);
+  });
+});
+
+describe('liste blanche d’écriture (phase 34, WRQ-03, D-06)', () => {
+  it('J. WRITE_ALLOWLIST porte exactement les 5 tables de D-14 — ni plus, ni moins', () => {
+    // Résolution A5 (RESEARCH 34) : la lecture allowlistait products et
+    // shopping_lists (annexes de rendu), mais SEULES les tables portant
+    // client_key (0177) peuvent être enfilées et rejouées de façon
+    // idempotente. La liste EST la frontière : le test refuse tout écart.
+    expect([...WRITE_ALLOWLIST].sort()).toEqual(
+      ['routine_completions', 'routines', 'shopping_list_items', 'task_assignees', 'tasks'],
+    );
+    expect(isWriteAllowed('products')).toBe(false);
+    expect(isWriteAllowed('shopping_lists')).toBe(false);
+    expect(isWriteAllowed('household_members')).toBe(false);
+    expect(isWriteAllowed('profiles')).toBe(false);
+    expect(isWriteAllowed('expenses')).toBe(false);
+    expect(isWriteAllowed('notes')).toBe(false);
+    expect(isWriteAllowed('task_assignees'), 'la jointure Tier 1 EST inscrite (Pitfall 6)').toBe(true);
+  });
+
+  it('K. assertWriteAllowed laisse TOUT passer en ligne — la liste blanche borne le hors-ligne', () => {
+    // En ligne, les modules hors liste (ardoise, notes…) fonctionnent
+    // normalement : refuser serait casser l'app entière.
+    onlineManager.setOnline(true);
+    expect(() => assertWriteAllowed('expenses')).not.toThrow();
+    expect(() => assertWriteAllowed('messages')).not.toThrow();
+    onlineManager.setOnline(false);
+    expect(() => assertWriteAllowed('expenses')).toThrow(OFFLINE_WRITE_REFUSED_MESSAGE);
+  });
+});
+
+describe('aucun MutationCache écrit à la main hors de la politique (garde de classe, D-02)', () => {
+  it('L. seule query-policy.ts construit un MutationCache', () => {
+    // Même garde que le Test E, pour le second client du constructeur : le
+    // MutationCache central ne vit que dans la fabrique, sinon une copie
+    // divergerait silencieusement de la politique d'enfilage (§2.7 E).
+    const root = findSourceRoot();
+    expect(root).not.toBeNull();
+    const allowed = resolve(root!, 'lib/query-policy.ts');
+    const needle = ['new MutationCache', '('].join('');
+    expect(
+      readFileSync(allowed, 'utf8').includes(needle),
+      `l’aiguille « ${needle} » ne reconnaît pas ${allowed} : le garde ne peut rien voir`,
+    ).toBe(true);
+    const offenders = collectSourceFiles(root!)
+      .filter((file) => file !== allowed && readFileSync(file, 'utf8').includes(needle))
+      .map((file) => file.slice(root!.length + 1));
+    expect(
+      offenders,
+      `MutationCache écrit à la main hors de la fabrique : ${offenders.join(', ')} — dériver de buildQueryClient`,
     ).toEqual([]);
   });
 });

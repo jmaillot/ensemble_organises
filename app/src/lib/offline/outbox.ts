@@ -228,14 +228,30 @@ export function newClientKey(): string {
  * expose. Réseau/5xx : retryable, part en file.
  */
 export function isNetworkFailure(error: unknown): boolean {
-  if (error instanceof TypeError) return true; // fetch échoué : réseau indisponible
-  const candidate = error as { code?: unknown; status?: unknown; message?: unknown } | null | undefined;
-  if (candidate && typeof candidate === 'object') {
-    if (typeof candidate.code === 'string' && candidate.code.length > 0) return false;
-    if (candidate.message === REMOVE_MISSING_MESSAGE || candidate.message === REMOVE_WHERE_MISSING_MESSAGE) return false;
-    if (typeof candidate.status === 'number') return candidate.status >= 500;
+  // DataError enveloppe l'erreur d'origine (`cause` = erreur supabase-js) :
+  // le code PG vit dans la cause, jamais sur l'Error elle-même. Les deux
+  // maillons sont examinés — un code PG à l'un OU l'autre est un refus métier.
+  const chain: unknown[] = [error];
+  const cause = (error as { cause?: unknown } | null | undefined)?.cause;
+  if (cause !== undefined && cause !== error) chain.push(cause);
+  for (const candidate of chain) {
+    if (candidate instanceof TypeError) {
+      continue;
+    }
+    const c = candidate as { code?: unknown; status?: unknown; message?: unknown } | null | undefined;
+    if (!c || typeof c !== 'object') continue;
+    // Pitfall 2 : un code PostgREST est un refus métier (42501 RLS, 23505
+    // unicité, 23514 check) — JAMAIS enfilé, il échoue devant l'utilisateur.
+    if (typeof c.code === 'string' && c.code.length > 0) return false;
+    // Une suppression de 0 ligne (RLS-refusée ou ligne déjà absente — les
+    // deux indistinguables, Pitfall 3) lève REMOVE_*_MISSING sans code PG :
+    // un refus métier, pas un incident réseau.
+    if (c.message === REMOVE_MISSING_MESSAGE || c.message === REMOVE_WHERE_MISSING_MESSAGE) return false;
+    if (typeof c.status === 'number') {
+      if (c.status < 500) return false;
+    }
   }
-  return true; // ni code ni statut : échec transport par défaut
+  return true; // ni code ni statut décisif : échec transport par défaut
 }
 
 export type FailureClassification = { kind: 'terminal'; code: string; message: string } | { kind: 'retryable' };
@@ -247,14 +263,21 @@ export type FailureClassification = { kind: 'terminal'; code: string; message: s
  * CODE, jamais un fragment de message PostgREST.
  */
 export function classifyFailure(error: unknown): FailureClassification {
-  const candidate = error as { code?: unknown; status?: unknown; message?: unknown } | null | undefined;
-  const message = candidate && typeof candidate.message === 'string' ? candidate.message : String(error);
-  if (typeof candidate?.code === 'string' && candidate.code.length > 0) {
-    return { kind: 'terminal', code: candidate.code, message };
+  const chain: unknown[] = [error];
+  const cause = (error as { cause?: unknown } | null | undefined)?.cause;
+  if (cause !== undefined && cause !== error) chain.push(cause);
+  const message =
+    chain.find(
+      (candidate): candidate is { message: string } =>
+        Boolean(candidate) && typeof candidate === 'object' && typeof (candidate as { message?: unknown }).message === 'string',
+    )?.message ?? String(error);
+  for (const candidate of chain) {
+    const c = candidate as { code?: unknown; message?: unknown } | null | undefined;
+    if (!c || typeof c !== 'object') continue;
+    // Pitfall 4 : le CODE décide, jamais un fragment de message PostgREST.
+    if (typeof c.code === 'string' && c.code.length > 0) return { kind: 'terminal', code: c.code, message };
+    if (c.message === REMOVE_MISSING_MESSAGE) return { kind: 'terminal', code: 'REMOVE_MISSING', message };
+    if (c.message === REMOVE_WHERE_MISSING_MESSAGE) return { kind: 'terminal', code: 'REMOVE_WHERE_MISSING', message };
   }
-  if (candidate?.message === REMOVE_MISSING_MESSAGE) return { kind: 'terminal', code: 'REMOVE_MISSING', message };
-  if (candidate?.message === REMOVE_WHERE_MISSING_MESSAGE) {
-    return { kind: 'terminal', code: 'REMOVE_WHERE_MISSING', message };
-  }
-  return { kind: 'retryable' };
+  return { kind: 'retryable' }; // réseau / 5xx : rejeté, reste en file (D-10)
 }
