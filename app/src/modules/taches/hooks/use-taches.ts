@@ -345,8 +345,18 @@ export function useTaches(): UseTachesResult {
     },
     isLoading: isLoading || assigneesQuery.isLoading || remindersQuery.isLoading,
     isFetching: isFetching || assigneesQuery.isFetching || remindersQuery.isFetching,
-    isError: isError || assigneesQuery.isError || remindersQuery.isError,
-    error: error ?? assigneesQuery.error ?? remindersQuery.error,
+    // Les requêtes d'annexe (assignees/reminders) sont des useQuery directs
+    // volontairement hors allowlist/persistance (décision 33-03) : en mode
+    // avion leur refetch échoue avec data === undefined — sans garde, l'isError
+    // composé masquerait les lignes de tâches en cache (G-33-3).
+    isError:
+      isError ||
+      (assigneesQuery.isError && assigneesQuery.data === undefined) ||
+      (remindersQuery.isError && remindersQuery.data === undefined),
+    error:
+      error ??
+      (assigneesQuery.isError && assigneesQuery.data === undefined ? assigneesQuery.error : null) ??
+      (remindersQuery.isError && remindersQuery.data === undefined ? remindersQuery.error : null),
     isMutating,
     refetch,
     toggleStatus,

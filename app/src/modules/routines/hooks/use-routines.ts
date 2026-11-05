@@ -390,8 +390,21 @@ export function useRoutines(): UseRoutinesResult {  const queryClient = useQuery
     setQuery,
     isLoading: isLoading || completionsResource.isLoading || assigneesQuery.isLoading || remindersQuery.isLoading,
     isFetching: isFetching || completionsResource.isFetching || assigneesQuery.isFetching || remindersQuery.isFetching,
-    isError: isError || completionsResource.isError || assigneesQuery.isError || remindersQuery.isError,
-    error: error ?? completionsResource.error ?? assigneesQuery.error ?? remindersQuery.error,
+    // Les requêtes d'annexe (assignees/reminders) sont des useQuery directs
+    // volontairement hors allowlist/persistance (décision 33-03) : en mode
+    // avion leur refetch échoue avec data === undefined — sans garde, l'isError
+    // composé masquerait les lignes en cache (G-33-3). `completionsResource`
+    // est un useResource : son isError est déjà cloisonné dans le hook lui-même.
+    isError:
+      isError ||
+      completionsResource.isError ||
+      (assigneesQuery.isError && assigneesQuery.data === undefined) ||
+      (remindersQuery.isError && remindersQuery.data === undefined),
+    error:
+      error ??
+      completionsResource.error ??
+      (assigneesQuery.isError && assigneesQuery.data === undefined ? assigneesQuery.error : null) ??
+      (remindersQuery.isError && remindersQuery.data === undefined ? remindersQuery.error : null),
     isMutating,
     refetch,
     toggleOccurrence,
