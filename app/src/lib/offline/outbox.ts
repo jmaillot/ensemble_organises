@@ -142,10 +142,29 @@ export function enqueueOutbox(client: QueryClient, marker: MutationMarker, varia
 
   // D-04 fusion : la NOUVELLE écriture écrase la pendante de la même entité —
   // une écriture finale par entité, la dernière action locale gagne.
+  // CR-02 : sauf quand la pendante est un CREATE — le retirer au profit d'un
+  // update rejouerait un update sur une ligne qui n'existe pas côté serveur
+  // (0 ligne modifiée, PGRST116, échec terminal) : la ligne ne serait jamais
+  // créée. Les valeurs de l'update sont donc fusionnées DANS le create, qui
+  // conserve son client_key (clé d'idempotence du rejeu) : l'invariant
+  // « une écriture finale par entité » est maintenu SANS faire disparaître
+  // la création.
+  const superseded = entries.find(
+    (entry) => entry.status === 'pending' && entry.table === incoming.table && entry.key === incoming.key,
+  );
+  if (incoming.operation === 'update' && superseded?.operation === 'create') {
+    client.setQueryData(key, [
+      ...entries.filter((entry) => entry !== superseded),
+      {
+        ...superseded,
+        values: { ...superseded.values, ...incoming.values },
+        enqueuedAt: incoming.enqueuedAt,
+      },
+    ]);
+    return;
+  }
   client.setQueryData(key, [
-    ...entries.filter(
-      (entry) => !(entry.status === 'pending' && entry.table === incoming.table && entry.key === incoming.key),
-    ),
+    ...entries.filter((entry) => entry !== superseded),
     incoming,
   ]);
 }

@@ -162,6 +162,31 @@ describe('sémantique de file (D-04 fusion, D-05 annulation, Pitfall 2)', () => 
     expect(outboxEntries(client), 'la ligne n’a jamais existé côté serveur : create ET remove disparaissent').toHaveLength(0);
   });
 
+  it('create puis update de la même entité = UN create fusionné (CR-02) — jamais un update sur une ligne inexistante', async () => {
+    // Cas qui doit échouer sur l'état pré-fixe : la fusion D-04 retirait le
+    // create au profit de l'update ; au rejeu, l'update sur un id absent
+    // côté serveur levait PGRST116 (échec terminal) et la ligne n'était
+    // jamais créée — perte de données silencieuse.
+    onlineManager.setOnline(false);
+    vi.mocked(data.create).mockRejectedValue(new TypeError('fetch failed'));
+    vi.mocked(data.update).mockRejectedValue(new TypeError('fetch failed'));
+    const client = makeClient();
+
+    const { result } = renderHook(() => useResource('shopping_list_items'), { wrapper: wrapperFor(client) });
+    await expect(result.current.create({ name: 'Pian', household_id: 'h1' })).rejects.toThrow('fetch failed');
+    const created = outboxEntries(client)[0];
+    await expect(result.current.update(created.id as string, { name: 'Pain' })).rejects.toThrow('fetch failed');
+
+    const entries = outboxEntries(client);
+    expect(entries, 'une écriture finale par entité').toHaveLength(1);
+    // L'entrée reste un CREATE : le rejeu insérera la ligne avec les valeurs
+    // fusionnées, plutôt qu'un update sur une ligne qui n'existe pas.
+    expect(entries[0].operation).toBe('create');
+    expect(entries[0].values?.name).toBe('Pain');
+    // Le client_key du create est conservé : clé d'idempotence du rejeu.
+    expect(entries[0].clientKey).toBe(created.clientKey);
+  });
+
   it('remove après update : l’update est retiré, le remove part (la ligne existe côté serveur)', async () => {
     onlineManager.setOnline(false);
     vi.mocked(data.update).mockRejectedValue(new TypeError('fetch failed'));
