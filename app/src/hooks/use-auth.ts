@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { User, UserIdentity } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { data } from '@/lib/data';
-import { useSessionStore } from '@/stores/session-store';
+import { useSessionStore, assertSignOutAllowed } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
 import { connectOfflineCache } from '@/lib/offline/query-persistence';
@@ -348,6 +348,16 @@ export async function signUpWithEmail(email: string, password: string) {
 }
 
 export async function signOut(options?: { acknowledgePendingWrites?: boolean }) {
+  // WR-01 (D-17, classe corrigée) : le scan précède la révocation. Si des
+  // écritures pendantes rejettent la déconnexion (OutboxPendingError), le
+  // jeton serveur est ENCORE VALIDE — l'utilisateur qui annule la dialog
+  // garde une app réellement fonctionnelle, et le rejeu de la file peut
+  // partir. Avant ce correctif, la révocation passait d'abord : annuler la
+  // dialog laissait un jeton mort derrière un statut « authenticated ».
+  // L'acknowledgment est ensuite transmis au goulot tel quel : si le scan a
+  // rejeté, on n'atteint jamais la révocation ; sinon le goulot re-scanne
+  // sans effet pour les chemins qui n'ont pas scanné (listener SIGNED_OUT…).
+  await assertSignOutAllowed(options);
   try {
     if (supabase) await supabase.auth.signOut();
   } finally {

@@ -485,3 +485,61 @@ describe('comptes liés (fusion email + OAuth)', () => {
     expect(auth.unlinkIdentity).toHaveBeenCalledWith(google);
   });
 });
+
+describe('signOut — WR-01 : le scan de la file précède la révocation du jeton', () => {
+  beforeEach(() => {
+    auth.signOut.mockReset();
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+    useHouseholdStore.getState().reset();
+  });
+
+  it("avec des écritures pendantes sans acknowledgment, le jeton n'est PAS révoqué (OutboxPendingError d'abord)", async () => {
+    // Cas qui doit échouer sur l'état pré-fixe : `signOut` révoquait le jeton
+    // DANS le try, PUIS scannait la file dans le finally. L'utilisateur qui
+    // annulait la confirm-dialog gardait un statut « authenticated » avec un
+    // jeton déjà mort : 401 partout, rejeu impossible.
+    const { signOut } = await import('./use-auth');
+    const { queryClient } = await import('@/app/router');
+    const { outboxKeyFor } = await import('@/lib/offline/outbox');
+    const { OutboxPendingError } = await import('@/stores/session-store');
+
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: user.id, email: 'alice@example.fr', displayName: 'Alice Martin', avatarUrl: null, provider: 'email' },
+      householdLoaded: true,
+    });
+    useHouseholdStore.getState().setHousehold(
+      { id: 'h1', name: 'Foyer', avatar_color: 'accent' } as HouseholdRow,
+      [],
+    );
+    queryClient.setQueryData(outboxKeyFor(user.id, 'h1'), [
+      { key: 'tasks:t1', table: 'tasks', operation: 'update', id: 't1', values: { name: 'x' }, enqueuedAt: 1, status: 'pending' },
+    ]);
+    auth.signOut.mockResolvedValue({ error: null });
+
+    await expect(signOut()).rejects.toBeInstanceOf(OutboxPendingError);
+    // LE point du correctif : la révocation serveur n'a pas eu lieu.
+    expect(auth.signOut).not.toHaveBeenCalled();
+    queryClient.removeQueries({ queryKey: ['outbox'] });
+  });
+
+  it('sans écriture pendante, la révocation puis la purge partent normalement', async () => {
+    const { signOut } = await import('./use-auth');
+
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: user.id, email: 'alice@example.fr', displayName: 'Alice Martin', avatarUrl: null, provider: 'email' },
+      householdLoaded: true,
+    });
+    useHouseholdStore.getState().setHousehold(
+      { id: 'h1', name: 'Foyer', avatar_color: 'accent' } as HouseholdRow,
+      [],
+    );
+    auth.signOut.mockResolvedValue({ error: null });
+
+    await signOut();
+
+    expect(auth.signOut).toHaveBeenCalledOnce();
+    expect(useSessionStore.getState().status).toBe('guest');
+  });
+});

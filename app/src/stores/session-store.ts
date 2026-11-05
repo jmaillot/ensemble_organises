@@ -73,6 +73,11 @@ export const useSessionStore = create<SessionState>()(
         // explicite, des écritures pendantes rejettent la déconnexion —
         // jamais de purge silencieuse d'écritures non parties. La lecture de
         // l'identifiant et le scan précèdent donc tout le reste.
+        // WR-01 : `use-auth.signOut` appelle aussi `assertSignOutAllowed`
+        // AVANT de révoquer le jeton serveur — mais le scan ici reste la
+        // ceinture pour les chemins qui n'ont pas scanné (listener
+        // SIGNED_OUT, bootstrap, mode local). Sans acknowledgment, il
+        // rejette à nouveau : idempotent, jamais double purge.
         const userId = get().user?.id ?? null;
         const householdId = useHouseholdStore.getState().householdId;
         if (userId && householdId) {
@@ -118,6 +123,31 @@ export const useSessionStore = create<SessionState>()(
     { name: 'ensemble-organises-session', version: 1, partialize: (state) => ({ user: state.user }) },
   ),
 );
+
+/**
+ * WR-01 : scan de la file d'écriture SANS effacer quoi que ce soit.
+ *
+ * `use-auth.signOut` l'appelle AVANT `supabase.auth.signOut()` : la
+ * révocation du jeton serveur ne doit intervenir qu'APRÈS que le scan a
+ * accepté — sinon l'utilisateur qui annule la confirm-dialog (des écritures
+ * pendantes, sans acknowledgment) garde une app « authentifiée » avec un
+ * jeton déjà mort : chaque lecture échoue 401 et le rejeu de la file ne
+ * peut plus partir. Jette `OutboxPendingError` si des écritures sont
+ * pendantes sans acknowledgment explicite.
+ */
+export async function assertSignOutAllowed(options?: { acknowledgePendingWrites?: boolean }): Promise<void> {
+  const userId = useSessionStore.getState().user?.id ?? null;
+  const householdId = useHouseholdStore.getState().householdId;
+  if (!userId || !householdId) return; // pas de couple établi : rien à protéger
+  const entries =
+    (await import('@/app/router').then(({ queryClient }) =>
+      queryClient.getQueryData<OutboxEntry[]>(outboxKeyFor(userId, householdId)),
+    )) ?? [];
+  const pendingCount = entries.filter((entry) => entry.status === 'pending').length;
+  if (pendingCount > 0 && !options?.acknowledgePendingWrites) {
+    throw new OutboxPendingError(pendingCount);
+  }
+}
 
 /** Marque le foyer comme chargé : tous les `await` du chargement ont abouti. */
 function markHouseholdLoaded() {
