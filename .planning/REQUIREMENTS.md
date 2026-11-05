@@ -22,7 +22,7 @@
 
 ### File d'écriture (WRQ)
 
-- [ ] **WRQ-01** : Migration SQL d'idempotence : clé client UUID sur les écritures Tier 1 (upsert/unicité) avec tests SQL négatifs §2.7 — prérequis de toute écriture en file
+- [x] **WRQ-01** : Migration SQL d'idempotence : clé client UUID sur les écritures Tier 1 (upsert/unicité) avec tests SQL négatifs §2.7 — prérequis de toute écriture en file
 - [ ] **WRQ-02** : Une écriture simple effectuée hors-ligne sur un module Tier 1 (ajout/coche Courses, Tâches, Routines) est enfilée localement et rejouée automatiquement au retour du réseau (foreground)
 - [ ] **WRQ-03** : La file est une liste blanche : toute écriture sur un module hors liste (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client avec un test qui le prouve
 - [ ] **WRQ-04** : Un rejeu qui bute sur un refus RLS ou une ligne supprimée est classé terminal (surfacer à l'utilisateur, retirer de la file) vs retryable (réseau) — jamais de retry en boucle, jamais d'effacement silencieux
@@ -70,7 +70,7 @@
 | OFFR-03 | Phase 33 | Pending |
 | OFFR-04 | Phase 33 | Complete (33-04) |
 | OFFR-05 | Phase 33 | Pending |
-| WRQ-01 | Phase 34 | Pending |
+| WRQ-01 | Phase 34 | Complete |
 | WRQ-02 | Phase 34 | Pending |
 | WRQ-03 | Phase 34 | Pending |
 | WRQ-04 | Phase 34 | Pending |

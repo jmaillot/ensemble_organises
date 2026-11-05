@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 milestone: v1.1
 current_phase: 34
 current_phase_name: File d'écriture & rejeu
-status: phase_complete
-stopped_at: Phase 34 context gathered
-last_updated: "2026-11-05T09:32:55.099Z"
+status: executing
+stopped_at: Completed 34-01-PLAN.md
+last_updated: "2026-11-05T10:57:01.693Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 33 marquée complète — UAT 4/4 passés (re-test 3 post-fix 33-06 validé sur appareil réel)
-state_head: a3053ebae8f8b6e634e96c56e59eb168835eb37c
+last_activity_desc: Phase 34 execution started
+state_head: e6b0c89517f743961728034c0e513075baaeb93a
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 13
+  completed_plans: 10
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 33 — Cache de lecture offline
+**Current focus:** Phase 34 — File d'écriture & rejeu
 
 ## Current Position
 
-Phase: 33 (Cache de lecture offline) — COMPLETE
-Plan: 6 of 6
-Status: Phase 33 complete — UAT 4/4, verification passed
-Last activity: 2026-11-05 — UAT 4/4 passés (re-test 3 post-fix 33-06 validé sur appareil réel)
+Phase: 34 (File d'écriture & rejeu) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-11-05 — Phase 34 execution started
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -48,6 +48,13 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | 33 | 6 | - | - |
 | 34 | 0 | - | - |
 | 35 | 0 | - | - |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 34 P01 | 50min | 3 tasks | 25 files |
+| Phase 34 P01 | 50min | 3 tasks | 25 files |
+| Phase 34 P01 | 50min | 3 tasks | 25 files |
 
 ## Accumulated Context
 
@@ -60,6 +67,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - OFFR-05 (denylist SW API, contrôle statique prouvé sur cas must-fail) livrée dans la même phase que le premier rendu caché
 - Rejeu foreground-first : Background Sync = Chromium-only, iOS = cible de design ; enrichissement v1.x seulement
 - Aucun store, aucun APK, aucun wrapper natif (arbitrage 2026-11-04) ; pas de retour du mode démo Dexie (D-10)
+- [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
+- [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
+- [Phase 34]: 34-01 : client_key uuid NOT NULL + unicité (household_id, client_key) sur les 5 tables Tier 1 ; task_assignees unicité sur client_key seul ; pas de DEFAULT (refus = signal client buggé), fonctions serveur (cron/RPC) alimentées en gen_random_uuid() (0178/0179)
 
 ### Pending Todos
 
@@ -74,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-05T09:32:55.051Z
-Stopped at: Phase 34 context gathered
-Resume file: .planning/phases/34-file-d-criture-rejeu/34-CONTEXT.md
+Last session: 2026-11-05T10:57:01.641Z
+Stopped at: Completed 34-01-PLAN.md
+Resume file: None
