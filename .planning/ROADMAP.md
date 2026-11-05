@@ -59,7 +59,13 @@ Plans:
   3. Toute écriture sur un module hors liste blanche (Ardoise, Messages, Cadeaux, Cercle, invitations/tokens) est refusée côté client — prouvé par un test qui fait échouer une tentative hors liste
   4. Un rejeu butant sur un refus RLS ou une ligne supprimée est classé terminal et surfacé à l'utilisateur (échec visible avec réessayer/abandonner, retrait de la file) ; seuls les échecs réseau/5xx sont rejoués — jamais de retry en boucle, jamais d'effacement silencieux
   5. Le badge « N en attente » est visible pendant la déconnexion et retombe à zéro après un rejeu complet ; une écriture rejouée ne crée jamais de doublon face à Realtime (réconciliation par clé client, Realtime/invalidation priment sur l'overlay optimiste)
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 34-01-PLAN.md — Migration SQL d'idempotence : client_key uuid + backfill + NOT NULL + unicité sur les 5 tables Tier 1, tests SQL négatifs §2.7 (WRQ-01)
+- [ ] 34-02-PLAN.md — Outbox : enfilage central MutationCache (D-02), liste blanche d'écriture + refus upfront (WRQ-02/03), fusion D-04, annulation D-05, persistance dans le persister 33
+- [ ] 34-03-PLAN.md — Rejeu foreground FIFO creates-d'abord via upsert idempotent, classification terminal/retryable sans boucle (WRQ-02/04), réconciliation Realtime par clé client (WRQ-06)
+- [ ] 34-04-PLAN.md — Surface : use-outbox source unique, badge « N en attente / N bloquées », panneau Réessayer/Abandonner, toast une fois, purge D-17 (WRQ-05)
 
 ### Phase 35: Deep links & validation multi-OS
 **Goal** : Un raccourci tapé en cold-start déconnecté mène toujours à la bonne vue après reconnexion, et l'expérience offline complète est validée de bout en bout sur les trois OS — l'app de poche est prête, prouvée, pas supposée.
