@@ -5,12 +5,23 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { data } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
-import type { ProductRow, ShoppingListRow } from '@/types';
+import type { ProductRow, ShoppingListItemRow, ShoppingListRow } from '@/types';
 import { ProductSheet } from './components/product-sheet';
 import { PRODUCTS_TABLE, productPhotoUrl } from './products-api';
 import type { OffProduct } from './off-client';
 import { compressImage } from '@/modules/cercle/lib/media';
 import { depositHouseholdFile, removeHouseholdFile } from '@/lib/storage';
+
+/**
+ * Mutateurs d'article adossés à l'adaptateur local : même interface que la
+ * couche mutation Tier 1 du hook (G-34-1), dont la fiche produit dépend.
+ */
+const itemMutators = {
+  createItem: (values: Partial<ShoppingListItemRow>) =>
+    data.create<ShoppingListItemRow>('shopping_list_items', values),
+  updateItem: (id: string, values: Partial<ShoppingListItemRow>) =>
+    data.update<ShoppingListItemRow>('shopping_list_items', id, values),
+};
 
 /**
  * Persistance photo produit (D-05, D-01) : la photo locale compressée part en
@@ -78,6 +89,7 @@ function renderSheet(listId: string, offProduct: OffProduct | null, ean: string)
       offProduct,
       ean,
       lists: [{ id: listId, name: 'Hebdo' }],
+      itemMutators,
     }),
   );
 }
@@ -176,6 +188,7 @@ describe('photo produit persistée (D-05, D-01)', () => {
           { id: listA.id, name: 'Fresque' },
           { id: listB.id, name: 'Maison' },
         ],
+        itemMutators,
       }),
     );
 
@@ -201,6 +214,7 @@ describe('photo produit persistée (D-05, D-01)', () => {
         offProduct: null,
         ean: NUTELLA_EAN,
         lists: [{ id: list.id, name: 'Hebdo' }],
+        itemMutators,
         offError: true,
         onRetry,
       }),

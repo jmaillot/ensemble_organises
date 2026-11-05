@@ -1,7 +1,8 @@
 import { data, DataError } from '@/lib/data';
+import { assertWriteAllowed } from '@/lib/data/write-policy';
 import { householdMediaPathOf, isHouseholdMediaPath, resolveHouseholdMediaUrl } from '@/lib/storage';
 import type { ProductRow, ShoppingListItemRow } from '@/types';
-import { createShoppingItem, SHOPPING_ITEMS_TABLE } from './api';
+import { buildShoppingItemValues, SHOPPING_ITEMS_TABLE } from './api';
 import { type OffProduct, cleanOffImageUrl } from './off-client';
 import { normalizeRayon } from './types';
 
@@ -15,6 +16,17 @@ import { normalizeRayon } from './types';
  */
 
 export const PRODUCTS_TABLE = 'products';
+
+/**
+ * Mutateurs d'ARTICLE injectés (G-34-1) : toute écriture d'issue de scan
+ * passe par la couche mutation Tier 1 du hook (`itemResource`), jamais par
+ * un appel adaptateur brut ici. `products-api.ts` reste un module de
+ * fonctions — il ne peut pas porter la couche mutation, il la REÇOIT.
+ */
+export interface ItemMutators {
+  createItem: (values: Partial<ShoppingListItemRow>) => Promise<ShoppingListItemRow>;
+  updateItem: (id: string, values: Partial<ShoppingListItemRow>) => Promise<ShoppingListItemRow>;
+}
 
 export interface FindProductInput {
   householdId: string;
@@ -201,6 +213,10 @@ export function productInputFromOff(
  * retrouvée par EAN, jamais dupliquée) avec photo et rayon, puis l'article
  * est lié (`product_id`) comme après un scan. Le nom d'article reste celui
  * saisi par l'utilisateur ; la fiche garde le nom OFF canonique.
+ *
+ * Un résultat OFF suppose TOUJOURS la création d'une fiche (`products` hors
+ * liste blanche) : hors ligne, la garde D-07 refuse D'EMBLÉE — avant toute
+ * écriture d'article, qui resterait sinon orpheline d'une fiche jamais créée.
  */
 export interface ResolveManualOffInput {
   householdId: string;
@@ -215,7 +231,9 @@ export interface ResolveManualOffInput {
 
 export async function resolveManualOffProduct(
   input: ResolveManualOffInput,
+  { createItem }: ItemMutators,
 ): Promise<{ product: ProductRow; item: ShoppingListItemRow }> {
+  assertWriteAllowed(PRODUCTS_TABLE);
   const product = await findOrCreateProduct(
     productInputFromOff(
       input.householdId,
@@ -223,16 +241,18 @@ export async function resolveManualOffProduct(
       { category: input.rayon, createdBy: input.addedBy ?? null },
     ),
   );
-  const item = await createShoppingItem({
-    householdId: input.householdId,
-    listId: input.listId,
-    name: input.name.trim(),
-    quantity: input.quantity,
-    unit: input.unit?.trim() || null,
-    rayon: normalizeRayon(input.rayon),
-    addedBy: input.addedBy ?? null,
-    productId: product.id,
-  });
+  const item = await createItem(
+    buildShoppingItemValues({
+      householdId: input.householdId,
+      listId: input.listId,
+      name: input.name.trim(),
+      quantity: input.quantity,
+      unit: input.unit?.trim() || null,
+      rayon: normalizeRayon(input.rayon),
+      addedBy: input.addedBy ?? null,
+      productId: product.id,
+    }),
+  );
   return { product, item };
 }
 
@@ -240,8 +260,18 @@ export async function resolveManualOffProduct(
  * Totale 1-tap de la fiche (D-02) : enregistre le produit ET l'ajoute a la
  * liste courante. Re-scan d'un produit deja present : quantite +1 sur
  * l'article existant (decoché au passage), zero nouvelle ligne (D-04).
+ *
+ * Le refus hors-ligne porte sur la CRÉATION DE FICHE seulement : produit
+ * DÉJÀ CONNU (lecture par EAN, jamais un appel réseau quand le magasin est
+ * le magasin local), l'article est écrit via les mutateurs Tier 1 et
+ * s'enfile hors ligne — c'est le D-06 qu'aucun refus ne doit casser.
  */
-export async function resolveScannedProduct(input: ResolveScanInput): Promise<ScanResolution> {
+export async function resolveScannedProduct(
+  input: ResolveScanInput,
+  { createItem, updateItem }: ItemMutators,
+): Promise<ScanResolution> {
+  const known = await findProductByEan(input.householdId, input.ean);
+  if (!known) assertWriteAllowed(PRODUCTS_TABLE); // produit inconnu : fiche à créer — refus AVANT toute écriture d'article
   const product = await findOrCreateProduct(input);
   const siblings = await data.list<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, {
     household_id: input.householdId,
@@ -251,22 +281,24 @@ export async function resolveScannedProduct(input: ResolveScanInput): Promise<Sc
   const current = siblings[0];
   if (current) {
     // `null` vaut implicitement une unité : la base du +1 est donc 1 (CR-03).
-    const item = await data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, current.id, {
+    const item = await updateItem(current.id, {
       quantity: (current.quantity ?? 1) + 1,
       checked: false,
     });
     return { product, item, incremented: true };
   }
-  const item = await createShoppingItem({
-    householdId: input.householdId,
-    listId: input.listId,
-    name: product.name,
-    quantity: null,
-    unit: null,
-    rayon: normalizeRayon(product.category),
-    addedBy: input.addedBy ?? null,
-    productId: product.id,
-  });
+  const item = await createItem(
+    buildShoppingItemValues({
+      householdId: input.householdId,
+      listId: input.listId,
+      name: product.name,
+      quantity: null,
+      unit: null,
+      rayon: normalizeRayon(product.category),
+      addedBy: input.addedBy ?? null,
+      productId: product.id,
+    }),
+  );
   return { product, item, incremented: false };
 }
 

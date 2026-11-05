@@ -25,6 +25,7 @@ import {
   createShoppingItem,
   deleteShoppingItem,
   deleteShoppingList,
+  SHOPPING_ITEMS_TABLE,
 } from '@/modules/courses/api';
 import { guessRayon } from '@/modules/courses/types';
 import type { ShoppingListItemRow } from '@/types';
@@ -141,7 +142,15 @@ export function TripCoursesTab({ tripId, householdId, currentMemberId, readOnly 
     const target = pendingDeleteList;
     setPendingDeleteList(null);
     if (!target) return;
-    void deleteShoppingList(target, householdId)
+    void deleteShoppingList(
+      target,
+      householdId,
+      // Onglet voyage : pas de couche hook ici (choix historique hors périmètre
+      // 34-05) — la suppression d'article reste un appel brut. La garde
+      // adaptateur D-07 porte le refus hors ligne ; voir le commentaire des
+      // voies brutes dans courses/api.ts.
+      (itemId) => data.remove(SHOPPING_ITEMS_TABLE, itemId),
+    )
       .then(() => {
         refresh();
         toast('Liste du voyage supprimée.');

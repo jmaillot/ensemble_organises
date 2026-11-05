@@ -20,6 +20,17 @@ import type { OffProduct } from './off-client';
 const HOUSEHOLD = 'household-scan-test';
 const OTHER_HOUSEHOLD = 'household-scan-test-autre';
 
+/**
+ * Mutateurs injectés adossés à l'adaptateur local : les résolutions reçoivent
+ * la même interface que la couche mutation Tier 1 du hook en production.
+ */
+const itemMutators = {
+  createItem: (values: Partial<ShoppingListItemRow>) =>
+    data.create<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, values),
+  updateItem: (id: string, values: Partial<ShoppingListItemRow>) =>
+    data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, id, values),
+};
+
 async function createList(householdId: string, name: string): Promise<ShoppingListRow> {
   return data.create<ShoppingListRow>('shopping_lists', {
     household_id: householdId,
@@ -102,7 +113,8 @@ describe('productInputFromOff', () => {
 describe('resolveManualOffProduct', () => {
   it('cree la fiche catalogue (photo OFF) et lie l’article, sans doublon', async () => {
     const list = await createList(HOUSEHOLD, 'Manuelle');
-    const first = await resolveManualOffProduct({
+    const first = await resolveManualOffProduct(
+      {
       householdId: HOUSEHOLD,
       listId: list.id,
       name: 'Nutella bio',
@@ -110,14 +122,15 @@ describe('resolveManualOffProduct', () => {
       unit: null,
       rayon: 'Divers',
       off: NUTELLA_OFF,
-    });
+    }, itemMutators);
     expect(first.product.ean).toBe(NUTELLA_OFF.ean);
     expect(first.product.photo_url).toBeNull();
     expect(first.product.off_data.image_url).toBe(NUTELLA_OFF.imageUrl);
     expect(first.item.product_id).toBe(first.product.id);
     expect(first.item.name).toBe('Nutella bio');
 
-    const second = await resolveManualOffProduct({
+    const second = await resolveManualOffProduct(
+      {
       householdId: HOUSEHOLD,
       listId: list.id,
       name: 'Nutella',
@@ -125,7 +138,7 @@ describe('resolveManualOffProduct', () => {
       unit: null,
       rayon: 'Divers',
       off: NUTELLA_OFF,
-    });
+    }, itemMutators);
     expect(second.product.id).toBe(first.product.id);
     const sameEan = await data.list<ProductRow>(PRODUCTS_TABLE, {
       household_id: HOUSEHOLD,
@@ -146,7 +159,7 @@ describe('resolveScannedProduct', () => {
       name: 'Pates',
       brand: 'Barilla',
       category: 'Divers',
-    });
+    }, itemMutators);
     expect(resolution.incremented).toBe(false);
     expect(resolution.item.product_id).toBe(resolution.product.id);
     expect(resolution.item.name).toBe('Pates');
@@ -162,9 +175,9 @@ describe('resolveScannedProduct', () => {
       name: 'Riz',
       category: 'Divers' as const,
     };
-    const first = await resolveScannedProduct(input);
+    const first = await resolveScannedProduct(input, itemMutators);
     expect(first.incremented).toBe(false);
-    const second = await resolveScannedProduct(input);
+    const second = await resolveScannedProduct(input, itemMutators);
     expect(second.incremented).toBe(true);
     expect(second.product.id).toBe(first.product.id);
     const items = await itemsOf(list.id);
@@ -181,9 +194,9 @@ describe('resolveScannedProduct', () => {
       name: 'Lentilles',
       category: 'Divers' as const,
     };
-    const first = await resolveScannedProduct(input);
+    const first = await resolveScannedProduct(input, itemMutators);
     await data.update<ShoppingListItemRow>(SHOPPING_ITEMS_TABLE, first.item.id, { checked: true });
-    const second = await resolveScannedProduct(input);
+    const second = await resolveScannedProduct(input, itemMutators);
     expect(second.incremented).toBe(true);
     expect(second.item.checked).toBe(false);
     expect(second.item.quantity).toBe(2);
