@@ -235,8 +235,12 @@ export function useVoyages(): VoyagesState {
     members,
     today,
     isLoading: tripsQuery.isLoading,
-    isError: tripsQuery.isError,
-    error: (tripsQuery.error as Error | null) ?? null,
+    // Refetch échoué hors ligne : TanStack v5 garde `data` et pose `status:
+    // "error"` — l'erreur n'est honnête que SANS données (D-09) ; la péremption
+    // reste signalée par le bandeau ambre (D-12/D-13).
+    isError: tripsQuery.isError && tripsQuery.data === undefined,
+    error:
+      tripsQuery.isError && tripsQuery.data === undefined ? ((tripsQuery.error as Error | null) ?? null) : null,
     tasksError: (tasksQuery.error as Error | null) ?? null,
     refetch: () => void tripsQuery.refetch(),
     isMutating: createMutation.isPending || updateMutation.isPending || removeMutation.isPending,

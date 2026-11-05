@@ -700,8 +700,20 @@ export function useMessagesFeed(): MessagesFeed {
     householdId,
     currentMemberId,
     isLoading: conversationsQuery.isLoading || participantsQuery.isLoading || previewsQuery.isLoading,
-    isError: conversationsQuery.isError || participantsQuery.isError || previewsQuery.isError,
-    error: (conversationsQuery.error ?? participantsQuery.error ?? previewsQuery.error ?? null) as Error | null,
+    // Cloisonnement erreur/données (G-33-3) : un refetch échoué hors ligne
+    // garde `data` et pose `status: "error"` — l'erreur n'est honnête que
+    // SANS données (D-09). `keepPreviousData` maintient `data` défini entre
+    // pages : le garde y est d'autant plus nécessaire.
+    isError:
+      (conversationsQuery.isError && conversationsQuery.data === undefined) ||
+      (participantsQuery.isError && participantsQuery.data === undefined) ||
+      (previewsQuery.isError && previewsQuery.data === undefined),
+    error:
+      (conversationsQuery.isError && conversationsQuery.data === undefined) ||
+      (participantsQuery.isError && participantsQuery.data === undefined) ||
+      (previewsQuery.isError && previewsQuery.data === undefined)
+        ? ((conversationsQuery.error ?? participantsQuery.error ?? previewsQuery.error ?? null) as Error | null)
+        : null,
     refetch,
     readMap,
     markRead,

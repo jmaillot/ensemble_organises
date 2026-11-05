@@ -175,7 +175,12 @@ export function useRefDays(year: number, zone: SchoolZone | null) {
     holidays,
     vacations: zone === null ? [] : vacations,
     isLoading: holidaysQuery.isLoading || vacationsQuery.isLoading,
-    isError: holidaysQuery.isError || vacationsQuery.isError,
+    // Cloisonnement erreur/données (G-33-3) : un refetch échoué hors ligne
+    // garde `data` et pose `status: "error"` — l'erreur n'est honnête que
+    // SANS données (D-09) ; le bandeau ambre signale la péremption (D-12/D-13).
+    isError:
+      (holidaysQuery.isError && holidaysQuery.data === undefined) ||
+      (vacationsQuery.isError && vacationsQuery.data === undefined),
     refetch: async () => {
       await holidaysQuery.refetch();
       if (zone !== null) await vacationsQuery.refetch();

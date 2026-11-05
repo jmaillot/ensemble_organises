@@ -142,9 +142,18 @@ export function useTripDetail(tripId: string | null): TripDetailState {
   );
 
   const isLoading = tripQuery.isLoading || membersQuery.isLoading || guestsQuery.isLoading;
+  // Cloisonnement erreur/données (G-33-3) : chaque requête ne déclare une
+  // erreur pour le rendu que SANS données en cache — un refetch échoué hors
+  // ligne garde `data` et pose `status: "error"` (TanStack v5).
+  const hasError =
+    (tripQuery.isError && tripQuery.data === undefined) ||
+    (membersQuery.isError && membersQuery.data === undefined) ||
+    (guestsQuery.isError && guestsQuery.data === undefined);
+  // L'agrégat brut reste porteur du gating (`notAuthorized`, `enabled` des
+  // compteurs) : changer sa sémantique dépendrait de l'ancien comportement et
+  // seul l'exposé au rendu est cloisonné ici — raison de la séparation.
   const isError = tripQuery.isError || membersQuery.isError || guestsQuery.isError;
-  const error =
-    ((tripQuery.error ?? membersQuery.error ?? guestsQuery.error) as Error | null) ?? null;
+  const error = hasError ? (((tripQuery.error ?? membersQuery.error ?? guestsQuery.error) as Error | null) ?? null) : null;
   // RLS : un non-membre ne lit pas le voyage (`null`) ; en démo (sans RLS),
   // l'appartenance explicite tranche (D-01).
   const notAuthorized =
@@ -165,7 +174,7 @@ export function useTripDetail(tripId: string | null): TripDetailState {
     storedCover,
     tabState: displayTrip && !notAuthorized ? displayTrip.tabState : null,
     isLoading,
-    isError,
+    isError: hasError,
     error,
     notAuthorized,
     isParticipant,
