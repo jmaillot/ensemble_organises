@@ -516,8 +516,9 @@ export function useCourses(): UseCoursesResult {
   const removeList = useCallback(
     async (id: string) => {
       if (!householdId) return;
-      // Les ARTICLES partent par le mutateur Tier 1 ; la liste elle-même
-      // reste un appel brut (hors liste blanche — refus D-07 assumé).
+      // La LISTE part d'abord (appel brut hors liste blanche, refus D-07
+      // assumé) : hors ligne, ce refus précède tout enfilage d'articles
+      // (WR-04) — pas de moitié de suppression qui s'applique en silence.
       await deleteShoppingList(id, householdId, itemResource.remove);
       await invalidate();
     },

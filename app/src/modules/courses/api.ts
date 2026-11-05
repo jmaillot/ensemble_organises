@@ -116,6 +116,14 @@ async function searchOffProxy(query: string, limit: number): Promise<OffSearchHi
  * mutation (marque D-02, enfilage) comme leurs autres écritures. La liste
  * elle-même reste un appel brut (`shopping_lists` hors liste blanche, voir
  * le commentaire d'en-tête).
+ *
+ * WR-04 : la liste part D'ABORD. Hors ligne, le refus D-07 sur
+ * `shopping_lists` doit preceder tout enfilage : a l'inverse, les articles
+ * partaient en file (table allowlistée) PUIS la liste etait refusee —
+ * l'utilisateur voyait « suppression impossible » pendant que ses articles
+ * partaient quand meme au rejeu, laissant une liste fantome vide cote
+ * serveur. Si la liste part, les articles suivent ; si elle est refusee,
+ * rien n'est enfile.
  */
 export async function deleteShoppingList(
   id: string,
@@ -126,8 +134,8 @@ export async function deleteShoppingList(
     household_id: householdId,
     list_id: id,
   });
-  await Promise.all(items.map((item) => removeItem(item.id)));
   await data.remove(SHOPPING_LISTS_TABLE, id);
+  await Promise.all(items.map((item) => removeItem(item.id)));
 }
 
 /** Articles d'une liste (lecture ciblée pour la fusion à l'envoi recette). */
