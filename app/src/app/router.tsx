@@ -12,6 +12,7 @@ import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, 
 import { AppShell } from './app-shell';
 import { signOut, useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
 import { OutboxReplayWatcher } from '@/hooks/use-outbox-replay';
+import { OutboxBadgeWatcher } from '@/hooks/use-outbox-replay-badge';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { Forbidden } from '@/components/ui/forbidden';
 import { data } from '@/lib/data';
@@ -621,6 +622,12 @@ export function AppRouter() {
             passes concurrentes pour le même effet.
           */}
           <OutboxReplayWatcher />
+          {/*
+            Badge « N en attente » / « N bloquées » de la file (phase 34,
+            D-11/D-13) : monté UNE fois, même raisonnement que le rejeu
+            ci-dessus — le badge est un service global, jamais par vue.
+          */}
+          <OutboxBadgeWatcher />
           <AppRoutes />
         </BrowserRouter>
       </ToastProvider>
