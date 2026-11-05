@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
@@ -30,6 +30,13 @@ vi.mock('@/lib/data', () => ({
 // Import APRÈS le mock (comme `use-auth.test.ts`) : le factory du mock lit
 // `listMock`, qui doit être initialisé quand le module est chargé.
 const { useResource } = await import('./useResource');
+
+// WR-02 : dépendances du bloc overlay optimiste — importées au niveau module
+// (un `await` n'est pas permis dans une fonction de rappel `describe`).
+const dataModule = (await import('@/lib/data')) as { data: { update: ReturnType<typeof vi.fn> } };
+const { onlineManager } = await import('@tanstack/react-query');
+const { useSessionStore } = await import('@/stores/session-store');
+const { useHouseholdStore } = await import('@/stores/household-store');
 
 const wrapperFor =
   (client: ReturnType<typeof createTestQueryClient>) =>
@@ -108,5 +115,64 @@ describe('useResource — `rows` a une identité stable quand la requête est d�
     const first = result.current.rows;
     rerender();
     expect(result.current.rows).toBe(first);
+  });
+});
+
+describe('useResource — overlay optimiste de l’update (WR-02)', () => {
+  const updateMock = vi.fn();
+  const { data } = dataModule;
+
+  beforeEach(() => {
+    updateMock.mockReset();
+    data.update = updateMock;
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: 'u-1', email: 'a@b.c', displayName: 'A', avatarUrl: null, provider: 'email' },
+    });
+    useHouseholdStore.setState({ householdId: 'h-1' });
+  });
+
+  afterEach(() => {
+    onlineManager.setOnline(true);
+    useSessionStore.setState({ status: 'guest', user: null });
+    useHouseholdStore.getState().reset();
+  });
+
+  it('conserve l’overlay sur échec RÉSEAU — l’update est enfilé, le rejeu réconciliera', async () => {
+    // Cas qui doit échouer sur l'état pré-fixe : le catch restaurait le
+    // snapshot sans distinction — l'utilisateur voyait son changement
+    // disparaître alors que l'écriture partait en file et s'appliquerait au
+    // rejeu (contrat incohérent avec la voie `create`, Pitfall 7).
+    onlineManager.setOnline(false);
+    updateMock.mockRejectedValue(new TypeError('fetch failed'));
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+
+    await expect(result.current.update('task-foyer', { status: 'fait' })).rejects.toThrow('fetch failed');
+
+    const painted = queryClient
+      .getQueryCache()
+      .getAll()
+      .find((query) => query.queryKey[0] === 'tasks')
+      ?.state.data as Array<Row>;
+    expect(painted?.find((row) => row.id === 'task-foyer')?.status, 'l’overlay reste peint tant que la ligne n’a pas été invalidée').toBe('fait');
+  });
+
+  it('retire l’overlay sur refus MÉTIER (RLS) — l’écriture n’aura jamais lieu', async () => {
+    const refusal = Object.assign(new Error('row-level security'), { code: '42501' });
+    updateMock.mockRejectedValue(refusal);
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+
+    await expect(result.current.update('task-foyer', { status: 'fait' })).rejects.toThrow();
+
+    const painted = queryClient
+      .getQueryCache()
+      .getAll()
+      .find((query) => query.queryKey[0] === 'tasks')
+      ?.state.data as Array<Row>;
+    expect(painted?.find((row) => row.id === 'task-foyer')?.status).toBe('a_faire');
   });
 });

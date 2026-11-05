@@ -206,7 +206,14 @@ export function useResource<T = Row>(
         await invalidate();
         return result;
       } catch (error) {
-        queryClient.setQueryData<T[]>(key, snapshot);
+        // WR-02 : symétrie avec `create` (Pitfall 7). Sur échec RÉSEAU
+        // l'overlay RESTE peint : la MutationCache vient d'enfiler l'update
+        // dans l'outbox et le rejeu le réconciliera. Restaurer le snapshot
+        // sans distinction ferait disparaître à l'écran un changement qui
+        // s'appliquera pourtant au rejeu — et ferait diverger l'écran de la
+        // file jusqu'à l'invalidation suivante. Seul un refus MÉTIER remet
+        // l'écran en l'état : l'écriture n'aura jamais lieu.
+        if (!isNetworkFailure(error)) queryClient.setQueryData<T[]>(key, snapshot);
         throw error;
       }
     },
