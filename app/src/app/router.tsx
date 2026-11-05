@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AppShell } from './app-shell';
 import { signOut, useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
+import { OutboxReplayWatcher } from '@/hooks/use-outbox-replay';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
 import { Forbidden } from '@/components/ui/forbidden';
 import { data } from '@/lib/data';
@@ -612,6 +613,14 @@ export function AppRouter() {
               il couvre le shell ET les pages hors shell (l'accueil compris,
               qui n'a, par arbitrage, aucun état d'erreur propre). */}
           <OfflineBanner />
+          {/*
+            Rejeu de la file d'écriture hors-ligne (phase 34, D-08) : UN
+            seul déclencheur pour toute l'app — retour réseau
+            (onlineManager), retour d'onglet (visibilitychange) et montage
+            initial. Jamais par vue : un déclencheur par page créerait des
+            passes concurrentes pour le même effet.
+          */}
+          <OutboxReplayWatcher />
           <AppRoutes />
         </BrowserRouter>
       </ToastProvider>
