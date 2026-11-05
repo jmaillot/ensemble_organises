@@ -5,7 +5,7 @@
 ## Phases
 
 - [x] **Phase 32: Install & raccourcis** - Manifest durci (icônes maskable, display_override, apple-*), UX d'installation par OS, raccourcis « Tâches du jour » et « Courses », mises à jour SW sûres *(UAT 7 passées, 1 bloquée — re-test au prochain déploiement, cf. 32-UAT.md)*
-- [ ] **Phase 33: Cache de lecture offline** - Cache persisté TanStack Query (restauré avant premier rendu), bandeau stale horodaté, allowlist Tier 1, cache namespacé par utilisateur, SW denylist API prouvée
+- [x] **Phase 33: Cache de lecture offline** - Cache persisté TanStack Query (restauré avant premier rendu), bandeau stale horodaté, allowlist Tier 1, cache namespacé par utilisateur, SW denylist API prouvée (complète 2026-11-05)
 - [ ] **Phase 34: File d'écriture & rejeu** - Idempotence serveur d'abord, outbox Tier 1 (Courses/Tâches/Routines) rejoué en foreground, classification terminal/retryable, badge « N en attente », réconciliation Realtime
 - [ ] **Phase 35: Deep links & validation multi-OS** - Deep link déconnecté → login → retour à la cible, vue « Tâches du jour » dédiée, validation e2e de bout en bout sur desktop/Android/iOS
 
@@ -39,12 +39,15 @@ Plans:
   3. Un module hors allowlist (ex. Ardoise, Messages) en mode avion affiche l'erreur d'origine honnête, jamais des données cachées ; l'allowlist porte un maxAge par famille de données
   4. Après déconnexion (ou changement de foyer), l'appareil ne garde aucune donnée de l'utilisateur pour un autre : cache namespacé par utilisateur, purge synchrone attendue avant navigation — prouvé par un test sur un appareil partagé simulé
   5. Le contrôle statique §2.7 prouve que le service worker ne met jamais en cache `/rest/`, `/auth/`, `/realtime/`, `/storage/`, `/functions/` — et il a été vu rouge sur un cas qui doit échouer
-**Plans**: 5 plans
+**Plans**: 6 plans (incl. 33-06 gap closure)
 - [x] 33-01-PLAN.md — Socle persistance : dépendances épinglées (checkpoint légitimité) + tracer seed → persist IndexedDB → restore → lecture (OFFR-01, OFFR-04)
-- [ ] 33-02-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
-- [ ] 33-03-PLAN.md — Allowlist Tier 1/maxAge/prune + restore avant premier rendu (OFFR-01, OFFR-03)
+- [x] 33-02-PLAN.md — Contrôle statique SW : jamais de cache API, vu rouge (OFFR-05)
+- [x] 33-03-PLAN.md — Allowlist Tier 1/maxAge/prune + restore avant premier rendu (OFFR-01, OFFR-03)
 - [x] 33-04-PLAN.md — Purge attendue déconnexion/changement de foyer + preuve appareil partagé (OFFR-04)
 - [x] 33-05-PLAN.md — Bandeau « dernier état connu le… » (OFFR-02)
+- [x] 33-06-PLAN.md — Gap closure G-33-3 : isError cloisonné par présence de données, offline = lignes en cache + bandeau ambre, jamais d'ErrorState (OFFR-01, OFFR-03)
+
+**Suivi UAT (2026-11-05)** : 4/4 passés. Le défaut du test 3 (G-33-3 : ErrorState après ~30 s hors ligne malgré le cache) a été corrigé par 33-06 (commits 8f8f37e→6a5ccc9) et re-validé sur appareil réel. Voir `33-UAT.md` § Tests, `33-VERIFICATION.md`.
 
 ### Phase 34: File d'écriture & rejeu
 **Goal** : Une écriture simple effectuée hors-ligne sur un module Tier 1 atteint malgré tout le serveur — exactement une fois, sans doublon ni perte silencieuse — et l'utilisateur voit toujours combien d'écritures sont en attente et ce qui a échoué.
