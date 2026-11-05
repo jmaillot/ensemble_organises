@@ -4,8 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router';
 import { cn, initials } from '@/lib/utils';
 import { isChildHiddenModule, isModuleDisabled, moduleMap, modulePath, type ModuleKey } from '@/lib/modules';
 import { useIsMobileLayout } from '@/hooks/use-mobile-layout';
-import { signOut } from '@/hooks/use-auth';
-import { useToast } from '@/components/ui/toast';
+import { useSignOutWithConfirm } from '@/hooks/use-sign-out';
 import { FeuillePortal } from '@/components/ui/dialog';
 import { Icon, type IconName } from './icon';
 import { memberTagClass } from './member-avatar';
@@ -98,9 +97,13 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   const householdColor = useHouseholdStore((state) => state.householdColor);
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const toast = useToast();
   const [query, setQuery] = useState('');
-  const [signingOut, setSigningOut] = useState(false);
+  // D-17 (plan 34-04) : la déconnexion passe par le hook partagé — si des
+  // écritures sont pendantes, sa confirm-dialog s'ouvre au lieu de toast.
+  const { signOut: requestSignOut, dialog: signOutDialog, busy: signingOut } = useSignOutWithConfirm(() => {
+    onOpenChange(false);
+    navigate('/connexion', { replace: true });
+  });
   // Le tiroir n'existe que sous 651px : un redimensionnement au-delà le
   // referme, sinon le piège de focus et le verrou de scroll survivent
   // invisibles.
@@ -124,7 +127,6 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
   useEffect(() => {
     if (!open) return;
     setQuery('');
-    setSigningOut(false);
     if (typeof document !== 'undefined') document.body.dataset.scrollLock = 'true';
     return () => {
       if (typeof document !== 'undefined') document.body.dataset.scrollLock = 'false';
@@ -137,17 +139,9 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
     ? visibleEntries.filter((entry) => normalizeQuery(entry.label).includes(normalized))
     : null;
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (signingOut) return;
-    setSigningOut(true);
-    try {
-      await signOut();
-      onOpenChange(false);
-      navigate('/connexion', { replace: true });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Déconnexion impossible.', 'error');
-      setSigningOut(false);
-    }
+    void requestSignOut();
   };
 
   return (
@@ -264,6 +258,9 @@ export function MobileDrawer({ open, onOpenChange, householdName, memberCount, i
               </button>
             </div>
           </div>
+        {/* D-17 : la confirmation d'écritures pendantes vit dans le tiroir —
+            elle doit fermer avec lui (montée dans le même portail). */}
+        {signOutDialog}
       </FeuillePortal>
     </DialogPrimitive.Root>
   );

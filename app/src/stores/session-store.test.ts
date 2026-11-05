@@ -228,3 +228,107 @@ describe('signOut — goulot unique de purge (OFFR-04, D-05)', () => {
     queryClient.clear(); // laisser le client partagé propre pour les autres suites
   });
 });
+
+/**
+ * D-17 (plan 34-04, T-34-08) : scan-avertir-purger. Des écritures pendantes
+ * dans la file outbox BLOQUENT la déconnexion tant que l'appelant n'a pas
+ * passé `{ acknowledgePendingWrites: true }` — jamais de purge silencieuse
+ * d'écritures non parties. La file est lue dans le client mémoire PARTAGÉ de
+ * `@/app/router` : le même canal que le goulot au runtime.
+ */
+describe('signOut — file outbox pendante (D-17, scan-avertir-purger)', () => {
+  const OUTBOX_PENDING = {
+    key: 'tasks:t1',
+    table: 'tasks',
+    operation: 'update' as const,
+    enqueuedAt: 1,
+    status: 'pending' as const,
+  };
+
+  const poserSession = () =>
+    useSessionStore.setState({
+      status: 'authenticated',
+      householdLoaded: true,
+      user: { id: 'u1', email: 'alice@example.fr', displayName: 'Alice', avatarUrl: null, provider: 'email' },
+    });
+
+  beforeEach(async () => {
+    purgeUserCacheSpy.mockReset();
+    stopPersistingSpy.mockReset();
+    purgeUserCacheSpy.mockImplementation(
+      async (userId: string | null) => {
+        const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+          '@/lib/offline/query-persistence',
+        );
+        return actual.purgeUserCache(userId);
+      },
+    );
+    stopPersistingSpy.mockImplementation(async () => {
+      const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+        '@/lib/offline/query-persistence',
+      );
+      actual.stopPersisting();
+    });
+    const { queryClient } = await import('@/app/router');
+    queryClient.clear();
+    const { useHouseholdStore } = await import('./household-store');
+    useHouseholdStore.getState().reset();
+    useHouseholdStore.setState({ householdId: 'h1' });
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+  });
+
+  it('des écritures pendantes rejettent OutboxPendingError et NE purgent PAS', async () => {
+    const { queryClient } = await import('@/app/router');
+    const { outboxKeyFor } = await import('@/lib/offline/outbox');
+    queryClient.setQueryData(outboxKeyFor('u1', 'h1'), [OUTBOX_PENDING]);
+    poserSession();
+
+    await expect(useSessionStore.getState().signOut()).rejects.toThrow('écriture en attente');
+
+    // T-34-08 : RIEN n'a été purgé — ni le stockage (espion), ni l'état.
+    expect(purgeUserCacheSpy).not.toHaveBeenCalled();
+    expect(stopPersistingSpy).not.toHaveBeenCalled();
+    expect(useSessionStore.getState().user?.id).toBe('u1');
+    // La file elle-même est intacte : l'utilisateur n'a rien perdu.
+    expect(queryClient.getQueryData(outboxKeyFor('u1', 'h1'))).toEqual([OUTBOX_PENDING]);
+    queryClient.clear();
+  });
+
+  it('avec acknowledgePendingWrites, la déconnexion purge tout y compris la file', async () => {
+    const { queryClient } = await import('@/app/router');
+    const { outboxKeyFor } = await import('@/lib/offline/outbox');
+    queryClient.setQueryData(outboxKeyFor('u1', 'h1'), [OUTBOX_PENDING]);
+    poserSession();
+
+    await expect(useSessionStore.getState().signOut({ acknowledgePendingWrites: true })).resolves.toBeUndefined();
+
+    expect(purgeUserCacheSpy).toHaveBeenCalledWith('u1');
+    expect(useSessionStore.getState().user).toBeNull();
+    // La frontière mémoire (CR-01) emporte aussi la file : aucune entrée ne
+    // peut ressusciter au prochain sign-in via le client partagé.
+    expect(queryClient.getQueryData(outboxKeyFor('u1', 'h1'))).toBeUndefined();
+  });
+
+  it('file vide → déconnexion directe sans erreur ni question', async () => {
+    poserSession();
+    await expect(useSessionStore.getState().signOut()).resolves.toBeUndefined();
+    expect(purgeUserCacheSpy).toHaveBeenCalledWith('u1');
+    expect(useSessionStore.getState().user).toBeNull();
+  });
+
+  it('des écritures ÉCHOUÉES seules ne bloquent pas (le scan ne compte que pending)', async () => {
+    const { queryClient } = await import('@/app/router');
+    const { outboxKeyFor } = await import('@/lib/offline/outbox');
+    queryClient.setQueryData(outboxKeyFor('u1', 'h1'), [
+      { ...OUTBOX_PENDING, status: 'failed' as const, failure: { kind: 'terminal' as const, code: '42501', message: 'refus RLS' } },
+    ]);
+    poserSession();
+
+    // Une écriture terminale a déjà été refusée par le serveur : elle n'est
+    // pas « en attente de départ », elle attend une décision humaine. Le
+    // scan D-17 ne compte que le pending — même sémantique que la gate
+    // 32-D10 (`isEmpty = pendingCount === 0`, contrat préservé).
+    await expect(useSessionStore.getState().signOut()).resolves.toBeUndefined();
+    expect(useSessionStore.getState().user).toBeNull();
+  });
+});

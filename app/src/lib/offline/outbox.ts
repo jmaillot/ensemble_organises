@@ -208,6 +208,58 @@ function buildEntry(marker: MutationMarker, variables: unknown): OutboxEntry {
 }
 
 /**
+ * Retire UNE entrée de la file (action « Abandonner » du panneau offline,
+ * D-11, plan 04). Le retrait est EXPLICITE : jamais automatique (T-34-09) —
+ * l'appelant UI doit d'abord avoir montré la confirm-dialog (§6 AGENTS :
+ * toute suppression destructive passe par une confirmation).
+ *
+ * Ici et pas dans `outbox-replay.ts` : aucune passe de rejeu n'est déclenchée,
+ * la fonction est pure (setQueryData), et `outbox.ts` reste sans dépendance
+ * vers l'adaptateur.
+ */
+export function abandonOutboxEntry(
+  client: QueryClient,
+  userId: string,
+  householdId: string,
+  entry: OutboxEntry,
+): void {
+  const key = outboxKeyFor(userId, householdId);
+  client.setQueryData<OutboxEntry[]>(key, (current) => (current ?? []).filter((candidate) => candidate !== entry));
+}
+
+/**
+ * Libellé lisible du panneau (D-11) : opération en français + table. AUCUNE
+ * valeur de ligne n'y entre (T-34-08, plan 04) : l'identité affichée se borne
+ * à la table, à l'opération et, pour une entrée à `id`, à l'identifiant —
+ * les `values` et le `filter` ne quittent jamais la file vers l'écran.
+ */
+export function outboxEntryLabel(entry: OutboxEntry): string {
+  const operations: Record<OutboxOperation, string> = {
+    create: 'Ajout',
+    update: 'Modification',
+    remove: 'Suppression',
+    removeWhere: 'Suppression multiple',
+  };
+  const tables: Partial<Record<string, string>> = {
+    tasks: 'tâche',
+    shopping_list_items: 'article de liste',
+    events: 'événement',
+    notes: 'note',
+    expenses: 'dépense',
+    routines: 'routine',
+    routine_completions: 'complétion de routine',
+    messages: 'message',
+    posts: 'publication',
+    post_comments: 'commentaire',
+    post_reactions: 'réaction',
+    task_assignees: 'assignation',
+    profile: 'profil',
+  };
+  const table = tables[entry.table] ?? entry.table;
+  return `${operations[entry.operation]} — ${table}`;
+}
+
+/**
  * `client_key` uuid généré côté client (D-05/D-14) — clé d'idempotence du
  * rejeu. `crypto.randomUUID()` est natif (contexte sécurisé, iOS ≥ 15.4) ;
  * le repli est le même que `randomId` (utils) pour les environnements de

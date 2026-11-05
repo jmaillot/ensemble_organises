@@ -10,7 +10,8 @@ import { routeChunkLoaders } from './route-preload';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AppShell } from './app-shell';
-import { signOut, useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
+import { useIsAuthenticated, useSessionUser } from '@/hooks/use-auth';
+import { useSignOutWithConfirm } from '@/hooks/use-sign-out';
 import { OutboxReplayWatcher } from '@/hooks/use-outbox-replay';
 import { OutboxBadgeWatcher } from '@/hooks/use-outbox-replay-badge';
 import { useCurrentMember, useHouseholdStore } from '@/stores/household-store';
@@ -59,6 +60,15 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // D-17 (plan 34-04) : même classe que les autres chemins de déconnexion —
+  // si des écritures sont pendantes, la confirm-dialog s'ouvre au lieu du
+  // toast sec, et la déconnexion n'a lieu qu'après confirmation explicite.
+  // Le hook est appelé AVANT tout retour anticipé : l'ordre des hooks ne
+  // varie jamais selon la session ou l'attestation (contrat React).
+  const { signOut: requestRefuseSignOut, dialog: refuseSignOutDialog } = useSignOutWithConfirm(() => {
+    toast('Compte déconnecté.');
+    navigate('/connexion', { replace: true });
+  });
 
   const profileQuery = useQuery({
     queryKey: ['profile', 'attestation', user?.id ?? ''],
@@ -90,11 +100,10 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
       .finally(() => setIsSaving(false));
   };
 
+  // D-17 : le hook est appelé en tête de composant (voir plus haut) ; le
+  // handler seul reste local.
   const refuse = () => {
-    void signOut().then(() => {
-      toast('Compte déconnecté.');
-      navigate('/connexion', { replace: true });
-    });
+    void requestRefuseSignOut();
   };
 
   return (
@@ -137,6 +146,8 @@ export function RequireAttestation({ children }: { children: ReactNode }) {
           </DialogActions>
         </DialogContent>
       </Dialog>
+      {/* D-17 : confirmation d'écritures pendantes pour « Refuser et se déconnecter ». */}
+      {refuseSignOutDialog}
     </>
   );
 }

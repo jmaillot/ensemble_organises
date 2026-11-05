@@ -94,6 +94,14 @@ export const useHouseholdStore = create<HouseholdState>()(
         // sans lui, une sauvegarde throttlée en vol ressusciterait la clé.
         const previousId = get().householdId;
         if (previousId && previousId !== householdId) {
+          // D-17 (plan 34-04, T-34-08) : cette purge emporte l'outbox du foyer
+          // quitté (la file persiste dans `cacheKey(userId, householdId)`)
+          // SANS confirmation — contrairement à la déconnexion, qui scanne la
+          // file et exige l'acknowledgment (`OutboxPendingError`). Ici
+          // l'utilisateur a lui-même demandé le changement de foyer et reste
+          // connecté : les écritures pendantes du foyer quitté perdent leur
+          // destinataire, c'est le prix assumé du départ (prouvé par test :
+          // « la purge du foyer quitté emporte l'outbox persistée »).
           stopPersisting();
           if (userId) await purgeCache(userId, previousId);
         }

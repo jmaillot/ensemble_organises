@@ -15,8 +15,13 @@
 //   avec `title` égal à la valeur — le panneau ne prétend jamais à un SHA
 //   qu'il n'a pas.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders, createTestQueryClient } from '@/test/render';
+import { useSessionStore } from '@/stores/session-store';
+import { outboxKeyFor } from '@/lib/offline/outbox';
+import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
+import { OfflinePanel } from './offline-panel';
 
 const SHA_40 = '42b76a163b845c6f29c196ea3852172063583fb1';
 // D-11 : sans estampille, le libellé écran est une déclaration honnête —
@@ -117,6 +122,19 @@ vi.mock('@/hooks/use-outbox-gate', () => ({
   useOutboxGate: () => ({ isEmpty: swState.outboxEmpty }),
 }));
 
+// D-11 (plan 34-04) : `retryOutboxEntry` est espionné — le panneau doit
+// DÉLÉGUER au moteur de rejeu, jamais rejouer lui-même. `abandonOutboxEntry`
+// (pur setQueryData, module `outbox`) reste réel : son effet se lit dans le
+// cache du client de test.
+const { retryOutboxEntrySpy } = vi.hoisted(() => ({
+  retryOutboxEntrySpy: vi.fn(async () => ({ applied: 1, failed: 0 })),
+}));
+
+vi.mock('@/lib/offline/outbox-replay', () => ({
+  replayOutbox: vi.fn(async () => ({ applied: 0, failed: 0 })),
+  retryOutboxEntry: (...args: Parameters<typeof retryOutboxEntrySpy>) => retryOutboxEntrySpy(...args),
+}));
+
 const MOCK_SW_VERSION = 'precache-push-v2';
 const MOCK_REGISTRATION = {
   active: { postMessage: () => {} },
@@ -185,5 +203,119 @@ describe('OfflinePanel — état du service worker (D-12)', () => {
     await rendreAvecVersion(SHA_40);
     expect(screen.queryByText('Mise à jour en attente')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Appliquer maintenant' })).toBeNull();
+  });
+});
+
+/**
+ * D-11 (plan 34-04, WRQ-05) : la section « Écritures en attente » du panneau
+ * offline. La file est lue par la SOURCE UNIQUE `useOutbox` (même canal que
+ * le badge) et ensemencée par `setQueryData` AVANT le rendu — le canal réel
+ * d'enfilage. Le libellé borne l'information à table + opération : AUCUNE
+ * valeur de ligne ne franchit l'écran (T-34-08).
+ */
+describe('OfflinePanel — écritures en attente (D-11, plan 34-04)', () => {
+  const USER = 'user-panneau';
+
+  const poserSession = () =>
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: USER, email: 'p@example.fr', displayName: 'P', avatarUrl: null, provider: 'email' },
+    });
+
+  const fichier = () => outboxKeyFor(USER, DEMO_HOUSEHOLD_ID);
+
+  afterEach(() => {
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+    retryOutboxEntrySpy.mockClear();
+  });
+
+  it('affiche un état vide soigné quand la file est vide', async () => {
+    poserSession();
+    renderWithProviders(<OfflinePanel />);
+
+    expect(screen.getByText(/Aucune écriture en attente/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abandonner' })).toBeNull();
+  });
+
+  it('liste chaque écriture (libellé, statut) et n’affiche AUCUNE valeur de ligne (T-34-08)', async () => {
+    const client = createTestQueryClient();
+    client.setQueryData(fichier(), [
+      {
+        key: 'tasks:t1',
+        table: 'tasks',
+        operation: 'update',
+        id: 't1',
+        values: { name: 'TITRE-SECRET-NE-PAS-AFFICHER' },
+        enqueuedAt: 1,
+        status: 'pending',
+      },
+      {
+        key: 'expenses:e9',
+        table: 'expenses',
+        operation: 'create',
+        id: 'e9',
+        values: { title: 'MONTANT-SECRET', amount: 42 },
+        enqueuedAt: 2,
+        status: 'failed',
+        failure: { kind: 'terminal', code: '42501', message: 'refus RLS' },
+      },
+    ]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    expect(screen.getByText('Modification — tâche')).toBeTruthy();
+    expect(screen.getByText('En attente du réseau')).toBeTruthy();
+    expect(screen.getByText('Ajout — dépense')).toBeTruthy();
+    expect(screen.getByText(/Bloquée \(42501\)/)).toBeTruthy();
+    // L'information affichée se borne à l'identité : les valeurs des lignes
+    // (montant, titre, contenu) ne quittent jamais la file vers l'écran.
+    expect(document.body.textContent).not.toContain('TITRE-SECRET-NE-PAS-AFFICHER');
+    expect(document.body.textContent).not.toContain('MONTANT-SECRET');
+  });
+
+  it('Réessayer délègue au moteur de rejeu (retryOutboxEntry), jamais un rejeu maison', async () => {
+    const client = createTestQueryClient();
+    const entree = {
+      key: 'tasks:t1',
+      table: 'tasks',
+      operation: 'update' as const,
+      id: 't1',
+      enqueuedAt: 1,
+      status: 'pending' as const,
+    };
+    client.setQueryData(fichier(), [entree]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+
+    await waitFor(() => expect(retryOutboxEntrySpy).toHaveBeenCalledTimes(1));
+    expect(retryOutboxEntrySpy).toHaveBeenCalledWith(client, USER, DEMO_HOUSEHOLD_ID, entree);
+  });
+
+  it('Abandonner exige la confirmation puis retire l’entrée de la file (T-34-09)', async () => {
+    const client = createTestQueryClient();
+    const entree = {
+      key: 'expenses:e9',
+      table: 'expenses',
+      operation: 'create' as const,
+      id: 'e9',
+      enqueuedAt: 2,
+      status: 'failed' as const,
+      failure: { kind: 'terminal' as const, code: '42501', message: 'refus RLS' },
+    };
+    client.setQueryData(fichier(), [entree]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    // Un clic sur Abandonner ne retire RIEN : la dialog vient d'abord.
+    fireEvent.click(screen.getByRole('button', { name: 'Abandonner' }));
+    expect(screen.getByText(/Abandonner cette écriture/)).toBeTruthy();
+    expect(client.getQueryData(fichier())).toEqual([entree]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abandonner l’écriture' }));
+
+    await waitFor(() => expect(client.getQueryData(fichier())).toEqual([]));
   });
 });

@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Panel } from '@/components/shared/module-shell';
 import { LoadingRows } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { signOut, useSessionUser } from '@/hooks/use-auth';
+import { useSessionUser } from '@/hooks/use-auth';
+import { useSignOutWithConfirm } from '@/hooks/use-sign-out';
 import { useSessionStore } from '@/stores/session-store';
 import { DEMO_USER_ID } from '@/lib/data/seed';
 import { useHouseholdStore, useMemberRole } from '@/stores/household-store';
@@ -41,7 +42,13 @@ export function ProfileForm() {
   const members = useHouseholdStore((state) => state.members);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
+  // D-17 (plan 34-04) : la déconnexion passe par le hook partagé — si des
+  // écritures sont pendantes, sa confirm-dialog s'ouvre au lieu de toast.
+  // `busy` couvre les deux phases (tentative puis acknowledgment) et retombe
+  // tant que la dialog attend la décision.
+  const { signOut: requestSignOut, dialog: signOutDialog, busy: signingOut } = useSignOutWithConfirm(() => {
+    navigate('/connexion', { replace: true });
+  });
 
   const target = useMemo(() => {
     // « Mon profil » agit sur le membre lié à la session, jamais sur le profil
@@ -152,20 +159,12 @@ export function ProfileForm() {
           className="mt-4"
           fullWidth
           disabled={signingOut}
-          onClick={async () => {
-            setSigningOut(true);
-            try {
-              await signOut();
-              navigate('/connexion', { replace: true });
-            } catch (signOutError) {
-              toast(signOutError instanceof Error ? signOutError.message : 'Déconnexion impossible.', 'error');
-              setSigningOut(false);
-            }
-          }}
+          onClick={() => void requestSignOut()}
         >
           {signingOut ? 'Déconnexion…' : 'Se déconnecter'}
         </Button>
       </Panel>
+      {signOutDialog}
     </div>
   );
 }

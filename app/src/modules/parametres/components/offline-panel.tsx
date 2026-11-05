@@ -7,7 +7,12 @@ import { useToast } from '@/components/ui/toast';
 import { clearDatabase } from '@/lib/data/dexie';
 import { isLocalMode } from '@/lib/data';
 import { useInstallPrompt } from '@/hooks/use-pwa';
+import { useOutbox } from '@/hooks/use-outbox';
 import { useOutboxGate } from '@/hooks/use-outbox-gate';
+import { useSessionStore } from '@/stores/session-store';
+import { useHouseholdStore } from '@/stores/household-store';
+import { abandonOutboxEntry, outboxEntryLabel, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
+import { retryOutboxEntry } from '@/lib/offline/outbox-replay';
 import { useSwState, updateSW } from '@/lib/sw-register';
 import { dataModeLabel } from '../types';
 
@@ -54,6 +59,14 @@ export function OfflinePanel() {
   const sw = useSwState();
   const { isEmpty } = useOutboxGate();
   const [swVersion, setSwVersion] = useState<string | null>(null);
+  // D-11 (plan 34-04) : la liste des écritures vient de la SOURCE UNIQUE
+  // `useOutbox` — le même canal que le badge et la gate, aucun comptage ni
+  // listing parallèle.
+  const { entries } = useOutbox();
+  const userId = useSessionStore((state) => state.user?.id ?? null);
+  const householdId = useHouseholdStore((state) => state.householdId);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [entryToAbandon, setEntryToAbandon] = useState<OutboxEntry | null>(null);
 
   // Ping EO_VERSION (sw.ts) vers le worker actif : la réponse reporte la
   // version du SW en service. Repli honnête si pas de registration ni d'API
@@ -74,6 +87,34 @@ export function OfflinePanel() {
     active.postMessage({ type: 'EO_VERSION' });
     return () => swApi.removeEventListener('message', onMessage);
   }, [sw.registration]);
+
+  /** D-11 : Réessayer — l'entrée repasse à `pending` et une passe de rejeu part (T-34-10). */
+  const handleRetry = async (entry: OutboxEntry) => {
+    if (!userId || !householdId) return;
+    setRetrying(entry.key);
+    try {
+      await retryOutboxEntry(queryClient, userId, householdId, entry);
+      // Le verdict est lu dans la file elle-même, jamais deviné : l'entrée
+      // partie = envoyée ; encore présente = réseau toujours absent, elle
+      // retentera (§2.7 F : un succès muet est un échec inexpliqué).
+      const encore = (queryClient.getQueryData<OutboxEntry[]>(outboxKeyFor(userId, householdId)) ?? []).some(
+        (candidate) => candidate === entry,
+      );
+      toast(encore ? 'Écriture toujours en attente : elle repartira dès le retour du réseau.' : 'Écriture partie au serveur.');
+    } catch (retryError) {
+      toast(retryError instanceof Error ? retryError.message : 'Rejeu impossible.', 'error');
+    } finally {
+      setRetrying(null);
+    }
+  };
+
+  /** D-11 : Abandonner — retrait explicite, après confirmation (T-34-09). */
+  const handleAbandon = () => {
+    if (!entryToAbandon || !userId || !householdId) return;
+    abandonOutboxEntry(queryClient, userId, householdId, entryToAbandon);
+    setEntryToAbandon(null);
+    toast('Écriture abandonnée : elle ne sera pas envoyée au serveur.');
+  };
 
   return (
     <div className="grid gap-[18px] max-[920px]:grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
@@ -134,6 +175,49 @@ export function OfflinePanel() {
         </div>
       </Panel>
 
+      <Panel
+        title="Écritures en attente"
+        description="Les modifications faites hors connexion partent au serveur dès que le réseau revient."
+      >
+        {entries.length === 0 ? (
+          <p className="m-0 text-[11px] text-muted">
+            Aucune écriture en attente : tout ce que vous avez fait est arrivé au serveur du foyer.
+          </p>
+        ) : (
+          <ul className="m-0 grid list-none gap-2.5 p-0">
+            {entries.map((entry) => (
+              <li
+                key={entry.key}
+                className="flex flex-wrap items-center justify-between gap-2.5 rounded-[12px] border border-border px-3 py-2.5 text-xs"
+              >
+                <div className="min-w-0">
+                  <strong className="block">{outboxEntryLabel(entry)}</strong>
+                  {entry.status === 'failed' && entry.failure ? (
+                    <span className="block text-[11px] font-semibold text-coral-text">
+                      Bloquée ({entry.failure.code}) — {entry.failure.message}
+                    </span>
+                  ) : (
+                    <span className="block text-[11px] text-muted">En attente du réseau</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={retrying === entry.key}
+                    onClick={() => void handleRetry(entry)}
+                  >
+                    {retrying === entry.key ? 'Rejeu…' : 'Réessayer'}
+                  </Button>
+                  <Button variant="secondary" icon="trash" onClick={() => setEntryToAbandon(entry)}>
+                    Abandonner
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
       <Panel title="Application web" description="Installable, sans magasin d’applications.">
         <ul className="m-0 grid list-none gap-2.5 p-0 text-[11px] text-muted">
           <li>Application web installable (manifeste + service worker).</li>
@@ -164,6 +248,17 @@ export function OfflinePanel() {
             setConfirmClear(false);
           }
         }}
+      />
+
+      <ConfirmDialog
+        open={entryToAbandon !== null}
+        onOpenChange={(open) => {
+          if (!open) setEntryToAbandon(null);
+        }}
+        title="Abandonner cette écriture ?"
+        description="Elle ne sera jamais envoyée au serveur : la modification concernée restera locale et sera perdue. Cette action est définitive."
+        confirmLabel="Abandonner l’écriture"
+        onConfirm={handleAbandon}
       />
     </div>
   );

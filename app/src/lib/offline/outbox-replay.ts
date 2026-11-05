@@ -108,6 +108,33 @@ export async function replayOutbox(
 }
 
 /**
+ * Action « Réessayer » du panneau offline (D-11, plan 04). L'entrée passe à
+ * `pending` UNE fois — sur une action utilisateur EXPLICITE (T-34-10 : le
+ * rejeu automatique ne lit que 'pending' déjà là, jamais une entrée failed ;
+ * ici c'est l'inverse, un humain a tranché) — puis une passe de rejeu
+ * complète est déclenchée : d'autres entrées pendantes peuvent attendre
+ * derrière, la passe FIFO (D-09) les couvre gratuitement.
+ *
+ * Ici et pas dans `outbox.ts` : `retryOutboxEntry` appelle `replayOutbox`,
+ * et importer `outbox-replay` depuis `outbox.ts` créerait un cycle de
+ * modules (outbox-replay importe déjà `./outbox`).
+ */
+export async function retryOutboxEntry(
+  client: QueryClient,
+  userId: string,
+  householdId: string,
+  entry: OutboxEntry,
+): Promise<ReplayResult> {
+  const key = outboxKeyFor(userId, householdId);
+  client.setQueryData<OutboxEntry[]>(key, (current) =>
+    (current ?? []).map((candidate) =>
+      candidate === entry ? { ...entry, status: 'pending' as const, failure: undefined } : candidate,
+    ),
+  );
+  return replayOutbox(client, userId, householdId);
+}
+
+/**
  * Rejoue UNE entrée par les méthodes typées de l'adaptateur — JAMAIS de SQL
  * construit ni de requête brute : le payload de la file (persistée côté
  * client) ne peut toucher le serveur qu'à travers le contrat `DataAdapter`,

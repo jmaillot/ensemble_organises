@@ -347,7 +347,7 @@ export async function signUpWithEmail(email: string, password: string) {
   await applySession(data.user);
 }
 
-export async function signOut() {
+export async function signOut(options?: { acknowledgePendingWrites?: boolean }) {
   try {
     if (supabase) await supabase.auth.signOut();
   } finally {
@@ -359,7 +359,10 @@ export async function signOut() {
     // l'utilisateur localement (profile-form : pas de navigation en cas
     // d'erreur) — jamais de déconnexion « réussie » qui laisserait les
     // données de l'utilisateur derrière elle (T-33-11).
-    await useSessionStore.getState().signOut();
+    // D-17 : `options.acknowledgePendingWrites` est transmis tel quel — seul
+    // le goulot décide ; le hook `useSignOutWithConfirm` est le canal UI qui
+    // pose la question après une `OutboxPendingError`.
+    await useSessionStore.getState().signOut(options);
   }
 }
 

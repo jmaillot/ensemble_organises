@@ -3,9 +3,27 @@ import { persist } from 'zustand/middleware';
 import { demoProfile, demoHousehold, demoMembers, DEMO_MEMBERS } from '@/lib/data/seed';
 import { data } from '@/lib/data';
 import { purgeUserCache, stopPersisting } from '@/lib/offline/query-persistence';
-import { setOutboxScopeProvider } from '@/lib/offline/outbox';
+import { setOutboxScopeProvider, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
 import { useHouseholdStore } from './household-store';
 import type { HouseholdMemberRow, HouseholdRow, SessionStatus, SessionUser } from '@/types';
+
+/**
+ * D-17 (T-34-08) : une déconnexion qui écraserait des écritures pendantes est
+ * une perte de données silencieuse. Le goulot `signOut` scanne la file AVANT
+ * toute purge ; sans acknowledgment explicite, il rejette cette erreur typée
+ * et ne purge RIEN. L'appelant UI attrape l'erreur, affiche la confirm-dialog,
+ * puis re-appelle `signOut({ acknowledgePendingWrites: true })`.
+ */
+export class OutboxPendingError extends Error {
+  constructor(public readonly pendingCount: number) {
+    super(
+      pendingCount > 1
+        ? `${pendingCount} écritures en attente : elles seront perdues. Confirmez pour continuer.`
+        : '1 écriture en attente : elle sera perdue. Confirmez pour continuer.',
+    );
+    this.name = 'OutboxPendingError';
+  }
+}
 
 interface SessionState {
   status: SessionStatus;
@@ -28,7 +46,7 @@ interface SessionState {
    */
   householdLoaded: boolean;
   signIn: (user: SessionUser) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { acknowledgePendingWrites?: boolean }) => Promise<void>;
   setStatus: (status: SessionStatus) => void;
   refreshUser: (user: SessionUser) => void;
 }
@@ -45,15 +63,30 @@ export const useSessionStore = create<SessionState>()(
         set({ user, status: 'authenticated', householdLoaded: false });
         await loadHousehold();
       },
-      signOut: async () => {
+      signOut: async (options) => {
         // D-05 (OFFR-04, T-33-10) : le goulot unique de purge. TOUS les chemins
         // de déconnexion passent ici — `use-auth.signOut`, le listener
         // `SIGNED_OUT`, les branches bootstrap sans session, le mode local —
         // c'est la classe corrigée (Pitfall 4), pas une instance.
+        // D-17 (T-34-08) : scan-avertir-purger. Le scan de la file précède
+        // TOUT effacement (stopPersisting, purge) : sans acknowledgment
+        // explicite, des écritures pendantes rejettent la déconnexion —
+        // jamais de purge silencieuse d'écritures non parties. La lecture de
+        // l'identifiant et le scan précèdent donc tout le reste.
+        const userId = get().user?.id ?? null;
+        const householdId = useHouseholdStore.getState().householdId;
+        if (userId && householdId) {
+          const entries = (await import('@/app/router').then(({ queryClient }) =>
+            queryClient.getQueryData<OutboxEntry[]>(outboxKeyFor(userId, householdId)),
+          )) ?? [];
+          const pendingCount = entries.filter((entry) => entry.status === 'pending').length;
+          if (pendingCount > 0 && !options?.acknowledgePendingWrites) {
+            throw new OutboxPendingError(pendingCount);
+          }
+        }
         // Ordre imposé (Pitfall 6, T-33-13) : désabonnement de la sauvegarde
         // AVANT la purge — sinon une sauvegarde throttlée en vol ressuscite
         // la clé purgée. L'identifiant est lu AVANT tout effacement d'état.
-        const userId = get().user?.id ?? null;
         stopPersisting();
         try {
           await purgeUserCache(userId); // tous foyers de l'utilisateur (D-03)

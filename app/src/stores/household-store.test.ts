@@ -233,6 +233,41 @@ describe('switchWithPurge — ordre purge → clear → switch (OFFR-04, D-04)',
     await expect(get(cacheKey('u1', 'h-old'), probeStore)).resolves.toBeUndefined();
   });
 
+  /**
+   * D-17 (plan 34-04, T-34-08) : l'outbox PERSISTE dans la clé
+   * `cacheKey(userId, householdId)` (phase 34, Pitfall 5 de query-persistence).
+   * Le changement de foyer purgera donc la file du foyer quitté SANS
+   * confirmation — contrairement à la déconnexion, qui scanne et demande
+   * (D-17). Ce test prouve que la purge emporte réellement une file enfile
+   * pour le foyer quitté : une écriture jamais partie ne peut pas fuiter
+   * vers le foyer suivant ni survivre côté client.
+   */
+  it('la purge du foyer quitté emporte l\'outbox persistée, sans confirmation (D-17)', async () => {
+    const { persistNow, cacheKey } = await import('@/lib/offline/query-persistence');
+    const { outboxKeyFor } = await import('@/lib/offline/outbox');
+    const { createStore, get } = await import('idb-keyval');
+    const { buildQueryClient } = await import('@/lib/query-policy');
+    const probeStore = createStore('eo-offline-cache', 'query');
+
+    const client = buildQueryClient({ queries: { retry: false } });
+    const fileQuittée = [
+      { key: 'tasks:t1', table: 'tasks', operation: 'update' as const, enqueuedAt: 1, status: 'pending' as const },
+    ];
+    client.setQueryData(outboxKeyFor('u1', 'h-old'), fileQuittée);
+    await persistNow(client, 'u1', 'h-old', { throttleTime: 0 });
+
+    useHouseholdStore.setState({ householdId: 'h-old', householdName: 'Ancien' });
+    await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, 'u1');
+
+    // La clé persistée du foyer quitté — outbox comprise — a disparu, et le
+    // switch n'a JAMAIS demandé confirmation (aucune question posée, aucune
+    // erreur levée : `switchWithPurge` s'est résolue normalement).
+    const raw = await get<string>(cacheKey('u1', 'h-old'), probeStore);
+    expect(raw).toBeUndefined();
+    expect(client.getQueryData(outboxKeyFor('u1', 'h-old'))).toBeUndefined();
+    expect(useHouseholdStore.getState().householdId).toBe('h-new');
+  });
+
   it('suit strictement l\'ordre stopPersisting → purge → clear (Pitfall 5/6)', async () => {
     const ordre: string[] = [];
     const { persistNow } = await import('@/lib/offline/query-persistence');
