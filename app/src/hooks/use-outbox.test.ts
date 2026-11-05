@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { onlineManager, QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { buildQueryClient } from '@/lib/query-policy';
 import { useSessionStore } from '@/stores/session-store';
@@ -105,5 +105,60 @@ describe('useOutbox — comptages dérivés de la liste (D-03)', () => {
     const { result } = renderHook(() => useOutbox(), { wrapper: wrapper(client) });
 
     expect(result.current.entries).toHaveLength(0);
+  });
+});
+
+describe('useOutbox — la file survit à un refetch (CR-01)', () => {
+  /**
+   * Cas qui doit échouer sur l'état pré-fixe : la query héritait de la
+   * politique globale (staleTime 30 s, refetchOnReconnect true, networkMode
+   * 'always'), donc une invalidation globale — exactement le « Vider le
+   * cache local » du panneau offline — refetchait la query et écrasait la
+   * file par le `[]` de la queryFn, détruisant les écritures pendantes.
+   */
+  it('survit à invalidateQueries() globale après péremption — la file n’est pas écrasée', async () => {
+    vi.useFakeTimers();
+    try {
+      establishSession();
+      const client = makeClient();
+      seed(client, [entry({ key: 'tasks:t1', status: 'pending' })]);
+      const { result } = renderHook(() => useOutbox(), { wrapper: wrapper(client) });
+      expect(result.current.pendingCount).toBe(1);
+
+      // Au-delà du staleTime de la politique globale : la query est périmée.
+      vi.advanceTimersByTime(60_000);
+
+      await client.invalidateQueries(); // invalidateQueries() sans filtre — refetch garanti sur l'état pré-fixe
+      await vi.runAllTimersAsync();
+
+      // L'invalidation rend la query périmée mais ne doit PAS la refetch :
+      // le rejeu ne peut pas partir si la file a été vidée entre-temps.
+      expect(result.current.entries).toHaveLength(1);
+      expect(result.current.pendingCount).toBe(1);
+      expect(client.getQueryState(outboxKeyFor(SCOPE.userId, SCOPE.householdId))?.data).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('survit au retour du réseau (refetchOnReconnect) après péremption', async () => {
+    vi.useFakeTimers();
+    try {
+      establishSession();
+      const client = makeClient();
+      onlineManager.setOnline(false);
+      seed(client, [entry({ key: 'tasks:t1', status: 'pending' })]);
+      const { result } = renderHook(() => useOutbox(), { wrapper: wrapper(client) });
+      expect(result.current.pendingCount).toBe(1);
+
+      vi.advanceTimersByTime(60_000); // au-delà du staleTime global
+      onlineManager.setOnline(true); // déclencheur refetchOnReconnect
+      await vi.runAllTimersAsync();
+
+      expect(result.current.pendingCount).toBe(1);
+    } finally {
+      onlineManager.setOnline(true);
+      vi.useRealTimers();
+    }
   });
 });
