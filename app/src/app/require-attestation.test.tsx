@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/render';
 import { getLocalAdapter } from '@/lib/data/local-adapter';
@@ -109,6 +109,8 @@ describe('RequireAttestation', () => {
 
     await screen.findByText('Une dernière étape avant de commencer');
     await user.click(screen.getByRole('button', { name: /Refuser/ }));
-    expect(useSessionStore.getState().status).toBe('guest');
+    // `signOut` est une chaîne asynchrone (import dynamique du goulot, purge
+    // IndexedDB) : l'assertion attend l'état au lieu de courir contre lui.
+    await waitFor(() => expect(useSessionStore.getState().status).toBe('guest'));
   });
 });
