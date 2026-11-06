@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 34
 current_phase_name: File d'écriture & rejeu
 status: executing
-stopped_at: Completed 34-04-PLAN.md
-last_updated: "2026-11-05T14:04:20.081Z"
+stopped_at: Phase 35 context gathered
+last_updated: "2026-11-06T11:10:38.847Z"
 last_activity: 2026-11-05
 last_activity_desc: Phase 34 execution started
-state_head: 477c8500f0900b7cb484faad5c48cb3cdad4fe1c
+state_head: 44d37c39f17638600c520cf3bb5a94f71a6bb4a3
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 14
-  completed_plans: 13
+  total_plans: 15
+  completed_plans: 15
 ---
 
 # Project State
@@ -93,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-05T13:06:36.054Z
-Stopped at: Completed 34-04-PLAN.md
-Resume file: None
+Last session: 2026-11-06T11:10:38.784Z
+Stopped at: Phase 35 context gathered
+Resume file: .planning/phases/35-deep-links-validation-multi-os/35-CONTEXT.md
