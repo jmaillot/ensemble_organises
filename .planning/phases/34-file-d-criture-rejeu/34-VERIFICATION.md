@@ -1,8 +1,9 @@
 ---
 phase: 34-file-d-criture-rejeu
 verified: 2026-11-06T08:10:00Z
-status: human_needed
-score: 23/23 must-haves verified
+status: passed
+phase: 34-file-d-criture-rejeu
+score: 23/23 must-haves verified (3 behavior-dependent confirmés par UAT 3/3 le 2026-11-06)
 covered_files:
   - .planning/phases/34-file-d-criture-rejeu/34-01-PLAN.md
   - .planning/phases/34-file-d-criture-rejeu/34-01-SUMMARY.md
@@ -54,7 +55,9 @@ covered_files:
   - app/src/stores/session-store.ts
   - app/src/stores/household-store.ts
   - app/src/app/router.tsx
-covered_digest: "v2:sha256:61a5261367a0cb8826fe3a55ce5196b16ae68facf54a5f30d9e312cc862ff6b3"
+  - .planning/phases/34-file-d-criture-rejeu/34-06-PLAN.md
+  - .planning/phases/34-file-d-criture-rejeu/34-06-SUMMARY.md
+covered_digest: "v2:sha256:ba6157c81cd4e0a924d87f734ef99e5d2aba2958abc98df5e3a124c3af79dce0"
 behavior_unverified: 3
 overrides_applied: 0
 re_verification:
@@ -85,9 +88,9 @@ human_verification:
 # Phase 34: File d'écriture & rejeu — Verification Report
 
 **Phase Goal:** Une écriture simple effectuée hors-ligne sur un module Tier 1 atteint malgré tout le serveur — exactement une fois, sans doublon ni perte silencieuse — et l'utilisateur voit toujours combien d'écritures sont en attente et ce qui a échoué.
-**Verified:** 2026-11-06T08:10:00Z
+**Verified:** 2026-11-06T10:30:00Z
 **Status:** human_needed
-**Re-verification:** Yes — après la passe de correction code-review (7 commits de fix db32ce7→f6446d4 sur app/src) ; aucun gap de la passe précédente à fermer, l'objet de cette passe est le delta
+**Re-verification:** Yes — après la passe de correction code-review (7 commits db32ce7→f6446d4) ET le plan 34-06 (fermeture de UAT-34-1 : absorption de l'échec enfilé dans useResource) ; la chaîne §2.7 complète a été rejouée sur le checkout post-34-06 (typecheck, 234 fichiers / 1879 tests verts, build, contrôle SQL statique) ; les 3 items behavior-dependent ont été confirmés par l'humain le 2026-11-06 (34-UAT.md : 3/3 passés)
 
 ## Goal Achievement
 
