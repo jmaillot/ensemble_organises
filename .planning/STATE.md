@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.1
-current_phase: 34
-current_phase_name: File d'écriture & rejeu
+current_phase: 35
+current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: Phase 35 context gathered
-last_updated: "2026-11-06T11:10:38.847Z"
-last_activity: 2026-11-05
-last_activity_desc: Phase 34 execution started
-state_head: 44d37c39f17638600c520cf3bb5a94f71a6bb4a3
+stopped_at: Completed 35-03-PLAN.md
+last_updated: "2026-11-06T12:17:15.386Z"
+last_activity: 2026-11-06
+last_activity_desc: Phase 35 execution started
+state_head: d67f18dfe06a80e745fc93eb4629e3136da388e5
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 18
+  completed_plans: 16
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 34 — File d'écriture & rejeu
+**Current focus:** Phase 35 — Deep links & validation multi-OS
 
 ## Current Position
 
-Phase: 34 (File d'écriture & rejeu) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 34
-Last activity: 2026-11-05 — Phase 34 execution started
+Phase: 35 (Deep links & validation multi-OS) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-11-06 — Phase 35 execution started
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -59,6 +59,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 34 P03 | ~30 min | 3 tasks | 4 files |
 | Phase 34 P04 | 2h45 | 3 tasks | 16 files |
 | Phase 34 P04 | 2h45 | 3 tasks | 16 files |
+| Phase 35 P35-03 | 14min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 34]: Garde anti-parallélisme module-level sur replayOutbox : une seule passe à la fois — Les déclencheurs D-08 peuvent se rapprocher à la ms ; une seconde passe rejouerait des entrées en vol (T-34-02)
 - [Phase 34]: Gate 32-D10 branchée sur useOutbox : isEmpty = pendingCount === 0, échecs terminaux hors comptage (34-04)
 - [Phase 34]: Purge D-17 scan-avertir-purger dans le goulot signOut ; changement de foyer purge l'outbox sans confirmation (34-04)
+- [Phase 35]: 35-03 : écran D-07 hors-ligne sans session dans sign-in-page.tsx ; vue visée affichée comme chemin interne filtré par internalPathOf (pas de table de libellés), révocation formulaire par useState non persisté (D-08)
 
 ### Pending Todos
 
@@ -93,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-06T11:10:38.784Z
-Stopped at: Phase 35 context gathered
-Resume file: .planning/phases/35-deep-links-validation-multi-os/35-CONTEXT.md
+Last session: 2026-11-06T12:17:15.323Z
+Stopped at: Completed 35-03-PLAN.md
+Resume file: None
