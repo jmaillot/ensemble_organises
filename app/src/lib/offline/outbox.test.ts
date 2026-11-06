@@ -71,13 +71,20 @@ afterEach(() => {
 });
 
 describe('enfilage hors-ligne (tracer WRQ-02, D-02)', () => {
+  // UAT-34-1 (34-06) : depuis l'absorption de l'échec enfilé dans
+  // useResource, create/update/remove RÉSOLVENT au lieu de rejeter — les
+  // anciens `await expect(...).rejects` servaient de point de
+  // synchronisation sur l'ANCIEN verdict ; les enfilages ci-dessous sont
+  // aujourd'hui attendus par simple `await`. Les rejets restants
+  // (useLinkedRows, mutation non marquée) visent des chemins non couverts
+  // par l'absorption.
   it('enfile un create hors-ligne dans la query outbox, avec id ET client_key distincts', async () => {
     onlineManager.setOnline(false);
     vi.mocked(data.create).mockRejectedValue(new TypeError('fetch failed'));
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('shopping_list_items'), { wrapper: wrapperFor(client) });
-    await expect(result.current.create({ name: 'Pain', household_id: 'h1' })).rejects.toThrow('fetch failed');
+    await result.current.create({ name: 'Pain', household_id: 'h1' });
 
     const entries = outboxEntries(client);
     expect(entries, 'l’échec réseau doit laisser UNE entrée en file').toHaveLength(1);
@@ -100,7 +107,7 @@ describe('enfilage hors-ligne (tracer WRQ-02, D-02)', () => {
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('shopping_list_items'), { wrapper: wrapperFor(client) });
-    await expect(result.current.create({ name: 'Beurre', household_id: 'h1' })).rejects.toThrow('fetch failed');
+    await result.current.create({ name: 'Beurre', household_id: 'h1' });
 
     const painted = client
       .getQueryCache()
@@ -138,8 +145,8 @@ describe('sémantique de file (D-04 fusion, D-05 annulation, Pitfall 2)', () => 
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('tasks'), { wrapper: wrapperFor(client) });
-    await expect(result.current.update('t1', { name: 'cochée' })).rejects.toThrow('fetch failed');
-    await expect(result.current.update('t1', { name: 'décochée' })).rejects.toThrow('fetch failed');
+    await result.current.update('t1', { name: 'cochée' });
+    await result.current.update('t1', { name: 'décochée' });
 
     const entries = outboxEntries(client);
     expect(entries, 'la dernière action locale gagne : une seule écriture pendante').toHaveLength(1);
@@ -155,9 +162,9 @@ describe('sémantique de file (D-04 fusion, D-05 annulation, Pitfall 2)', () => 
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('shopping_list_items'), { wrapper: wrapperFor(client) });
-    await expect(result.current.create({ name: 'Pain', household_id: 'h1' })).rejects.toThrow('fetch failed');
+    await result.current.create({ name: 'Pain', household_id: 'h1' });
     const createdId = outboxEntries(client)[0].id as string;
-    await expect(result.current.remove(createdId)).rejects.toThrow('fetch failed');
+    await result.current.remove(createdId);
 
     expect(outboxEntries(client), 'la ligne n’a jamais existé côté serveur : create ET remove disparaissent').toHaveLength(0);
   });
@@ -173,9 +180,9 @@ describe('sémantique de file (D-04 fusion, D-05 annulation, Pitfall 2)', () => 
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('shopping_list_items'), { wrapper: wrapperFor(client) });
-    await expect(result.current.create({ name: 'Pian', household_id: 'h1' })).rejects.toThrow('fetch failed');
+    await result.current.create({ name: 'Pian', household_id: 'h1' });
     const created = outboxEntries(client)[0];
-    await expect(result.current.update(created.id as string, { name: 'Pain' })).rejects.toThrow('fetch failed');
+    await result.current.update(created.id as string, { name: 'Pain' });
 
     const entries = outboxEntries(client);
     expect(entries, 'une écriture finale par entité').toHaveLength(1);
@@ -194,8 +201,8 @@ describe('sémantique de file (D-04 fusion, D-05 annulation, Pitfall 2)', () => 
     const client = makeClient();
 
     const { result } = renderHook(() => useResource('tasks'), { wrapper: wrapperFor(client) });
-    await expect(result.current.update('t1', { name: 'x' })).rejects.toThrow('fetch failed');
-    await expect(result.current.remove('t1')).rejects.toThrow('fetch failed');
+    await result.current.update('t1', { name: 'x' });
+    await result.current.remove('t1');
 
     const entries = outboxEntries(client);
     expect(entries).toHaveLength(1);

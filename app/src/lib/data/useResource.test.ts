@@ -137,17 +137,20 @@ describe('useResource — overlay optimiste de l’update (WR-02)', () => {
   });
 
   it('conserve l’overlay sur échec RÉSEAU — l’update est enfilé, le rejeu réconciliera', async () => {
-    // Cas qui doit échouer sur l'état pré-fixe : le catch restaurait le
-    // snapshot sans distinction — l'utilisateur voyait son changement
-    // disparaître alors que l'écriture partait en file et s'appliquerait au
-    // rejeu (contrat incohérent avec la voie `create`, Pitfall 7).
+    // Cas historique du verdict pré-UAT-34-1 : le catch restaurait le
+    // snapshot sans distinction, puis re-propageait l'échec. Depuis 34-06
+    // l'update ENFILÉ (table allowlistée + échec réseau, D-02) résout avec
+    // la ligne fusionnée du cache — l'incident transport ne traverse plus
+    // la couche hook (le badge est le signal, D-11/D-12), et l'overlay
+    // reste peint tant que la ligne n'a pas été invalidée.
     onlineManager.setOnline(false);
     updateMock.mockRejectedValue(new TypeError('fetch failed'));
     const queryClient = createTestQueryClient();
     const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
     await waitFor(() => expect(result.current.rows).toHaveLength(2));
 
-    await expect(result.current.update('task-foyer', { status: 'fait' })).rejects.toThrow('fetch failed');
+    const returned = await result.current.update('task-foyer', { status: 'fait' });
+    expect(returned.status).toBe('fait');
 
     const painted = queryClient
       .getQueryCache()

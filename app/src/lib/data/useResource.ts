@@ -240,10 +240,17 @@ export function useResource<T = Row>(
         // file jusqu'à l'invalidation suivante. Seul un refus MÉTIER remet
         // l'écran en l'état : l'écriture n'aura jamais lieu.
         if (isEnqueuedFailure(table, error)) {
+          // Ligne fusionnée lue dans le cache, source de vérité de
+          // l'overlay ; si la ligne n'est pas (encore) peinte — cache vide
+          // ou requête désactivée — la promesse reflète quand même l'état
+          // final de la file : l'écriture est enfilée, la ligne
+          // réconciliée au rejeu portera { id, ...values }. Relancer ici
+          // ferait absorber l'échec selon la chance du cache (T-34-15).
           const cached = (queryClient.getQueryData<T[]>(key) ?? []).find(
             (row) => hasId(row as unknown as Row) && (row as unknown as Row).id === id,
           );
           if (cached !== undefined) return cached;
+          return { ...(values as object), id } as T;
         }
         if (!isNetworkFailure(error)) queryClient.setQueryData<T[]>(key, snapshot);
         throw error;
