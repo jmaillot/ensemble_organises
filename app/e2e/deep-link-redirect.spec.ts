@@ -66,3 +66,59 @@ test.describe('redirect-after-login sur deep link (DLNK-02, D-06)', () => {
     await expect(page.getByRole('list', { name: 'Tâches du jour' })).toBeVisible();
   });
 });
+
+/**
+ * Cas hors-ligne (plan 35-04, matrice §1.4/§1.5 de 35-VERIFICATION.md).
+ *
+ *  - §1.5 (test G) : deep link hors-ligne SANS session → l'écran « connexion
+ *    requise pour cette vue » (D-07, plan 35-03) doit être atteint, pas
+ *    l'écran d'erreur « Votre foyer n'a pas pu être chargé » (WR-04). Avant le
+ *    correctif 35-04, le bootstrap bloquait et le routeur ne montait jamais.
+ *  - §1.4 (test H) : deep link hors-ligne AVEC session démo → la vue Tâches du
+ *    jour est rendue. En mode démo le bootstrap local n'appelle pas
+ *    `loadHousehold` Supabase : ce cas prouve le rendu hors-ligne de la vue ;
+ *    le chemin Supabase cold-start (sessions réelles) est prouvé par les tests
+ *    unitaires D/E de `auth-bootstrap-offline.test.tsx`.
+ *
+ * Les deux cas chargent d'abord l'app EN LIGNE pour laisser le service worker
+ * prendre le contrôle : c'est lui qui sert l'application au cold-start hors
+ * ligne d'une PWA installée — la navigation est interceptée par le SW, même
+ * sans réseau. D-08 : aucune écriture de stockage ici — les assertions portent
+ * sur l'URL et le rendu, la session est seulement PURGÉE (équivalent démo d'une
+ * expiration), jamais fabriquée.
+ */
+async function attendreControleServiceWorker(page: Page) {
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null, undefined, { timeout: 20_000 });
+}
+
+test.describe('deep link hors-ligne (35-04, matrice §1.4/§1.5)', () => {
+  test('sans session : deep link hors-ligne → écran « connexion requise pour cette vue » (D-07)', async ({ page }) => {
+    // L'app est chargée une fois en ligne (page sans session) pour que le SW
+    // prenne le contrôle, comme sur une PWA installée.
+    await page.goto('/connexion');
+    await expect(page.getByRole('heading', { name: 'Ravi de vous revoir' })).toBeVisible();
+    await attendreControleServiceWorker(page);
+
+    // Cold-start hors-ligne sur le deep link, sans session.
+    await viderSession(page);
+    await page.context().setOffline(true);
+    await page.goto(target);
+
+    // Avant le correctif 35-04 : « Chargement de votre foyer… » puis l'écran
+    // d'erreur WR-04. Après : le routeur monte, la garde renvoie vers
+    // /connexion et l'écran D-07 est rendu.
+    await page.waitForURL('**/connexion');
+    await expect(page.getByRole('heading', { name: 'Connexion requise pour cette vue' })).toBeVisible();
+  });
+
+  test('avec session démo : deep link hors-ligne → vue Tâches du jour rendue', async ({ page }) => {
+    await ouvrirSessionDemo(page);
+    await attendreControleServiceWorker(page);
+
+    await page.context().setOffline(true);
+    await page.goto(target);
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Tâches du jour' })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Tâches du jour' })).toBeVisible();
+  });
+});
