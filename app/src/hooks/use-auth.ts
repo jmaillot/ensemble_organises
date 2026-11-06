@@ -98,6 +98,17 @@ export interface AuthBootstrap {
 }
 
 /** Restaure la session Supabase au chargement et le foyer de l'utilisateur. */
+
+/**
+ * Échéance du gardien d'amorçage (plan 35-06, gap G-35-3) : 10 s. La fenêtre
+ * de backoff du rafraîchissement GoTrue (`AUTO_REFRESH_TICK_DURATION_MS`)
+ * monte à 30 s — attendre autant, c'est perdre l'utilisateur devant un
+ * spinner. 10 s laissent passer un cold-start Android lent sur un réseau réel
+ * dégradé, tout en restant nettement sous cette fenêtre et sous la patience
+ * d'un utilisateur. Exportée pour que les tests pilotent la même valeur.
+ */
+export const DELAI_GARDIEN_AMORCAGE_MS = 10_000;
+
 export function useAuthBootstrap(): AuthBootstrap {
   // Tant que la session n'est pas restaurée, l'application affiche un état de
   // chargement : sinon une route protégée redirigerait vers la connexion.
@@ -185,10 +196,46 @@ export function useAuthBootstrap(): AuthBootstrap {
       setReady(true);
     };
 
-    supabase.auth
+    // Plan 35-06 (gap G-35-3, diagnostic dlnk02) : sous Android cold-start,
+    // la promesse `getSession()` peut ne JAMAIS se terminer — GoTrue attend
+    // son `initializePromise`, qui tente un rafraîchissement réseau avec
+    // backoff (fenêtre jusqu'à 30 s, sans timeout applicatif), et
+    // `navigator.onLine` vaut true même en mode avion (H1). Tous les replis
+    // aval (conditionnés à un rejet ou à onLine=false) sont alors
+    // inatteignables et « Chargement de votre foyer… » reste indéfini.
+    // Le témoin `reglee` est posé par le PREMIER point de sortie de la
+    // chaîne ou du gardien : une résolution TARDIVE de la chaîne réelle ne
+    // doit rien ré-appliquer après le chemin invité (T-35-06). Le témoin ne
+    // verrouille PAS le listener `onAuthStateChange` : le verrouiller
+    // supprimerait son rattrapage légitime (TOKEN_REFRESHED/SIGNED_IN
+    // pendant que l'app tourne — `reglee` vaut déjà true à ce moment) ; ce
+    // chemin listener reste couvert par la RLS serveur (choix documenté,
+    // revue du plan).
+    let reglee = false;
+
+    // Le gardien course la chaîne ci-dessous contre une échéance seule. Il ne
+    // consulte VOLONTAIREMENT PAS `onlineManager` : `navigator.onLine` vaut
+    // true en mode avion Android (H1) — c'est précisément la source
+    // trompeuse qui rendait le hang invisible pour tous les replis 35-04.
+    const gardien = setTimeout(() => {
+      if (reglee || !active) return;
+      // Témoin posé AVANT l'effet : la chaîne qui résout après coup est
+      // bloquée par les gardes `reglee` de ses branches.
+      reglee = true;
+      // §2.7 F — jamais un succès muet : chaque déclenchement est dit.
+      console.warn(
+        "[auth] gardien d'amorçage : la restauration de session n'a pas abouti en 10 s, bascule sur le chemin invité (réseau probablement indisponible malgré navigator.onLine)",
+      );
+      cheminInvite();
+    }, DELAI_GARDIEN_AMORCAGE_MS);
+
+    const chaineAmorcage = supabase.auth
       .getSession()
       .then(async ({ data }) => {
         if (!active) return;
+        // Gardien déjà passé : la session résout trop tard, elle ne doit
+        // rien ré-appliquer après le chemin invité (témoin reglee).
+        if (reglee) return;
         const session = data.session;
         if (!session) {
           // Même chemin qu'en mode local : `setStatus('guest')` laissait
@@ -222,6 +269,9 @@ export function useAuthBootstrap(): AuthBootstrap {
           // les mêmes causes réseau, et doit produire le même écran.
           await applySession(session.user);
         } catch (cause) {
+          // Le gardien a déjà basculé invité pendant l'attente : ne rien
+          // ajouter, la purge a déjà eu lieu (témoin reglee).
+          if (reglee) return;
           // Hors-ligne, le rejet d'`applySession` (une lecture foyer que la
           // tolérance de `loadHousehold` n'a pas pu tenir — pas de foyer
           // persisté, par exemple) ne doit pas davantage bloquer le routeur :
@@ -234,6 +284,13 @@ export function useAuthBootstrap(): AuthBootstrap {
           return;
         }
         if (!active) return;
+        if (reglee) {
+          // Le gardien a basculé invité pendant l'attente d'`applySession` :
+          // la session qui arrive trop tard est PURGÉE (jamais ré-appliquée
+          // après le chemin invité — T-35-06 tient aussi sur ce chemin).
+          cheminInvite();
+          return;
+        }
         // Le cache offline est restauré puis élagué AVANT `setReady(true)`
         // (OFFR-01) : le routeur ne monte jamais sans cache restauré. Les
         // identités viennent des stores, posés par `applySession` juste
@@ -268,6 +325,9 @@ export function useAuthBootstrap(): AuthBootstrap {
         setReady(true);
       })
       .catch((cause) => {
+        // Le gardien a déjà rétabli le chemin invité : le rejet tardif de la
+        // chaîne ne doit ni re-purger ni afficher WR-04 par-dessus.
+        if (reglee) return;
         // Plan 35-04 : le rejet de la chaîne `getSession` elle-même (lecture du
         // stockage de session + rafraîchissement réseau) subit le même régime
         // que le reste — hors-ligne, chemin invité ; en ligne, écran WR-04.
@@ -277,6 +337,14 @@ export function useAuthBootstrap(): AuthBootstrap {
         }
         fail(cause);
       });
+    // Le témoin est posé quand la CHAÎNE se termine (après le `setReady`) :
+    // tant qu'elle est en vol, seul l'échéancier du gardien peut le poser.
+    // La minuterie est annulée en même temps : un amorçage réussi ne doit
+    // jamais déclencher le gardien après coup (W3).
+    void chaineAmorcage.finally(() => {
+      reglee = true;
+      clearTimeout(gardien);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -298,6 +366,9 @@ export function useAuthBootstrap(): AuthBootstrap {
 
     return () => {
       active = false;
+      // Le gardien ne doit pas échoir après démontage (reprise : une nouvelle
+      // tentative repose un effect, donc un nouveau gardien).
+      clearTimeout(gardien);
       listener.subscription.unsubscribe();
     };
   }, [attempt]);
