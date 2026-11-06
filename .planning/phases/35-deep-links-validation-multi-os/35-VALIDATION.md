@@ -40,10 +40,10 @@ created: "2026-11-06"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 35-01-01 | 01 | 1 | DLNK-02 | — | N/A | e2e | `cd app && npx playwright test deep-link-redirect-auth` | ❌ W0 | ⬜ pending |
-| 35-01-02 | 01 | 1 | DLNK-03 | — | N/A | unit | `cd app && npx vitest run src/modules/taches` | ❌ W0 | ⬜ pending |
-| 35-01-03 | 01 | 1 | DLNK-03 | — | N/A | unit | `cd app && npx vitest run src/lib/offline` | ✅ | ⬜ pending |
-| 35-02-01 | 02 | 1 | DLNK-03 | — | N/A | manual-checkpoint | checkpoint:human (matrice OS) | N/A | ⬜ pending |
+| 35-01-01 | 01 | 2 | DLNK-03 | — | N/A | unit | `cd app && npx vitest run src/modules/taches src/lib/query-policy.test.ts src/pwa` | ❌ W0 | ⬜ pending |
+| 35-01-02 | 01 | 2 | DLNK-02 | — | N/A | e2e | `cd app && npx playwright test deep-link-redirect` | ❌ W0 | ⬜ pending |
+| 35-03-01 | 03 | 1 | DLNK-02 | T-35-01, T-35-02 | Écran « connexion requise » offline sans session (D-07) | unit | `cd app && npx vitest run src/modules/landing` | ❌ W0 | ⬜ pending |
+| 35-02-01 | 02 | 3 | DLNK-03 | — | N/A | manual-checkpoint | checkpoint:human (matrice OS, 35-VALIDATION-MATRICE.md) | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,7 +52,8 @@ created: "2026-11-06"
 ## Wave 0 Requirements
 
 - [ ] `app/src/modules/taches/__tests__/jour-view.test.tsx` — stubs pour le rendu de `/taches/jour` (aujourd'hui + retards, D-02)
-- [ ] e2e `app/e2e/deep-link-redirect-auth.spec.ts` — stub du scénario DLNK-02 (deep link → login → retour vue cible)
+- [ ] `app/src/modules/landing/__tests__/connexion-requise.test.tsx` — les 5 cas de l'écran D-07 (Plan 03)
+- [ ] e2e `app/e2e/deep-link-redirect.spec.ts` — stub du scénario DLNK-02 (deep link → login → retour /taches/jour)
 
 *Existing infra (Vitest, Playwright, patron spec offline) couvre le reste.*
 
