@@ -32,6 +32,7 @@ export const routeChunkLoaders = {
   dashboard: () => import('@/modules/dashboard/dashboard-page'),
   dashboardGuide: () => import('@/modules/dashboard/dashboard-guide-page'),
   taches: () => import('@/modules/taches/taches-page'),
+  tachesJour: () => import('@/modules/taches/taches-jour-page'),
   tachesGuide: () => import('@/modules/taches/taches-guide-page'),
   calendrier: () => import('@/modules/calendrier/calendrier-page'),
   calendrierGuide: () => import('@/modules/calendrier/calendrier-guide-page'),

@@ -33,10 +33,10 @@ describe('manifeste PWA (vite.config.ts)', () => {
     }
   });
 
-  it('déclare exactement deux raccourcis vers /taches et /courses, sans paramètre', () => {
+  it('déclare exactement deux raccourcis, « Tâches du jour » visant la vue dédiée /taches/jour (D-01), sans paramètre', () => {
     const shortcuts = pwaManifest.shortcuts ?? [];
     expect(shortcuts).toHaveLength(2);
-    expect(shortcuts.map((s) => s.url).sort()).toEqual(['/courses', '/taches']);
+    expect(shortcuts.map((s) => s.url).sort()).toEqual(['/courses', '/taches/jour']);
     for (const shortcut of shortcuts) {
       expect(shortcut.url).not.toContain('?');
       // L'icône de raccourci est un PNG 96x96 committé (Chromium l'exige carré).

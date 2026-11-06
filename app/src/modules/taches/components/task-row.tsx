@@ -11,8 +11,14 @@ import { memberFirstName, type Task } from '../types';
 export interface TaskRowProps {
   task: Task;
   onToggle: (task: Task) => void;
-  onEdit: (task: Task) => void;
-  onDelete: (task: Task) => void;
+  /**
+   * Édition et suppression OPTIONNELLES : la vue « Tâches du jour » (D-03)
+   * borne son périmètre à liste + coche, elle ne passe donc ni l'une ni
+   * l'autre. Une action non passée ne rend pas son bouton — un bouton mort
+   * ferait promettre un geste que la vue ne porte pas.
+   */
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
   /** Rôle `enfant` : lecture seule, sans poignée ni actions d'écriture. */
   readOnly?: boolean;
   /**
@@ -100,7 +106,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
 
       <div className="flex items-center gap-1">
         <PriorityTag priority={task.priority} />
-        {!readOnly ? (
+        {!readOnly && onEdit ? (
           <button
             type="button"
             onClick={() => onEdit(task)}
@@ -110,7 +116,7 @@ export function TaskRow({ task, onToggle, onEdit, onDelete, readOnly = false, ca
             <Icon name="edit" size="sm" />
           </button>
         ) : null}
-        {canDelete ? (
+        {canDelete && onDelete ? (
           <button
             type="button"
             onClick={() => onDelete(task)}

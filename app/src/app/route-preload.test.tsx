@@ -147,9 +147,10 @@ describe('preloadRouteChunks — préchargement idle', () => {
     // couverture précache (`scripts/check-precache-coverage.sh`) compare
     // la table au build. Le nombre se met à jour ICI, à l'ajout d'une
     // route — jamais dans le silence.
-    // 61 morceaux depuis la phase 31 : join-household (31-03) ; mentions-legales
-    // (31-05) réutilise le morceau légal existant, sans entrée propre.
-    expect(ROUTE_CHUNK_COUNT).toBe(61);
+    // 62 morceaux depuis la phase 35 : tachesJour (35-01, cible du raccourci
+    // manifest). join-household (31-03) ; mentions-legales (31-05) réutilise
+    // le morceau légal existant, sans entrée propre.
+    expect(ROUTE_CHUNK_COUNT).toBe(62);
   });
 
   it("ne télécharge rien avant l'idle, puis chaque morceau en ligne", async () => {

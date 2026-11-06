@@ -83,6 +83,7 @@ export const OFFLINE_FAMILIES: ReadonlyArray<{ prefix: string; maxAgeMs: number 
   { prefix: 'products', maxAgeMs: 24 * 60 * 60 * 1000 },
   { prefix: 'task_lists', maxAgeMs: 24 * 60 * 60 * 1000 },
   { prefix: 'tasks', maxAgeMs: 24 * 60 * 60 * 1000 },
+  { prefix: 'task_assignees', maxAgeMs: 24 * 60 * 60 * 1000 },
   { prefix: 'routine_folders', maxAgeMs: 24 * 60 * 60 * 1000 },
   { prefix: 'routines', maxAgeMs: 24 * 60 * 60 * 1000 },
   { prefix: 'routine_completions', maxAgeMs: 24 * 60 * 60 * 1000 },

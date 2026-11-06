@@ -190,6 +190,21 @@ export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
   return tasks.filter((task) => task.status !== 'fait');
 }
 
+/**
+ * Vue « Tâches du jour » (D-02) : échéance atteinte ou dépassée, tâche non
+ * faite. La comparaison reste une comparaison de DATE — `todayIso()` et
+ * `daysBetween`, déjà lus par `lateDaysFor` — jamais un instant UTC : une
+ * `due_date` est une date pure, un instant UTC la décalerait d'un jour selon
+ * le fuseau. Le tri de la vue reste `sortTasks` tel quel : le retard y est
+ * épinglé en tête.
+ */
+export function tasksDuJour(tasks: Task[]): Task[] {
+  const today = todayIso();
+  return tasks.filter(
+    (task) => task.status !== 'fait' && task.dueDate !== null && daysBetween(today, task.dueDate) <= 0,
+  );
+}
+
 /** Onglet dossier : `null` = Général (tâches sans dossier). */
 export function filterByFolder(tasks: Task[], folderId: string | null): Task[] {
   return tasks.filter((task) => (task.folderId ?? null) === folderId);

@@ -313,6 +313,12 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/taches/jour"
+          element={
+            <LazyRoute load={routeChunkLoaders.tachesJour} />
+          }
+        />
+        <Route
             path="/taches/aide"
             element={
               <LazyRoute load={routeChunkLoaders.tachesGuide} />

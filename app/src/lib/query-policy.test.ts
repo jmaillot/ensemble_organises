@@ -7,7 +7,7 @@ import { OFFLINE_FAMILIES } from './query-policy';
 import { queryClient as appQueryClient } from '@/app/router';
 import { SHOPPING_LISTS_TABLE, SHOPPING_ITEMS_TABLE } from '@/modules/courses/api';
 import { PRODUCTS_TABLE } from '@/modules/courses/products-api';
-import { TASKS_TABLE, TASK_LISTS_TABLE } from '@/modules/taches/api';
+import { TASKS_TABLE, TASK_LISTS_TABLE, TASK_ASSIGNEES_TABLE } from '@/modules/taches/api';
 import { ROUTINES_TABLE, ROUTINE_FOLDERS_TABLE, ROUTINE_COMPLETIONS_TABLE } from '@/modules/routines/api';
 
 /**
@@ -217,7 +217,7 @@ describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () =
     expect(options.queries?.gcTime ?? 0).toBeGreaterThanOrEqual(sevenDays);
   });
 
-  it('G. OFFLINE_FAMILIES contient exactement les 8 familles vivantes et les 2 annexes', () => {
+  it('G. OFFLINE_FAMILIES contient exactement les 9 familles vivantes et les 2 annexes', () => {
     const byAge = (prefix: string) => OFFLINE_FAMILIES.find((family) => family.prefix === prefix)?.maxAgeMs;
     const day = 24 * 60 * 60 * 1000;
     for (const prefix of [
@@ -226,6 +226,7 @@ describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () =
       'products',
       'task_lists',
       'tasks',
+      'task_assignees',
       'routine_folders',
       'routines',
       'routine_completions',
@@ -235,9 +236,12 @@ describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () =
     for (const prefix of ['household_members', 'profiles']) {
       expect(byAge(prefix), `annexe ${prefix} absente`).toBe(7 * day);
     }
-    // Exactement ces dix-là : rien de plus, rien de moins (D-07 — la liste
-    // EST la frontière de ce qui quitte la mémoire).
-    expect(OFFLINE_FAMILIES).toHaveLength(10);
+    // Exactement ces onze-là : rien de plus, rien de moins (D-07 — la liste
+    // EST la frontière de ce qui quitte la mémoire). `task_assignees` (phase
+    // 35, D-04) hydrate les assignés de la vue « Tâches du jour » en
+    // cold-start hors-ligne : sans lui, la vue rend « on ne sait pas »
+    // (assigneesUnknown) au lieu des avatars.
+    expect(OFFLINE_FAMILIES).toHaveLength(11);
   });
 
   it('H. les préfixes correspondent aux constantes réelles des hooks Tier 1', () => {
@@ -252,6 +256,7 @@ describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () =
       PRODUCTS_TABLE,
       TASKS_TABLE,
       TASK_LISTS_TABLE,
+      TASK_ASSIGNEES_TABLE,
       ROUTINE_FOLDERS_TABLE,
       ROUTINES_TABLE,
       ROUTINE_COMPLETIONS_TABLE,
@@ -262,6 +267,7 @@ describe('famille offline — allowlist de persistance (D-07, D-08, D-10)', () =
     // correspondance ci-dessus serait vide de sens (les deux côtés auraient
     // pu dériver ensemble).
     expect(TASKS_TABLE).toBe('tasks');
+    expect(TASK_ASSIGNEES_TABLE).toBe('task_assignees');
     expect(SHOPPING_LISTS_TABLE).toBe('shopping_lists');
     expect(ROUTINES_TABLE).toBe('routines');
     expect(PRODUCTS_TABLE).toBe('products');

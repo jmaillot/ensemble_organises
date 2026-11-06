@@ -39,9 +39,10 @@ export const pwaManifest: Partial<ManifestOptions> = {
     { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
   // Raccourcis vers des routes existantes du routeur — AUCUN paramètre
-  // d'URL (D-05, DLNK-01) ; la vue dédiée vient en phase 35.
+  // d'URL (D-05, DLNK-01) ; « Tâches du jour » vise la vue dédiée
+  // /taches/jour (phase 35, D-01).
   shortcuts: [
-    { name: 'Tâches du jour', url: '/taches', icons: [{ src: 'shortcut-taches-96.png', sizes: '96x96', type: 'image/png' }] },
+    { name: 'Tâches du jour', url: '/taches/jour', icons: [{ src: 'shortcut-taches-96.png', sizes: '96x96', type: 'image/png' }] },
     { name: 'Courses', url: '/courses', icons: [{ src: 'shortcut-courses-96.png', sizes: '96x96', type: 'image/png' }] },
   ],
   // Ordre imposé par D-06 : WCO d'abord, fallback minimal-ui puis standalone.
