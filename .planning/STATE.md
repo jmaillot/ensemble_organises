@@ -4,11 +4,11 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: Completed 35-01-PLAN.md
-last_updated: "2026-11-06T12:48:56.602Z"
+stopped_at: "35-02 terminé : matrice consignée et confirmée, SUMMARY écrit, 3 travaux correctifs enregistrés"
+last_updated: "2026-11-06T12:54:54.746Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: b02d32a9619066e2535180d82fbbd803852cbdd0
+state_head: 5c6a0cb0c3253ac19d5e3c90bb1022d9cd8dbf32
 progress:
   total_phases: 4
   completed_phases: 1
@@ -61,6 +61,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 34 P04 | 2h45 | 3 tasks | 16 files |
 | Phase 35 P35-03 | 14min | 1 tasks | 2 files |
 | Phase 35 P35-01 | 27min | 2 tasks | 12 files |
+| Phase 35 P35-02 | checkpoint (passage 2026-11-06) + ~15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 35]: 35-03 : écran D-07 hors-ligne sans session dans sign-in-page.tsx ; vue visée affichée comme chemin interne filtré par internalPathOf (pas de table de libellés), révocation formulaire par useState non persisté (D-08)
 - [Phase 35]: Preuve de state.from par le comportement post-connexion dans l'e2e (jamais une lecture de stockage, D-08)
 - [Phase 35]: TaskRow : onEdit/onDelete optionnels — une action non passée ne rend pas son bouton (vue jour D-03)
+- [Phase 35]: Grille 35-VALIDATION-MATRICE.md créée : ordre fixe D-12, vocabulaire de cellule fermé (D-11), quirks iOS pré-remplis [ASSUMED A2] ; écart documenté : PITFALLS contient 10 items, pas 11
+- [Phase 35]: 35-02 : matrice consignée et confirmée (CONFIRMATION-CONSIGNATION, Desktop + Android 16, iOS absent) ; un « Échoué » ouvre un travail correctif (3 ouverts : DLNK-02, D-07, outbox silencieux) ; gate SW et iOS = Non testé raisonné, à rejouer ; défaut de grille 1.7 documenté (connexion de B hors-ligne impossible par construction)
 
 ### Pending Todos
 
@@ -96,9 +99,13 @@ None yet.
 - Phase 35 : comportement iOS réel (éviction ITP ~7 j, install, pas de raccourcis manifest) — MEDIUM confidence, validation on-device
 - Phase 34 : comportement purge file à la déconnexion avec N en attente (purge directe vs confirmation) — décision produit de phase
 - e2e préexistant en échec (critical-paths « rejoindre un foyer valide le format du token », chromium+mobile) — constaté sur la base 36ac215, consigné deferred-items.md
+- [35-02, matrice 2026-11-06] DLNK-02 : cold-start déconnecté AVEC session → écran blanc/erreur technique au lieu de /taches/jour, Desktop + Android 16 (matrice §1.4 + item 7) — travail correctif ouvert, constat multi-OS pas une régression 35-01
+- [35-02, matrice 2026-11-06] D-07 : deep link hors-ligne SANS session → écran « foyer n'a pas pu être chargé » au lieu de l'écran « connexion requise » 35-03, non atteint sur ce chemin, Desktop + Android 16 (matrice §1.5) — travail correctif ouvert
+- [35-02, matrice 2026-11-06] Outbox : écriture vers une ligne supprimée serveur = échec silencieux, entrée de file évaporée sans message surfaced (checklist item 2) — travail correctif ouvert, contredit la décision 34 « jamais d'effacement silencieux » sur ce scénario
+- [35-02] Gate SW « file vide » (matrice §2) et items iOS non testés (build non publié / appareil absent) — à rejouer à la prochaine mise en production et sur un vrai iPhone
 
 ## Session Continuity
 
-Last session: 2026-11-06T12:48:56.539Z
-Stopped at: Completed 35-01-PLAN.md
+Last session: 2026-11-06
+Stopped at: 35-02 terminé : matrice consignée et confirmée, SUMMARY écrit, 3 travaux correctifs enregistrés
 Resume file: None
