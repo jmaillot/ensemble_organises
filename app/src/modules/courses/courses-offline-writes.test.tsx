@@ -142,6 +142,9 @@ vi.mock('@/lib/supabase/client', () => {
         pending.filters.push([key, value]);
         return builder;
       },
+      // Plan 35-06 : `list` attache un signal d'abandon — le harnais l'accepte
+      // sans effet (aucun abandon simulé ici, les lectures résolvent).
+      abortSignal: () => builder,
       then: (onFulfilled: unknown, onRejected: unknown) =>
         Promise.resolve()
           .then(() => ({ data: rowsOf(table).filter((row) => matches(row, pending.filters)), error: null }))
