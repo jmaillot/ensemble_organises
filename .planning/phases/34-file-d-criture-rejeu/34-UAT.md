@@ -8,13 +8,13 @@ updated: 2026-11-05T19:10:00Z
 
 ## Current Test
 
-number: 2
-name: Rendu visuel badge/toast (D-11/D-12/D-13)
+number: 3
+name: Parcours e2e appareil réel
 expected: |
-  Enfiler 2 écritures hors-ligne puis provoquer 1 échec terminal ; observer la
-  bannière, le compteur, le toast. Badge visible online et offline, retombe à
-  zéro après rejeu complet, « N bloquées » ouvre le panneau, un seul toast par
-  passe d'échec.
+  Mode avion → ajouter un article Courses + cocher une tâche → retour réseau →
+  vérifier que le serveur contient exactement les 2 écritures et que le badge
+  descend à 0. Exactement une écriture serveur par action, zéro doublon, zéro
+  perte silencieuse.
 awaiting: user response
 
 ## Tests
@@ -33,7 +33,7 @@ note: |
 
 ### 2. Rendu visuel badge/toast (D-11/D-12/D-13)
 expected: Enfiler 2 écritures hors-ligne puis provoquer 1 échec terminal ; observer la bannière, le compteur, le toast. Badge visible online et offline, retombe à zéro après rejeu complet, « N bloquées » ouvre le panneau, un seul toast par passe d'échec.
-result: [pending]
+result: [pass]
 
 ### 3. Parcours e2e appareil réel
 expected: Mode avion → ajouter un article Courses + cocher une tâche → retour réseau → vérifier que le serveur contient exactement les 2 écritures et que le badge descend à 0. Exactement une écriture serveur par action, zéro doublon, zéro perte silencieuse.
@@ -42,9 +42,9 @@ result: [pending]
 ## Summary
 
 total: 3
-passed: 1
+passed: 2
 issues: 1
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
