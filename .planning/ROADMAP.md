@@ -93,7 +93,7 @@ Plans:
   3. La matrice de validation est passée sur desktop, Android et iOS réels : install, raccourcis, lecture hors-ligne avec bandeau, rejeu foreground, purge inter-utilisateurs — chaque résultat (y compris les quirks iOS ITP/éviction) est consigné, rien n'est marqué vérifié à tort
   4. La checklist « looks done but isn't » des PITFALLS est passée en revue et le gate de mise à jour SW « file vide » est vérifié : aucune mise à jour ne recharge pendant un rejeu
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -102,7 +102,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 35-01-PLAN.md — Vue « Tâches du jour » `/taches/jour` + e2e redirect-after-login + écran « connexion requise » offline
-- [ ] 35-05-PLAN.md — Gap closure : rejeu on-device §1.4/§1.5 après correction + consignation (checkpoint humain)
+- [x] 35-05-PLAN.md — Gap closure : rejeu on-device §1.4/§1.5 après correction + consignation (checkpoint humain)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 35-02-PLAN.md — Grille de validation multi-OS (matrice + gate SW + checklist PITFALLS) et passage on-device consigné
@@ -116,4 +116,4 @@ Plans:
 | 32. Install & raccourcis | 0/? | Not started | - |
 | 33. Cache de lecture offline | 4/5 (33-05 termine la vague 3) | Executing | 2026-11-04 |
 | 34. File d'écriture & rejeu | 5/5 | In Progress|  |
-| 35. Deep links & validation multi-OS | 4/5 | In Progress|  |
+| 35. Deep links & validation multi-OS | 5/5 | In Progress|  |

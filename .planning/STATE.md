@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: "35-04 terminé : bootstrap hors-ligne tolérant (gaps §1.4/§1.5 fermés), SUMMARY écrit, re-validation on-device au 35-05"
-last_updated: "2026-11-06T15:58:26.830Z"
+stopped_at: "Completed 35-05-PLAN.md (rejeu consigné : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android Échoué)"
+last_updated: "2026-11-06T16:18:58.678Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: 59af4fd4c5cad952fc52eb4640993f135f49b1fe
+state_head: b6e5612769314e66c34fbd5f79a38f4469643577
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Project State
@@ -28,9 +28,11 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 35 (Deep links & validation multi-OS) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
-Last activity: 2026-11-06 — Phase 35 execution started
+Last activity: 2026-11-06 — Plan 35-05 consigné (rejeu on-device : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android 16 Échoué)
+
+> **Suivi requis — gap 1 (DLNK-02 Android)** : le cold-start hors-ligne avec session échoue ENCORE sur Android 16 après le correctif 35-04 (« Chargement de votre foyer » au lieu de `/taches/jour`). Item réouvert dans deferred-items.md. Piste diagnostique : contrôle SW sur Android ou restauration zustand persist au cold-start. Un plan de diagnostic/correctif suivi d'un re-rejeu on-device est nécessaire avant de déclarer DLNK-02 clos.
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -63,6 +65,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 35 P35-01 | 27min | 2 tasks | 12 files |
 | Phase 35 P35-02 | checkpoint (passage 2026-11-06) + ~15min | 2 tasks | 4 files |
 | Phase 35 P04 | ~55min | 3 tasks | 7 files |
+| Phase 35 P05 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -88,6 +91,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 35]: TaskRow : onEdit/onDelete optionnels — une action non passée ne rend pas son bouton (vue jour D-03)
 - [Phase 35]: Grille 35-VALIDATION-MATRICE.md créée : ordre fixe D-12, vocabulaire de cellule fermé (D-11), quirks iOS pré-remplis [ASSUMED A2] ; écart documenté : PITFALLS contient 10 items, pas 11
 - [Phase 35]: 35-02 : matrice consignée et confirmée (CONFIRMATION-CONSIGNATION, Desktop + Android 16, iOS absent) ; un « Échoué » ouvre un travail correctif (3 ouverts : DLNK-02, D-07, outbox silencieux) ; gate SW et iOS = Non testé raisonné, à rejouer ; défaut de grille 1.7 documenté (connexion de B hors-ligne impossible par construction)
+- [Phase 35]: 35-05 : rejeu on-device — §1.5 (D-07) Passé sur Desktop+Android, gap 2 clos ; §1.4 (DLNK-02) Passé Desktop / Échoué Android (« chargement de votre foyer » persiste), gap 1 partiellement clos, item Android réouvert (piste : contrôle SW ou restauration zustand persist au cold-start Android)
 
 ### Pending Todos
 
@@ -107,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-06T15:58:26.768Z
-Stopped at: 35-04 terminé : bootstrap hors-ligne tolérant (gaps §1.4/§1.5 fermés), SUMMARY écrit, re-validation on-device au 35-05
+Last session: 2026-11-06T16:18:46.622Z
+Stopped at: Completed 35-05-PLAN.md (rejeu consigné : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android Échoué)
 Resume file: None
