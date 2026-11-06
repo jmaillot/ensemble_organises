@@ -99,6 +99,8 @@ Plans:
 - [x] 35-03-PLAN.md
 - [x] 35-01-PLAN.md — Vue « Tâches du jour » `/taches/jour` + e2e redirect-after-login + écran « connexion requise » offline
 - [ ] 35-02-PLAN.md — Grille de validation multi-OS (matrice + gate SW + checklist PITFALLS) et passage on-device consigné
+- [ ] 35-04-PLAN.md — Gap closure : bootstrap tolérant hors-ligne (cold-start avec session → /taches/jour depuis cache ; sans session → écran D-07) + couverture automatisée des deux chemins
+- [ ] 35-05-PLAN.md — Gap closure : rejeu on-device §1.4/§1.5 après correction + consignation (checkpoint humain)
 
 **UI hint**: yes
 
