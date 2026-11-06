@@ -72,6 +72,37 @@ export function internalPathOf(value: unknown): string | null {
   }
 }
 
+/**
+ * Écran « connexion requise pour cette vue » (D-07, plan 35-03) : un raccourci
+ * hors-ligne vers une vue du foyer sans session active arrive sur /connexion
+ * avec `state.from` — on remplace le formulaire nu par un écran explicite qui
+ * nomme la vue visée, patron sobre de `forbidden.tsx`. Le chemin affiché est
+ * déjà filtré par `internalPathOf` (garde T-19-43 réutilisée telle quelle) ;
+ * aucune donnée utilisateur, aucun stockage — `navigator.onLine` est une
+ * lecture d'état (D-08). Le bouton révèle le formulaire : la connexion reste
+ * le seul chemin vers la vue, jamais une redirection silencieuse.
+ */
+export function ConnexionRequise({ vue, onReconnect }: { vue: string; onReconnect: () => void }) {
+  return (
+    <div className="grid min-h-[60vh] place-items-center px-5 text-center">
+      <div className="max-w-[440px]">
+        <span className="mx-auto mb-5 grid size-14 place-items-center rounded-[18px] bg-accent-soft text-accent-strong">
+          <Icon name="info" size="lg" />
+        </span>
+        <h1 className="mb-2 text-[clamp(24px,3vw,36px)] leading-[1.05]">Connexion requise pour cette vue</h1>
+        <p className="lede mx-auto mb-6 text-[14px]">
+          Vous êtes hors ligne et cette vue n’est pas encore dans vos mains : reconnectez-vous pour ouvrir{' '}
+          <span className="font-bold text-fg">{vue}</span>.
+        </p>
+        <Button onClick={onReconnect}>
+          <Icon name="arrow" size="sm" />
+          Se reconnecter
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,6 +131,14 @@ export default function SignInPage() {
    * l'invariant d'amorçage : ce sont les gardes, pas cette page, qui décident.
    */
   const requestedPath = internalPathOf((location.state as { from?: unknown } | null)?.from);
+
+  // D-07 : l'écran « connexion requise » ne s'applique qu'au deep link visé
+  // (vue demandée présente) ET hors ligne — en ligne, le formulaire standard
+  // reste inchangé. `useState` réserve la révocation par le bouton
+  // « Se reconnecter » : révéler le formulaire est un état de session de la
+  // page, jamais persisté (D-08).
+  const [formRevealed, setFormRevealed] = useState(false);
+  const offlineWithoutSession = requestedPath !== null && !navigator.onLine && !formRevealed;
 
   const run = async (label: string, action: () => Promise<unknown>) => {
     setPending(label);
@@ -141,6 +180,10 @@ export default function SignInPage() {
 
       <section className="flex items-center justify-center px-5 py-10 max-[650px]:px-[15px]">
         <div className="w-full max-w-[420px]">
+          {offlineWithoutSession ? (
+            <ConnexionRequise vue={requestedPath} onReconnect={() => setFormRevealed(true)} />
+          ) : (
+            <>
           <Link to="/" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg lg:hidden">
             <Icon name="arrowLeft" size="sm" />
             Retour à l’accueil
@@ -226,6 +269,8 @@ export default function SignInPage() {
               </Button>
             </div>
           ) : null}
+            </>
+          )}
         </div>
       </section>
     </div>
