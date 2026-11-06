@@ -5,14 +5,14 @@ current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
 stopped_at: "35-02 terminé : matrice consignée et confirmée, SUMMARY écrit, 3 travaux correctifs enregistrés"
-last_updated: "2026-11-06T12:54:54.746Z"
+last_updated: "2026-11-06T15:38:06.429Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: 5c6a0cb0c3253ac19d5e3c90bb1022d9cd8dbf32
+state_head: 65e916774dfada9540d0d0f928434cab9820df60
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 18
+  total_plans: 20
   completed_plans: 17
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 35 (Deep links & validation multi-OS) — EXECUTING
+Phase: 35 — READY TO EXECUTE
 Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 35 execution started
