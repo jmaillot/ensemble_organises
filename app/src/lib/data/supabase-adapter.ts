@@ -103,6 +103,30 @@ export class SupabaseAdapter implements DataAdapter {
   }
 
   /**
+   * Délai d'abandon des lectures `list` (plan 35-06, couche 2) : même valeur
+   * que le gardien d'amorçage (`DELAI_GARDIEN_AMORCAGE_MS = 10_000` dans
+   * use-auth.ts) — cohérence voulue : un backend qui ne répond pas en 10 s est
+   * traité comme indisponible partout. Exporté ET injectable pour que les
+   * tests pilotent la même horloge par les fake timers.
+   */
+  private static delaiLectureMs = 10_000;
+
+  /** Injecte le délai d'abandon des lectures — usage de test uniquement. */
+  static setDelaiLecturePourTest(ms: number) {
+    SupabaseAdapter.delaiLectureMs = ms;
+  }
+
+  /** Rétablit le délai d'abandon par défaut. */
+  static reinitialiserDelaiLecture() {
+    SupabaseAdapter.delaiLectureMs = 10_000;
+  }
+
+  /** Délai courant, exporté pour la journalisation et les assertions. */
+  static get DELAI_LECTURE_MS() {
+    return SupabaseAdapter.delaiLectureMs;
+  }
+
+  /**
    * Lecture directe : toute erreur (réseau, droits, validation) remonte
    * telle quelle à l'appelant — aucun repli, aucun cache, aucune file
    * (retrait du mode offline D-10 : le backend répond ou l'erreur d'origine
@@ -117,9 +141,44 @@ export class SupabaseAdapter implements DataAdapter {
       else if (Array.isArray(value)) query = query.in(key, value as string[]);
       else query = query.eq(key, value);
     }
-    const { data: rows, error } = await query;
-    if (error) throw new DataError(error.message, error);
-    return (rows ?? []) as T[];
+    // Plan 35-06 (couche 2, gap G-35-3) : au cold-start Android hors-ligne, un
+    // fetch qui hang maintenait `loadHousehold` suspendu HORS de son catch —
+    // le repli foyer persisté de 35-04 était condamné derrière un fetch
+    // suspendu. L'abandon manuel (AbortController + setTimeout — PAS
+    // `AbortSignal.timeout`, dont les minuteries internes échappent à
+    // `vi.useFakeTimers` et rendraient le test X1 jamais vert) convertit le
+    // hang en rejet rapide et réactive ce repli LORSQUE onLine=false ; sous H1
+    // (onLine=true en mode avion), le repli de loadHousehold relance
+    // volontairement et le gardien de bootstrap est le seul rétablissement.
+    // Les ÉCRITURES (create/update/remove/removeWhere) ne sont pas signalées
+    // VOLONTAIREMENT : une écriture avortée à mi-course serait ré-enfilée par
+    // l'outbox, et un délai n'y apporte rien — le contrat de rejeu reste
+    // entier (T-35-10).
+    const controleur = new AbortController();
+    query = query.abortSignal(controleur.signal);
+    const minuterie = setTimeout(
+      () => controleur.abort(new Error(`Délai de lecture dépassé (${SupabaseAdapter.delaiLectureMs} ms)`)),
+      SupabaseAdapter.delaiLectureMs,
+    );
+    try {
+      const { data: rows, error } = await query;
+      if (error) throw new DataError(error.message, error);
+      return (rows ?? []) as T[];
+    } catch (cause) {
+      if (controleur.signal.aborted) {
+        // §2.7 F : le rejet nomme le délai dépassé — jamais un échec générique
+        // muet ; le message remonte dans la journalisation de loadHousehold.
+        throw new DataError(
+          `Délai de lecture dépassé (${SupabaseAdapter.delaiLectureMs} ms) — le serveur n'a pas répondu à temps`,
+          cause,
+        );
+      }
+      throw cause;
+    } finally {
+      // La minuterie est annulée en sortie : un contrôleur résiduel ne doit
+      // jamais aboûter une lecture suivante sur la même requête réutilisée.
+      clearTimeout(minuterie);
+    }
   }
 
   async create<T = Row>(table: string, values: Partial<T>): Promise<T> {
