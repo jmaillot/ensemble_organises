@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: Completed 35-03-PLAN.md
-last_updated: "2026-11-06T12:17:15.386Z"
+stopped_at: Completed 35-01-PLAN.md
+last_updated: "2026-11-06T12:48:56.602Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: d67f18dfe06a80e745fc93eb4629e3136da388e5
+state_head: b02d32a9619066e2535180d82fbbd803852cbdd0
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 35 (Deep links & validation multi-OS) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 35 execution started
 
@@ -60,6 +60,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 34 P04 | 2h45 | 3 tasks | 16 files |
 | Phase 34 P04 | 2h45 | 3 tasks | 16 files |
 | Phase 35 P35-03 | 14min | 1 tasks | 2 files |
+| Phase 35 P35-01 | 27min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 34]: Gate 32-D10 branchée sur useOutbox : isEmpty = pendingCount === 0, échecs terminaux hors comptage (34-04)
 - [Phase 34]: Purge D-17 scan-avertir-purger dans le goulot signOut ; changement de foyer purge l'outbox sans confirmation (34-04)
 - [Phase 35]: 35-03 : écran D-07 hors-ligne sans session dans sign-in-page.tsx ; vue visée affichée comme chemin interne filtré par internalPathOf (pas de table de libellés), révocation formulaire par useState non persisté (D-08)
+- [Phase 35]: Preuve de state.from par le comportement post-connexion dans l'e2e (jamais une lecture de stockage, D-08)
+- [Phase 35]: TaskRow : onEdit/onDelete optionnels — une action non passée ne rend pas son bouton (vue jour D-03)
 
 ### Pending Todos
 
@@ -92,9 +95,10 @@ None yet.
 - Phase 34 : sémantique de rejeu TanStack (`resumePausedMutations` vs outbox pur) — une seule voie de mutation par type d'opération, à trancher en plan
 - Phase 35 : comportement iOS réel (éviction ITP ~7 j, install, pas de raccourcis manifest) — MEDIUM confidence, validation on-device
 - Phase 34 : comportement purge file à la déconnexion avec N en attente (purge directe vs confirmation) — décision produit de phase
+- e2e préexistant en échec (critical-paths « rejoindre un foyer valide le format du token », chromium+mobile) — constaté sur la base 36ac215, consigné deferred-items.md
 
 ## Session Continuity
 
-Last session: 2026-11-06T12:17:15.323Z
-Stopped at: Completed 35-03-PLAN.md
+Last session: 2026-11-06T12:48:56.539Z
+Stopped at: Completed 35-01-PLAN.md
 Resume file: None
