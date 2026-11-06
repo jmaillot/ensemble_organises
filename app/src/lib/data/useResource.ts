@@ -65,6 +65,23 @@ export type UseResourceOptions =
 const hasId = (row: Row): row is Row & { id: string } => typeof row.id === 'string';
 
 /**
+ * L'échec vient-il d'être enfilé dans l'outbox ?
+ *
+ * Le MutationCache (query-policy.ts) vient d'enfiler cette écriture dans
+ * l'outbox (D-02) : absorber l'échec ici — le signal utilisateur est le
+ * badge D-11/D-12, pas un toast d'erreur (UAT-34-1). Le prédicat recopie
+ * EXACTEMENT le filtre `onError` du MutationCache (meta table+operation
+ * garanti par construction : les trois mutations portent leur meta et le
+ * catch vit dans le même hook qui les a lancées) pour ne JAMAIS avaler un
+ * échec non enfilé — table hors liste ou refus métier —, ce qui serait une
+ * perte silencieuse (T-34-14). L'export sert au test d'invariant qui refuse
+ * toute divergence future entre les deux couches.
+ */
+export function isEnqueuedFailure(table: string, error: unknown): boolean {
+  return isWriteAllowed(table) && isNetworkFailure(error);
+}
+
+/**
  * Prépare une création sur table allowlistée (Pitfall 7, RESEARCH 34).
  *
  * L'identité est générée CÔTÉ CLIENT d'emblée : l'`id` texte (l'adaptateur le
@@ -180,6 +197,13 @@ export function useResource<T = Row>(
         await invalidate();
         return result;
       } catch (error) {
+        // UAT-34-1 : si le MutationCache vient d'enfiler l'écriture (table
+        // allowlistée + échec réseau), l'incident transport ne remonte PAS
+        // à l'appelant — la promesse rend la ligne overlay déjà peinte
+        // (identité client id + client_key portée par l'outbox, cohérente
+        // avec la réconciliation du rejeu). Sinon comportement inchangé :
+        // refus métier → retrait d'overlay + rejet.
+        if (prepared.overlay && isEnqueuedFailure(table, error)) return prepared.overlay as T;
         if (prepared.overlay && !isNetworkFailure(error)) queryClient.setQueryData<T[]>(key, snapshot);
         throw error;
       }
@@ -206,13 +230,21 @@ export function useResource<T = Row>(
         await invalidate();
         return result;
       } catch (error) {
-        // WR-02 : symétrie avec `create` (Pitfall 7). Sur échec RÉSEAU
+        // UAT-34-1 : écriture enfilée (D-02) → l'incident transport ne
+        // remonte pas ; la promesse rend la ligne fusionnée LUE DANS LE
+        // CACHE, source de vérité de l'overlay. WR-02 : sur échec RÉSEAU
         // l'overlay RESTE peint : la MutationCache vient d'enfiler l'update
         // dans l'outbox et le rejeu le réconciliera. Restaurer le snapshot
         // sans distinction ferait disparaître à l'écran un changement qui
         // s'appliquera pourtant au rejeu — et ferait diverger l'écran de la
         // file jusqu'à l'invalidation suivante. Seul un refus MÉTIER remet
         // l'écran en l'état : l'écriture n'aura jamais lieu.
+        if (isEnqueuedFailure(table, error)) {
+          const cached = (queryClient.getQueryData<T[]>(key) ?? []).find(
+            (row) => hasId(row as unknown as Row) && (row as unknown as Row).id === id,
+          );
+          if (cached !== undefined) return cached;
+        }
         if (!isNetworkFailure(error)) queryClient.setQueryData<T[]>(key, snapshot);
         throw error;
       }
@@ -224,10 +256,21 @@ export function useResource<T = Row>(
 
   const remove = useCallback(
     async (id: string) => {
-      await removeMutation.mutateAsync(id);
-      await invalidate();
+      try {
+        await removeMutation.mutateAsync(id);
+        await invalidate();
+      } catch (error) {
+        // UAT-34-1 : un remove enfilé (table allowlistée + échec réseau,
+        // D-02) résout — le rejet d'un incident transport déjà converti en
+        // écriture différée ne doit pas atteindre l'appelant. Le remove ne
+        // pose pas d'overlay optimiste, il n'y a donc ni snapshot ni
+        // restauration à faire ici : sur un refus métier, le rejet seul se
+        // propage (D-10) et le cache est déjà en l'état.
+        if (isEnqueuedFailure(table, error)) return;
+        throw error;
+      }
     },
-    [invalidate, removeMutation],
+    [invalidate, removeMutation, table],
   );
 
   return {
