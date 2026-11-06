@@ -32,8 +32,8 @@
 ### Raccourcis & deep links (DLNK)
 
 - [ ] **DLNK-01** : Le manifest déclare des raccourcis « Tâches du jour » et « Courses » vers des URLs existantes (Android/Chrome natifs ; vues restant atteignables in-app pour iOS qui ignore le champ)
-- [ ] **DLNK-02** : Un deep link ouvert pendant une session expirée mène au login puis revient à la vue cible (redirect-after-login, e2e dédié)
-- [ ] **DLNK-03** : Une vue « Tâches du jour » dédiée existe comme cible du raccourci (à vérifier en plan ; créer si absente)
+- [x] **DLNK-02** : Un deep link ouvert pendant une session expirée mène au login puis revient à la vue cible (redirect-after-login, e2e dédié)
+- [x] **DLNK-03** : Une vue « Tâches du jour » dédiée existe comme cible du raccourci (à vérifier en plan ; créer si absente)
 
 ### Installabilité (INST)
 
@@ -77,8 +77,8 @@
 | WRQ-05 | Phase 34 | Complete |
 | WRQ-06 | Phase 34 | Complete |
 | DLNK-01 | Phase 32 | Pending |
-| DLNK-02 | Phase 35 | Pending |
-| DLNK-03 | Phase 35 | Pending |
+| DLNK-02 | Phase 35 | Complete |
+| DLNK-03 | Phase 35 | Complete |
 | INST-01 | Phase 32 | Pending |
 | INST-02 | Phase 32 | Pending |
 | INST-03 | Phase 32 | Pending |

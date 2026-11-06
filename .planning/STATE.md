@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: "35-02 terminé : matrice consignée et confirmée, SUMMARY écrit, 3 travaux correctifs enregistrés"
-last_updated: "2026-11-06T15:38:06.429Z"
+stopped_at: "35-04 terminé : bootstrap hors-ligne tolérant (gaps §1.4/§1.5 fermés), SUMMARY écrit, re-validation on-device au 35-05"
+last_updated: "2026-11-06T15:58:26.830Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: 65e916774dfada9540d0d0f928434cab9820df60
+state_head: 59af4fd4c5cad952fc52eb4640993f135f49b1fe
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 20
-  completed_plans: 17
+  completed_plans: 19
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 35 — READY TO EXECUTE
-Plan: 3 of 3
+Phase: 35 (Deep links & validation multi-OS) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 35 execution started
 
@@ -62,6 +62,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 35 P35-03 | 14min | 1 tasks | 2 files |
 | Phase 35 P35-01 | 27min | 2 tasks | 12 files |
 | Phase 35 P35-02 | checkpoint (passage 2026-11-06) + ~15min | 2 tasks | 4 files |
+| Phase 35 P04 | ~55min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-06
-Stopped at: 35-02 terminé : matrice consignée et confirmée, SUMMARY écrit, 3 travaux correctifs enregistrés
+Last session: 2026-11-06T15:58:26.768Z
+Stopped at: 35-04 terminé : bootstrap hors-ligne tolérant (gaps §1.4/§1.5 fermés), SUMMARY écrit, re-validation on-device au 35-05
 Resume file: None
