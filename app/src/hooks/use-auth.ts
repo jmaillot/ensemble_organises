@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { User, UserIdentity } from '@supabase/supabase-js';
+import { onlineManager } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { data } from '@/lib/data';
 import { useSessionStore, assertSignOutAllowed } from '@/stores/session-store';
@@ -170,6 +171,20 @@ export function useAuthBootstrap(): AuthBootstrap {
       setReady(true);
     };
 
+    // Plan 35-04 (gaps §1.4/§1.5 de 35-VERIFICATION.md) : hors-ligne, un rejet
+    // du bootstrap (rafraîchissement de jeton impossible, lectures foyer
+    // réseau) ne doit jamais bloquer le routeur sur l'écran d'erreur WR-04 —
+    // les gardes en aval (RequireAuth, écran « connexion requise » D-07)
+    // décident, pas l'écran technique. On passe par le chemin invité exact de
+    // la branche « session absente » ci-dessous : purge best-effort des deux
+    // stores persistés, puis `setReady(true)` pour laisser le routeur monter.
+    const cheminInvite = () => {
+      void useSessionStore.getState().signOut().catch((cause) => {
+        console.error('[auth] purge de déconnexion impossible au bootstrap (hors ligne) :', cause);
+      });
+      setReady(true);
+    };
+
     supabase.auth
       .getSession()
       .then(async ({ data }) => {
@@ -188,11 +203,33 @@ export function useAuthBootstrap(): AuthBootstrap {
           setReady(true);
           return;
         }
+        // T-35-06 : une session dont `expires_at` est dépassé et hors-ligne ne
+        // doit JAMAIS être appliquée comme authentifiée — le rafraîchissement
+        // du jeton exige le réseau et a déjà échoué, donc ce serait un jeton
+        // mort derrière un statut « authenticated ». Elle tombe sur le chemin
+        // invité. En ligne, le comportement est inchangé : supabase-js tentera
+        // le rafraîchissement réseau de lui-même.
+        if (
+          typeof session.expires_at === 'number' &&
+          session.expires_at * 1000 <= Date.now() &&
+          !onlineManager.isOnline()
+        ) {
+          cheminInvite();
+          return;
+        }
         try {
           // `applySession` lit le profil et charge le foyer : il rejette pour
           // les mêmes causes réseau, et doit produire le même écran.
           await applySession(session.user);
         } catch (cause) {
+          // Hors-ligne, le rejet d'`applySession` (une lecture foyer que la
+          // tolérance de `loadHousehold` n'a pas pu tenir — pas de foyer
+          // persisté, par exemple) ne doit pas davantage bloquer le routeur :
+          // chemin invité, les gardes en aval décident.
+          if (!onlineManager.isOnline()) {
+            cheminInvite();
+            return;
+          }
           fail(cause);
           return;
         }
@@ -230,7 +267,16 @@ export function useAuthBootstrap(): AuthBootstrap {
         // avant ce point (OFFR-01, commentaire au-dessus).
         setReady(true);
       })
-      .catch(fail);
+      .catch((cause) => {
+        // Plan 35-04 : le rejet de la chaîne `getSession` elle-même (lecture du
+        // stockage de session + rafraîchissement réseau) subit le même régime
+        // que le reste — hors-ligne, chemin invité ; en ligne, écran WR-04.
+        if (!onlineManager.isOnline()) {
+          cheminInvite();
+          return;
+        }
+        fail(cause);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {

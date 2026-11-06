@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { onlineManager } from '@tanstack/react-query';
 import { demoProfile, demoHousehold, demoMembers, DEMO_MEMBERS } from '@/lib/data/seed';
 import { data } from '@/lib/data';
 import { purgeUserCache, stopPersisting } from '@/lib/offline/query-persistence';
@@ -154,8 +155,45 @@ function markHouseholdLoaded() {
   useSessionStore.setState({ householdLoaded: true });
 }
 
-/** Charge le foyer de l'utilisateur et l'enregistre dans le store. */
+/**
+ * Charge le foyer de l'utilisateur et l'enregistre dans le store.
+ *
+ * Plan 35-04 (gap §1.4 de 35-VERIFICATION.md) : au cold-start hors-ligne, les
+ * lectures réseau ci-dessous rejetaient et le rejet remontait jusqu'au
+ * bootstrap (`use-auth`), qui affichait l'écran d'erreur WR-04 au lieu de
+ * laisser le routeur monter. Hors-ligne uniquement, si le foyer est DÉJÀ
+ * persisté (`householdId` non null + membres vivants, restaurés de façon
+ * synchrone par le persist zustand de household-store), la lecture résout sur
+ * ce foyer persisté : c'est le même régime de confiance que le cache offline
+ * de lecture accepté en phase 33 — les mêmes données, sur cet appareil, pour
+ * cet utilisateur, sans solliciter le réseau. La revalidation serveur se fera
+ * au retour du réseau. En ligne, ou sans foyer persisté, le rejet se propage :
+ * WR-04 reste l'écran des vraies pannes (backend indisponible, réseau actif).
+ */
 export async function loadHousehold() {
+  const storeAvantLecture = useHouseholdStore.getState();
+  try {
+    return await lireHousehold();
+  } catch (cause) {
+    if (onlineManager.isOnline() || !storeAvantLecture.householdId || storeAvantLecture.members.length === 0) {
+      throw cause;
+    }
+    // §2.7 F — jamais un succès muet : la revalidation reportée est dite.
+    console.warn('[household] hors ligne : revalidation serveur du foyer reportée au retour du réseau :', cause);
+    markHouseholdLoaded();
+    // La ligne reconstruite sert d'information (aucun appelant du bootstrap ne
+    // la consomme) ; l'état du foyer reste celui du store, inchangé.
+    return {
+      id: storeAvantLecture.householdId,
+      name: storeAvantLecture.householdName,
+      avatar_color: storeAvantLecture.householdColor,
+      disabled_modules: storeAvantLecture.disabledModules,
+    } as HouseholdRow;
+  }
+}
+
+/** Lectures réseau du foyer — extraites pour que le repli hors-ligne les encadre. */
+async function lireHousehold() {
   const memberships = await data.list<RowWithHousehold>('household_members');
   const store = useHouseholdStore.getState();
 
