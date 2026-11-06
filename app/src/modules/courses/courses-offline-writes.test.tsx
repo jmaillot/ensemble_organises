@@ -60,7 +60,25 @@ vi.mock('@/lib/supabase/client', () => {
       if (!HOISTED.state.writesSucceed) throw new TypeError('Failed to fetch');
     };
     const commit = (): Record<string, unknown> | null => {
-      failOrThrow();
+      try {
+        failOrThrow();
+      } catch (transportError) {
+        // UAT-34-1 : depuis l'absorption de l'échec enfilé (D-02) dans
+        // useResource, la promesse de création RÉSOUT et le module invalide
+        // ses requêtes — la relecture révèle ce magasin. Il simule l'état
+        // APRÈS rejeu : l'écriture est enfilée dans l'outbox, pas perdue, et
+        // le rejeu (scénario f) upsert en dédupliquant par client_key, donc
+        // aucune doublon n'est créé. Le transport lève quand même : le
+        // verdict « aucun succès réseau » reste porté par le throw.
+        if (pending.op === 'insert' || pending.op === 'upsert') {
+          const rows = rowsOf(table);
+          const clientKey = pending.payload?.client_key;
+          const existing = clientKey ? rows.find((row) => row.client_key === clientKey) : undefined;
+          if (existing) Object.assign(existing, pending.payload);
+          else if (clientKey) rows.push({ ...pending.payload });
+        }
+        throw transportError;
+      }
       const rows = rowsOf(table);
       if (pending.op === 'insert') {
         rows.push({ ...pending.payload });
@@ -386,5 +404,44 @@ describe('écritures Courses hors ligne — file d\'écriture et rejeu (G-34-1)'
       const rows = cachedItemRows(client);
       expect(rows.some((row) => row.id === overlay.id && row.client_key === overlay.client_key)).toBe(true);
     });
+  });
+
+  it('(g) ajout hors-ligne enfilé : la promesse résout, AUCUN toast d\'erreur — seulement le badge (UAT-34-1, D-11/D-12)', async () => {
+    const client = makeClient();
+    const { result } = renderHook(() => useCourses(), { wrapper: wrapper(client) });
+    // Même attente que (a) : la première lecture ne doit pas écraser
+    // l'overlay après coup.
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    onlineManager.setOnline(false);
+
+    // UAT-34-1 : l'ajout hors-ligne est enfilé dans l'outbox (D-02) — la
+    // promesse DOIT résoudre, l'incident transport ne traverse plus la couche
+    // hook. Le pending se lit sur le badge, le toast d'erreur ne porte plus
+    // que les refus réels (D-11/D-12). Pas de `.catch(() => undefined)` :
+    // c'est le changement de verdict, un rejet ici ferait échouer le test.
+    let outcome: 'resolved' | { rejected: unknown } = 'resolved';
+    await act(async () => {
+      await result.current.addItemToList('l1', 'Café').then(
+        () => undefined,
+        (error) => (outcome = { rejected: error }),
+      );
+    });
+    expect(outcome).toBe('resolved');
+
+    // ZÉRO toast : le ToastProvider du wrapper peint chaque toast dans le
+    // document (role="status", fond coral-text pour le niveau erreur). La
+    // preuve d'absence est observable et falsifiable — un toast émis
+    // rougirait le sélecteur.
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(0);
+
+    // L'écriture est enfilée et l'overlay peint : l'utilisateur voit la
+    // ligne et le badge.
+    const entries = outboxEntries(client);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ table: 'shopping_list_items', operation: 'create', status: 'pending' });
+    const rows = cachedItemRows(client);
+    expect(rows).toHaveLength(1);
+    expect(typeof rows[0].id).toBe('string');
+    expect(typeof rows[0].client_key).toBe('string');
   });
 });
