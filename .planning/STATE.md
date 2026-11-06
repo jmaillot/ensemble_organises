@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 35 (Deep links & validation multi-OS) — EXECUTING
+Phase: 35 (Deep links & validation multi-OS) — EXECUTING — gap closure 35-04/35-05 complete; awaiting re-verification. Décision utilisateur 2026-11-06 : gap 1 Android §1.4 « consigner et différer » — la phase n'est PAS close tant que DLNK-02 Android n'est pas corrigé et re-rejoué.
 Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-11-06 — Plan 35-05 consigné (rejeu on-device : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android 16 Échoué)
