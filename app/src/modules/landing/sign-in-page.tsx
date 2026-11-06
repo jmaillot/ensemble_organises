@@ -8,6 +8,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/components/ui/toast';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 import { signInWithEmail, signInWithProvider, signUpWithEmail } from '@/hooks/use-auth';
 import { signInDemo } from '@/stores/session-store';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
@@ -138,7 +139,12 @@ export default function SignInPage() {
   // « Se reconnecter » : révéler le formulaire est un état de session de la
   // page, jamais persisté (D-08).
   const [formRevealed, setFormRevealed] = useState(false);
-  const offlineWithoutSession = requestedPath !== null && !navigator.onLine && !formRevealed;
+  // MED-1 (35-REVIEW) : l'état réseau est RÉACTIF (`useOnlineStatus`, source
+  // `onlineManager` — la même que le bootstrap), pas `navigator.onLine` lu une
+  // fois au rendu : si le réseau revient pendant que l'écran D-07 est affiché,
+  // il doit refléter le retour en ligne, pas rester figé hors ligne.
+  const online = useOnlineStatus();
+  const offlineWithoutSession = requestedPath !== null && !online && !formRevealed;
 
   const run = async (label: string, action: () => Promise<unknown>) => {
     setPending(label);
@@ -184,91 +190,91 @@ export default function SignInPage() {
             <ConnexionRequise vue={requestedPath} onReconnect={() => setFormRevealed(true)} />
           ) : (
             <>
-          <Link to="/" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg lg:hidden">
-            <Icon name="arrowLeft" size="sm" />
-            Retour à l’accueil
-          </Link>
-          <p className="eyebrow mb-2">Connexion</p>
-          <h2 className="mb-2 text-[clamp(24px,2.6vw,32px)] leading-[1.08]">Ravi de vous revoir</h2>
-          <p className="lede mb-6 text-[13px]">Utilisez votre compte Google ou votre adresse e-mail.</p>
-          <p className="mb-5 text-xs text-muted">
-            Déjà un compte e-mail ? Connectez-vous avec, puis liez Google depuis Paramètres → Profil :
-            les deux connexions mèneront au même foyer.
-          </p>
-
-          <div className="mb-5 grid gap-2.5">
-            <Button variant="secondary" disabled={pending !== null} onClick={() => run('google', () => signInWithProvider('google'))}>
-              <GoogleMark />
-              {pending === 'google' ? 'Redirection en cours…' : 'Continuer avec Google'}
-            </Button>
-          </div>
-
-          <div className="mb-5 flex items-center gap-3 text-[11px] text-muted">
-            <span className="h-px flex-1 bg-border" />
-            ou avec un email
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-3.5" noValidate>
-            <Field label="Adresse e-mail" error={errors.email?.message}>
-              {(props) => <Input type="email" autoComplete="email" placeholder="vous@exemple.fr" {...props} {...register('email')} />}
-            </Field>
-            <Field label="Mot de passe" error={errors.password?.message}>
-              {(props) => <Input type="password" autoComplete="current-password" placeholder="8 caractères minimum" {...props} {...register('password')} />}
-            </Field>
-            {formError ? (
-              <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
-                {formError}
-              </p>
-            ) : null}
-            <Button type="submit" fullWidth disabled={pending !== null} icon="arrow">
-              {mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}
-            </Button>
-          </form>
-
-          <p className="mt-4 mb-0 text-xs text-muted">
-            {mode === 'connexion' ? 'Pas encore de compte ?' : 'Vous avez déjà un compte ?'}{' '}
-            <button
-              type="button"
-              className="font-bold text-accent-strong"
-              onClick={() => setMode(mode === 'connexion' ? 'inscription' : 'connexion')}
-            >
-              {mode === 'connexion' ? 'Créer un compte' : 'Se connecter'}
-            </button>
-          </p>
-          <p className="mt-3 mb-0 text-[11px] text-muted">
-            En continuant, vous acceptez les{' '}
-            <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
-              CGU
-            </Link>{' '}
-            et la{' '}
-            <Link to="/confidentialite" className="font-bold text-accent-strong">
-              politique de confidentialité
+            <Link to="/" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg lg:hidden">
+              <Icon name="arrowLeft" size="sm" />
+              Retour à l’accueil
             </Link>
-            .
-          </p>
+            <p className="eyebrow mb-2">Connexion</p>
+            <h2 className="mb-2 text-[clamp(24px,2.6vw,32px)] leading-[1.08]">Ravi de vous revoir</h2>
+            <p className="lede mb-6 text-[13px]">Utilisez votre compte Google ou votre adresse e-mail.</p>
+            <p className="mb-5 text-xs text-muted">
+              Déjà un compte e-mail ? Connectez-vous avec, puis liez Google depuis Paramètres → Profil :
+              les deux connexions mèneront au même foyer.
+            </p>
 
-          {!isSupabaseConfigured ? (
-            <div className="mt-6 rounded-[16px] border border-dashed border-accent/40 bg-accent-faint p-4">
-              <h3 className="mb-1.5 font-display text-[15px] tracking-[-0.03em]">Mode démonstration</h3>
-              <p className="mb-3 text-xs text-muted">
-                Aucun backend n’est configuré sur cet environnement. Entrez dans le foyer de démonstration pour
-                parcourir l’ensemble des modules.
-              </p>
-              <Button
-                icon="arrow"
-                disabled={pending !== null}
-                onClick={async () => {
-                  await run('demo', async () => {
-                    await signInDemo();
-                    toast('Session de démonstration ouverte.');
-                  });
-                }}
-              >
-                Entrer dans la démonstration
+            <div className="mb-5 grid gap-2.5">
+              <Button variant="secondary" disabled={pending !== null} onClick={() => run('google', () => signInWithProvider('google'))}>
+                <GoogleMark />
+                {pending === 'google' ? 'Redirection en cours…' : 'Continuer avec Google'}
               </Button>
             </div>
-          ) : null}
+
+            <div className="mb-5 flex items-center gap-3 text-[11px] text-muted">
+              <span className="h-px flex-1 bg-border" />
+              ou avec un email
+              <span className="h-px flex-1 bg-border" />
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="grid gap-3.5" noValidate>
+              <Field label="Adresse e-mail" error={errors.email?.message}>
+                {(props) => <Input type="email" autoComplete="email" placeholder="vous@exemple.fr" {...props} {...register('email')} />}
+              </Field>
+              <Field label="Mot de passe" error={errors.password?.message}>
+                {(props) => <Input type="password" autoComplete="current-password" placeholder="8 caractères minimum" {...props} {...register('password')} />}
+              </Field>
+              {formError ? (
+                <p role="alert" className="m-0 text-[11px] font-semibold text-coral-text">
+                  {formError}
+                </p>
+              ) : null}
+              <Button type="submit" fullWidth disabled={pending !== null} icon="arrow">
+                {mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}
+              </Button>
+            </form>
+
+            <p className="mt-4 mb-0 text-xs text-muted">
+              {mode === 'connexion' ? 'Pas encore de compte ?' : 'Vous avez déjà un compte ?'}{' '}
+              <button
+                type="button"
+                className="font-bold text-accent-strong"
+                onClick={() => setMode(mode === 'connexion' ? 'inscription' : 'connexion')}
+              >
+                {mode === 'connexion' ? 'Créer un compte' : 'Se connecter'}
+              </button>
+            </p>
+            <p className="mt-3 mb-0 text-[11px] text-muted">
+              En continuant, vous acceptez les{' '}
+              <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
+                CGU
+              </Link>{' '}
+              et la{' '}
+              <Link to="/confidentialite" className="font-bold text-accent-strong">
+                politique de confidentialité
+              </Link>
+              .
+            </p>
+
+            {!isSupabaseConfigured ? (
+              <div className="mt-6 rounded-[16px] border border-dashed border-accent/40 bg-accent-faint p-4">
+                <h3 className="mb-1.5 font-display text-[15px] tracking-[-0.03em]">Mode démonstration</h3>
+                <p className="mb-3 text-xs text-muted">
+                  Aucun backend n’est configuré sur cet environnement. Entrez dans le foyer de démonstration pour
+                  parcourir l’ensemble des modules.
+                </p>
+                <Button
+                  icon="arrow"
+                  disabled={pending !== null}
+                  onClick={async () => {
+                    await run('demo', async () => {
+                      await signInDemo();
+                      toast('Session de démonstration ouverte.');
+                    });
+                  }}
+                >
+                  Entrer dans la démonstration
+                </Button>
+              </div>
+            ) : null}
             </>
           )}
         </div>

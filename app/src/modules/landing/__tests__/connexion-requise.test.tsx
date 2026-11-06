@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { onlineManager } from '@tanstack/react-query';
 import { renderWithProviders } from '@/test/render';
 import SignInPage from '../sign-in-page';
 
@@ -8,14 +9,15 @@ import SignInPage from '../sign-in-page';
  * D-07 (plan 35-03) — deep link hors-ligne sans session : l'écran « connexion
  * requise pour cette vue » remplace le formulaire nu (jamais une erreur
  * technique générique). D-08 : aucun stockage au-delà de `state.from` —
- * `navigator.onLine` est une lecture d'état, pas une écriture.
+ * l'état réseau est une lecture, pas une écriture.
  */
 
 /** Rend SignInPage avec `state.from` (ce que RequireAuth écrit) et l'état réseau donné. */
 function renderConnexion(from: unknown, online: boolean) {
-  // jsdom n'expose pas de moyen de basculer navigator.onLine : redéfinition
-  // proprement bornée au test (restaurée par le garde afterEach).
-  Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+  // Depuis MED-1, la page lit `useOnlineStatus` (source `onlineManager` de
+  // TanStack Query, la même que le bootstrap) : c'est lui qu'on bascule, pas
+  // `navigator.onLine` que jsdom ne sait pas faire varier.
+  onlineManager.setOnline(online);
   return renderWithProviders(<SignInPage />, {
     route: { pathname: '/connexion', state: { from } },
     withHousehold: false,
@@ -24,7 +26,7 @@ function renderConnexion(from: unknown, online: boolean) {
 
 afterEach(() => {
   cleanup();
-  Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+  onlineManager.setOnline(true);
 });
 
 describe('écran « connexion requise pour cette vue » (D-07)', () => {
