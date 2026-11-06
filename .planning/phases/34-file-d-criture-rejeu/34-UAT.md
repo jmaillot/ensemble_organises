@@ -1,21 +1,18 @@
 ---
-status: testing
+status: passed
 phase: 34-file-d-criture-rejeu
 source: [34-VERIFICATION.md]
 started: 2026-11-05T14:30:00Z
-updated: 2026-11-05T19:10:00Z
+updated: 2026-11-06T00:00:00Z
 ---
 
 ## Current Test
 
-number: 3
-name: Parcours e2e appareil réel
+number: none
+name: (session terminée — 3/3 passés)
 expected: |
-  Mode avion → ajouter un article Courses + cocher une tâche → retour réseau →
-  vérifier que le serveur contient exactement les 2 écritures et que le badge
-  descend à 0. Exactement une écriture serveur par action, zéro doublon, zéro
-  perte silencieuse.
-awaiting: user response
+  Aucun test en attente.
+awaiting: nothing
 
 ## Tests
 
@@ -37,15 +34,18 @@ result: [pass]
 
 ### 3. Parcours e2e appareil réel
 expected: Mode avion → ajouter un article Courses + cocher une tâche → retour réseau → vérifier que le serveur contient exactement les 2 écritures et que le badge descend à 0. Exactement une écriture serveur par action, zéro doublon, zéro perte silencieuse.
-result: [pending]
+result: [pass]
 
 ## Summary
 
 total: 3
-passed: 2
+passed: 3
 issues: 1
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
+
+> L'unique issue (UAT-34-1, toast NetworkError) a été diagnostiquée, planifiée
+> (34-06), corrigée et son rejeu est passé. Les 3 tests sont verts au 2026-11-06.
 
 ## Gaps
