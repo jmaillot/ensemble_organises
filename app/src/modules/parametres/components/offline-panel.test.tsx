@@ -337,7 +337,6 @@ describe('OfflinePanel — Cache hors-ligne (35-09, G-35-5)', () => {
   const USER = 'u-panneau-cache';
   const HH = 'h-cache';
   const heure = 60 * 60 * 1000;
-  const day = 24 * heure;
   const cacheStore = createStore('eo-offline-cache', 'query');
 
   const poserSession = () => {
