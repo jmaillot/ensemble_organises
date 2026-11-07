@@ -48,6 +48,18 @@ vi.mock('@/lib/offline/query-persistence', async (importOriginal) => {
   };
 });
 
+/**
+ * TEST-04 (plan 37-01, D-09) : la purge de la clé de session GoTrue réutilise
+ * la dérivation de `cleStockageSession()` (D-07) — le test fixe donc une URL
+ * déterministe pour dériver la même clé que le code de production, sans
+ * dépendre des variables d'environnement locales. Le client reste celui du
+ * module réel (null sans configuration) : seule l'URL est épinglée.
+ */
+vi.mock('@/lib/supabase/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/supabase/client')>()),
+  supabaseUrl: 'https://api.exemple.fr',
+}));
+
 const { loadHousehold } = await import('./session-store');
 const { useHouseholdStore } = await import('./household-store');
 const { useSessionStore } = await import('./session-store');
@@ -330,5 +342,62 @@ describe('signOut — file outbox pendante (D-17, scan-avertir-purger)', () => {
     // 32-D10 (`isEmpty = pendingCount === 0`, contrat préservé).
     await expect(useSessionStore.getState().signOut()).resolves.toBeUndefined();
     expect(useSessionStore.getState().user).toBeNull();
+  });
+});
+
+/**
+ * TEST-04 (plan 37-01, D-07/D-09) : la clé de session GoTrue
+ * `sb-<ref>-auth-token` (et ses fragments chunkés) doit disparaître à toute
+ * déconnexion. Aujourd'hui AUCUN chemin non-test ne la supprime hors
+ * `supabase.auth.signOut()` interne — or les chemins invités (fallback
+ * bootstrap, mode local) ne l'appellent jamais. Le rouge ci-dessous est la
+ * preuve du défaut (D-09, §2.7 B) ; le vert après correction est la preuve
+ * du fix. Lecture BRUTE du localStorage filtrée sur toute la famille de clés
+ * (pas une clé littérale — Pitfall 6), session seed factice sans identifiant
+ * réel (§2.7 H).
+ */
+describe('purge de la clé de session GoTrue (TEST-04, D-09)', () => {
+  const CLE = 'sb-api-auth-token';
+  const sessionFactice = JSON.stringify({
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: { id: 'u-seed-factice' },
+  });
+
+  beforeEach(() => {
+    purgeUserCacheSpy.mockReset();
+    stopPersistingSpy.mockReset();
+    purgeUserCacheSpy.mockImplementation(
+      async (userId: string | null) => {
+        const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
+          '@/lib/offline/query-persistence',
+        );
+        return actual.purgeUserCache(userId);
+      },
+    );
+    useHouseholdStore.getState().reset();
+    useSessionStore.setState({
+      status: 'authenticated',
+      householdLoaded: true,
+      user: { id: 'u1', email: 'alice@example.fr', displayName: 'Alice', avatarUrl: null, provider: 'email' },
+    });
+  });
+
+  it('retire la clé de base non chunkée à la déconnexion', async () => {
+    localStorage.setItem(CLE, sessionFactice);
+
+    await useSessionStore.getState().signOut();
+
+    const residuelles = Object.keys(localStorage).filter((cle) => /^sb-.*-auth-token(\.\d+)?$/.test(cle));
+    expect(residuelles).toEqual([]);
+  });
+
+  it('retire les fragments chunkés .0/.1 à la déconnexion', async () => {
+    localStorage.setItem(`${CLE}.0`, sessionFactice.slice(0, 10));
+    localStorage.setItem(`${CLE}.1`, sessionFactice.slice(10));
+
+    await useSessionStore.getState().signOut();
+
+    const residuelles = Object.keys(localStorage).filter((cle) => /^sb-.*-auth-token(\.\d+)?$/.test(cle));
+    expect(residuelles).toEqual([]);
   });
 });
