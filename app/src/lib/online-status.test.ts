@@ -157,4 +157,25 @@ describe('amorçage de l’état réseau au démarrage', () => {
     // côté de l'EFFET. Une garde comportementale dédiée exigerait de reproduire
     // tout ce harnais pour une ligne : disproportionné ici.
   });
+
+  it('E. le bootstrap démarre la sonde de joignabilité APRÈS le seed', () => {
+    const root = findSourceRoot();
+    expect(root, `racine des sources introuvable depuis ${process.cwd()}`).not.toBeNull();
+
+    const source = readFileSync(resolve(root!, 'main.tsx'), 'utf8');
+    const seedIndex = source.indexOf('seedOnlineStatus()');
+    const sondeIndex = source.indexOf('demarrerSondeJoignabilite()');
+
+    // Non-vacuité : si `seedOnlineStatus()` était absent, ce ne serait pas le
+    // main attendu et la garde ne regarderait rien.
+    expect(seedIndex, 'app/src/main.tsx n’appelle pas seedOnlineStatus()').toBeGreaterThanOrEqual(0);
+    expect(sondeIndex, 'app/src/main.tsx ne démarre pas la sonde de joignabilité').toBeGreaterThanOrEqual(0);
+
+    // L'ORDRE est le contrat : le seed optimiste peint l'état honnête de
+    // première vue, la sonde le CORRIGE ensuite (H1 Android). Démarrer la
+    // sonde avant le seed laisserait un fetch en vol décider avant l'amorce.
+    expect(sondeIndex, 'la sonde doit démarrer après le seed').toBeGreaterThan(seedIndex);
+
+    // LIMITE DITE : garde TEXTUELLE, même nature que le Test D ci-dessus.
+  });
 });

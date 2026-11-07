@@ -7,6 +7,9 @@ import { AppRouter } from '@/app/router';
 import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
 import { seedOnlineStatus } from '@/lib/online-status';
+// La sonde est la couche correctrice du seed optimiste : navigator.onLine
+// ment en mode avion Android (H1, dlnk02-android-cold-start-offline.md).
+import { demarrerSondeJoignabilite } from '@/lib/reachability';
 import '@fontsource-variable/fraunces';
 // L'italique est le geste typographique signature de melimelo (la seconde
 // ligne du héro) — il était resté au paquet, jamais embarqué (critique UI
@@ -23,6 +26,18 @@ import '@/styles/app.css';
 // ce point. C'est ce qui rend le retour du réseau notifiable (une seule fois,
 // au démarrage : ensuite, les événements `online`/`offline` prennent le relais).
 seedOnlineStatus();
+
+// La sonde de joignabilité démarre ICI, en parallèle du bootstrap : le seed
+// optimiste ci-dessus peint navigator.onLine (honnête sur Desktop), la sonde
+// le CORRIGE dès qu'elle a une preuve — si le backend est injoignable (mode
+// avion Android, H1), onlineManager bascule false pendant que
+// getSession/loadHousehold sont en cours, et le repli foyer persisté + le
+// bandeau s'activent sans attendre les 10 s du gardien 35-06.
+// PIRE CAS ASSUMÉ : si la première lecture d'onlineManager du bootstrap
+// précède l'échéance de la sonde (4 s), le comportement reste celui de
+// 35-06 (chemin invité à 10 s) — la sonde ne peut jamais DÉGRADER le
+// parcours, elle le corrige au plus tôt.
+demarrerSondeJoignabilite();
 
 /**
  * Attend la restauration de session avant d'afficher l'application, afin de
