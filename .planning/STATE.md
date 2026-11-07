@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: Finition de la dette offline
 current_phase: 37
 current_phase_name: Filet de tests fiable
-status: planning
-stopped_at: Phase 37 context gathered
-last_updated: "2026-11-07T19:57:35.630Z"
+status: executing
+stopped_at: Completed 37-01-PLAN.md
+last_updated: "2026-11-07T20:24:55.719Z"
 last_activity: 2026-11-07
-last_activity_desc: Phase 36 complete, transitioned to Phase 37
-state_head: 8859b52949f3fbed88c33e0954b3487b9d5b341f
+last_activity_desc: Phase 37 execution started
+state_head: 49829ea0371a36848445ebb8e27d150f00a45e4b
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-11-07)
 
 ## Current Position
 
-Phase: 37 — Filet de tests fiable
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
+Phase: 37 (Filet de tests fiable) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-11-07 — Phase 37 execution started
 
 **Progress bar:**
 
@@ -43,6 +43,12 @@ Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
 
 - v1.1 : 4 phases, 25 plans, 17 tasks, 145 commits, audit tech_debt 16/16
 - v1.2 : 2 phases planifiées, 6 exigences, dette/fiabilité uniquement (zéro nouvelle surface produit hors messages d'échec outbox)
+
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 37 P01 | 6 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,10 +71,14 @@ Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
 
 ## Session Continuity
 
-**Last session:** 2026-11-07T19:57:35.596Z
-**Stopped at:** Phase 37 context gathered
-**Resume file:** .planning/phases/37-filet-de-tests-fiable/37-CONTEXT.md
+**Last session:** 2026-11-07T20:24:55.685Z
+**Stopped at:** Completed 37-01-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.2 créée le 2026-11-07 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : `/gsd-plan-phase 36`.
 - Exigences : OBOX-01, OBOX-02 → Phase 36 ; TEST-01..04 → Phase 37 (traceability dans REQUIREMENTS.md).
+
+## Decisions
+
+- [Phase 37]: TEST-04 : purgerStockageSession() (clé GoTrue + chunks, dérivation cleStockageSession D-07) branchée au chokepoint signOut après les purges disque/mémoire ; preuve rouge-avant-vert D-09 capturée
