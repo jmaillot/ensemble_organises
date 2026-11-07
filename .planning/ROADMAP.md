@@ -54,7 +54,7 @@ Plans:
 - [x] 37-01-PLAN.md — Purge GoTrue au chokepoint signOut (purgerStockageSession), test unitaire rouge→vert, extension e2e localStorage (TEST-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 37-02-PLAN.md — Durcissement test D, confirmation cdd4fa7 (TEST-02), exécution e2e 2 comptes réels (TEST-03), campagne v1.2 en rétrospective (TEST-01)
+- [x] 37-02-PLAN.md — Durcissement test D, confirmation cdd4fa7 (TEST-02), campagne v1.2 en rétrospective (TEST-01) — **TEST-03 différé** : e2e 2 comptes réels en attente d'identifiants (skip conditionnel D-04 conservé)
 
 ## Progress
 
