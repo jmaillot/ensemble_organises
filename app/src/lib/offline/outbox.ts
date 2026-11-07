@@ -328,6 +328,47 @@ export function isNetworkFailure(error: unknown): boolean {
 export type FailureClassification = { kind: 'terminal'; code: string; message: string } | { kind: 'retryable' };
 
 /**
+ * Matrice D-05 : catalogue des codes terminaux connus → libellé français non
+ * générique. Les codes sont EXACTS (Pitfall 1 : jamais un préfixe qui
+ * rattraperait PGRST116 dans une autre famille — la famille « malformé »
+ * liste SES codes, elle ne commence pas par « PGRST10 »). Le libellé du 404
+ * (PGRST116) est VERROUILLÉ mot pour mot (D-01).
+ */
+export const FAILURE_FAMILIES: ReadonlyArray<{ codes: readonly string[]; label: string }> = [
+  // D-01 : la ligne visée a été supprimée côté serveur entre-temps.
+  { codes: ['PGRST116'], label: 'cet élément a été supprimé entre-temps' },
+  // D-05 : refus d'autorisation — RLS PG (42501) ou HTTP 403 PostgREST.
+  { codes: ['42501', '403'], label: 'droits insuffisants pour cette action' },
+  // D-05 : violation de contrainte CHECK / NOT NULL.
+  { codes: ['23514'], label: 'données invalides' },
+  // D-05 : clé étrangère violée — la cible n'existe pas (ou plus).
+  { codes: ['23503'], label: 'référence à un élément inexistant' },
+  // D-05 : violation d'unicité.
+  { codes: ['23505'], label: 'cet élément existe déjà' },
+  // D-05 : requête malformée — cast impossible (22P02) ou payload invalide
+  // (PGRST100) ; codes listés explicitement, jamais un préfixe de PGRST116.
+  { codes: ['22P02', 'PGRST100'], label: 'requête malformée' },
+];
+
+/** D-06 : tout code imprévu reçoit ce libellé générique — jamais un silence, jamais une boucle. */
+const LIBELLE_GENERIQUE = 'cette écriture a été refusée par le serveur';
+
+/**
+ * Libellé du panneau offline (D-01/D-05) : fonction PURE dérivée au rendu
+ * du SEUL `code` (T-36-01 — le message PostgREST brut ne franchit jamais
+ * l'écran). Matching EXACT sur le code (`===`, jamais startsWith — Pitfall 1).
+ * Aucune extension de la forme persistée `OutboxEntry.failure` (D-13,
+ * Pitfall 5) : zéro migration IndexedDB, les entrées d'avant la phase
+ * rendent le même libellé.
+ */
+export function failureLabel(failure: { code: string; message: string }): string {
+  for (const family of FAILURE_FAMILIES) {
+    if (family.codes.some((code) => failure.code === code)) return family.label;
+  }
+  return LIBELLE_GENERIQUE; // D-06 : code imprévu → libellé générique, défaut terminal
+}
+
+/**
  * Classification D-10 d'un échec de rejeu : terminal (refus RLS, ligne
  * absente — à surfacer et retirer de la file, JAMAIS rejoué) vs retryable
  * (réseau/5xx — reste en file, rejeté plus tard). Pitfall 4 : on lit le

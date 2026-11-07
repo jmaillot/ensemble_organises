@@ -11,7 +11,7 @@ import { useOutbox } from '@/hooks/use-outbox';
 import { useOutboxGate } from '@/hooks/use-outbox-gate';
 import { useSessionStore } from '@/stores/session-store';
 import { useHouseholdStore } from '@/stores/household-store';
-import { abandonOutboxEntry, outboxEntryLabel, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
+import { abandonOutboxEntry, failureLabel, outboxEntryLabel, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
 import { retryOutboxEntry } from '@/lib/offline/outbox-replay';
 import {
   getRestoreOutcome,
@@ -270,7 +270,7 @@ export function OfflinePanel() {
                   <strong className="block">{outboxEntryLabel(entry)}</strong>
                   {entry.status === 'failed' && entry.failure ? (
                     <span className="block text-[11px] font-semibold text-coral-text">
-                      Bloquée ({entry.failure.code}) — {entry.failure.message}
+                      Bloquée ({entry.failure.code}) — {failureLabel(entry.failure)}
                     </span>
                   ) : (
                     <span className="block text-[11px] text-muted">En attente du réseau</span>
