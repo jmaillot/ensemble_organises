@@ -654,3 +654,48 @@ appliquées ne se réécrivent pas ; la règle retenue pour l'avenir est écrite
 **un garde qui saute une opération requise doit lever (`raise exception`),
 jamais notifier.** Leçon §2.7-B dans sa forme la plus pure — le contrôle qui ne
 regarde rien est vert, ne fait aucun bruit, et ne peut rien voir.
+
+# Quatrième campagne — v1.1 PWA durcie : l'offline, la file, et la preuve sur appareil
+
+**Shipped:** 2026-11-07 · **Phases:** 32-35 (25 plans) · 145 commits, 16/16 exigences
+
+## 8. Ce que le jalon a construit et prouvé
+
+Cache de lecture offline (persisté, namespacé, bandeau horodaté, SW jamais
+cache API — contrôle statique vu rouge), file d'écriture idempotente
+(client_key SQL, outbox, rejeu FIFO exactement-une-fois, sans boucle),
+deep links cold-start offline, installabilité durcie. Validation on-device
+Desktop + Android 16 ; iOS réel absent, consigné « Non testé » — jamais
+coché à tort.
+
+## 9. Ce que l'exécution a révélé
+
+- **Un symptôme, quatre causes empilées.** L'échec Android du cold-start
+  hors-ligne (DLNK-02) n'était pas un bug mais une chaîne : `onLine=true`
+  trompeur (H1) → purge de session valide par le gardien (G-35-5) → erreurs
+  d'annexes non persistées qui écrasaient le message honnête (G-35-6). Chaque
+  correctif n'a révélé le suivant qu'au re-test sur appareil. Leçon : sur un
+  chemin offline multi-couches, la chaîne de diagnostic (gardien → sonde →
+  chemin authentifié → garde d'erreurs) doit être prévue comme une campagne,
+  pas comme un plan unique — et chaque maillon a été fermé par un rejeu
+  on-device, jamais par la preuve automatisée seule (D-11).
+- **La console ne remplace pas l'appareil — mais l'app peut s'auto-diagnostiquer.**
+  Faute d'USB debug, le panneau « Cache hors-ligne » (introspection +
+  télémétrie du restore avec delta de prune) a transformé « pourquoi ça ne
+  marche pas » en une lecture que l'utilisateur rapporte en une phrase. À
+  refaire : tout mécanisme invisible mérite son introspection avant le premier
+  re-test distant.
+- **Un contrôle statique peut être vert à tort — la contre-preuve est partie
+  du contrôle.** `check-sw-api-cache.sh` a été vu rouge sur une fixture
+  mauvaise avant d'être cru vert sur la vraie. Même discipline pour
+  `test-check-sql-statique.py` : un vérificateur qui n'a jamais refusé n'a
+  pas été exercé.
+- **Le véhicule de test manquant est un état, pas un oubli.** Gate SW
+  « file vide » et matrice iOS n'ont pas pu être testés : l'un exige un
+  déploiement avec file non vide, l'autre un appareil absent. Les deux sont
+  consignés skippés avec leur véhicule de re-test — la dette explicite vaut
+  mieux qu'un « passé » présumé.
+- **Un état rouge révèle le vrai contrat.** 35-10 : le plan disait « isError
+  inchangé », l'état rouge a prouvé qu'il fallait le gater sur `hasData` —
+  sinon les lignes en cache restaient masquées derrière la carte. Le TDD a
+  corrigé le plan, pas seulement le code.
