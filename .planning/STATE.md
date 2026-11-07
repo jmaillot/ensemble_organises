@@ -2,15 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.2
 milestone_name: Finition de la dette offline
+current_phase_name: roadmap defined
 status: planning
-last_updated: "2026-11-07T17:40:00.000Z"
+stopped_at: Phase 36 context gathered
+last_updated: "2026-11-07T18:28:01.270Z"
 last_activity: 2026-11-07
+last_activity_desc: ROADMAP v1.2 écrit (2 phases, 6/6 exigences mappées)
+state_head: af1676a28ec7c79b50aa34e219728ed64000b46d
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -30,6 +33,7 @@ Status: Ready for /gsd-plan-phase 36
 Last activity: 2026-11-07 — ROADMAP v1.2 écrit (2 phases, 6/6 exigences mappées)
 
 **Progress bar:**
+
 ```
 [■■■■■■■■■■] 0% — Phase 36 (Outbox) not started
 ```
@@ -42,17 +46,24 @@ Last activity: 2026-11-07 — ROADMAP v1.2 écrit (2 phases, 6/6 exigences mapp�
 ## Accumulated Context
 
 ### Decisions (this milestone)
+
 - Jalon volontairement 100 % dette : pas de phase de features, deux phases seulement (OBOX, TEST) — la granularité naturelle du travail.
 - GATE-01 (gate SW runtime) hors jalon : observatoire événementiel lié au prochain déploiement naturel, pas planifiable. Consigné dans ROADMAP (Deferred) et REQUIREMENTS (Future).
 - CACHE-01 (maxAge 24 h) et matrice iOS : hors jalon assumé (voir PROJECT.md).
 
 ### Todos
+
 - Rejouer GATE-01 (tests 32-UAT 7 et 35-UAT 2) lors de la prochaine mise en production — hors cycle de ce jalon.
 
 ### Blockers
+
 - e2e offline-shared-device : nécessite 2 comptes réels — planifier la disponibilité de l'humain (TEST-03).
 
 ## Session Continuity
+
+**Last session:** 2026-11-07T18:28:01.250Z
+**Stopped at:** Phase 36 context gathered
+**Resume file:** .planning/phases/36-outbox-plus-jamais-d-effacement-silencieux/36-CONTEXT.md
 
 - Roadmap v1.2 créée le 2026-11-07 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : `/gsd-plan-phase 36`.
