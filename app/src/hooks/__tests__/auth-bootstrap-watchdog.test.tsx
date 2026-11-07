@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { onlineManager } from '@tanstack/react-query';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
+import type { HouseholdMemberRow, HouseholdRow } from '@/types';
 
 /**
  * ============================================================================
@@ -27,7 +28,13 @@ import type { User } from '@supabase/supabase-js';
  *        comportement préexistant du listener, hors périmètre de ce plan —
  *        la garde `expires_at` ne vit que dans la chaîne d'amorçage, pas
  *        dans le listener, et c'est VOLONTAIRE.
- *  (iv)  Ce que l'e2e Playwright NE POURRA JAMAIS prouver (angle mort
+ *  (v)   Plan 35-08 (gap G-35-5) — extension des points (ii)/(iii) au NOUVEAU
+ *        chemin hors-ligne (`cheminHorsLigneValide`) : quand le gardien
+ *        établit un état authentifié-hors-ligne depuis le cache de session,
+ *        la résolution tardive de la chaîne ne ré-applique NI ne purge cet
+ *        état (contrat reglee redérivé — le rappel consulte le store avant
+ *        de décider, V5). Le listener reste hors garde reglee, inchangé.
+ *  (vi)  Ce que l'e2e Playwright NE POURRA JAMAIS prouver (angle mort
  *        nommé, plan 35-06 Task 3) : le webServer e2e build sans
  *        VITE_SUPABASE_URL (chemin démo), et `context.setOffline(true)`
  *        force `navigator.onLine = false` de façon déterministe — or le
@@ -118,6 +125,42 @@ function semerSessionExpiree() {
   );
 }
 
+/**
+ * Sème une session GoTrue VALIDE dans le localStorage — même forme JSON que
+ * `semerSessionExpiree`, mais `expires_at` dans le futur. Par défaut à une
+ * heure ; V1 passe une valeur courte (voir la note dans le cas V1).
+ */
+function semerSessionValide(secondesAvantExpiration = 3600) {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      access_token: 'jeton-valide',
+      refresh_token: 'jeton-rafraichissement',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + secondesAvantExpiration,
+      user,
+    }),
+  );
+}
+
+/** Foyer persisté dans household-store : la matière du repli 35-04 hors-ligne. */
+function semerFoyerPersiste() {
+  useHouseholdStore.getState().setHousehold(
+    { id: 'h-gardien', name: 'Foyer Gardien', avatar_color: 'accent', disabled_modules: [] } as HouseholdRow,
+    [
+      {
+        id: 'm-1',
+        household_id: 'h-gardien',
+        user_id: user.id,
+        display_name: 'Bob Martin',
+        role: 'admin',
+        deleted_at: null,
+      } as HouseholdMemberRow,
+    ],
+  );
+}
+
 describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -136,6 +179,8 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
   afterEach(() => {
     vi.useRealTimers();
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(`${STORAGE_KEY}.0`);
+    localStorage.removeItem(`${STORAGE_KEY}.1`);
     clientHolder.current = null;
     onlineManager.setOnline(true);
     useHouseholdStore.getState().reset();
@@ -252,5 +297,211 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     const warnGardien = warn.mock.calls.filter((call) => String(call[0]).includes('gardien'));
     expect(warnGardien.length).toBeGreaterThan(0);
     expect(String(warnGardien[0][0])).toContain('chemin invité');
+  });
+
+  // =========================================================================
+  // Plan 35-08 (gap G-35-5) : le chemin hors-ligne spécifié par ses tests.
+  // Une session VALIDE persistée ne doit JAMAIS être purgée par le gardien ni
+  // par un rejet hors-ligne ; une session expirée/absente/illisible garde le
+  // comportement T-35-06 exact (purge → écran D-07).
+  // =========================================================================
+
+  it('V1 : session valide + fetch réel qui hang (défaut Android) → chemin authentifié hors-ligne, session non purgée', async () => {
+    // +80 s : la fenêtre (60 s, 90 s) — au-delà de la marge de validité de
+    // session-cache (60 s) mais dans la marge de rafraîchissement de
+    // supabase-js (EXPIRY_MARGIN_MS = 90 s). C'est ce qui fait pendre
+    // `_recoverAndRefresh` sur le fetch mort (H2 — le défaut Android exact)
+    // tout en restant une session VALIDE pour le helper. Avec +3600 s, le
+    // client réel n'essayerait jamais de rafraîchir et getSession résoudrait
+    // sans réseau : le test passerait par la chaîne normale, pas par le
+    // gardien, et ne prouverait rien.
+    semerSessionValide(80);
+    semerFoyerPersiste();
+    // Le fetch ne répond JAMAIS : `_refreshAccessToken` reste en vol,
+    // `initializePromise` ne se termine pas, `getSession` hang (H2).
+    const fetchQuiHang = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', fetchQuiHang);
+    clientHolder.current = clientReel();
+    // Les lectures réseau rejettent : le repli 35-04 de `loadHousehold` rend
+    // le foyer persisté (il exige `!isOnline()`, posé ci-dessous).
+    listMock.mockRejectedValue(new Error('réseau indisponible (test)'));
+
+    const { result } = renderHook(() => useAuthBootstrap());
+
+    // Précondition explicite : la sonde 35-07 a dit « hors-ligne » AVANT
+    // l'avance d'horloge — sinon le repli 35-04 ne tire jamais et `signIn`
+    // rejetterait (session-store :178).
+    onlineManager.setOnline(false);
+
+    // Avant l'échéance : le spinner est toujours là (c'est le défaut Android).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DELAI_GARDIEN_AMORCAGE_MS - 100);
+    });
+    expect(result.current.ready).toBe(false);
+
+    // À l'échéance : le gardien consulte la session persistée — valide — et
+    // établit l'état authentifié depuis le cache, sans réseau.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+    expect(useSessionStore.getState().householdLoaded).toBe(true);
+    expect(useHouseholdStore.getState().householdId).toBe('h-gardien');
+    // L'INVARIANT du gap : la session valide n'a pas été purgée du stockage.
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('V2 : session EXPIRÉE + hang → purge T-35-06 inchangée', async () => {
+    semerSessionExpiree();
+    const fetchQuiHang = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', fetchQuiHang);
+    clientHolder.current = clientReel();
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DELAI_GARDIEN_AMORCAGE_MS + 100);
+    });
+
+    // Le signOut GoTrue en mode hang ne peut pas contacter le serveur : on
+    // vérifie l'état du store et l'absence de statut authentifié, pas la
+    // présence littérale de la clé (même convention que W1).
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().user).toBeNull();
+    expect(useSessionStore.getState().status).not.toBe('authenticated');
+  });
+
+  it('V3 : stockage vide + hang → purge comme aujourd’hui (D-07 sans-session inchangé)', async () => {
+    const fetchQuiHang = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', fetchQuiHang);
+    clientHolder.current = clientReel();
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    // Sans session persistée, la chaîne résout vite (session absente) : le
+    // chemin D-07 sans-session purge les deux stores, inchangé par 35-08.
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().user).toBeNull();
+    expect(useSessionStore.getState().status).not.toBe('authenticated');
+  });
+
+  it('V4 : rejet rapide de getSession hors-ligne + session valide persistée → même chemin hors-ligne, pas de purge (Desktop)', async () => {
+    semerSessionValide();
+    semerFoyerPersiste();
+    listMock.mockRejectedValue(new Error('réseau indisponible (test)'));
+    clientHolder.current = clientFactice(() =>
+      Promise.reject(new Error('rejet réseau immédiat (test)')),
+    );
+    onlineManager.setOnline(false);
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    // Site :catch de la chaîne (rejet hors-ligne) : même helper, session
+    // persistée valide → authentifié, jamais purgée.
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('V5 : la course RÉELLE — la complétion TARDIVE de la chaîne ne purge pas l’état authentifié-hors-ligne tout juste établi', async () => {
+    semerSessionValide();
+    const ligneMembre = {
+      id: 'm-1',
+      household_id: 'h-gardien',
+      user_id: user.id,
+      display_name: 'Bob Martin',
+      role: 'admin',
+      deleted_at: null,
+    } as HouseholdMemberRow;
+    const ligneFoyer = { id: 'h-gardien', name: 'Foyer Gardien', avatar_color: 'accent' } as HouseholdRow;
+    // getSession résout JUSTE AVANT l'échéance : la chaîne réelle s'engage et
+    // `applySession` se parque sur la lecture profil (pendante). La lecture
+    // foyer, elle, résout tout de suite — le signIn (chemin hors-ligne comme
+    // complétion tardive) est idempotent sur la même identité semée.
+    let resoudreProfils: () => void = () => {};
+    listMock.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return new Promise<void>((resolve) => {
+          resoudreProfils = () => resolve([]);
+        });
+      }
+      if (table === 'household_members') return Promise.resolve([ligneMembre]);
+      if (table === 'households') return Promise.resolve([ligneFoyer]);
+      return Promise.resolve([]);
+    });
+    clientHolder.current = clientFactice(() =>
+      Promise.resolve({ data: { session: { user, expires_at: Date.now() / 1000 + 3600 } } }),
+    );
+
+    const { result } = renderHook(() => useAuthBootstrap());
+
+    // Le gardien échoit pendant que `applySession` est en vol : le chemin
+    // hors-ligne pose l'état authentifié depuis le cache.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DELAI_GARDIEN_AMORCAGE_MS);
+    });
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+
+    // `listMock` résout : la chaîne d'origine atteint le rappel « reglee ».
+    // Avec l'ancien contrat (purge inconditionnelle), il détruirait l'état
+    // hors-ligne tout juste établi ; le nouveau contrat en fait un NO-OP.
+    await act(async () => {
+      resoudreProfils();
+      await Promise.resolve();
+    });
+
+    // Aucune ré-application n'a eu lieu (même identité), surtout aucune purge.
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+    expect(useSessionStore.getState().householdLoaded).toBe(true);
+    expect(useHouseholdStore.getState().householdId).toBe('h-gardien');
+    expect(result.current.ready).toBe(true);
+  });
+
+  it('V6 : session CHUNKÉE (format supabase-js v2, fragments .0/.1 sans clé de base) → réassemblée, chemin hors-ligne, pas de purge', async () => {
+    // Le payload dépasse la garde de taille de localStorage : supabase-js
+    // fragmente en `.0`, `.1`… et RETIRE la clé de base — le cas le plus
+    // probable pour les sessions Google OAuth volumineuses. Le helper doit
+    // réassembler les fragments dans l'ordre avant de parser.
+    const payload = JSON.stringify({
+      access_token: 'jeton-valide',
+      refresh_token: 'jeton-rafraichissement',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user,
+    });
+    const moitie = Math.ceil(payload.length / 2);
+    localStorage.setItem(`${STORAGE_KEY}.0`, payload.slice(0, moitie));
+    localStorage.setItem(`${STORAGE_KEY}.1`, payload.slice(moitie));
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    semerFoyerPersiste();
+    listMock.mockRejectedValue(new Error('réseau indisponible (test)'));
+    // getSession hang (H2) : le gardien est le seul chemin de rétablissement.
+    clientHolder.current = clientFactice(() => new Promise(() => {}));
+    onlineManager.setOnline(false);
+
+    const { result } = renderHook(() => useAuthBootstrap());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DELAI_GARDIEN_AMORCAGE_MS + 100);
+    });
+
+    // Sans réassemblage, le parse de la clé de base rend null → purge —
+    // exactement le rouge attendu avant l'implémentation.
+    expect(result.current.ready).toBe(true);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+    expect(localStorage.getItem(`${STORAGE_KEY}.0`)).not.toBeNull();
+    expect(localStorage.getItem(`${STORAGE_KEY}.1`)).not.toBeNull();
   });
 });
