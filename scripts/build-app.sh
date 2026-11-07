@@ -24,6 +24,15 @@ cd "$(dirname "$0")/.."
 VERSION="$(git describe --tags --always)"
 echo "estampille: $VERSION"
 
+# L'estampille n'est pas décorative : elle doit ATTEINDRE le build. Compose
+# interpole `GIT_SHA` depuis l'environnement du shell opérateur (compose.app.yaml
+# transmet l'argument, vide si la variable manque, et le Dockerfile replie alors
+# sur `unknown`) — exporter ici est donc ce qui rend l'oubli « structurellement
+# impossible » (§2.7 F : un silence vaudrait échec inexpliqué, et un « unknown »
+# rend le bundle déployé incomparable au dépôt).
+GIT_SHA="$VERSION"
+export GIT_SHA
+
 ARGS="--env-file .env.app -f compose.app.yaml"
 docker compose $ARGS build ${1:-} ensemble-organises-app
 docker compose $ARGS up -d --wait ensemble-organises-app
