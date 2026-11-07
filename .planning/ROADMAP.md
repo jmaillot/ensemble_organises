@@ -98,6 +98,7 @@ Plans:
 Plans:
 - [x] 35-06-PLAN.md
 - [x] 35-07-PLAN.md
+- [ ] 35-08-PLAN.md — Gap closure G-35-5 : chemin authentifié-hors-ligne (session persistée valide jamais purgée par le gardien ; expirée/absente → purge T-35-06)
 
 **Wave 1**
 - [x] 35-03-PLAN.md
