@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
-import { queryKeys, useResource } from '@/lib/data/useResource';
+import { composeOfflineAwareError, queryKeys, useResource } from '@/lib/data/useResource';
 import { eligibleMembersForModule } from '@/lib/member-eligibility';
 import { useCurrentMember, useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import { addDays, todayIso } from '@/lib/utils';
@@ -177,7 +177,7 @@ export function useRoutines(): UseRoutinesResult {  const queryClient = useQuery
     [currentMember?.id, isAdmin],
   );
 
-  const { rows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
+  const { rows, isLoading, isFetching, isError, error, hasData, refetch, create, update, remove, isMutating } =
     useResource<RoutineRow>(ROUTINES_TABLE);
   // Les occurrences portent `household_id` : la ressource est donc scopée.
   const completionsResource = useResource<RoutineCompletionRow>(ROUTINE_COMPLETIONS_TABLE);
@@ -395,16 +395,23 @@ export function useRoutines(): UseRoutinesResult {  const queryClient = useQuery
     // avion leur refetch échoue avec data === undefined — sans garde, l'isError
     // composé masquerait les lignes en cache (G-33-3). `completionsResource`
     // est un useResource : son isError est déjà cloisonné dans le hook lui-même.
+    // 35-10 (G-35-6) : quand le principal porte des lignes (cache persisté),
+    // l'échec d'une annexe ne masque plus rien — mêmes raisons que use-taches.
     isError:
       isError ||
       completionsResource.isError ||
-      (assigneesQuery.isError && assigneesQuery.data === undefined) ||
-      (remindersQuery.isError && remindersQuery.data === undefined),
+      (!hasData &&
+        ((assigneesQuery.isError && assigneesQuery.data === undefined) ||
+          (remindersQuery.isError && remindersQuery.data === undefined))),
+    // 35-10 (G-35-6) : les annexes sont hors persistance (décision 33-03) et
+    // leur erreur brute ne doit jamais écraser l'état honnête hors ligne —
+    // composeOfflineAwareError substitue le message D-11 (cause préservée)
+    // hors ligne sans données, et laisse passer l'erreur brute en ligne.
     error:
       error ??
       completionsResource.error ??
-      (assigneesQuery.isError && assigneesQuery.data === undefined ? assigneesQuery.error : null) ??
-      (remindersQuery.isError && remindersQuery.data === undefined ? remindersQuery.error : null),
+      composeOfflineAwareError(assigneesQuery) ??
+      composeOfflineAwareError(remindersQuery),
     isMutating,
     refetch,
     toggleOccurrence,

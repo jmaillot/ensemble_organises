@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
-import { queryKeys } from '@/lib/data/useResource';
+import { composeOfflineAwareError, queryKeys } from '@/lib/data/useResource';
 import { useHouseholdStore, useMembers } from '@/stores/household-store';
 import { useToast } from '@/components/ui/toast';
 import { randomId, todayIso } from '@/lib/utils';
@@ -239,8 +239,10 @@ export function useVoyages(): VoyagesState {
     // "error"` — l'erreur n'est honnête que SANS données (D-09) ; la péremption
     // reste signalée par le bandeau ambre (D-12/D-13).
     isError: tripsQuery.isError && tripsQuery.data === undefined,
-    error:
-      tripsQuery.isError && tripsQuery.data === undefined ? ((tripsQuery.error as Error | null) ?? null) : null,
+    // 35-10 (G-35-6) : useQuery brute — hors ligne sans données, l'erreur
+    // transport brute (TypeError fetch) est substituée par l'état honnête
+    // D-11 (cause préservée) ; en ligne, l'erreur d'origine passe inchangée.
+    error: composeOfflineAwareError(tripsQuery),
     tasksError: (tasksQuery.error as Error | null) ?? null,
     refetch: () => void tripsQuery.refetch(),
     isMutating: createMutation.isPending || updateMutation.isPending || removeMutation.isPending,

@@ -43,7 +43,7 @@ async function demarrageFroidDepuis(source: QueryClient, userId: string): Promis
 describe('Routines hors ligne (G-35-6)', () => {
   it('cold-start déconnecté, cache routines présent : les lignes rendent sans message réseau brut', async () => {
     const premier = renderWithProviders(<RoutinesPage />, { route: '/routines' });
-    expect(await screen.findByText('Sortie canine')).toBeInTheDocument();
+    await screen.findAllByText('Sortie canine');
     premier.unmount();
 
     const clientFroid = await demarrageFroidDepuis(premier.queryClient, `${UTILISATEUR_TEST}-a`);
@@ -58,7 +58,9 @@ describe('Routines hors ligne (G-35-6)', () => {
     await waitForQueryStatus(clientFroid, ['all', 'routine_reminders'], 'error');
     await waitForQueryStatus(clientFroid, ['routines'], 'error');
 
-    expect(screen.getByText('Sortie canine')).toBeInTheDocument();
+    // La routine apparaît deux fois (occurrence du jour + historique) :
+    // au moins un rendu prouve que les lignes reviennent.
+    expect(screen.getAllByText('Sortie canine').length).toBeGreaterThan(0);
     expect(screen.queryByText(/failed to fetch/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/NetworkError/i)).not.toBeInTheDocument();
     expect(listSpy).toHaveBeenCalled();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from '@/lib/data';
+import { composeOfflineAwareError } from '@/lib/data/useResource';
 import { randomId } from '@/lib/utils';
 import { isUnseen } from '@/lib/notification-reads';
 import { readTime, useSyncedReads } from '@/lib/notification-reads';
@@ -708,12 +709,14 @@ export function useMessagesFeed(): MessagesFeed {
       (conversationsQuery.isError && conversationsQuery.data === undefined) ||
       (participantsQuery.isError && participantsQuery.data === undefined) ||
       (previewsQuery.isError && previewsQuery.data === undefined),
+    // 35-10 (G-35-6) : les trois lectures sont des useQuery brutes ; leur
+    // erreur ne remonte au rendu que sans données, et hors ligne elle est
+    // substituée par l'état honnête D-11 (cause préservée) — jamais le
+    // TypeError transport brut. En ligne, l'erreur d'origine passe inchangée.
     error:
-      (conversationsQuery.isError && conversationsQuery.data === undefined) ||
-      (participantsQuery.isError && participantsQuery.data === undefined) ||
-      (previewsQuery.isError && previewsQuery.data === undefined)
-        ? ((conversationsQuery.error ?? participantsQuery.error ?? previewsQuery.error ?? null) as Error | null)
-        : null,
+      composeOfflineAwareError(conversationsQuery) ??
+      composeOfflineAwareError(participantsQuery) ??
+      composeOfflineAwareError(previewsQuery),
     refetch,
     readMap,
     markRead,

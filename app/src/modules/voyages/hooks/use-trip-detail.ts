@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/data/useResource';
+import { composeOfflineAwareError, queryKeys } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
 import { useCurrentMember, useIsAdmin, useMembers } from '@/stores/household-store';
 import { todayIso } from '@/lib/utils';
@@ -153,7 +153,13 @@ export function useTripDetail(tripId: string | null): TripDetailState {
   // compteurs) : changer sa sémantique dépendrait de l'ancien comportement et
   // seul l'exposé au rendu est cloisonné ici — raison de la séparation.
   const isError = tripQuery.isError || membersQuery.isError || guestsQuery.isError;
-  const error = hasError ? (((tripQuery.error ?? membersQuery.error ?? guestsQuery.error) as Error | null) ?? null) : null;
+  // 35-10 (G-35-6) : useQuery brutes — hors ligne sans données, l'erreur
+  // transport brute (TypeError fetch) est substituée par l'état honnête D-11
+  // (cause préservée) ; en ligne, l'erreur d'origine passe inchangée.
+  const error =
+    composeOfflineAwareError(tripQuery) ??
+    composeOfflineAwareError(membersQuery) ??
+    composeOfflineAwareError(guestsQuery);
   // RLS : un non-membre ne lit pas le voyage (`null`) ; en démo (sans RLS),
   // l'appartenance explicite tranche (D-01).
   const notAuthorized =
