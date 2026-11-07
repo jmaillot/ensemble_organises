@@ -4,8 +4,8 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: Completed 35-08-PLAN.md (chemin authentifié-hors-ligne, G-35-5 — rejeu on-device restant)
-last_updated: "2026-11-07T09:14:29.218Z"
+stopped_at: Completed 35-10-PLAN.md (garde honnête hors-ligne sur les annexes, G-35-6 — rejeu on-device restant)
+last_updated: "2026-11-07T12:52:00.000Z"
 last_activity: 2026-11-07
 last_activity_desc: Phase 35 execution started
 state_head: 301236d7293a418409f07b2b911bd8caa0b52aef
@@ -34,6 +34,7 @@ Last activity: 2026-11-07 — Plan 35-07 exécuté (sonde de joignabilité : onl
 
 > **Suivi requis — gap 1 (DLNK-02 Android)** : le cold-start hors-ligne avec session échoue ENCORE sur Android 16 après le correctif 35-04 (« Chargement de votre foyer » au lieu de `/taches/jour`). Item réouvert dans deferred-items.md. Piste diagnostique : contrôle SW sur Android ou restauration zustand persist au cold-start. Un plan de diagnostic/correctif suivi d'un re-rejeu on-device est nécessaire avant de déclarer DLNK-02 clos.
 > **Plan 35-07 (2026-11-07)** : sonde de joignabilité livrée (G-35-4) — lève le symptôme restant du rejeu 35-06 (carte « Failed to fetch » sous H1) ; gardien 35-06 intact. Le rejeu on-device du test 3 de 35-UAT.md reste le véhicule de fermeture.
+> **Plan 35-10 (2026-11-07)** : G-35-6 corrigé (comme défaut de code) — composeOfflineAwareError partagé de useResource appliqué aux annexes de taches/routines et aux sites useQuery brut (messages, voyages liste/détail) ; use-ref-days justifié hors périmètre (aucune erreur brute exposée). Décision 33-03 et D-09/D-10/D-11 intacts. 1946 tests + build + e2e deep-link verts. Le rejeu on-device du test 3 de 35-UAT.md reste l'arbitre de clôture (D-11).
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
