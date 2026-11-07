@@ -62,6 +62,15 @@ test.describe('appareil partagé hors ligne (OFFR-04, D-06)', () => {
     );
   }
 
+  /**
+   * TEST-04 (plan 37-01, D-08 niveau 2) : lecture brute du localStorage du
+   * navigateur (clés présentes) — même logique que `clesCacheBrutes` pour
+   * l'IndexedDB, appliquée à la session GoTrue.
+   */
+  async function clesStockageBrutes(page: Page): Promise<string[]> {
+    return page.evaluate(() => Object.keys(localStorage));
+  }
+
   async function seConnecter(page: Page, email: string, password: string) {
     await page.goto('/connexion');
     await page.getByLabel(/E-mail/i).fill(email);
@@ -88,6 +97,12 @@ test.describe('appareil partagé hors ligne (OFFR-04, D-06)', () => {
     await seDeconnecter(page);
     expect(await clesCacheBrutes(page)).not.toContainEqual(
       expect.stringContaining('eo-query-cache:'),
+    );
+
+    // TEST-04 (D-08 niveau 2) : la clé de session GoTrue (base + fragments)
+    // a disparu du localStorage — même checkpoint, une preuve de plus.
+    expect(await clesStockageBrutes(page)).not.toContainEqual(
+      expect.stringMatching(/^sb-.*-auth-token/),
     );
 
     // 3. B se connecte, puis l'avion est simulé sur SON contexte.
