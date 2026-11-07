@@ -275,16 +275,10 @@ Sans objet (stack interne, aucun changement d'écosystème). Rappel verrouillé 
 | A3 | La dette v1.1 « entrée évaporée » est en réalité un problème de message (jargon anglais) et non de perte d'entrée | Summary, Q1, Pitfall 4 | Si une vraie évaporation existe (autre chemin), le test rouge du scénario complet la révélera avant tout correctif |
 | A4 | Aucune autre surface n'affiche `entry.failure` que le panneau offline (badge ne montre que des comptes) | Architecture | Grep `failure` dans les composants au moment du plan pour confirmer |
 
-## Open Questions
+## Open Questions (RESOLVED — see 36-01-PLAN.md)
 
-1. **Où est l'« évaporation silencieuse » exacte du scénario d'origine ?**
-   - What we know: `classifyFailure` classe tout code → terminal et `markFailed` garde l'entrée en file (lecture statique, outbox.ts:336-354 + outbox-replay.ts:86-94). La dette v1.1 dit « entrée évaporée sans message » (MILESTONES.md:21).
-   - What's unclear: soit la dette décrit le message de jargon (pas une vraie perte), soit un chemin d'évaporation existe ailleurs (ex. chemin enfilage en ligne, ou entrée annulée par D-04/D-05 dans un cas de bord).
-   - Recommendation: le plan ouvre par le test d'intégration D-07 (rouge documenté), consigne le comportement observé, puis corrige ce que le rouge révèle — c'est exactement D-09 + §2.7 B. Ne pas pré-corriger sur hypothèse.
-
-2. **Codes PG retryable de nature (40001, 40P01, 08xxx, 53300) ?**
-   - What we know: règle actuelle = tout code → terminal (D-06 rend ce défaut acceptable).
-   - Recommendation: au plan, décider consciemment (discretion catalogue) soit de les lister retryable, soit de les laisser au défaut terminal avec libellé générique et Réessayer manuel. Documenter le choix en une ligne.
+1. **Où est l'« évaporation silencieuse » exacte du scénario d'origine ?** — RESOLVED par mécanisme (D-09) : le plan ouvre par le test d'intégration D-07 (rouge documenté, 36-01 Tâche 1), consigne le comportement observé dans le SUMMARY de 36-01, puis corrige ce que le rouge révèle. La lecture statique (PATTERNS.md) indique un problème de libellé (`offline-panel.tsx:271-274`), pas une vraie perte d'entrée.
+2. **Codes PG retryable de nature (40001, 40P01, 08xxx, 53300) ?** — RESOLVED : tranchés vers le défaut **terminal** de D-06 (libellé générique + Réessayer manuel), aucune famille retryable nouvelle. Décision consignée dans le frontmatter de 36-01-PLAN.md et testée explicitement en 36-01 Tâche 2.
 
 ## Environment Availability
 
