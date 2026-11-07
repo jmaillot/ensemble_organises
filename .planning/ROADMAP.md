@@ -9,7 +9,7 @@
 
 ## Phases
 
-- [ ] **Phase 36: Outbox — plus jamais d'effacement silencieux** - Le rejeu de l'outbox classe tout échec (404, 400, 403 RLS, 42501, …) terminal/retryable et le surface avec un message visible
+- [x] **Phase 36: Outbox — plus jamais d'effacement silencieux** - Le rejeu de l'outbox classe tout échec (404, 400, 403 RLS, 42501, …) terminal/retryable et le surface avec un message visible (completed 2026-11-07)
 - [ ] **Phase 37: Filet de tests fiable** - La dette tests de v1.1 est soldée : flocon épinglé, tests rouges verts, e2e offline-shared-device exécuté, clé GoTrue résiduelle éliminée
 
 ## Deferred / Hors jalon
@@ -30,7 +30,7 @@
   3. Les échecs terminaux apparaissent dans le panneau avec l'action Abandonner (confirmation) et les retryables restent rejouables via Réessayer — le badge « N en attente / N bloquées » reflète fidèlement chaque catégorie
   4. Des tests automatisés prouvent la classification des nouveaux codes (rouge→vert sur le scénario 404 silencieux d'origine) et la chaîne de vérification §2.7 reste verte
 
-**Plans**: 2/2 plans executed
+**Plans**: 2/2 plans complete
 
 Plans:
 - [x] 36-01-PLAN.md — Catalogue de libellés français (FAILURE_FAMILIES + failureLabel), scénario 404 rouge→vert, audit matriciel D-05 (OBOX-01, OBOX-02)
@@ -53,5 +53,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Outbox — plus jamais d'effacement silencieux | 2/2 | In Progress|  |
+| 36. Outbox — plus jamais d'effacement silencieux | 2/2 | Complete    | 2026-11-07 |
 | 37. Filet de tests fiable | 0/0 | Not started | - |
