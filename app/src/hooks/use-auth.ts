@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { User, UserIdentity } from '@supabase/supabase-js';
 import { onlineManager } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
+import { lireSessionPersistee, sessionPersisteeValide, MARGE_EXPIRATION_S } from '@/lib/supabase/session-cache';
 import { data } from '@/lib/data';
 import { useSessionStore, assertSignOutAllowed } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
@@ -196,6 +197,80 @@ export function useAuthBootstrap(): AuthBootstrap {
       setReady(true);
     };
 
+    // Plan 35-08 (gap G-35-5) : avant toute purge hors-ligne, consulter la
+    // session persistée GoTrue. Une session VALIDE (expires_at > now + marge)
+    // rétablit l'état authentifié depuis le cache : le signOut inconditionnel
+    // de `cheminInvite` déconnectait de fait un utilisateur dont la session
+    // vivante n'était simplement pas consultable (getSession hang H2 en mode
+    // avion Android). La validité cryptographique reste prouvée au premier
+    // contact serveur (RLS + JWT) ; la décision locale engage la durée du
+    // mode avion, d'où la marge de `MARGE_EXPIRATION_S`.
+    //
+    // `sessionEnMain` : les sites qui possèdent déjà la session (branche
+    // expires_at) la transmettent au lieu de forcer une relecture du cache.
+    const cheminHorsLigneValide = async (cause: string, sessionEnMain?: { user: User; expires_at: number }) => {
+      let utilisateur = sessionEnMain?.user ?? null;
+      let expireA = sessionEnMain?.expires_at ?? null;
+      if (!utilisateur || expireA === null) {
+        const cache = lireSessionPersistee();
+        utilisateur = cache?.user ?? null;
+        expireA = cache?.expiresAtSeconds ?? null;
+      }
+      if (!utilisateur || expireA === null || !sessionPersisteeValide(expireA)) {
+        // §2.7 F — jamais un succès muet : chaque purge est dite, avec sa cause.
+        console.warn(
+          `[auth] chemin hors-ligne (${cause}) : session persistée absente, illisible ou expirée — chemin invité`,
+        );
+        cheminInvite();
+        return;
+      }
+      const sessionUser = toSessionUser(utilisateur);
+      // La règle de réparation du nom est énoncée dans `applySession` (branche
+      // mode local) : la ligne membre persistée de household-store est la
+      // source de référence, jamais les métadonnées Auth seules.
+      const nomMembre = useHouseholdStore
+        .getState()
+        .members.find((member) => member.user_id === sessionUser.id)
+        ?.display_name?.trim();
+      if (!sessionUser.displayName?.trim() && nomMembre) sessionUser.displayName = nomMembre;
+      try {
+        // `signIn` passe le statut à `authenticated` avant de charger le foyer
+        // ; `loadHousehold` tire alors son repli 35-04 (la sonde 35-07 a posé
+        // `onlineManager.setOnLine(false)`), donc le foyer persisté est rendu.
+        await useSessionStore.getState().signIn(sessionUser);
+      } catch (causeSignIn) {
+        // Si `signIn` rejette tout de même (pas de foyer persisté, par
+        // exemple), retomber sur la purge : jamais d'écran WR-04 depuis ce
+        // chemin — les gardes en aval décident.
+        console.error(`[auth] chemin hors-ligne (${cause}) : rétablissement depuis le cache impossible — chemin invité :`, causeSignIn);
+        cheminInvite();
+        return;
+      }
+      console.warn(
+        `[auth] chemin hors-ligne (${cause}) : session persistée valide rétablie depuis le cache — revalidation serveur au retour du réseau`,
+      );
+      // Même restore best-effort que la chaîne normale (T-33-09, asymétrie
+      // volontaire) : l'identité vient des stores, jamais des arguments de la
+      // closure. Import DYNAMIQUE du client : cf. commentaire du même import
+      // dans la chaîne d'amorçage (cycle de modules évité).
+      try {
+        const { queryClient } = await import('@/app/router');
+        const userId = useSessionStore.getState().user?.id;
+        const householdId = useHouseholdStore.getState().householdId;
+        if (userId && householdId) {
+          try {
+            await connectOfflineCache(queryClient, userId, householdId);
+          } catch (causeRestore) {
+            console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', causeRestore);
+          }
+        }
+      } catch (causeImport) {
+        console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', causeImport);
+      }
+      if (!active) return;
+      setReady(true);
+    };
+
     // Plan 35-06 (gap G-35-3, diagnostic dlnk02) : sous Android cold-start,
     // la promesse `getSession()` peut ne JAMAIS se terminer — GoTrue attend
     // son `initializePromise`, qui tente un rafraîchissement réseau avec
@@ -224,9 +299,9 @@ export function useAuthBootstrap(): AuthBootstrap {
       reglee = true;
       // §2.7 F — jamais un succès muet : chaque déclenchement est dit.
       console.warn(
-        "[auth] gardien d'amorçage : la restauration de session n'a pas abouti en 10 s, bascule sur le chemin invité (réseau probablement indisponible malgré navigator.onLine)",
+        "[auth] gardien d'amorçage : la restauration de session n'a pas abouti en 10 s, consultation de la session persistée avant tout chemin invité (réseau probablement indisponible malgré navigator.onLine)",
       );
-      cheminInvite();
+      void cheminHorsLigneValide('gardien 10 s');
     }, DELAI_GARDIEN_AMORCAGE_MS);
 
     const chaineAmorcage = supabase.auth
@@ -250,18 +325,23 @@ export function useAuthBootstrap(): AuthBootstrap {
           setReady(true);
           return;
         }
-        // T-35-06 : une session dont `expires_at` est dépassé et hors-ligne ne
-        // doit JAMAIS être appliquée comme authentifiée — le rafraîchissement
-        // du jeton exige le réseau et a déjà échoué, donc ce serait un jeton
-        // mort derrière un statut « authenticated ». Elle tombe sur le chemin
-        // invité. En ligne, le comportement est inchangé : supabase-js tentera
-        // le rafraîchissement réseau de lui-même.
+        // T-35-06 (35-08) : hors-ligne, une session dont `expires_at` est
+        // dépassé — ou dans la marge de validité, le rafraîchissement exigeant
+        // le réseau qui a déjà échoué — ne doit JAMAIS être appliquée comme
+        // authentifiée. La session est en main : elle passe par le MÊME chemin
+        // hors-ligne que les autres sites (classe corrigée, pas l'instance) —
+        // le helper la juge avec la marge commune et retombe sur la purge si
+        // invalide. En ligne, le comportement est inchangé : supabase-js
+        // tentera le rafraîchissement réseau de lui-même.
         if (
           typeof session.expires_at === 'number' &&
-          session.expires_at * 1000 <= Date.now() &&
+          session.expires_at <= Date.now() / 1000 + MARGE_EXPIRATION_S &&
           !onlineManager.isOnline()
         ) {
-          cheminInvite();
+          void cheminHorsLigneValide('expires_at dépassé hors-ligne', {
+            user: session.user,
+            expires_at: session.expires_at,
+          });
           return;
         }
         try {
@@ -269,15 +349,16 @@ export function useAuthBootstrap(): AuthBootstrap {
           // les mêmes causes réseau, et doit produire le même écran.
           await applySession(session.user);
         } catch (cause) {
-          // Le gardien a déjà basculé invité pendant l'attente : ne rien
-          // ajouter, la purge a déjà eu lieu (témoin reglee).
+          // Le gardien a déjà basculé pendant l'attente : ne rien ajouter, la
+          // décision a déjà été prise (témoin reglee).
           if (reglee) return;
           // Hors-ligne, le rejet d'`applySession` (une lecture foyer que la
           // tolérance de `loadHousehold` n'a pas pu tenir — pas de foyer
           // persisté, par exemple) ne doit pas davantage bloquer le routeur :
-          // chemin invité, les gardes en aval décident.
+          // même chemin hors-ligne que les autres sites (35-08), les gardes
+          // en aval décident.
           if (!onlineManager.isOnline()) {
-            cheminInvite();
+            void cheminHorsLigneValide('rejet applySession hors-ligne');
             return;
           }
           fail(cause);
@@ -285,9 +366,17 @@ export function useAuthBootstrap(): AuthBootstrap {
         }
         if (!active) return;
         if (reglee) {
-          // Le gardien a basculé invité pendant l'attente d'`applySession` :
-          // la session qui arrive trop tard est PURGÉE (jamais ré-appliquée
-          // après le chemin invité — T-35-06 tient aussi sur ce chemin).
+          // Contrat reglee redérivé (35-08) : sous 35-06, le gardien
+          // n'établissait que l'état INVITÉ, donc purger une session tardive
+          // était correct. Désormais, le gardien peut avoir établi un état
+          // AUTHENTIFIÉ-HORS-LIGNE (cheminHorsLigneValide) : purger cet état
+          // serait la déconnexion de fait exacte que G-35-5 retire —
+          // intermittente et inattribuable (V5 prouve la course réelle).
+          // Le rappel consulte donc le store AVANT de décider : no-op quand
+          // le store est déjà authentifié (l'état vient du même cache, une
+          // résolution tardive ne ré-applique rien) ; purge T-35-06 inchangée
+          // quand il ne l'est pas (état invité, prémisse 35-06).
+          if (useSessionStore.getState().status === 'authenticated') return;
           cheminInvite();
           return;
         }
@@ -330,9 +419,11 @@ export function useAuthBootstrap(): AuthBootstrap {
         if (reglee) return;
         // Plan 35-04 : le rejet de la chaîne `getSession` elle-même (lecture du
         // stockage de session + rafraîchissement réseau) subit le même régime
-        // que le reste — hors-ligne, chemin invité ; en ligne, écran WR-04.
+        // que le reste — hors-ligne, le même chemin hors-ligne que les autres
+        // sites (35-08 : session persistée valide rétablie, purge sinon) ;
+        // en ligne, écran WR-04.
         if (!onlineManager.isOnline()) {
-          cheminInvite();
+          void cheminHorsLigneValide('rejet de la chaîne hors-ligne');
           return;
         }
         fail(cause);

@@ -147,7 +147,16 @@ function semerSessionValide(secondesAvantExpiration = 3600) {
 /** Foyer persisté dans household-store : la matière du repli 35-04 hors-ligne. */
 function semerFoyerPersiste() {
   useHouseholdStore.getState().setHousehold(
-    { id: 'h-gardien', name: 'Foyer Gardien', avatar_color: 'accent', disabled_modules: [] } as HouseholdRow,
+    {
+      id: 'h-gardien',
+      name: 'Foyer Gardien',
+      avatar_color: 'accent',
+      disabled_modules: [],
+      school_zone: null,
+      created_by: null,
+      created_at: '',
+      updated_at: '',
+    } as unknown as HouseholdRow,
     [
       {
         id: 'm-1',
@@ -215,7 +224,16 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     expect(useSessionStore.getState().status).not.toBe('authenticated');
   });
 
-  it('W2 : session valide + chaîne aval qui hang → à 12 s la résolution TARDIVE ne ré-applique pas la session', async () => {
+  it('W2 : session valide + chaîne aval qui hang → à 12 s la complétion TARDIVE ne re-purge pas la session que la chaîne vient d’établir', async () => {
+    // Contrat reglee redérivé (35-08) : le rappel :287 consulte le store AVANT
+    // de décider. Ici, SANS session persistée dans le cache, le gardien purge
+    // (chemin invité — prémisse 35-06 inchangée) ; PUIS la chaîne résout
+    // tardivement et son propre `applySession` établit l'authentification
+    // depuis la session VALIDE qu'il porte en main. Purger à nouveau cet état
+    // serait la déconnexion de fait que G-35-5 retire (V5 prouve la course).
+    // La garantie T-35-06 vit désormais en amont : une session EXPIRÉE est
+    // interceptée par la garde expires_at/marge avant `applySession` (V2/V3
+    // la prouvent), et le chemin hors-ligne juge le cache avec la même marge.
     // Client factice ici : le listener réel émettrait un INITIAL_SESSION de
     // rattrapage légitime (comportement documenté en tête de fichier, hors
     // garde reglee) qui noierait l'assertion sur la CHAÎNE. Le client factice
@@ -237,8 +255,8 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     expect(useSessionStore.getState().user).toBeNull();
 
     // La chaîne résout TARDIVEMENT (12 s) : applySession se termine, pose
-    // l'utilisateur… puis la garde reglee de la chaîne purge : la session
-    // n'est JAMAIS ré-appliquée après le chemin invité.
+    // l'utilisateur depuis sa session valide… et le rappel reglee est un
+    // NO-OP (store authentifié) : ni ré-application forcée, NI purge.
     resolvers.splice(0).forEach((resolve) => resolve([]));
     // Les lectures suivantes de la même chaîne résoluent immédiatement :
     // seule la PREMIÈRE attend la résolution tardive.
@@ -248,9 +266,9 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     });
     await Promise.resolve();
 
-    expect(useSessionStore.getState().user).toBeNull();
-    expect(useSessionStore.getState().status).not.toBe('authenticated');
-    expect(useSessionStore.getState().householdLoaded).toBe(false);
+    expect(useSessionStore.getState().user?.id).toBe(user.id);
+    expect(useSessionStore.getState().status).toBe('authenticated');
+    expect(useSessionStore.getState().householdLoaded).toBe(true);
     expect(result.current.ready).toBe(true);
   });
 
@@ -418,19 +436,32 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
       household_id: 'h-gardien',
       user_id: user.id,
       display_name: 'Bob Martin',
+      avatar_url: null,
+      color_tag: 'accent',
       role: 'admin',
+      birth_date: null,
+      managed_modules: [],
       deleted_at: null,
-    } as HouseholdMemberRow;
-    const ligneFoyer = { id: 'h-gardien', name: 'Foyer Gardien', avatar_color: 'accent' } as HouseholdRow;
+    } as unknown as HouseholdMemberRow;
+    const ligneFoyer = {
+      id: 'h-gardien',
+      name: 'Foyer Gardien',
+      avatar_color: 'accent',
+      school_zone: null,
+      created_by: null,
+      created_at: '',
+      updated_at: '',
+      disabled_modules: [],
+    } as unknown as HouseholdRow;
     // getSession résout JUSTE AVANT l'échéance : la chaîne réelle s'engage et
     // `applySession` se parque sur la lecture profil (pendante). La lecture
     // foyer, elle, résout tout de suite — le signIn (chemin hors-ligne comme
     // complétion tardive) est idempotent sur la même identité semée.
-    let resoudreProfils: () => void = () => {};
+    let resoudreProfils: (rows: unknown[]) => void = () => {};
     listMock.mockImplementation((table: string) => {
       if (table === 'profiles') {
-        return new Promise<void>((resolve) => {
-          resoudreProfils = () => resolve([]);
+        return new Promise((resolve) => {
+          resoudreProfils = resolve;
         });
       }
       if (table === 'household_members') return Promise.resolve([ligneMembre]);
@@ -444,9 +475,15 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     const { result } = renderHook(() => useAuthBootstrap());
 
     // Le gardien échoit pendant que `applySession` est en vol : le chemin
-    // hors-ligne pose l'état authentifié depuis le cache.
+    // hors-ligne pose l'état authentifié depuis le cache. (Deux tours d'act :
+    // le second laisse s'achever les I/O IndexedDB du restore best-effort —
+    // le persister TanStack planifie une relance à 1 s, minuterie factice que
+    // cette avance résout ; artefact de harnais, pas du code sous test.)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DELAI_GARDIEN_AMORCAGE_MS);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
     });
     expect(result.current.ready).toBe(true);
     expect(useSessionStore.getState().status).toBe('authenticated');
@@ -456,7 +493,7 @@ describe('useAuthBootstrap — gardien d’amorçage 10 s (35-06, G-35-3)', () =
     // Avec l'ancien contrat (purge inconditionnelle), il détruirait l'état
     // hors-ligne tout juste établi ; le nouveau contrat en fait un NO-OP.
     await act(async () => {
-      resoudreProfils();
+      resoudreProfils([]);
       await Promise.resolve();
     });
 
