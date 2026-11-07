@@ -93,9 +93,12 @@ Plans:
   3. La matrice de validation est passée sur desktop, Android et iOS réels : install, raccourcis, lecture hors-ligne avec bandeau, rejeu foreground, purge inter-utilisateurs — chaque résultat (y compris les quirks iOS ITP/éviction) est consigné, rien n'est marqué vérifié à tort
   4. La checklist « looks done but isn't » des PITFALLS est passée en revue et le gate de mise à jour SW « file vide » est vérifié : aucune mise à jour ne recharge pendant un rejeu
 
-**Plans**: 5/5 plans executed
+**Plans**: 7/7 plans executed
 
 Plans:
+- [x] 35-06-PLAN.md
+- [x] 35-07-PLAN.md
+
 **Wave 1**
 - [x] 35-03-PLAN.md
 - [x] 35-04-PLAN.md — Gap closure : bootstrap tolérant hors-ligne (cold-start avec session → /taches/jour depuis cache ; sans session → écran D-07) + couverture automatisée des deux chemins
@@ -116,4 +119,4 @@ Plans:
 | 32. Install & raccourcis | 0/? | Not started | - |
 | 33. Cache de lecture offline | 4/5 (33-05 termine la vague 3) | Executing | 2026-11-04 |
 | 34. File d'écriture & rejeu | 5/5 | In Progress|  |
-| 35. Deep links & validation multi-OS | 5/5 | In Progress|  |
+| 35. Deep links & validation multi-OS | 7/7 | In Progress|  |

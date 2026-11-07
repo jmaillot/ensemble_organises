@@ -4,16 +4,16 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: "Completed 35-05-PLAN.md (rejeu consigné : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android Échoué)"
-last_updated: "2026-11-06T16:18:58.678Z"
+stopped_at: Completed 35-07-PLAN.md (sonde de joignabilité, G-35-4)
+last_updated: "2026-11-07T07:53:44.391Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 35 execution started
-state_head: b6e5612769314e66c34fbd5f79a38f4469643577
+state_head: 33f23fb5d40d9a898c28bd2ee6375d77bb2952ac
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 22
+  completed_plans: 22
 ---
 
 # Project State
@@ -28,11 +28,12 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 35 (Deep links & validation multi-OS) — EXECUTING — gap closure 35-04/35-05 complete; awaiting re-verification. Décision utilisateur 2026-11-06 : gap 1 Android §1.4 « consigner et différer » — la phase n'est PAS close tant que DLNK-02 Android n'est pas corrigé et re-rejoué.
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-11-06 — Plan 35-05 consigné (rejeu on-device : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android 16 Échoué)
+Last activity: 2026-11-07 — Plan 35-07 exécuté (sonde de joignabilité : onlineManager reflète le backend réel en ≤ 4 s au boot ; upgrade sur succès observé uniquement, D-11)
 
 > **Suivi requis — gap 1 (DLNK-02 Android)** : le cold-start hors-ligne avec session échoue ENCORE sur Android 16 après le correctif 35-04 (« Chargement de votre foyer » au lieu de `/taches/jour`). Item réouvert dans deferred-items.md. Piste diagnostique : contrôle SW sur Android ou restauration zustand persist au cold-start. Un plan de diagnostic/correctif suivi d'un re-rejeu on-device est nécessaire avant de déclarer DLNK-02 clos.
+> **Plan 35-07 (2026-11-07)** : sonde de joignabilité livrée (G-35-4) — lève le symptôme restant du rejeu 35-06 (carte « Failed to fetch » sous H1) ; gardien 35-06 intact. Le rejeu on-device du test 3 de 35-UAT.md reste le véhicule de fermeture.
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -66,6 +67,7 @@ Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 | Phase 35 P35-02 | checkpoint (passage 2026-11-06) + ~15min | 2 tasks | 4 files |
 | Phase 35 P04 | ~55min | 3 tasks | 7 files |
 | Phase 35 P05 | 10min | 2 tasks | 3 files |
+| Phase 35 P07 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -92,6 +94,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions structurantes 
 - [Phase 35]: Grille 35-VALIDATION-MATRICE.md créée : ordre fixe D-12, vocabulaire de cellule fermé (D-11), quirks iOS pré-remplis [ASSUMED A2] ; écart documenté : PITFALLS contient 10 items, pas 11
 - [Phase 35]: 35-02 : matrice consignée et confirmée (CONFIRMATION-CONSIGNATION, Desktop + Android 16, iOS absent) ; un « Échoué » ouvre un travail correctif (3 ouverts : DLNK-02, D-07, outbox silencieux) ; gate SW et iOS = Non testé raisonné, à rejouer ; défaut de grille 1.7 documenté (connexion de B hors-ligne impossible par construction)
 - [Phase 35]: 35-05 : rejeu on-device — §1.5 (D-07) Passé sur Desktop+Android, gap 2 clos ; §1.4 (DLNK-02) Passé Desktop / Échoué Android (« chargement de votre foyer » persiste), gap 1 partiellement clos, item Android réouvert (piste : contrôle SW ou restauration zustand persist au cold-start Android)
+- [Phase 35]: 35-07 : sonde de joignabilité — upgrade en ligne UNIQUEMENT sur succès observé de la sonde (site unique), événement 'online' jamais cru seul, 'offline' immédiat, no-op en mode démo (D-08)
 
 ### Pending Todos
 
@@ -111,6 +114,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-11-06T16:18:46.622Z
-Stopped at: Completed 35-05-PLAN.md (rejeu consigné : §1.5 Passé ×2 OS, §1.4 Desktop Passé / Android Échoué)
+Last session: 2026-11-07T07:53:44.326Z
+Stopped at: Completed 35-07-PLAN.md (sonde de joignabilité, G-35-4)
 Resume file: None
