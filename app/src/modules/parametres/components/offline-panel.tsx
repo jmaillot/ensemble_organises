@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/shared/module-shell';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -13,6 +13,12 @@ import { useSessionStore } from '@/stores/session-store';
 import { useHouseholdStore } from '@/stores/household-store';
 import { abandonOutboxEntry, outboxEntryLabel, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
 import { retryOutboxEntry } from '@/lib/offline/outbox-replay';
+import {
+  getRestoreOutcome,
+  inspectPersistedCache,
+  type InspectCachePersiste,
+  type RestoreOutcome,
+} from '@/lib/offline/query-persistence';
 import { useSwState, updateSW } from '@/lib/sw-register';
 import { dataModeLabel } from '../types';
 
@@ -48,6 +54,38 @@ const titleRepli =
 const versionEcran = appVersionInconnue ? libelleRepli : appVersionShort;
 const titleEcran = appVersionInconnue ? titleRepli : appVersion;
 
+/**
+ * 35-09 (gap G-35-5) : libellés de la section « Cache hors-ligne ». D-11 —
+ * le panneau décrit des faits, jamais une fraîcheur prétendue ni une perte
+ * suggérée : une famille au-delà de sa conservation est « écartée au prochain
+ * démarrage », jamais « périmée et perdue » ; une absence de cache est « pas
+ * encore sur cet appareil », jamais « perdu ».
+ */
+function libelleAgeCache(ageMs: number): string {
+  const minutes = Math.round(ageMs / 60000);
+  if (minutes < 1) return 'moins d’une minute';
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.round(minutes / 60)} h`;
+}
+
+function libelleDureeConservation(maxAgeMs: number): string {
+  const heures = maxAgeMs / 3600000;
+  // Au-delà de deux jours, le jour est l'unité honnête ; 24 h reste « 24 h »
+  // (l'unité de la règle D-08 pour les familles Tier 1).
+  if (heures >= 48 && heures % 24 === 0) return `${heures / 24} j`;
+  return `${heures} h`;
+}
+
+function libelleIssueRestore(outcome: RestoreOutcome | null): string {
+  if (!outcome) return 'Restauration pas encore passée sur cette session';
+  if (outcome.failure) return `Dernière restauration : échec — ${outcome.failure}`;
+  if (outcome.restoredFamilies === 0) return 'Dernière restauration : rien à restaurer';
+  const base = `Dernière restauration : ${outcome.restoredFamilies} familles restaurées`;
+  // M = prunedFamilies : le delta de prune est un fait AFFICHÉ (compté avant/
+  // après par connectOfflineCache), jamais déduit. M = 0 → mention omise.
+  return outcome.prunedFamilies > 0 ? `${base}, ${outcome.prunedFamilies} écartées (> 24 h)` : base;
+}
+
 export function OfflinePanel() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -67,6 +105,44 @@ export function OfflinePanel() {
   const householdId = useHouseholdStore((state) => state.householdId);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [entryToAbandon, setEntryToAbandon] = useState<OutboxEntry | null>(null);
+
+  // 35-09 (T-35-19) : l'introspection du cache persisté est lue au montage et
+  // au changement de couple (utilisateur, foyer) — JAMAIS à chaque rendu.
+  // Lecture seule (D-08) : aucun effet de bord, aucun bouton.
+  const [cacheInspecte, setCacheInspecte] = useState<InspectCachePersiste | null>(null);
+  const [lectureCacheImpossible, setLectureCacheImpossible] = useState(false);
+  useEffect(() => {
+    if (!userId || !householdId) {
+      setCacheInspecte(null);
+      setLectureCacheImpossible(false);
+      return;
+    }
+    let annule = false;
+    setLectureCacheImpossible(false);
+    inspectPersistedCache(userId, householdId)
+      .then((rapport) => {
+        if (!annule) setCacheInspecte(rapport);
+      })
+      .catch(() => {
+        // L'échec de lecture est un état affiché, pas un plantage muet (§2.7 F).
+        if (!annule) setLectureCacheImpossible(true);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [userId, householdId]);
+
+  // L'issue du restore est un fait de SESSION, posé par connectOfflineCache au
+  // bootstrap (avant le montage de ce panneau) : lu une fois, pas de polling.
+  const [issueRestore] = useState<RestoreOutcome | null>(() => getRestoreOutcome());
+
+  // État réseau réel (onlineManager, corrigé par la sonde 35-07) — même
+  // discipline que le listener SW ci-dessus : abonnement + nettoyage appariés.
+  const [enLigne, setEnLigne] = useState(onlineManager.isOnline());
+  useEffect(() => {
+    const unsubscribe = onlineManager.subscribe(() => setEnLigne(onlineManager.isOnline()));
+    return unsubscribe;
+  }, []);
 
   // Ping EO_VERSION (sw.ts) vers le worker actif : la réponse reporte la
   // version du SW en service. Repli honnête si pas de registration ni d'API
@@ -215,6 +291,54 @@ export function OfflinePanel() {
               </li>
             ))}
           </ul>
+        )}
+      </Panel>
+
+      <Panel
+        title="Cache hors-ligne"
+        description="Ce que cet appareil a mis en cache pour ce foyer — lecture seule."
+      >
+        {!userId || !householdId ? (
+          <p className="m-0 text-[11px] text-muted">Connectez-vous pour voir le cache de ce foyer.</p>
+        ) : (
+          <div className="grid gap-0">
+            <div className="flex items-center justify-between gap-2.5 py-[13px] text-xs">
+              <span className="text-muted">État du réseau</span>
+              <strong>{enLigne ? 'En ligne' : 'Hors ligne'}</strong>
+            </div>
+            <div className="border-t border-border py-[13px] text-xs">
+              {lectureCacheImpossible ? (
+                <p className="m-0 text-[11px] text-muted">
+                  État du cache indisponible : la lecture de cet appareil a échoué.
+                </p>
+              ) : cacheInspecte === null ? (
+                <p className="m-0 text-[11px] text-muted">Lecture de l’état du cache…</p>
+              ) : cacheInspecte.families.length === 0 ? (
+                // L'absence est un fait, pas une erreur (D-11) : « pas encore
+                // sur cet appareil », jamais « perdu ».
+                <p className="m-0 text-[11px] text-muted">
+                  Aucune donnée mise en cache sur cet appareil pour ce foyer — reconnectez-vous une fois en ligne pour
+                  la mettre en cache.
+                </p>
+              ) : (
+                <ul className="m-0 grid list-none gap-2 p-0">
+                  {cacheInspecte.families.map((famille) => (
+                    <li key={famille.prefix} className="text-xs">
+                      {famille.prefix} — mise en cache il y a {libelleAgeCache(famille.ageMs)} — conserve{' '}
+                      {libelleDureeConservation(famille.maxAgeMs)}
+                      {famille.pruneEligible
+                        ? ' — au-delà de la durée de conservation, écartée au prochain démarrage'
+                        : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+              <span className="text-muted">Dernière restauration</span>
+              <strong>{libelleIssueRestore(issueRestore)}</strong>
+            </div>
+          </div>
         )}
       </Panel>
 

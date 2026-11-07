@@ -17,8 +17,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { onlineManager } from '@tanstack/react-query';
+import { createStore, del, set } from 'idb-keyval';
 import { renderWithProviders, createTestQueryClient } from '@/test/render';
 import { useSessionStore } from '@/stores/session-store';
+import { useHouseholdStore } from '@/stores/household-store';
+import { cacheKey, connectOfflineCache, persistNow, purgeCache, stopPersisting } from '@/lib/offline/query-persistence';
 import { outboxKeyFor } from '@/lib/offline/outbox';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import { OfflinePanel } from './offline-panel';
@@ -317,5 +321,164 @@ describe('OfflinePanel — écritures en attente (D-11, plan 34-04)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abandonner l’écriture' }));
 
     await waitFor(() => expect(client.getQueryData(fichier())).toEqual([]));
+  });
+});
+
+/**
+ * 35-09 (gap G-35-5) : section « Cache hors-ligne » du panneau Paramètres.
+ * Le diagnostic 35-07 a prouvé qu'on-device, l'utilisateur ne peut pas dire
+ * POURQUOI l'entrée de cache persistée était absente au cold-start. Cette
+ * section rend les trois sous-causes OBSERVABLES (D-11) : jamais persistée
+ * (« aucune donnée mise en cache »), élaguée > 24 h (« écartée au prochain
+ * démarrage »), restore en échec (cause affichée) — en LECTURE SEULE (D-08),
+ * sans aucune valeur de ligne à l'écran (T-35-18).
+ */
+describe('OfflinePanel — Cache hors-ligne (35-09, G-35-5)', () => {
+  const USER = 'u-panneau-cache';
+  const HH = 'h-cache';
+  const heure = 60 * 60 * 1000;
+  const day = 24 * heure;
+  const cacheStore = createStore('eo-offline-cache', 'query');
+
+  const poserSession = () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: USER, email: 'p@example.fr', displayName: 'P', avatarUrl: null, provider: 'email' },
+    });
+    useHouseholdStore.setState({ householdId: HH });
+  };
+
+  const rendre = () => renderWithProviders(<OfflinePanel />, { withHousehold: false });
+
+  /** Sème une entrée persistée pour le couple courant, famille tasks vieillie à volonté. */
+  const semer = async (ageMs: number | null) => {
+    const client = createTestQueryClient();
+    client.setQueryData(['tasks', HH, {}, null], [{ id: 't1', name: 'x' }]);
+    if (ageMs !== null) {
+      const q = client.getQueryCache().find({ queryKey: ['tasks', HH, {}, null] })!;
+      q.setState({ dataUpdatedAt: Date.now() - ageMs });
+    }
+    await persistNow(client, USER, HH, { throttleTime: 0 });
+  };
+
+  afterEach(async () => {
+    stopPersisting();
+    onlineManager.setOnline(true);
+    await purgeCache(USER, HH);
+    await purgeCache('u-rien', 'h-rien');
+    await del(cacheKey(USER, HH), cacheStore);
+    useSessionStore.setState({ status: 'guest', user: null, householdLoaded: false });
+    useHouseholdStore.getState().reset();
+  });
+
+  // IMPORTANT : ce test doit rester PREMIER du describe — `getRestoreOutcome`
+  // est un état de module, encore null tant qu'aucun connectOfflineCache n'a
+  // tourné dans ce fichier. « Pas encore passée sur cette session » est un
+  // fait, il se prouve sur le module vierge.
+  it('sans entrée ni restore : absence constatée, restauration pas encore passée', async () => {
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Aucune donnée mise en cache sur cet appareil pour ce foyer/)).toBeTruthy();
+    });
+    expect(screen.getByText(/Restauration pas encore passée sur cette session/)).toBeTruthy();
+  });
+
+  it('entrée présente : familles, âge, conservation, état réseau — aucun bouton (D-08)', async () => {
+    await semer(2 * heure);
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText(/mise en cache il y a/)).toBeTruthy();
+    });
+    const ligne = screen.getByText(/mise en cache il y a/).closest('li');
+    expect(ligne?.textContent).toContain('tasks');
+    expect(ligne?.textContent).toContain('il y a 2 h');
+    expect(ligne?.textContent).toContain('conserve 24 h');
+    expect(ligne?.textContent).not.toContain('écartée');
+    expect(screen.getByText('En ligne')).toBeTruthy();
+    // Aucune valeur de ligne à l'écran (T-35-18) : le nom sémé ci-dessus est
+    // neutre ('x') — la section ne porte QUE noms de familles et durées.
+    const section = screen.getByText('Cache hors-ligne').closest('section');
+    expect(section).not.toBeNull();
+    expect(within(section as HTMLElement).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('famille au-delà de la conservation : « écartée au prochain démarrage », jamais « perdue » (D-11)', async () => {
+    await semer(30 * heure);
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText(/écartée au prochain démarrage/)).toBeTruthy();
+    });
+    expect(document.body.textContent).not.toContain('perdue');
+  });
+
+  it('restore réussi sans prune : « N familles restaurées », sans mention d\'écartées', async () => {
+    await semer(2 * heure);
+    const client = createTestQueryClient();
+    await connectOfflineCache(client, USER, HH, { throttleTime: 0 });
+    stopPersisting();
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText('Dernière restauration : 1 familles restaurées')).toBeTruthy();
+    });
+    expect(screen.queryByText(/écartées/)).toBeNull();
+  });
+
+  it('restore avec prune : le delta élagué est AFFICHÉ — « N familles restaurées, M écartées (> 24 h) »', async () => {
+    await semer(25 * heure);
+    const client = createTestQueryClient();
+    await connectOfflineCache(client, USER, HH, { throttleTime: 0 });
+    stopPersisting();
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText('Dernière restauration : 1 familles restaurées, 1 écartées (> 24 h)')).toBeTruthy();
+    });
+  });
+
+  it('restore no-op : « rien à restaurer » — un fait distinct d\'un échec', async () => {
+    const client = createTestQueryClient();
+    await connectOfflineCache(client, 'u-rien', 'h-rien', { throttleTime: 0 });
+    stopPersisting();
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText('Dernière restauration : rien à restaurer')).toBeTruthy();
+    });
+  });
+
+  it('restore en échec : la cause est affichée, sans être avalée (G-35-5, sous-cause 3)', async () => {
+    // Entrée illisible (JSON cassé) : la désérialisation rejette — la même
+    // classe d'échec qu'un IndexedDB corrompu, que use-auth.ts avalait.
+    await set(cacheKey(USER, HH), 'pas-du-json{', cacheStore);
+    const client = createTestQueryClient();
+    await expect(connectOfflineCache(client, USER, HH, { throttleTime: 0 })).rejects.toThrow();
+    stopPersisting();
+    poserSession();
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Dernière restauration : échec —/)).toBeTruthy();
+    });
+  });
+
+  it('état réseau hors ligne : « Hors ligne » (abonnement onlineManager)', async () => {
+    await semer(2 * heure);
+    poserSession();
+    onlineManager.setOnline(false);
+    rendre();
+
+    await waitFor(() => {
+      expect(screen.getByText('Hors ligne')).toBeTruthy();
+    });
   });
 });
