@@ -79,6 +79,9 @@ describe('sonde de joignabilité', () => {
     // La sonde démarre immédiatement au boot.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://stub-sonde.example.fr/auth/v1/health');
+    // 35-09 (hypothèse résiduelle H-A' du diagnostic 35-07) : la preuve de
+    // joignabilité ne peut JAMAIS venir du cache HTTP du navigateur.
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: 'no-store' });
 
     // Avant l'échéance, l'état reste en ligne (pas de bascule prématurée).
     await vi.advanceTimersByTimeAsync(DELAI_SONDE_MS - 1);

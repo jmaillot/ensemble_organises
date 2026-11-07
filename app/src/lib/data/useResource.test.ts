@@ -177,3 +177,82 @@ describe('useResource — overlay optimiste de l’update (WR-02)', () => {
     expect(painted?.find((row) => row.id === 'task-foyer')?.status).toBe('a_faire');
   });
 });
+
+/**
+ * 35-09 (gap G-35-5, direction 1 du diagnostic 35-07) : hors ligne, SANS
+ * données en cache, l'échec transport brut — « TypeError: Failed to fetch »
+ * sous networkMode 'always' (D-10, inchangé) — ne dit rien à l'utilisateur.
+ * Le hook substitue un état honnête (D-11) ; l'erreur d'origine reste en
+ * `error.cause` pour le diagnostic machine. Avec du cache, D-09 est inchangé ;
+ * en ligne, le message d'origine reste entier.
+ */
+describe('useResource — état hors ligne sans données (35-09, D-11)', () => {
+  const MESSAGE_HORS_LIGNE =
+    'Ces données ne sont pas encore sur cet appareil — reconnectez-vous une fois pour les mettre en cache.';
+  const implParDefaut = listMock.getMockImplementation();
+
+  beforeEach(() => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: 'u-1', email: 'a@b.c', displayName: 'A', avatarUrl: null, provider: 'email' },
+    });
+    useHouseholdStore.setState({ householdId: 'h-1' });
+  });
+
+  afterEach(() => {
+    onlineManager.setOnline(true);
+    listMock.mockImplementation(implParDefaut!);
+    useSessionStore.setState({ status: 'guest', user: null });
+    useHouseholdStore.getState().reset();
+  });
+
+  it('hors ligne, sans cache : message honnête, TypeError brut substitué, cause préservée en error.cause', async () => {
+    onlineManager.setOnline(false);
+    listMock.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.offlineWithoutData).toBe(true);
+    expect(result.current.error?.message).toBe(MESSAGE_HORS_LIGNE);
+    // Rien n'est avalé (D-11) : le TypeError d'origine reste en `error.cause`.
+    const cause = (result.current.error as Error & { cause?: unknown }).cause;
+    expect(cause).toBeInstanceOf(TypeError);
+    expect((cause as Error).message).toBe('Failed to fetch');
+  });
+
+  it('hors ligne MAIS données en cache : D-09 inchangé — pas d\'erreur, lignes rendues', async () => {
+    onlineManager.setOnline(false);
+    listMock.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    const queryClient = createTestQueryClient();
+    // Hydratation AVANT l'échec, sur la clé EFFECTIVE du hook (le filtre
+    // scopé ajoute household_id — cf. queryKeys.table) : la donnée est
+    // présente en cache quand la requête échoue.
+    queryClient.setQueryData(['tasks', 'h-1', { household_id: 'h-1' }, null], [
+      { id: 'task-foyer', household_id: 'h-1', trip_id: null, status: 'a_faire' },
+    ]);
+    const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
+
+    await waitFor(() => {
+      const etat = queryClient.getQueryState(['tasks', 'h-1', { household_id: 'h-1' }, null]);
+      expect(etat?.status).toBe('error');
+    });
+
+    expect(result.current.isError).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.offlineWithoutData).toBe(false);
+    expect(result.current.rows).toEqual([{ id: 'task-foyer', household_id: 'h-1', trip_id: null, status: 'a_faire' }]);
+  });
+
+  it('en ligne, échec sans données : le message d\'origine est conservé — substitution UNIQUEMENT hors ligne', async () => {
+    listMock.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(() => useResource<TaskRow>('tasks'), { wrapper: wrapperFor(queryClient) });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.offlineWithoutData).toBe(false);
+    expect(result.current.error?.message).toBe('Failed to fetch');
+  });
+});

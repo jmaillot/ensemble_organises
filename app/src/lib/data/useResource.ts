@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { data } from './index';
 import { assertWriteAllowed, isWriteAllowed } from '@/lib/query-policy';
 import { isNetworkFailure, newClientKey } from '@/lib/offline/outbox';
@@ -25,6 +25,13 @@ export interface ResourceResult<T> {
   isFetching: boolean;
   isError: boolean;
   error: Error | null;
+  /**
+   * Vrai UNIQUEMENT hors ligne, en erreur et sans aucune donnée en cache
+   * (35-09, G-35-5) : c'est le cas où `error` porte le message D-11 substitué
+   * au lieu de l'erreur transport brute. Les pages qui veulent distinguer
+   * l'état sans dépendre du texte du message lisent ce booléen.
+   */
+  offlineWithoutData: boolean;
   refetch: () => void;
   create: (values: Partial<T>) => Promise<T>;
   update: (id: string, values: Partial<T>) => Promise<T>;
@@ -115,6 +122,16 @@ function prepareCreate<T>(table: string, values: Partial<T>): { values: Partial<
  * repli n'impose aucun type à l'appelant.
  */
 const NO_ROWS: never[] = [];
+
+/**
+ * Message D-11 (35-09, gap G-35-5) : hors ligne, SANS données en cache, la
+ * lecture réseau (qui part quand même sous networkMode 'always', D-10 —
+ * inchangé) échoue et l'utilisateur voyait « TypeError: Failed to fetch ». Le
+ * message substitué décrit le fait sans suggérer aucune perte : les données
+ * ne sont pas ENCORE sur cet appareil, une reconnexion les mettra en cache.
+ */
+export const MESSAGE_HORS_LIGNE_SANS_DONNEES =
+  'Ces données ne sont pas encore sur cet appareil — reconnectez-vous une fois pour les mettre en cache.';
 
 /**
  * Hook CRUD générique : une seule implémentation de cache, d'invalidation et
@@ -280,6 +297,21 @@ export function useResource<T = Row>(
     [invalidate, removeMutation, table],
   );
 
+  // 35-09 (G-35-5) : hors ligne, sans données en cache, l'erreur transport
+  // brute est substituée par l'état honnête D-11 — l'ErrorState des pages rend
+  // `error?.message` tel quel, la substitution dans le hook suffit sans
+  // toucher aucune page. L'erreur d'origine est PRÉSERVÉE en `error.cause`
+  // (ES2022) pour le diagnostic machine : rien n'est avalé. La substitution
+  // ne s'applique QUE sans données (D-09 inchangé avec du cache) et QUE hors
+  // ligne (en ligne, le message d'origine reste entier).
+  const offlineWithoutData = query.isError && query.data === undefined && !onlineManager.isOnline();
+  const error = useMemo(() => {
+    if (offlineWithoutData) return new Error(MESSAGE_HORS_LIGNE_SANS_DONNEES, { cause: query.error });
+    return query.isError && query.data === undefined ? ((query.error as Error | null) ?? null) : null;
+    // `query.data` participe : la substitution bascule dès qu'une donnée
+    // apparaît (hydrate offline) ou disparaît.
+  }, [offlineWithoutData, query.isError, query.data, query.error]);
+
   return {
     rows: query.data ?? NO_ROWS,
     isLoading: query.isLoading,
@@ -289,7 +321,8 @@ export function useResource<T = Row>(
     // (D-09) ; les lignes rendues restent signalées périmées par le bandeau
     // ambre (D-12/D-13).
     isError: query.isError && query.data === undefined,
-    error: query.isError && query.data === undefined ? ((query.error as Error | null) ?? null) : null,
+    error,
+    offlineWithoutData,
     refetch: () => void query.refetch(),
     create,
     update,

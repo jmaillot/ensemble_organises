@@ -79,6 +79,10 @@ export function demarrerSondeJoignabilite(options?: { delai?: number }): () => v
         fetch(`${supabaseUrl}/auth/v1/health`, {
           method: 'GET',
           mode: 'no-cors',
+          // 35-07 (hypothèse résiduelle H-A') : un succès servi par le cache
+          // HTTP du navigateur ferait croire à un backend joignable en mode
+          // avion. La sonde exige une preuve RÉSEAU : jamais le cache.
+          cache: 'no-store',
           signal: controleur.signal,
         }).then(() => {
           // SUCCÈS OBSERVÉ : le seul site d'upgrade de tout le module.
