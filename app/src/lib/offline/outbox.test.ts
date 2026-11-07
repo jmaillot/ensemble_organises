@@ -13,6 +13,8 @@ import {
   buildEntityKey,
   classifyFailure,
   enqueueOutbox,
+  FAILURE_FAMILIES,
+  failureLabel,
   isNetworkFailure,
   outboxKeyFor,
   setOutboxScopeProvider,
@@ -328,6 +330,66 @@ describe('classification d’enfilage (D-10, Pitfall 4)', () => {
     });
     expect(classifyFailure(new TypeError('fetch failed'))).toEqual({ kind: 'retryable' });
     expect(classifyFailure({ status: 503, message: 'Service Unavailable' })).toEqual({ kind: 'retryable' });
+  });
+});
+
+/**
+ * Catalogue de libellés et matrice d'audit (phase 36, D-01/D-04/D-05/D-06).
+ * L'audit VIT DANS LE CODE (D-04) : le test itère la CONSTANTE FAILURE_FAMILIES
+ * exportée, jamais une copie — une divergence classification/libellé casse
+ * immédiatement le test. Deux assertions par code (D-04) : classification
+ * terminal ET libellé de la famille (non générique).
+ */
+describe('catalogue de libellés et matrice d’audit (D-01/D-04/D-05/D-06)', () => {
+  const LIBELLE_GENERIQUE = 'cette écriture a été refusée par le serveur';
+
+  it.each(FAILURE_FAMILIES.map((family) => [family.label, family] as const))(
+    'famille « %s » : chaque code est terminal ET porte le libellé de SA famille (2× par code, D-04)',
+    (_label, family) => {
+      for (const code of family.codes) {
+        const classification = classifyFailure(new DataError('échec métier', { code, status: 400 }));
+        expect(classification, `le code ${code} est terminal`).toEqual({
+          kind: 'terminal',
+          code,
+          message: 'échec métier',
+        });
+        expect(failureLabel({ code, message: 'échec métier' })).toBe(family.label);
+        expect(family.label, 'un libellé de famille n’est jamais le repli générique').not.toBe(LIBELLE_GENERIQUE);
+      }
+    },
+  );
+
+  it('404 (D-01, niveau mapping) : PGRST116 → « cet élément a été supprimé entre-temps » mot pour mot', () => {
+    expect(failureLabel({ code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' })).toBe(
+      'cet élément a été supprimé entre-temps',
+    );
+  });
+
+  it('sonde « encoding » (Pitfall 1) : le matching est EXACT — un préfixe tronqué de PGRST116 n’appartient à aucune famille', () => {
+    expect(failureLabel({ code: 'PGRST10', message: '' })).toBe(LIBELLE_GENERIQUE);
+    expect(failureLabel({ code: 'PGRST1', message: '' })).toBe(LIBELLE_GENERIQUE);
+  });
+
+  it('cas retryable de la matrice (D-05) : TypeError, 5xx sans code, AbortError restent retryable (Pitfall 3)', () => {
+    expect(classifyFailure(new TypeError('fetch failed'))).toEqual({ kind: 'retryable' });
+    expect(classifyFailure({ status: 503, message: 'Service Unavailable' })).toEqual({ kind: 'retryable' });
+    // Le DOMException porte un `code` numérique hérité (20) : il ne doit PAS
+    // être pris pour un code PostgREST terminal.
+    expect(classifyFailure(new DOMException('aborted', 'AbortError'))).toEqual({ kind: 'retryable' });
+  });
+
+  it('D-06 : tout code imprévu tombe terminal avec le libellé générique — aucun code ne peut évaporer une entrée ni boucler par défaut', () => {
+    expect(classifyFailure(new DataError('inconnu', { code: 'XX999', status: 418 }))).toEqual({
+      kind: 'terminal',
+      code: 'XX999',
+      message: 'inconnu',
+    });
+    expect(failureLabel({ code: 'XX999', message: 'inconnu' })).toBe(LIBELLE_GENERIQUE);
+  });
+
+  it('décision Q2 : les codes PG retryable de nature (40001) restent sous le défaut terminal D-06 — libellé générique, Réessayer manuel conservé', () => {
+    expect(classifyFailure(new DataError('serialization failure', { code: '40001', status: 400 })).kind).toBe('terminal');
+    expect(failureLabel({ code: '40001', message: 'serialization failure' })).toBe(LIBELLE_GENERIQUE);
   });
 });
 
