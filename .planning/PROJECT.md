@@ -52,11 +52,16 @@ gate SW runtime (bandeau de mise à jour réel — re-test au prochain déploiem
 matrice iOS (appareil), flocon test D auth-bootstrap, 2 tests rouges
 anniversaires préexistants, e2e offline-shared-device (2 comptes réels requis).
 
-## Current Milestone: à définir
+## Current Milestone: v1.2 Finition de la dette offline
 
-Le jalon suivant n'est pas encore ouvert. Démarrage : `/gsd-new-milestone`
-(questioning → research → requirements → roadmap). Les exigences v1.1 (16/16)
-sont archivées dans `.planning/milestones/v1.1-REQUIREMENTS.md`.
+**Goal:** Fermer les dernières fissures de la promesse offline de v1.1 — plus jamais d'effacement silencieux, la chaîne de mise à jour observée en conditions réelles, un filet de tests fiable.
+
+**Target features:**
+- Outbox 404 silencieux : écriture rejouée vers une ligne supprimée serveur routée vers la classification terminale avec message visible (la décision 34 « jamais d'effacement silencieux » redevient vraie sans exception)
+- Gate SW runtime + INST-03 : bandeau de mise à jour observé sur un vrai déploiement, rejeu des tests 32-UAT 7 et 35-UAT 2 (prerequis : mise en production réelle)
+- Dette tests/qualité : flocon auth-bootstrap test D, 2 tests rouges anniversaires, e2e offline-shared-device (skip), leftover clé GoTrue sur purges invité
+
+**Out of scope (assumé) :** maxAge 24 h du cache (décision produit reportée, panneau diagnostic disponible), matrice iOS (appareil absent — critère « trois OS » reste consigné non testé).
 
 ## État v0.9.0 (historique)
 
@@ -81,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-07 after v1.1 milestone*
+*Last updated: 2026-11-07 at milestone v1.2 start*

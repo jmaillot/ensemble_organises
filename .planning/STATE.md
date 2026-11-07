@@ -1,19 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.1
-status: Awaiting next milestone
-stopped_at: Phase 35 — chain G-35-3→G-35-6 CLOSED on-device (v1.0-149, « ca marche ! » 2026-11-07) ; closure bookkeeping done, only UAT tests 1 (iOS, archived skip) and 2 (SW gate, next natural rebuild) remain with recorded reasons
-last_updated: "2026-11-07T16:38:28.636Z"
+milestone: v1.2
+milestone_name: Finition de la dette offline
+status: planning
+last_updated: "2026-11-07T17:26:06.124Z"
 last_activity: 2026-11-07
-last_activity_desc: Milestone v1.1 completed and archived
-state_head: 7915178c0c098806d1b22fe9ce8a57d6daf88f02
 progress:
-  total_phases: 4
-  completed_phases: 1
-  total_plans: 25
-  completed_plans: 25
-current_phase: 35
-current_phase_name: Deep links & validation multi-OS
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-11-07 — Milestone v1.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-11-07 — Milestone v1.2 started
 
 ## Performance Metrics
 
