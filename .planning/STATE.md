@@ -4,10 +4,10 @@ milestone: v1.1
 current_phase: 35
 current_phase_name: Deep links & validation multi-OS
 status: executing
-stopped_at: Completed 35-10-PLAN.md (garde honnête hors-ligne sur les annexes, G-35-6 — rejeu on-device restant)
-last_updated: "2026-11-07T12:52:00.000Z"
+stopped_at: Phase 35 — chain G-35-3→G-35-6 CLOSED on-device (v1.0-149, « ca marche ! » 2026-11-07) ; closure bookkeeping done, only UAT tests 1 (iOS, archived skip) and 2 (SW gate, next natural rebuild) remain with recorded reasons
+last_updated: "2026-11-07T14:30:00.000Z"
 last_activity: 2026-11-07
-last_activity_desc: Phase 35 execution started
+last_activity_desc: UAT test 3 passed on-device — DLNK-02 Android closed, blocker lifted
 state_head: 301236d7293a418409f07b2b911bd8caa0b52aef
 progress:
   total_phases: 4
@@ -27,14 +27,15 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 35 (Deep links & validation multi-OS) — EXECUTING — gap closure 35-04/35-05 complete; awaiting re-verification. Décision utilisateur 2026-11-06 : gap 1 Android §1.4 « consigner et différer » — la phase n'est PAS close tant que DLNK-02 Android n'est pas corrigé et re-rejoué.
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-11-07 — Plan 35-07 exécuté (sonde de joignabilité : onlineManager reflète le backend réel en ≤ 4 s au boot ; upgrade sur succès observé uniquement, D-11)
+Phase: 35 (Deep links & validation multi-OS) — EXECUTING — gap closure COMPLETE : chaîne G-35-3 → G-35-6 CLOS on-device (2026-11-07, bundle v1.0-149-g0e65444, re-test utilisateur « ca marche ! »). DLNK-02 Android cellé dans deferred-items.md ; bloqueur LEVÉ.
+Plan: 10 of 10 (35-01…35-10 exécutés)
+Status: Ready to verify / close — restent ouverts avec raison consignée : UAT 1 (iOS, appareil absent, archivé) et UAT 2 (gate SW, au prochain rebuild naturel avec file non vide)
+Last activity: 2026-11-07 — Re-test Android final PASSÉ : bandeau hors-ligne + tâches rendues depuis le cache sans carte d'erreur
 
-> **Suivi requis — gap 1 (DLNK-02 Android)** : le cold-start hors-ligne avec session échoue ENCORE sur Android 16 après le correctif 35-04 (« Chargement de votre foyer » au lieu de `/taches/jour`). Item réouvert dans deferred-items.md. Piste diagnostique : contrôle SW sur Android ou restauration zustand persist au cold-start. Un plan de diagnostic/correctif suivi d'un re-rejeu on-device est nécessaire avant de déclarer DLNK-02 clos.
-> **Plan 35-07 (2026-11-07)** : sonde de joignabilité livrée (G-35-4) — lève le symptôme restant du rejeu 35-06 (carte « Failed to fetch » sous H1) ; gardien 35-06 intact. Le rejeu on-device du test 3 de 35-UAT.md reste le véhicule de fermeture.
-> **Plan 35-10 (2026-11-07)** : G-35-6 corrigé (comme défaut de code) — composeOfflineAwareError partagé de useResource appliqué aux annexes de taches/routines et aux sites useQuery brut (messages, voyages liste/détail) ; use-ref-days justifié hors périmètre (aucune erreur brute exposée). Décision 33-03 et D-09/D-10/D-11 intacts. 1946 tests + build + e2e deep-link verts. Le rejeu on-device du test 3 de 35-UAT.md reste l'arbitre de clôture (D-11).
+> **Suivi requis — gap 1 (DLNK-02 Android)** : ~~réouvert~~ **CLOS 2026-11-07** (rejeu on-device v1.0-149, chaîne 35-04/05 → 35-06 gardien → 35-07 sonde → 35-08 chemin authentifié-hors-ligne → 35-09 diagnostics → 35-10 garde d'erreurs d'annexe). Item cellé dans deferred-items.md.
+> **Plan 35-07 (2026-11-07)** : sonde de joignabilité livrée (G-35-4) — PROUVÉE on-device (bandeau hors-ligne affiché au re-test).
+> **Plan 35-10 (2026-11-07)** : G-35-6 corrigé — composeOfflineAwareError partagé de useResource appliqué aux annexes de taches/routines et aux sites useQuery brut (messages, voyages liste/détail) ; use-ref-days justifié hors périmètre (aucune erreur brute exposée). Décision 33-03 et D-09/D-10/D-11 intacts. 1946 tests + build + e2e deep-link verts.
+> **Clôture (2026-11-07)** : test 3 UAT `passed` (« ca marche ! », bundle v1.0-149). Restent skippés avec raison : test 1 (iOS, appareil absent — archivé par l'utilisateur) et test 2 (gate SW « file vide » — reporté au prochain rebuild naturel avec file non vide).
 
 Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
 
@@ -110,8 +111,8 @@ None yet.
 - Phase 35 : comportement iOS réel (éviction ITP ~7 j, install, pas de raccourcis manifest) — MEDIUM confidence, validation on-device
 - Phase 34 : comportement purge file à la déconnexion avec N en attente (purge directe vs confirmation) — décision produit de phase
 - e2e préexistant en échec (critical-paths « rejoindre un foyer valide le format du token », chromium+mobile) — constaté sur la base 36ac215, consigné deferred-items.md
-- [35-02, matrice 2026-11-06] DLNK-02 : cold-start déconnecté AVEC session → écran blanc/erreur technique au lieu de /taches/jour, Desktop + Android 16 (matrice §1.4 + item 7) — travail correctif ouvert, constat multi-OS pas une régression 35-01
-- [35-02, matrice 2026-11-06] D-07 : deep link hors-ligne SANS session → écran « foyer n'a pas pu être chargé » au lieu de l'écran « connexion requise » 35-03, non atteint sur ce chemin, Desktop + Android 16 (matrice §1.5) — travail correctif ouvert
+- [35-02, matrice 2026-11-06] ~~DLNK-02 : cold-start déconnecté AVEC session → écran blanc/erreur technique~~ **CLOS 2026-11-07** — chaîne de correctifs 35-04→35-10, rejeu on-device Android v1.0-149 Passé (« ca marche ! »), item cellé deferred-items.md
+- [35-02, matrice 2026-11-06] D-07 : ~~deep link hors-ligne SANS session → écran « foyer n'a pas pu être chargé »~~ **CLOS 2026-11-06** (plan 35-04, rejeu on-device plan 35-05 Passé Desktop+Android)
 - [35-02, matrice 2026-11-06] Outbox : écriture vers une ligne supprimée serveur = échec silencieux, entrée de file évaporée sans message surfaced (checklist item 2) — travail correctif ouvert, contredit la décision 34 « jamais d'effacement silencieux » sur ce scénario
 - [35-02] Gate SW « file vide » (matrice §2) et items iOS non testés (build non publié / appareil absent) — à rejouer à la prochaine mise en production et sur un vrai iPhone
 
