@@ -10,6 +10,7 @@ import { useHouseholdStore } from '@/stores/household-store';
 import {
   type OutboxEntry,
   enqueueOutbox,
+  failureLabel,
   outboxKeyFor,
   setOutboxScopeProvider,
 } from './outbox';
@@ -298,6 +299,37 @@ describe('classification intégrée au rejeu (Task 2, D-10, Pitfall 3/4)', () =>
       ['t3', 'pending'],
       ['t4', 'pending'],
     ]);
+  });
+});
+
+describe('scénario 404 : ligne supprimée serveur pendant la coupure (phase 36, D-07/D-09)', () => {
+  it('update rejouée sur une ligne disparue (PGRST116) : entrée failed, libellé verrouillé, jamais évaporée ni rejouée', async () => {
+    const client = makeClient();
+    const adapter = makeAdapterMock();
+    // Le serveur répond 406/PGRST116 : la ligne visée n'existe plus (supprimée
+    // entre-temps par un autre membre du foyer).
+    adapter.update.mockRejectedValue(
+      new DataError('JSON object requested, multiple (or no) rows returned', { code: 'PGRST116', status: 406 }),
+    );
+    enqueueEntry(client, { table: 'tasks', operation: 'update' }, { id: 't404', values: { name: 'x' }, client_key: 'ck-404' });
+
+    await replayOutbox(client, SCOPE.userId, SCOPE.householdId, adapter);
+
+    const entries = outboxEntries(client);
+    // Jamais d'effacement silencieux (D-34) : l'entrée reste dans la file.
+    expect(entries, 'l’entrée PGRST116 n’est JAMAIS évaporée').toHaveLength(1);
+    expect(entries[0].status).toBe('failed');
+    expect(entries[0].failure?.code).toBe('PGRST116');
+    // D-01 verrouillé mot pour mot : le libellé est dérivé du SEUL code,
+    // jamais le message PostgREST brut.
+    expect(failureLabel(entries[0].failure!)).toBe('cet élément a été supprimé entre-temps');
+
+    // Non-boucle (T-34-02) : dix déclencheurs d'affilée, l'adaptateur n'est
+    // pas rappelé — une entrée terminal n'est jamais rejetée en boucle.
+    for (let round = 0; round < 10; round += 1) {
+      await replayOutbox(client, SCOPE.userId, SCOPE.householdId, adapter);
+    }
+    expect(adapter.update, 'un refus terminal est visible mais jamais rejoué automatiquement').toHaveBeenCalledOnce();
   });
 });
 
