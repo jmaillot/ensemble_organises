@@ -90,7 +90,13 @@ describe('useAuthBootstrap — hors-ligne (35-04)', () => {
 
     const { result } = renderHook(() => useAuthBootstrap());
 
-    await waitFor(() => expect(result.current.ready).toBe(true));
+    // D-01 : flocon ~1/367 sous charge (parallélisme 243 fichiers) — le waitFor
+    // par défaut était la seule course observée. Tolérance bornée à CE test,
+    // jamais au bloc test global de vite.config.ts.
+    await waitFor(
+      () => expect(result.current.ready).toBe(true),
+      { timeout: 5_000, interval: 50 },
+    );
     expect(result.current.error).toBeNull();
     expect(useSessionStore.getState().status).toBe('authenticated');
     expect(useSessionStore.getState().householdLoaded).toBe(true);
