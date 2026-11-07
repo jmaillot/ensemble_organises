@@ -28,7 +28,11 @@
   2. Chaque code d'erreur de rejeu (404, 400, 403 RLS, 42501, réseau, 5xx, …) est couvert par un audit consigné avec sa classification terminal/retryable — aucun code ne laisse l'entrée silencieusement disparaître ni rejouer indéfiniment
   3. Les échecs terminaux apparaissent dans le panneau avec l'action Abandonner (confirmation) et les retryables restent rejouables via Réessayer — le badge « N en attente / N bloquées » reflète fidèlement chaque catégorie
   4. Des tests automatisés prouvent la classification des nouveaux codes (rouge→vert sur le scénario 404 silencieux d'origine) et la chaîne de vérification §2.7 reste verte
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 36-01-PLAN.md — Catalogue de libellés français (FAILURE_FAMILIES + failureLabel), scénario 404 rouge→vert, audit matriciel D-05 (OBOX-01, OBOX-02)
+- [ ] 36-02-PLAN.md — Retrait du toast D-12, badge unique signal actif, chaîne §2.7 complète (OBOX-01/D-03)
 
 ### Phase 37: Filet de tests fiable
 **Goal**: Le filet de tests redevient un instrument de confiance — chaque dette tests héritée de v1.1 est fermée, corrigée ou documentée honnêtement
