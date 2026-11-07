@@ -42,12 +42,17 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # OCI porteraient `dead&beef` : divergence inter-canaux silencieuse (D-01),
 # conteneur démarrant quand même. Une valeur invalide échoue donc bruyamment
 # au build, avant tout `sed` — cette validation remplace l'acceptation du
-# risque T-24-02. `unknown` est accepté explicitement : c'est le repli voulu
+# risque T-24-02. La validation porte sur les caractères DANGEREUX pour un
+# remplacement `sed` (`&`, `\`, `/`, espace, séparateur) — pas sur un format
+# deviné : l'estampille du contrat (build-app.sh) est la sortie `git describe`
+# (`v1.0-134-gd2f67e6`), qui n'est pas un SHA hexadécimal pur et que le
+# premier motif rejetait à tort, en échec bruyant au build. `unknown` est
+# accepté explicitement : c'est le repli voulu
 # quand l'argument est vide, le rejeter interdirait le build Compose avec la
 # variable absente.
 ARG GIT_SHA
 RUN sha="${GIT_SHA:-unknown}"; \
-    printf '%s' "$sha" | grep -qxE '[0-9a-f]{7,40}|unknown' || { echo "GIT_SHA invalide: $sha" >&2; exit 1; }; \
+    printf '%s' "$sha" | grep -qxE '[A-Za-z0-9._-]+' || { echo "GIT_SHA invalide: $sha" >&2; exit 1; }; \
     sed -i "s/__APP_GIT_SHA__/$sha/g" /etc/nginx/conf.d/default.conf
 # Nom défini par la spécification OCI : « Source control revision identifier
 # for the packaged software ».
