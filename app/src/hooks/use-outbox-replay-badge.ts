@@ -1,14 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useOutbox } from './use-outbox';
 import { useBannerStore } from '@/components/banners/banner-store';
-import { useToast } from '@/components/ui/toast';
 
 /** kind du bandeau outbox dans le banner-store — consommé par banner-slot.tsx. */
 export const OUTBOX_BANNER_KIND = 'outbox-pending';
 
 /**
- * Badge « N en attente » / « N bloquées » + toast d'échec terminal (phase 34,
- * D-11/D-12/D-13, WRQ-05).
+ * Badge « N en attente » / « N bloquées » (phase 34, D-11/D-13, WRQ-05).
  *
  * MONTÉ UNE SEULE FOIS, à côté du rejeu (`OutboxBadgeWatcher` dans
  * `router.tsx`) : le badge est un service global de l'app, pas une
@@ -24,16 +22,12 @@ export const OUTBOX_BANNER_KIND = 'outbox-pending';
  * écriture est bloquée, le rendu du bandeau (banner-slot) affiche
  * « N bloquées » cliquable vers le panneau offline de Paramètres.
  *
- * (c) D-12 : UN toast discret PAR PASSE d'échecs terminaux. Les échecs d'une
- * même passe arrivent en rafale (une mutation `setQueryData` par entrée) :
- * un antirebond attend la fin de la rafale pour n'en émettre qu'un. Un
- * simple retard réseau (pendingCount seul) NE toast PAS ; le toast ne
- * réapparaît que si de NOUVEAUX échecs surviennent (failedCount croît à
- * nouveau au-dessus de la dernière valeur vue).
+ * Le toast d'échec terminal D-12 a été retiré (phase 36, D-03) : le badge est
+ * l'unique signal actif et le panneau offline l'unique canal de détail — un
+ * seul canal de vérité, le toast était du bruit redondant.
  */
 export function useOutboxReplayBadge(): void {
   const { pendingCount, failedCount } = useOutbox();
-  const toast = useToast();
 
   // (a)+(b) Badge : pousse/met à jour tant que la file n'est pas vide.
   useEffect(() => {
@@ -49,39 +43,6 @@ export function useOutboxReplayBadge(): void {
       useBannerStore.getState().dismiss(OUTBOX_BANNER_KIND);
     }
   }, [pendingCount, failedCount]);
-
-  // (c) Toast une fois par passe d'échecs (antirebond sur la rafale).
-  const previousFailed = useRef(0);
-  const toastTimer = useRef<number | null>(null);
-  useEffect(() => {
-    const previous = previousFailed.current;
-    previousFailed.current = failedCount;
-    if (failedCount <= previous) {
-      // Recul (Abandonner) ou inchangé : une émission en attente est annulée —
-      // la passe a peut-être été résolue entre-temps.
-      if (toastTimer.current !== null) {
-        window.clearTimeout(toastTimer.current);
-        toastTimer.current = null;
-      }
-      return;
-    }
-    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
-    const target = failedCount;
-    toastTimer.current = window.setTimeout(() => {
-      toastTimer.current = null;
-      toast(
-        target === 1
-          ? '1 écriture n’a pas pu être appliquée — voir détails dans Paramètres.'
-          : `${target} écritures n’ont pas pu être appliquées — voir détails dans Paramètres.`,
-        'error',
-      );
-    }, 400);
-    return () => {
-      // Le nettoyage React n'annule PAS l'émission (la rafale re-rend entre
-      // deux échecs de la même passe) : seul le recul de failedCount
-      // l'annule, au-dessus.
-    };
-  }, [failedCount, toast]);
 }
 
 /**
