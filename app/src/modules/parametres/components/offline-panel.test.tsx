@@ -271,11 +271,94 @@ describe('OfflinePanel — écritures en attente (D-11, plan 34-04)', () => {
     expect(screen.getByText('Modification — tâche')).toBeTruthy();
     expect(screen.getByText('En attente du réseau')).toBeTruthy();
     expect(screen.getByText('Ajout — dépense')).toBeTruthy();
-    expect(screen.getByText(/Bloquée \(42501\)/)).toBeTruthy();
+    // D-05 : le libellé de la famille 42501 est dérivé du code — le message
+    // PostgREST brut ne doit plus apparaître (T-36-01).
+    expect(screen.getByText('Bloquée (42501) — droits insuffisants pour cette action')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('refus RLS');
     // L'information affichée se borne à l'identité : les valeurs des lignes
     // (montant, titre, contenu) ne quittent jamais la file vers l'écran.
     expect(document.body.textContent).not.toContain('TITRE-SECRET-NE-PAS-AFFICHER');
     expect(document.body.textContent).not.toContain('MONTANT-SECRET');
+  });
+
+  it('affiche le libellé 404 dérivé (D-01) : jamais le message PostgREST brut au DOM (T-36-01, T-34-08 étendue)', () => {
+    const client = createTestQueryClient();
+    client.setQueryData(fichier(), [
+      {
+        key: 'tasks:t404',
+        table: 'tasks',
+        operation: 'update',
+        id: 't404',
+        values: { name: 'x' },
+        enqueuedAt: 1,
+        status: 'failed',
+        failure: {
+          kind: 'terminal',
+          code: 'PGRST116',
+          message: 'JSON object requested, multiple (or no) rows returned',
+        },
+      },
+    ]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    expect(screen.getByText(/cet élément a été supprimé entre-temps/)).toBeTruthy();
+    // T-36-01 : le message d'origine serveur (DataError.cause.message) ne
+    // franchit JAMAIS l'écran — le libellé dérive du seul code.
+    expect(document.body.textContent).not.toContain('JSON object requested');
+  });
+
+  it('entrée « ancienne forme » (Pitfall 5, zéro migration) : le libellé dérivé reste correct', () => {
+    // Entrée persistée par un build d'AVANT la phase : même forme
+    // { kind, code, message }, message PostgREST anglais d'origine. Le
+    // libellé est dérivé du code au rendu — aucune migration IndexedDB.
+    const client = createTestQueryClient();
+    client.setQueryData(fichier(), [
+      {
+        key: 'expenses:e9',
+        table: 'expenses',
+        operation: 'create',
+        id: 'e9',
+        enqueuedAt: 2,
+        status: 'failed',
+        failure: {
+          kind: 'terminal',
+          code: 'PGRST116',
+          message: 'JSON object requested, multiple (or no) rows returned',
+        },
+      },
+    ]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    expect(screen.getByText(/cet élément a été supprimé entre-temps/)).toBeTruthy();
+    expect(document.body.textContent).not.toContain('JSON object requested');
+  });
+
+  it('sonde edge « empty » : entrée pending sans failure → « En attente du réseau », file vide → aucun crash', async () => {
+    const client = createTestQueryClient();
+    client.setQueryData(fichier(), [
+      {
+        key: 'tasks:t1',
+        table: 'tasks',
+        operation: 'update',
+        id: 't1',
+        values: { name: 'x' },
+        enqueuedAt: 1,
+        status: 'pending',
+      },
+    ]);
+    poserSession();
+    renderWithProviders(<OfflinePanel />, { queryClient: client });
+
+    expect(screen.getByText('En attente du réseau')).toBeTruthy();
+    expect(screen.queryByText(/Bloquée/)).toBeNull();
+
+    // File entièrement vidée : le panneau suit la source unique (useOutbox)
+    // et repasse à son état vide — aucun crash, libellé inchangé.
+    client.setQueryData(fichier(), []);
+    await waitFor(() => expect(screen.getByText(/Aucune écriture en attente/)).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
   });
 
   it('Réessayer délègue au moteur de rejeu (retryOutboxEntry), jamais un rejeu maison', async () => {
