@@ -697,5 +697,62 @@ coché à tort.
   mieux qu'un « passé » présumé.
 - **Un état rouge révèle le vrai contrat.** 35-10 : le plan disait « isError
   inchangé », l'état rouge a prouvé qu'il fallait le gater sur `hasData` —
-  sinon les lignes en cache restaient masquées derrière la carte. Le TDD a
+  sinon les lignes en cache restaient masquées derrière la carte. Le jalon a
   corrigé le plan, pas seulement le code.
+
+# Campagne tests v1.2 — filet de tests fiable : quatre dettes de test, trois soldées, une assumée
+
+**Shipped:** 2026-11-07 · **Phases:** 37 (2 plans) · TEST-01, TEST-02, TEST-04 fermés ; TEST-03 en attente (voir ci-dessous)
+
+Cette campagne tests v1.2 est consignée en un seul endroit (D-10) — trois dettes fermées avec leur preuve, une assumée ouverte, plus une observation hors périmètre en clôture.
+
+## Ce que la campagne a fermé, preuve par preuve
+
+- **Le flocon auth-bootstrap était un waitFor nu, pas un bug de production
+  (TEST-01).** Fréquence mesurée : ~1/367 sous charge réelle (suite complète,
+  parallélisme sur 243 fichiers). Le test D (bootstrap offline) attendait
+  `result.current.ready` avec un `waitFor` sans options ; le durcissement
+  (`b0c9c3d`) lui donne `{ timeout: 5_000, interval: 50 }` explicites, bornés
+  à CE test — harnais, tests E/F et bloc `test` de `vite.config.ts` intacts.
+  La suite entière repasse au vert (243 fichiers / 1960 tests). Hypothèse
+  de course dans le code de production écartée par la répétition sous charge :
+  le défaut vivait dans la tolérance du test, pas dans le bootstrap.
+- **Les 2 tests anniversaires rouges d'origine v1.1 étaient déjà corrigés
+  (TEST-02).** La lecture du diff complet de `cdd4fa7` (5 nov) prouve qu'il
+  touche `anniversaires-page.test.tsx` avec le bornage annuel de la recherche
+  de pastille — exactement les 2 tests visés. La suite anniversaire et la
+  suite complète sont vertes. Dette déjà soldée : confirmation par preuve,
+  aucun chantier lancé.
+- **La clé GoTrue résiduelle est purgée à la déconnexion (TEST-04).** Preuve
+  rouge capturée avant le vert (`1de5c61` : 2 cas échouaient sur le code
+  d'origine — `sb-api-auth-token` et ses chunks `.0`/`.1` survivaient à
+  `signOut`), puis correctif (`39ac6a8`) : `purgerStockageSession()` dérivée
+  de `cleStockageSession()` (source unique de nommage), branchée au chokepoint
+  `session-store.signOut` après les purges disque/mémoire — ordre
+  anti-résurrection : plus aucun writer en vol ne peut réécrire la clé.
+  Lisible e2e via `clesStockageBrutes()` et l'assertion localStorage au
+  checkpoint offline (`49829ea`).
+
+## Ce qui reste ouvert, assumé (TEST-03)
+
+- **L'e2e offline-shared-device avec 2 comptes réels est préparé mais non
+  exécuté.** Le spec est étendu (assertion localStorage après déconnexion,
+  croisant la preuve TEST-04) et son skip conditionnel aux env vars
+  `E2E_SHARED_USER_*` est conservé tel quel — il reste correct : sans
+  identifiants réels fournis hors dépôt, un faux compte inventerait une preuve.
+  Conformément à la décision au checkpoint du plan 37-02, l'exécution est
+  reportée jusqu'à disponibilité des 2 comptes réels avec données Tier 1.
+  Le véhicule de re-test existe déjà ; la dette est explicite, pas présumée
+  passée — même discipline que la matrice iOS de v1.1 (§ 9 ci-dessus).
+
+- **Un frère du flocon a montré le bout de son nez pendant la campagne de
+  clôture — hors périmètre, consigné.** Lors de la re-vérification finale
+  (`npm test` après l'entrée rétrospective), `household-store.test.ts`
+  (WR-03 : « rétablit la persistance sur le nouveau couple après le switch »)
+  a échoué 1 à 2 fois sous charge parallèle sur 243 fichiers, puis repassé
+  13/13 deux fois en isolation — le même profil de flocon que le test D
+  (attente temporelle bornée, sensible au parallélisme), mais un test hors
+  périmètre de la phase 37, non modifié par elle. La dette est consignée
+  dans `.planning/phases/37-filet-de-tests-fiable/deferred-items.md` :
+  « passé » présumé n'a jamais été revendiqué ici, et le filet de v1.2 l'a
+  exactement attrapé comme il est censé le faire.
