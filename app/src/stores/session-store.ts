@@ -5,6 +5,7 @@ import { demoProfile, demoHousehold, demoMembers, DEMO_MEMBERS } from '@/lib/dat
 import { data } from '@/lib/data';
 import { purgeUserCache, stopPersisting } from '@/lib/offline/query-persistence';
 import { setOutboxScopeProvider, outboxKeyFor, type OutboxEntry } from '@/lib/offline/outbox';
+import { purgerStockageSession } from '@/lib/supabase/session-cache';
 import { useHouseholdStore } from './household-store';
 import type { HouseholdMemberRow, HouseholdRow, SessionStatus, SessionUser } from '@/types';
 
@@ -117,6 +118,15 @@ export const useSessionStore = create<SessionState>()(
         // créerait un cycle de modules ; au runtime le module est chargé.
         const { queryClient } = await import('@/app/router');
         queryClient.clear();
+        // TEST-04 (plan 37-01, D-07) : la clé de session GoTrue résiduelle
+        // est purgée APRÈS le succès des purges disque/mémoire et AVANT le
+        // reset d'état — l'ordre anti-résurrection (Pitfall 2) : un writer
+        // en vol de la sauvegarde a déjà été désabonné (stopPersisting),
+        // donc plus rien ne peut réécrire la clé entre la purge et le
+        // débranchement. La purge cache offline (IndexedDB) et la purge
+        // session GoTrue (localStorage) sont deux frontières distinctes :
+        // celle-ci ne remplace pas l'autre (§2.7 E — classe, pas instance).
+        purgerStockageSession();
         set({ user: null, status: 'guest', householdLoaded: false });
         useHouseholdStore.getState().reset();
       },

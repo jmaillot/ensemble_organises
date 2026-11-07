@@ -82,6 +82,34 @@ export function lireSessionPersistee(): { user: User; expiresAtSeconds: number }
 }
 
 /**
+ * Purge la clé de session GoTrue persistée dans localStorage — clé de base
+ * `sb-<ref>-auth-token` ET tous ses fragments chunkés `.0`, `.1`… (TEST-04,
+ * plan 37-01, D-07).
+ *
+ * La dérivation est réutilisée de `cleStockageSession()` (D-07 : source unique
+ * de nommage, aucune nouvelle logique). Le défaut empêché : une déconnexion
+ * ou une purge invité laissait la clé résiduelle sur l'appareil partagé —
+ * les chemins qui ne passent pas par `supabase.auth.signOut()` (fallback
+ * bootstrap, mode local) ne retirent jamais la session GoTrue eux-mêmes,
+ * rompant l'isolation A/B promise par v1.1 D-05.
+ *
+ * Mêmes gardes que la lecture : sans clé dérivable ni localStorage, il n'y a
+ * rien à supprimer. Les fragments sont découverts par la même règle que
+ * `lireSessionPersistee` (premier index absent = fin de séquence, nombre
+ * non borné a priori).
+ */
+export function purgerStockageSession(): void {
+  const cle = cleStockageSession();
+  if (!cle || typeof localStorage === 'undefined') return;
+  localStorage.removeItem(cle);
+  for (let index = 0; ; index++) {
+    const fragment = `${cle}.${index}`;
+    if (localStorage.getItem(fragment) === null) break;
+    localStorage.removeItem(fragment);
+  }
+}
+
+/**
  * Validité d'une session persistée pour la durée du mode avion : au-delà de
  * la marge uniquement. Une session déjà morte (ou mourante) retombe sur la
  * purge T-35-06 — jamais de jeton derrière un statut « authenticated ».
