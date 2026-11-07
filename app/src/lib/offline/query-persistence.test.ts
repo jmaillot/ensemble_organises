@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildQueryClient } from '@/lib/query-policy';
 import {
   cacheKey,
   connectOfflineCache,
+  getRestoreOutcome,
+  inspectPersistedCache,
+  OFFLINE_CACHE_BUSTER,
   persistNow,
   pruneExpiredFamilies,
   purgeCache,
@@ -10,7 +13,7 @@ import {
   restoreOfflineCache,
   stopPersisting,
 } from './query-persistence';
-import { createStore, entries, get } from 'idb-keyval';
+import { createStore, del, entries, get, set } from 'idb-keyval';
 
 // La base de test est isolée par fichier : ce module écrit dans la même base
 // `eo-offline-cache` que le code de prod, mais fake-indexeddb reçoit un nom
@@ -254,6 +257,12 @@ describe('purgeUserCache (OFFR-04, D-03/D-06)', () => {
     // Simulation d'une purge de l'ancienne clé, puis rebranchement direct par
     // `persistNow` sans passer par `stopPersisting` (ex. reprise du bootstrap).
     await del(cacheKey('userA', 'h1'), probeStore);
+    // 35-09 : `persistNow` ne fait PLUS de restore interne (correctif Rule 1 —
+    // un second restore ré-hydratait les familles que la prune venait
+    // d'écarter). Le client rebranché porte donc ses données h2 explicites :
+    // l'assertion ci-dessous prouve la PERSISTANCE du nouveau couple, plus
+    // jamais une résurrection du persisté d'un test antérieur.
+    client.setQueryData(['tasks', 'h2', {}, null], LINES);
     await persistNow(client, 'userB', 'h2');
 
     // La traîne de l'ANCIEN persister échoit dans la fenêtre : elle ne doit
@@ -261,5 +270,181 @@ describe('purgeUserCache (OFFR-04, D-03/D-06)', () => {
     await new Promise((resolve) => setTimeout(resolve, 1400));
     await expect(get(cacheKey('userA', 'h1'), probeStore)).resolves.toBeUndefined();
     await expect(get(cacheKey('userB', 'h2'), probeStore)).resolves.toContain('"tasks"');
+  });
+});
+
+/**
+ * 35-09 (gap G-35-5) : introspection du cache persisté et télémétrie du
+ * restore. Le diagnostic 35-07 a prouvé que la carte « Failed to fetch »
+ * on-device signifiait « entrée de cache persistée absente à l'amorçage à
+ * froid » — sans pouvoir dire POURQUOI (jamais persistée ? élaguée > 24 h ?
+ * échec IndexedDB avalé par use-auth.ts:263-265 ?). Ces tests prouvent que
+ * l'introspection et la télémétrie rendent ces trois causes OBSERVABLES.
+ */
+describe('inspectPersistedCache (35-09, G-35-5)', () => {
+  const USER = 'u-inspect';
+  const HH = 'h-inspect';
+  const day = 24 * 60 * 60 * 1000;
+
+  afterEach(async () => {
+    stopPersisting();
+    await purgeCache(USER, HH);
+  });
+
+  it('cache vide → { exists: false, families: [] } — l\'absence EST le fait demandé', async () => {
+    // Couple jamais persisté : la réponse porte l'absence, elle ne lève pas.
+    await expect(inspectPersistedCache('u-jamais', 'h-jamais')).resolves.toEqual({
+      exists: false,
+      buster: null,
+      persistedAt: null,
+      families: [],
+    });
+  });
+
+  it('entrée persistée avec famille fraîche → exists, dataUpdatedAt, âge, maxAge lu d\'OFFLINE_FAMILIES, pruneEligible: false', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], LINES);
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+
+    const now = Date.now() + 1000;
+    const rapport = await inspectPersistedCache(USER, HH, now);
+
+    expect(rapport.exists).toBe(true);
+    // Le buster persisté et l'horodatage de la dernière écriture (champ
+    // `timestamp` de l'entrée `PersistedClient` de TanStack) sont portés.
+    expect(rapport.buster).toBe(OFFLINE_CACHE_BUSTER);
+    expect(typeof rapport.persistedAt).toBe('number');
+    expect(rapport.families).toHaveLength(1);
+    const tasks = rapport.families[0]!;
+    expect(tasks.prefix).toBe('tasks');
+    expect(tasks.dataUpdatedAt).toBeGreaterThan(0);
+    // L'âge est calculé contre l'horloge fournie, pas deviné.
+    expect(tasks.ageMs).toBe(now - tasks.dataUpdatedAt);
+    // Le maxAge est LU de la politique (24 h), jamais recopié.
+    expect(tasks.maxAgeMs).toBe(day);
+    expect(tasks.pruneEligible).toBe(false);
+  });
+
+  it('famille dont dataUpdatedAt dépasse maxAgeMs → pruneEligible: true (même prédicat que la prune)', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], LINES);
+    const aged = source.getQueryCache().find({ queryKey: ['tasks', HH, {}, null] })!;
+    aged.setState({ dataUpdatedAt: Date.now() - day - 60 * 60 * 1000 }); // 25 h
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+
+    const rapport = await inspectPersistedCache(USER, HH);
+
+    expect(rapport.families[0]!.pruneEligible).toBe(true);
+    expect(rapport.families[0]!.ageMs).toBeGreaterThan(day);
+  });
+
+  it('AUCUN contenu de ligne dans le résultat : noms de familles et horodatages seulement (T-35-18)', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], [{ id: 't1', name: 'SECRET-INTROSPECTION' }]);
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+
+    const rapport = await inspectPersistedCache(USER, HH);
+
+    // T-35-18 : le rapport ne franchit l'écran QUE par le panneau — sa forme
+    // entière est inspectée, aucune valeur de ligne ne doit y figurer.
+    expect(JSON.stringify(rapport)).not.toContain('SECRET-INTROSPECTION');
+  });
+
+  it('inspectPersistedCache n\'écrit RIEN : l\'entrée persistée garde son identité de contenu', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], LINES);
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+    const avant = await get<string>(cacheKey(USER, HH), probeStore);
+
+    await inspectPersistedCache(USER, HH);
+
+    const apres = await get<string>(cacheKey(USER, HH), probeStore);
+    expect(apres).toBe(avant);
+  });
+});
+
+/**
+ * 35-09 : l'issue du restore — jusque-là avalée par le catch de
+ * use-auth.ts:263-265 — est un fait enregistré par `connectOfflineCache`
+ * AVANT que le catch du hook ne l'avale. Quatre cas : succès sans prune,
+ * succès avec prune, rien-de-persisté (fait distinct d'un échec), échec.
+ */
+describe('télémétrie du restore — getRestoreOutcome (35-09)', () => {
+  const USER = 'u-telemetry';
+  const HH = 'h-telemetry';
+  const day = 24 * 60 * 60 * 1000;
+
+  afterEach(async () => {
+    stopPersisting();
+    await purgeCache(USER, HH);
+  });
+
+  it('succès sans prune : restoredFamilies compte AVANT prune, prunedFamilies 0, failure null', async () => {
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], LINES);
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+
+    const fresh = buildQueryClient({ queries: { retry: false } });
+    await connectOfflineCache(fresh, USER, HH, { throttleTime: 0 });
+
+    const outcome = getRestoreOutcome();
+    expect(outcome).not.toBeNull();
+    expect(outcome!.restoredFamilies).toBe(1);
+    expect(outcome!.prunedFamilies).toBe(0);
+    expect(outcome!.failure).toBeNull();
+    expect(outcome!.at).toBeGreaterThan(0);
+  });
+
+  it('succès avec prune : le delta de prune est un fait AFFICHÉ, jamais déduit', async () => {
+    // La famille tasks est persistée vieille de 25 h : au restore, elle est
+    // hydratée (comptée) PUIS écartée par pruneExpiredFamilies. Sans le
+    // comptage avant/après, cette élagage ne laisserait aucune trace et le
+    // panneau ne pourrait pas répondre à « était-elle là, élaguée ? ».
+    const source = buildQueryClient({ queries: { retry: false } });
+    source.setQueryData(['tasks', HH, {}, null], LINES);
+    const aged = source.getQueryCache().find({ queryKey: ['tasks', HH, {}, null] })!;
+    aged.setState({ dataUpdatedAt: Date.now() - day - 60 * 60 * 1000 });
+    await persistNow(source, USER, HH, { throttleTime: 0 });
+
+    const fresh = buildQueryClient({ queries: { retry: false } });
+    await connectOfflineCache(fresh, USER, HH, { throttleTime: 0 });
+    // La donnée périmée est bien PARTIE du client (D-09 inchangé).
+    expect(fresh.getQueryData(['tasks', HH, {}, null])).toBeUndefined();
+
+    const outcome = getRestoreOutcome();
+    expect(outcome!.restoredFamilies).toBe(1);
+    expect(outcome!.prunedFamilies).toBe(1);
+    expect(outcome!.failure).toBeNull();
+  });
+
+  it('rien de persisté : 0 famille, failure null — un fait distinct d\'un échec', async () => {
+    // Couple jamais persisté : restoreOfflineCache est un no-op honnête.
+    const fresh = buildQueryClient({ queries: { retry: false } });
+    await connectOfflineCache(fresh, 'u-rien', 'h-rien', { throttleTime: 0 });
+
+    const outcome = getRestoreOutcome();
+    expect(outcome!.restoredFamilies).toBe(0);
+    expect(outcome!.prunedFamilies).toBe(0);
+    expect(outcome!.failure).toBeNull();
+    await purgeCache('u-rien', 'h-rien');
+  });
+
+  it('échec du restore : la cause du rejet est enregistrée, le rejet reste propagé', async () => {
+    // Le rejet est provoqué par une entrée persistée ILLISIBLE : JSON non
+    // valide — la désérialisation de TanStack rejette, exactement comme un
+    // IndexedDB corrompu le ferait. `set` brut, pas le persister : la clé
+    // doit contenir de la donnée cassée, pas une forme valide.
+    await set(cacheKey(USER, HH), 'pas-du-json{', probeStore);
+
+    const fresh = buildQueryClient({ queries: { retry: false } });
+    // connectOfflineCache enregistre PUIS relance : le catch du hook
+    // (use-auth.ts:263-265) garde sa ceinture de sécurité, inchangé.
+    await expect(connectOfflineCache(fresh, USER, HH, { throttleTime: 0 })).rejects.toThrow();
+
+    const outcome = getRestoreOutcome();
+    expect(outcome!.failure).toBeTruthy();
+    expect(outcome!.restoredFamilies).toBe(0);
+    expect(outcome!.prunedFamilies).toBe(0);
+    await del(cacheKey(USER, HH), probeStore);
   });
 });

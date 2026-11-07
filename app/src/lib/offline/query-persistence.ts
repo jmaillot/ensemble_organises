@@ -1,4 +1,4 @@
-import { persistQueryClient, persistQueryClientSave, type PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
+import { persistQueryClientSave, persistQueryClientSubscribe, type PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { createStore, del, entries, get, set } from 'idb-keyval';
 import { hydrate as hydrateState } from '@tanstack/react-query';
@@ -240,19 +240,22 @@ export async function persistNow(
     },
     ...persistOptions,
   };
-  // `persistQueryClient` retourne [unsubscribe, promise] (doc v5) : il restaure
-  // puis souscrit aux changements de cache, mais ne fait PAS de sauvegarde
-  // initiale — le save ne part que sur événement de cache postérieur. On la
-  // déclenche donc explicitement : le seed déjà présent au branchement est
-  // persisté immédiatement, pas à la prochaine écriture.
-  const [unsubscribe, promise] = persistQueryClient(persistProps);
+  // 35-09 (correctif Rule 1, preuve par le test « succès avec prune ») :
+  // `persistQueryClient` = restore + souscription. Ici le restore est DÉJÀ
+  // fait (restoreOfflineCache) et la prune a suivi : un second restore
+  // ré-hydraterait les familles que la prune vient d'écarter — le delta de
+  // prune serait affiché au panneau pendant que la donnée périmée revient à
+  // l'écran. La souscription nue (`persistQueryClientSubscribe`) + la
+  // sauvegarde initiale explicite honorent le contrat de `persistNow` :
+  // persister l'état COURANT du client et le garder souscrit, sans jamais
+  // réinjecter le persisté derrière le dos de l'appelant.
+  const unsubscribe = persistQueryClientSubscribe(persistProps);
   activeUnsubscribe = unsubscribe;
   // Le persister vient d'être recréé : sa garde d'annulation devient la
   // courante (l'ancienne a été invoquée au début de cette fonction, avec le
   // désabonnement — WR-01).
   const cancel = persisterCancels.get(persister as unknown as object) ?? null;
   activeCancel = cancel;
-  await promise;
   await persistQueryClientSave(persistProps);
 }
 
@@ -273,6 +276,19 @@ export async function restoreOfflineCache(
   if (!persisted) return; // rien de persisté : état vide honnête, rien à réinjecter
   if (persisted.buster !== OFFLINE_CACHE_BUSTER) return; // forme d'un autre build : jetée
   hydrateState(client, persisted.clientState);
+}
+
+/**
+ * Prédicat d'expiration partagé (35-09, WR-04) : une query jamais chargée
+ * (`dataUpdatedAt` <= 0, en attente ou en erreur) n'est JAMAIS périmée — la
+ * traiter comme telle (`now - 0 > maxAgeMs`) la ferait retirer au
+ * rebranchement. La comparaison vit ICI, en un seul site : `pruneExpiredFamilies`
+ * (le geste) et `inspectPersistedCache` (la lecture) l'utilisent telle quelle,
+ * les deux chemins ne peuvent pas diverger (§2.7 E).
+ */
+export function famillePerimee(dataUpdatedAt: number, maxAgeMs: number, now: number): boolean {
+  if (dataUpdatedAt <= 0) return false;
+  return now - dataUpdatedAt > maxAgeMs;
 }
 
 /**
@@ -300,11 +316,11 @@ export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): voi
       const family = familyOf(String(query.queryKey[0]));
       if (!family) return false; // hors allowlist : jamais hydraté de toute façon
       // WR-04 (revue 33) : une query JAMAIS chargée (`dataUpdatedAt` = 0,
-      // en attente ou en erreur) n'est pas périmée — la traiter comme telle
-      // (`now - 0 > maxAgeMs`) la ferait retirer au rebranchement, annulant
-      // une lecture en vol ou réinitialisant une query déjà montée.
+      // en attente ou en erreur) n'est pas périmée — le prédicat partagé
+      // `famillePerimee` porte la règle (35-09) : un seul site de
+      // comparaison, la lecture d'introspection ne peut pas diverger.
       if (query.state.dataUpdatedAt <= 0) return false;
-      return now - query.state.dataUpdatedAt > family.maxAgeMs;
+      return famillePerimee(query.state.dataUpdatedAt, family.maxAgeMs, now);
     },
   });
 }
@@ -321,6 +337,14 @@ export function pruneExpiredFamilies(client: QueryClient, now = Date.now()): voi
  * L'ordre impose restore AVANT prune AVANT souscription : la souscription
  * garde un cache déjà élagué, et aucune donnée périmée n'a le temps d'être
  * rendue entre le hydrate et la prune (même micro-tâche, `await` séquentiel).
+ *
+ * 35-09 : l'issue du restore+prune est enregistrée dans la télémétrie de
+ * module (`getRestoreOutcome`) AVANT que le rejet éventuel ne remonte au hook
+ * — le catch de use-auth.ts:263-265 garde son comportement (ceinture de
+ * sécurité), la cause est simplement lisible désormais. Le try/catch entoure
+ * restore+prune UNIQUEMENT : la souscription `persistNow` reste hors de la
+ * télémétrie d'échec de restore — un échec de souscription n'est pas un fait
+ * sur le cache persisté.
  */
 export async function connectOfflineCache(
   client: QueryClient,
@@ -328,7 +352,137 @@ export async function connectOfflineCache(
   householdId: string,
   options: Partial<PersistQueryClientOptions> & { throttleTime?: number } = {},
 ): Promise<void> {
-  await restoreOfflineCache(client, userId, householdId);
-  pruneExpiredFamilies(client);
+  try {
+    await restoreOfflineCache(client, userId, householdId);
+    const avantPrune = compterFamillesRestaurees(client);
+    pruneExpiredFamilies(client);
+    const apresPrune = compterFamillesRestaurees(client);
+    dernierRestore = {
+      restoredFamilies: avantPrune,
+      prunedFamilies: avantPrune - apresPrune,
+      failure: null,
+      at: Date.now(),
+    };
+  } catch (cause) {
+    dernierRestore = { restoredFamilies: 0, prunedFamilies: 0, failure: String(cause), at: Date.now() };
+    throw cause; // le hook relève et console.error comme avant — inchangé
+  }
   await persistNow(client, userId, householdId, options);
+}
+
+/**
+ * Forme LUE du cache persisté pour l'introspection (35-09, gap G-35-5). Le
+ * diagnostic 35-07 a prouvé que la carte « Failed to fetch » on-device
+ * signifiait « entrée de cache absente au cold-start » — sans dire pourquoi.
+ * Le rapport répond aux trois sous-causes : jamais persistée (`exists: false`),
+ * élaguée au prochain démarrage (`pruneEligible`), restore en échec (télémétrie
+ * ci-dessous).
+ *
+ * T-35-18 : le rapport ne porte QUE des noms de familles, des horodatages et
+ * des booléens — AUCUN contenu de ligne. La lecture est testée pour la prouver.
+ */
+export interface FamilleInspectee {
+  /** Préfixe de table, tel que déclaré dans OFFLINE_FAMILIES (D-07). */
+  prefix: string;
+  /** Horodatage de la donnée (TanStack `dataUpdatedAt`), 0 si jamais chargée. */
+  dataUpdatedAt: number;
+  /** Âge calculé contre l'horloge fournie : `now - dataUpdatedAt`. */
+  ageMs: number;
+  /** Durée de conservation lue de la politique OFFLINE_FAMILIES (D-07). */
+  maxAgeMs: number;
+  /** Même prédicat que `pruneExpiredFamilies` — écartée au prochain restore. */
+  pruneEligible: boolean;
+}
+
+export interface InspectCachePersiste {
+  /** Une entrée existe pour ce couple (utilisateur, foyer). */
+  exists: boolean;
+  /** Buster persisté, s'il existe — une forme d'un autre build est jetée au restore. */
+  buster: string | null;
+  /** Horodatage de la dernière écriture, si l'entrée l'expose (champ TanStack `timestamp`). */
+  persistedAt: number | null;
+  /** Familles allowlistées présentes, sans aucun contenu de ligne (T-35-18). */
+  families: FamilleInspectee[];
+}
+
+/**
+ * Lit le cache persisté d'un couple (utilisateur, foyer) — LECTURE SEULE
+ * (D-08) : aucun écriture, aucun rejet de donnée, aucune hydratation. Le
+ * panneau Paramètres l'appelle une fois au montage et au changement de couple
+ * (T-35-19), jamais à chaque rendu.
+ *
+ * POURQUOI RESTORER VIA LE PERSISTER (et pas une lecture `get` brute) : le
+ * persister porte la désérialisation TanStack et le namespacing D-03 ; une
+ * lecture maison recopierait la forme de l'entrée, que seul TanStack possède.
+ * POURQUOI LE MAPPING PASSE PAR `familyOf` : la source unique des familles est
+ * OFFLINE_FAMILIES (D-07) — ce fichier ne recopie aucun préfixe ni maxAge.
+ * L'outbox n'est PAS une famille (phase 34, Pitfall 5) : elle n'a aucun
+ * maxAge, l'introspection de conservation ne lui dit rien.
+ */
+export async function inspectPersistedCache(
+  userId: string,
+  householdId: string,
+  now = Date.now(),
+): Promise<InspectCachePersiste> {
+  const persister = buildPersister(userId, householdId);
+  const persisted = await persister.restoreClient();
+  // L'absence EST le fait demandé par le diagnostic : un rapport vide, jamais
+  // une levée — le panneau doit pouvoir dire « rien de persisté » comme un
+  // état, pas comme une erreur.
+  if (!persisted) return { exists: false, buster: null, persistedAt: null, families: [] };
+  const families: FamilleInspectee[] = [];
+  for (const query of persisted.clientState.queries) {
+    const family = familyOf(String(query.queryKey[0]));
+    if (!family) continue; // hors allowlist (ou outbox) : jamais conservée par D-07
+    families.push({
+      prefix: family.prefix,
+      dataUpdatedAt: query.state.dataUpdatedAt,
+      ageMs: Math.max(0, now - query.state.dataUpdatedAt),
+      maxAgeMs: family.maxAgeMs,
+      pruneEligible: famillePerimee(query.state.dataUpdatedAt, family.maxAgeMs, now),
+    });
+  }
+  return {
+    exists: true,
+    buster: persisted.buster,
+    // Le champ existe sur `PersistedClient` (TanStack) ; la garde de forme
+    // évite de deviner si un jour l'entrée n'expose plus d'horodatage.
+    persistedAt: typeof persisted.timestamp === 'number' ? persisted.timestamp : null,
+    families,
+  };
+}
+
+/**
+ * Issue du restore enregistrée par `connectOfflineCache` (35-09). Jusque-là,
+ * un échec de restore IndexedDB était avalé par le catch de use-auth.ts:263-265
+ * — et une famille élaguée au restore ne laissait AUCUNE trace. Le delta de
+ * prune est un fait AFFICHÉ (compté avant/après), jamais déduit : le panneau
+ * peut répondre à « était-elle là, écartée ? ».
+ *
+ * `restoredFamilies` compte les familles hydratées APRÈS restore, AVANT prune
+ * (l'outbox compte : elle est restaurée aussi, même si la prune ne la touche
+ * pas). `failure` distingue trois états : null + 0 famille = rien de persisté
+ * (fait, pas échec) ; null + N familles = succès ; chaîne = cause du rejet,
+ * via `String(cause)` — la même forme que le console.error du hook.
+ */
+export interface RestoreOutcome {
+  restoredFamilies: number;
+  prunedFamilies: number;
+  failure: string | null;
+  at: number;
+}
+
+let dernierRestore: RestoreOutcome | null = null;
+
+/** Dernier fait de restauration de la session, ou null si `connectOfflineCache` n'a pas encore tourné. */
+export function getRestoreOutcome(): RestoreOutcome | null {
+  return dernierRestore;
+}
+
+/** Compte les entrées restaurées : familles OFFLINE_FAMILIES + outbox (Pitfall 5). */
+function compterFamillesRestaurees(client: QueryClient): number {
+  return client.getQueryCache().getAll().filter((query) => {
+    const prefix = String(query.queryKey[0]);
+    return prefix === 'outbox' || familyOf(prefix) !== undefined;
+  }).length;
 }
