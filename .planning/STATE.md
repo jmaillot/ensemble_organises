@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.1
-current_phase: 35
-current_phase_name: Deep links & validation multi-OS
-status: executing
+status: Awaiting next milestone
 stopped_at: Phase 35 — chain G-35-3→G-35-6 CLOSED on-device (v1.0-149, « ca marche ! » 2026-11-07) ; closure bookkeeping done, only UAT tests 1 (iOS, archived skip) and 2 (SW gate, next natural rebuild) remain with recorded reasons
-last_updated: "2026-11-07T14:30:00.000Z"
+last_updated: "2026-11-07T16:38:28.636Z"
 last_activity: 2026-11-07
-last_activity_desc: UAT test 3 passed on-device — DLNK-02 Android closed, blocker lifted
-state_head: 301236d7293a418409f07b2b911bd8caa0b52aef
+last_activity_desc: Milestone v1.1 completed and archived
+state_head: 7915178c0c098806d1b22fe9ce8a57d6daf88f02
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 25
+  completed_plans: 25
+current_phase: 35
+current_phase_name: Deep links & validation multi-OS
 ---
 
 # Project State
@@ -27,17 +27,10 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 35 (Deep links & validation multi-OS) — EXECUTING — gap closure COMPLETE : chaîne G-35-3 → G-35-6 CLOS on-device (2026-11-07, bundle v1.0-149-g0e65444, re-test utilisateur « ca marche ! »). DLNK-02 Android cellé dans deferred-items.md ; bloqueur LEVÉ.
-Plan: 10 of 10 (35-01…35-10 exécutés)
-Status: Ready to verify / close — restent ouverts avec raison consignée : UAT 1 (iOS, appareil absent, archivé) et UAT 2 (gate SW, au prochain rebuild naturel avec file non vide)
-Last activity: 2026-11-07 — Re-test Android final PASSÉ : bandeau hors-ligne + tâches rendues depuis le cache sans carte d'erreur
-
-> **Suivi requis — gap 1 (DLNK-02 Android)** : ~~réouvert~~ **CLOS 2026-11-07** (rejeu on-device v1.0-149, chaîne 35-04/05 → 35-06 gardien → 35-07 sonde → 35-08 chemin authentifié-hors-ligne → 35-09 diagnostics → 35-10 garde d'erreurs d'annexe). Item cellé dans deferred-items.md.
-> **Plan 35-07 (2026-11-07)** : sonde de joignabilité livrée (G-35-4) — PROUVÉE on-device (bandeau hors-ligne affiché au re-test).
-> **Plan 35-10 (2026-11-07)** : G-35-6 corrigé — composeOfflineAwareError partagé de useResource appliqué aux annexes de taches/routines et aux sites useQuery brut (messages, voyages liste/détail) ; use-ref-days justifié hors périmètre (aucune erreur brute exposée). Décision 33-03 et D-09/D-10/D-11 intacts. 1946 tests + build + e2e deep-link verts.
-> **Clôture (2026-11-07)** : test 3 UAT `passed` (« ca marche ! », bundle v1.0-149). Restent skippés avec raison : test 1 (iOS, appareil absent — archivé par l'utilisateur) et test 2 (gate SW « file vide » — reporté au prochain rebuild naturel avec file non vide).
-
-Progress: [█░░░░░░░░░] 25% (1/4 phases v1.1)
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-07 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -121,3 +114,7 @@ None yet.
 Last session: 2026-11-07T09:14:29.150Z
 Stopped at: Completed 35-08-PLAN.md (chemin authentifié-hors-ligne, G-35-5 — rejeu on-device restant)
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

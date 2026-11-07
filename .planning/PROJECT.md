@@ -29,28 +29,34 @@ tokens 0176). Audit passed 38/38 exigences, 7/7 phases vérifiées. La prod
 reçoit des étrangers : le foyer est désormais son unité d'organisation en
 production.
 
-## Current Milestone: v1.1 — PWA durcie mobile-first
+## État courant — jalon v1.1 clôturé le 2026-11-07
 
-**Goal :** la PWA installée devient une vraie app de poche — fiable
-hors-ligne, joignable en un tap depuis l'écran d'accueil, sans aucun store.
+Le jalon v1.1 « PWA durcie mobile-first » (phases 32-35) est livré et taggé :
+la PWA installée est une vraie app de poche — **lecture offline** (cache
+TanStack persisté IndexedDB namespacé, bandeau « dernier état connu le… »,
+allowlist Tier 1, SW ne cachant jamais une réponse API), **file d'écriture
+idempotente** (client_key + unicité SQL, outbox MutationCache, rejeu FIFO
+exactement-une-fois, badge « N en attente », purge scan-avertir-purger),
+**deep links** (/taches/jour, redirect-after-login, cold-start offline avec
+session conservée — gardien 10 s + sonde réseau), et **installabilité durcie**
+(manifest maskable + raccourcis, registerType prompt avec gate « file vide »).
+Audit tech_debt 16/16 exigences, intégration 8/8 coutures, aucune rupture de
+flux. Validation on-device : Desktop Chrome + Android 16 (chaîne offline
+complète passée le 2026-11-07, v1.0-149) ; **iOS réel non testé** (appareil
+absent, consigné honnêtement — cellules matrice « Non testé »).
 
-**Target features :**
-- Offline réel : lecture depuis le cache (dernier état connu, horodaté) +
-  file d'attente d'écriture rejouée à la reconnexion
-- Raccourcis web : vues dédiées (tâches du jour, courses) en deep links
-- Durcissement PWA : installabilité vérifiée tous OS (desktop, Android, iOS),
-  manifest et service worker au niveau
+**Dette reportée au jalon suivant :** outbox silencieux (écriture vers ligne
+supprimée serveur = entrée évaporée sans message — contredit la décision 34),
+maxAge 24 h du cache (décision produit avec les données du panneau diagnostic),
+gate SW runtime (bandeau de mise à jour réel — re-test au prochain déploiement),
+matrice iOS (appareil), flocon test D auth-bootstrap, 2 tests rouges
+anniversaires préexistants, e2e offline-shared-device (2 comptes réels requis).
 
-**Arbitrages d'ouverture (2026-11-04) :** aucun store, aucun APK, aucun
-wrapper natif — les widgets natifs sont sortis du périmètre au profit des
-raccourcis web ; l'offline v1.1 n'est pas le retour du mode démo Dexie
-(retiré du prod en phase 09, D-10).
+## Current Milestone: à définir
 
-### Active requirements
-
-Voir REQUIREMENTS.md (jalon v1.1, en cours de définition). Le v1.0 a livré
-toutes ses exigences (38/38, audit passed) : voir
-.planning/milestones/v1.0-REQUIREMENTS.md pour l'historique.
+Le jalon suivant n'est pas encore ouvert. Démarrage : `/gsd-new-milestone`
+(questioning → research → requirements → roadmap). Les exigences v1.1 (16/16)
+sont archivées dans `.planning/milestones/v1.1-REQUIREMENTS.md`.
 
 ## État v0.9.0 (historique)
 
@@ -75,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-04 — démarrage jalon v1.1*
+*Last updated: 2026-11-07 after v1.1 milestone*
