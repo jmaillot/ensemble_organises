@@ -30,11 +30,11 @@
   3. Les échecs terminaux apparaissent dans le panneau avec l'action Abandonner (confirmation) et les retryables restent rejouables via Réessayer — le badge « N en attente / N bloquées » reflète fidèlement chaque catégorie
   4. Des tests automatisés prouvent la classification des nouveaux codes (rouge→vert sur le scénario 404 silencieux d'origine) et la chaîne de vérification §2.7 reste verte
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 - [x] 36-01-PLAN.md — Catalogue de libellés français (FAILURE_FAMILIES + failureLabel), scénario 404 rouge→vert, audit matriciel D-05 (OBOX-01, OBOX-02)
-- [ ] 36-02-PLAN.md — Retrait du toast D-12, badge unique signal actif, chaîne §2.7 complète (OBOX-01/D-03)
+- [x] 36-02-PLAN.md — Retrait du toast D-12, badge unique signal actif, chaîne §2.7 complète (OBOX-01/D-03)
 
 ### Phase 37: Filet de tests fiable
 
@@ -53,5 +53,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Outbox — plus jamais d'effacement silencieux | 1/2 | In Progress|  |
+| 36. Outbox — plus jamais d'effacement silencieux | 2/2 | In Progress|  |
 | 37. Filet de tests fiable | 0/0 | Not started | - |
