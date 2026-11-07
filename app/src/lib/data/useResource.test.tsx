@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { data, DataError } from '@/lib/data';
 import { DEMO_HOUSEHOLD_ID } from '@/lib/data/seed';
 import { createTestQueryClient, seedHouseholdStore } from '@/test/render';
-import { isEnqueuedFailure, queryKeys, useResource } from './useResource';
+import { isEnqueuedFailure, composeOfflineAwareError, MESSAGE_HORS_LIGNE_SANS_DONNEES, queryKeys, useResource } from './useResource';
 
 /**
  * G-33-3, unitaire : après un refetch échoué hors ligne, TanStack v5 pose
@@ -194,5 +194,43 @@ describe('absorption de l’échec enfilé — UAT-34-1', () => {
     expect(hookSource).toContain('isEnqueuedFailure(table, error)');
     expect(policySource).toContain('isWriteAllowed(marker.table)');
     expect(policySource).toContain('isNetworkFailure(error)');
+  });
+});
+
+/**
+ * 35-10 (G-35-6) : le garde de composition partage — même mécanique que la
+ * substitution interne de `useResource`, exposé pour les annexes `useQuery`
+ * brutes des hooks (tâches, routines). Trois branches : substitution honnête
+ * hors ligne sans données (cause préservée), null avec données (D-09),
+ * erreur brute en ligne (D-11 n'édulcore rien en ligne).
+ */
+describe('composeOfflineAwareError (G-35-6)', () => {
+  afterEach(() => {
+    onlineManager.setOnline(true);
+    vi.restoreAllMocks();
+  });
+
+  it('hors ligne + en erreur + sans données : message honnête, cause préservée', () => {
+    onlineManager.setOnline(false);
+    const brute = new TypeError('failed to fetch');
+    const composee = composeOfflineAwareError({ isError: true, data: undefined, error: brute });
+    expect(composee).toBeInstanceOf(Error);
+    expect(composee?.message).toBe(MESSAGE_HORS_LIGNE_SANS_DONNEES);
+    expect(composee?.cause).toBe(brute);
+  });
+
+  it('en ligne : l’erreur brute passe telle quelle', () => {
+    onlineManager.setOnline(true);
+    const brute = new TypeError('failed to fetch');
+    expect(composeOfflineAwareError({ isError: true, data: undefined, error: brute })).toBe(brute);
+  });
+
+  it('avec des données en cache : null (D-09 — les lignes rendues restent autoritaires)', () => {
+    onlineManager.setOnline(false);
+    expect(composeOfflineAwareError({ isError: true, data: [{ id: 't1' }], error: new TypeError('failed to fetch') })).toBeNull();
+  });
+
+  it('sans erreur : null, quel que soit l’état réseau', () => {
+    expect(composeOfflineAwareError({ isError: false, data: undefined, error: null })).toBeNull();
   });
 });

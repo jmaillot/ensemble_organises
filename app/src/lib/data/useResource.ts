@@ -32,6 +32,14 @@ export interface ResourceResult<T> {
    * l'état sans dépendre du texte du message lisent ce booléen.
    */
   offlineWithoutData: boolean;
+  /**
+   * Vrai dès que la requête porte des données (35-10) — `data !== undefined`,
+   * même périmées ou en échec de refetch. Les compositions d'annexe des hooks
+   * (tâches, routines) l'utilisent pour ne JAMAIS laisser l'échec d'une annexe
+   * masquer des lignes en cache (D-09 : les lignes rendues restent
+   * autoritaires, G-35-6).
+   */
+  hasData: boolean;
   refetch: () => void;
   create: (values: Partial<T>) => Promise<T>;
   update: (id: string, values: Partial<T>) => Promise<T>;
@@ -132,6 +140,33 @@ const NO_ROWS: never[] = [];
  */
 export const MESSAGE_HORS_LIGNE_SANS_DONNEES =
   'Ces données ne sont pas encore sur cet appareil — reconnectez-vous une fois pour les mettre en cache.';
+
+/**
+ * Garde hors-ligne partage (35-10, gap G-35-6) : miroir EXACT du useMemo de
+ * substitution de `useResource` ci-dessous, extrait pour les compositions
+ * d'erreur qui mélangent un `useResource` principal et des annexes `useQuery`
+ * brutes (tâches, routines). Une seule mécanique, deux appelants — le message
+ * et la condition ne peuvent pas diverger (§2.7 E).
+ *
+ * - hors ligne + en erreur + SANS données → l'état honnête D-11, l'erreur
+ *   d'origine préservée en `cause` (rien n'est avalé pour le diagnostic) ;
+ * - en erreur AVEC données → null (D-09 : les lignes rendues restent
+ *   autoritaires, l'erreur ne les masque pas) ;
+ * - hors erreur → null ; en ligne → l'erreur brute, inchangée (D-11
+ *   n'édulcore rien en ligne).
+ *
+ * Les annexes (assignataires, rappels) sont hors persistance (décision 33-03)
+ * : leur erreur brute ne doit jamais écraser l'état honnête quand l'app se
+ * sait hors ligne, ni passer en ligne — c'est la chaîne `?? annexe` des hooks
+ * qui décide de qui gagne ; ce helper garantit que ce qui passe est digne
+ * d'être rendu.
+ */
+export function composeOfflineAwareError(query: { isError: boolean; data: unknown; error: unknown }): Error | null {
+  if (!query.isError) return null;
+  if (query.data !== undefined) return null;
+  if (!onlineManager.isOnline()) return new Error(MESSAGE_HORS_LIGNE_SANS_DONNEES, { cause: query.error });
+  return (query.error as Error | null) ?? null;
+}
 
 /**
  * Hook CRUD générique : une seule implémentation de cache, d'invalidation et
@@ -304,13 +339,15 @@ export function useResource<T = Row>(
   // (ES2022) pour le diagnostic machine : rien n'est avalé. La substitution
   // ne s'applique QUE sans données (D-09 inchangé avec du cache) et QUE hors
   // ligne (en ligne, le message d'origine reste entier).
+  // 35-10 : la mécanique vit dans `composeOfflineAwareError` — un seul site
+  // pour la condition et le message, partagé avec les annexes des hooks.
   const offlineWithoutData = query.isError && query.data === undefined && !onlineManager.isOnline();
-  const error = useMemo(() => {
-    if (offlineWithoutData) return new Error(MESSAGE_HORS_LIGNE_SANS_DONNEES, { cause: query.error });
-    return query.isError && query.data === undefined ? ((query.error as Error | null) ?? null) : null;
+  const error = useMemo(
+    () => composeOfflineAwareError(query),
     // `query.data` participe : la substitution bascule dès qu'une donnée
     // apparaît (hydrate offline) ou disparaît.
-  }, [offlineWithoutData, query.isError, query.data, query.error]);
+    [query.isError, query.data, query.error],
+  );
 
   return {
     rows: query.data ?? NO_ROWS,
@@ -323,6 +360,7 @@ export function useResource<T = Row>(
     isError: query.isError && query.data === undefined,
     error,
     offlineWithoutData,
+    hasData: query.data !== undefined,
     refetch: () => void query.refetch(),
     create,
     update,

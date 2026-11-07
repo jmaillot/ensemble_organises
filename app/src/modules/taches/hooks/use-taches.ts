@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryKeys, useResource } from '@/lib/data/useResource';
+import { composeOfflineAwareError, queryKeys, useResource } from '@/lib/data/useResource';
 import { data } from '@/lib/data';
 import { useCurrentMember, useHouseholdStore, useIsAdmin, useMembers } from '@/stores/household-store';
 import type { HouseholdMemberRow, TaskListRow, TaskRow } from '@/types';
@@ -153,7 +153,7 @@ export function useTaches(): UseTachesResult {
       folder.visibility === 'perso' ? folder.owner_member_id === currentMember?.id : isAdmin,
     [currentMember?.id, isAdmin],
   );
-  const { rows: allRows, isLoading, isFetching, isError, error, refetch, create, update, remove, isMutating } =
+  const { rows: allRows, isLoading, isFetching, isError, error, hasData, refetch, create, update, remove, isMutating } =
     useResource<TaskRow>(TASKS_TABLE);
 
   /**
@@ -349,14 +349,23 @@ export function useTaches(): UseTachesResult {
     // volontairement hors allowlist/persistance (décision 33-03) : en mode
     // avion leur refetch échoue avec data === undefined — sans garde, l'isError
     // composé masquerait les lignes de tâches en cache (G-33-3).
+    // 35-10 (G-35-6) : quand le principal PORTE des lignes (cache persisté
+    // restauré), l'échec d'une annexe ne masque plus rien — l'annexe est
+    // décorative (assignataires « on ne sait pas », rappels) et les lignes
+    // rendues restent autoritaires (D-09). Elle ne porte l'erreur que sans
+    // données principales à rendre.
     isError:
       isError ||
-      (assigneesQuery.isError && assigneesQuery.data === undefined) ||
-      (remindersQuery.isError && remindersQuery.data === undefined),
+      (!hasData &&
+        ((assigneesQuery.isError && assigneesQuery.data === undefined) ||
+          (remindersQuery.isError && remindersQuery.data === undefined))),
+    // 35-10 (G-35-6) : les annexes sont hors persistance (décision 33-03) et
+    // leur erreur brute ne doit jamais écraser l'état honnête quand l'app se
+    // sait hors ligne — composeOfflineAwareError substitue le message D-11
+    // (cause préservée) hors ligne sans données, et laisse passer l'erreur
+    // brute en ligne (D-11 inchangé en ligne).
     error:
-      error ??
-      (assigneesQuery.isError && assigneesQuery.data === undefined ? assigneesQuery.error : null) ??
-      (remindersQuery.isError && remindersQuery.data === undefined ? remindersQuery.error : null),
+      error ?? composeOfflineAwareError(assigneesQuery) ?? composeOfflineAwareError(remindersQuery),
     isMutating,
     refetch,
     toggleStatus,
