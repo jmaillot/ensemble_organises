@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-07)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 36 — Outbox — plus jamais d'effacement silencieux
+**Current focus:** Phase 37 — Filet de tests fiable
 
 ## Current Position
 
@@ -37,7 +37,7 @@ Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
 **Progress bar:**
 
 ```
-[■■■■■■■■■■] 0% — Phase 36 (Outbox) not started
+[■■■■■■■■■■] Phase 36 (Outbox) complete 2/2 — Phase 37 prête à planifier
 ```
 
 ## Performance Metrics
@@ -52,6 +52,8 @@ Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
 - Jalon volontairement 100 % dette : pas de phase de features, deux phases seulement (OBOX, TEST) — la granularité naturelle du travail.
 - GATE-01 (gate SW runtime) hors jalon : observatoire événementiel lié au prochain déploiement naturel, pas planifiable. Consigné dans ROADMAP (Deferred) et REQUIREMENTS (Future).
 - CACHE-01 (maxAge 24 h) et matrice iOS : hors jalon assumé (voir PROJECT.md).
+- Phase 36 : le toast d'échec terminal D-12 est retiré — le badge est l'unique signal actif, le panneau l'unique canal de détail (36-02).
+- Phase 36 : libellés d'échec dérivés d'un catalogue code→famille→libellé dans `outbox.ts`, jamais d'un message PostgREST brut (36-01).
 
 ### Todos
 
@@ -60,12 +62,13 @@ Last activity: 2026-11-07 — Phase 36 complete, transitioned to Phase 37
 ### Blockers
 
 - e2e offline-shared-device : nécessite 2 comptes réels — planifier la disponibilité de l'humain (TEST-03).
+- ⚠️ [Phase 36] 2 échecs e2e préexistants « rejoindre un foyer / format du token » (prouvés sur baseline b02e0a0) — consignés dans `deferred-items.md` de la phase 36 ; à traiter en phase 37 (filet de tests).
 
 ## Session Continuity
 
-**Last session:** 2026-11-07T18:28:01.250Z
-**Stopped at:** Phase 36 complete, ready to plan Phase 37
-**Resume file:** .planning/phases/36-outbox-plus-jamais-d-effacement-silencieux/36-CONTEXT.md
+**Last session:** 2026-11-07T21:05:00+01:00
+**Stopped at:** Phase 36 complete (vérification 7/7), prêt à planifier Phase 37
+**Resume file:** None
 
 - Roadmap v1.2 créée le 2026-11-07 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : `/gsd-plan-phase 36`.

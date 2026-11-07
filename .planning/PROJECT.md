@@ -57,11 +57,10 @@ anniversaires préexistants, e2e offline-shared-device (2 comptes réels requis)
 **Goal:** Fermer les dernières fissures de la promesse offline de v1.1 — plus jamais d'effacement silencieux, la chaîne de mise à jour observée en conditions réelles, un filet de tests fiable.
 
 **Target features:**
-- Outbox 404 silencieux : écriture rejouée vers une ligne supprimée serveur routée vers la classification terminale avec message visible (la décision 34 « jamais d'effacement silencieux » redevient vraie sans exception)
-- Gate SW runtime + INST-03 : bandeau de mise à jour observé sur un vrai déploiement, rejeu des tests 32-UAT 7 et 35-UAT 2 (prerequis : mise en production réelle)
+- Outbox 404 silencieux : écriture rejouée vers une ligne supprimée serveur routée vers la classification terminale avec message visible (la décision 34 « jamais d'effacement silencieux » redevient vraie sans exception) + audit exhaustif des codes d'erreur du rejeu — **livré en phase 36 (2026-11-07, vérification 7/7)**
 - Dette tests/qualité : flocon auth-bootstrap test D, 2 tests rouges anniversaires, e2e offline-shared-device (skip), leftover clé GoTrue sur purges invité
 
-**Out of scope (assumé) :** maxAge 24 h du cache (décision produit reportée, panneau diagnostic disponible), matrice iOS (appareil absent — critère « trois OS » reste consigné non testé).
+**Out of scope (assumé) :** gate SW runtime + INST-03 (rejeu à la prochaine mise en prod naturelle, hors jalon), maxAge 24 h du cache (décision produit reportée, panneau diagnostic disponible), matrice iOS (appareil absent — critère « trois OS » reste consigné non testé).
 
 ## État v0.9.0 (historique)
 
@@ -86,4 +85,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-07 at milestone v1.2 start*
+*Last updated: 2026-11-07 after Phase 36 (milestone v1.2 en cours)*
