@@ -2,17 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.2
 milestone_name: Finition de la dette offline
-current_phase_name: roadmap defined
-status: planning
+current_phase: 36
+current_phase_name: Outbox — plus jamais d'effacement silencieux
+status: executing
 stopped_at: Phase 36 context gathered
-last_updated: "2026-11-07T18:28:01.270Z"
+last_updated: "2026-11-07T18:51:58.565Z"
 last_activity: 2026-11-07
-last_activity_desc: ROADMAP v1.2 écrit (2 phases, 6/6 exigences mappées)
-state_head: af1676a28ec7c79b50aa34e219728ed64000b46d
+last_activity_desc: Phase 36 execution started
+state_head: b02e0a0bc703ab8602ee63c34d4f0b62c27d2852
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
 ---
 
@@ -23,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-07)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Jalon v1.2 « Finition de la dette offline » — fermer les fissures de la promesse offline de v1.1
+**Current focus:** Phase 36 — Outbox — plus jamais d'effacement silencieux
 
 ## Current Position
 
-Phase: Not started (roadmap defined)
-Plan: —
-Status: Ready for /gsd-plan-phase 36
-Last activity: 2026-11-07 — ROADMAP v1.2 écrit (2 phases, 6/6 exigences mappées)
+Phase: 36 (Outbox — plus jamais d'effacement silencieux) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 36
+Last activity: 2026-11-07 — Phase 36 execution started
 
 **Progress bar:**
 
