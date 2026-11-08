@@ -11,7 +11,7 @@
 
 Summary checklist:
 
-- [ ] **Phase 38: Filet de tests fiable** - Flakes dimanche corrigés à la racine + dette review 37 (IN-01/IN-02) ; la chaîne §2.7 devient un instrument de confiance pour tout le jalon
+- [x] **Phase 38: Filet de tests fiable** - Flakes dimanche corrigés à la racine + dette review 37 (IN-01/IN-02) ; la chaîne §2.7 devient un instrument de confiance pour tout le jalon (completed 2026-11-08)
 - [ ] **Phase 39: Outillage prod de vérification** - Smoke-test en mode prod réel via API Admin + spec e2e join-token refondue contre le flux 31-03
 - [ ] **Phase 40: Ardoise « Rejoindre via mon compte »** - L'unique surface produit du jalon : un invité sans foyer rejoint le foyer via le flux d'invitation existant, atterrit dans l'ardoise partagée
 - [ ] **Phase 41: Gate SW simulable** - Le chemin runtime de la gate « file vide » validé e2e contre build+preview réel (GATE-01 planifiable)
@@ -30,7 +30,7 @@ Summary checklist:
   3. IN-01 : la garde morte de `api.ts:315` n'existe plus (supprimée, pas commentée) ; IN-02 : le select `service_role` d'`index.ts:656` est borné, avec `sh scripts/test-db.sh` vert si du SQL a été touché — ou l'absence de Docker consignée explicitement
   4. Les helpers `debutSemaineIso`/`jourSemaine` de `lib/datetime.ts` sont la seule source de semis de semaine lundi→dimanche (classe corrigée, pas l'instance)
 
-**Plans:** 4/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -98,7 +98,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 38. Filet de tests fiable | 4/4 | In Progress|  |
+| 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
 | 39. Outillage prod de vérification | 0/? | Not started | - |
 | 40. Ardoise « Rejoindre via mon compte » | 0/? | Not started | - |
 | 41. Gate SW simulable | 0/? | Not started | - |
