@@ -1,4 +1,4 @@
-import { instantOfDatetimeLocal } from '@/lib/datetime';
+import { debutSemaineIso, instantOfDatetimeLocal, jourSemaine } from '@/lib/datetime';
 import { addDays, todayIso } from '@/lib/utils';
 import type {
   ArdoiseGuestRow,
@@ -67,6 +67,9 @@ import type { Row } from '@/types';
  */
 
 const now = () => new Date().toISOString();
+// Relatif au jour, sans grille semaine : la visibilité des données posées
+// avec `day(n)` ne dépend d'aucun regroupement lundi → dimanche (contrairement
+// aux repas du menu, ancrés semaine via `jourSemaine` plus bas).
 const day = (offset: number) => addDays(todayIso(), offset);
 /**
  * Instant à `n` minutes dans le passé. Un message a été **envoyé** : son
@@ -156,11 +159,17 @@ export const demoPantryItems = [
  * Menu de démonstration (0142, vague 3.1) : la semaine courante, recette du
  * foyer et textes libres mêlés, pour exercer les deux contenus et les trois
  * moments de la journée.
+ *
+ * Ancrage lundi (S-01) : contrairement aux autres relatifs au jour, ces repas
+ * sont relus par la page menu sur une grille lundi → dimanche. `day(0..2)` un
+ * dimanche les envoyait en semaine suivante et vidait le menu — ils sont donc
+ * posés via `jourSemaine(debutSemaineIso(todayIso()), n)`, recalés chaque jour
+ * sur la semaine courante (foyer vivant, jamais de lundi calendaire figé).
  */
 export const demoMealEntries = [
-  { id: 'meal-1', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(0), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 4, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas, DEMO_MEMBERS.lina], created_by: DEMO_MEMBERS.camille, created_at: now() },
-  { id: 'meal-2', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(1), slot: 'midi', recipe_id: null, free_text: 'Restes du frigo', servings: 2, member_ids: [], created_by: DEMO_MEMBERS.thomas, created_at: now() },
-  { id: 'meal-3', household_id: DEMO_HOUSEHOLD_ID, entry_date: day(2), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 2, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas], created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'meal-1', household_id: DEMO_HOUSEHOLD_ID, entry_date: jourSemaine(debutSemaineIso(todayIso()), 0), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 4, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas, DEMO_MEMBERS.lina], created_by: DEMO_MEMBERS.camille, created_at: now() },
+  { id: 'meal-2', household_id: DEMO_HOUSEHOLD_ID, entry_date: jourSemaine(debutSemaineIso(todayIso()), 1), slot: 'midi', recipe_id: null, free_text: 'Restes du frigo', servings: 2, member_ids: [], created_by: DEMO_MEMBERS.thomas, created_at: now() },
+  { id: 'meal-3', household_id: DEMO_HOUSEHOLD_ID, entry_date: jourSemaine(debutSemaineIso(todayIso()), 2), slot: 'soir', recipe_id: 'recipe-1', free_text: null, servings: 2, member_ids: [DEMO_MEMBERS.camille, DEMO_MEMBERS.thomas], created_by: DEMO_MEMBERS.camille, created_at: now() },
 ];
 
 export const demoMembers: HouseholdMemberRow[] = [
