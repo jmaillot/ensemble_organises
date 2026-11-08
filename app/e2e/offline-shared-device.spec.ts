@@ -75,7 +75,10 @@ test.describe('appareil partagé hors ligne (OFFR-04, D-06)', () => {
     await page.goto('/connexion');
     await page.getByLabel(/E-mail/i).fill(email);
     await page.getByLabel(/Mot de passe/i).fill(password);
-    await page.getByRole('button', { name: /Se connecter|Continuer/i }).click();
+    // Ancre exacte : /Se connecter|Continuer/i matcherait AUSSI « Continuer
+    // avec Google » (violation strict mode, révélée à la première exécution
+    // réelle de ce spec — avant il était toujours skippé).
+    await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
     await page.waitForURL('**/accueil');
     await expect(page.getByRole('heading', { level: 1, name: /Bonjour/ })).toBeVisible();
   }
@@ -87,6 +90,11 @@ test.describe('appareil partagé hors ligne (OFFR-04, D-06)', () => {
   }
 
   test('A consulte, se déconnecte, B se connecte : hors ligne B voit SES lignes, jamais celles de A', async ({ page, context }) => {
+    // Borné au-dessus du chemin d'amorçage hors ligne réel (35-06) : gardien
+    // 10 s + restore du cache ≈ 30–40 s mesurés avant le premier rendu de la
+    // page — le timeout par défaut (45 s de test, 8 s d'expect) expirait
+    // AVANT que le repli ne rende la main.
+    test.setTimeout(180_000);
     // 1. A consulte un module Tier 1 en ligne.
     await seConnecter(page, userAEmail!, userAPassword!);
     await page.goto('/taches');
@@ -112,9 +120,12 @@ test.describe('appareil partagé hors ligne (OFFR-04, D-06)', () => {
     await context.setOffline(true);
 
     // SC1 : la vue Tier 1 de B rend les lignes restaurées du cache — pas
-    // d'écran vide ni d'erreur brute.
+    // d'écran vide ni d'erreur brute. Hors ligne, l'amorçage passe par le
+    // gardien de 10 s (plan 35-06 : GoTrue peut ne jamais résoudre en avion,
+    // navigator.onLine trompeur) PUIS le restore du cache : ≈ 30–40 s mesurés
+    // avant le premier rendu — l'attente est bornée explicitement au-dessus.
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 60_000 });
 
     // 4. Isolation : hors ligne, seules les clés de B existent — la preuve
     //    forte (aucune donnée de A, identifiants comparés) vit dans le test
