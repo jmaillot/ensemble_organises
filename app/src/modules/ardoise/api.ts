@@ -310,7 +310,7 @@ async function callArdoiseInvite<T>(action: string, body: Record<string, unknown
     // Porteur de la même forme que SettlementRequestError, nom distinct : le
     // périmètre est le partage (invite), pas le calcul des soldes.
     throw new InviteRequestError(
-      typeof response.status === 'number' ? response.status : 0,
+      response.status,
       (detail as { error?: string } | null)?.error ?? 'Partage impossible.',
     );
   }
