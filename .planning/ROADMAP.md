@@ -30,13 +30,13 @@ Summary checklist:
   3. IN-01 : la garde morte de `api.ts:315` n'existe plus (supprimée, pas commentée) ; IN-02 : le select `service_role` d'`index.ts:656` est borné, avec `sh scripts/test-db.sh` vert si du SQL a été touché — ou l'absence de Docker consignée explicitement
   4. Les helpers `debutSemaineIso`/`jourSemaine` de `lib/datetime.ts` sont la seule source de semis de semaine lundi→dimanche (classe corrigée, pas l'instance)
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 **Wave 1**
 - [x] 38-01-PLAN.md — Helpers `debutSemaineIso`/`jourSemaine` + preuve 7 jours + recalage des semis semaine (menu, seed) + garde anti-récidive
 - [x] 38-02-PLAN.md — Flake WR-03 : protocole W-02 (reproduction → preuve d'innocence → attente d'état) + diagnostic rétrospectif
-- [ ] 38-03-PLAN.md — Dette review 37 : suppression IN-01, bornage IN-02 dans la requête, balayage I-01 du fichier entier
+- [x] 38-03-PLAN.md — Dette review 37 : suppression IN-01, bornage IN-02 dans la requête, balayage I-01 du fichier entier
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 38-04-PLAN.md — Chaîne §2.7 complète + signature e2e (join-token seul rouge, J-01/J-02) + gardes statiques de discipline

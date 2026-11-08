@@ -5,16 +5,16 @@ milestone_name: Solde de la dette
 current_phase: 38
 current_phase_name: Filet de tests fiable
 status: executing
-stopped_at: Completed 38-02-PLAN.md
-last_updated: "2026-11-08T18:46:31.534Z"
+stopped_at: Completed 38-03-PLAN.md
+last_updated: "2026-11-08T19:02:50.099Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 38 execution started
-state_head: b4a19efe9e7339b8abe9f158d83581d7ebc85335
+state_head: aacb2093680d294bc230cdd55c0d60533cc93763
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 ## Current Position
 
 Phase: 38 (Filet de tests fiable) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 38 execution started
 
@@ -45,6 +45,7 @@ Last activity: 2026-11-08 — Phase 38 execution started
 |------|----------|-------|-------|
 | Phase 38 P01 | 14min | 3 tasks | 5 files |
 | Phase 38 P02 | 80min | 3 tasks | 2 files |
+| Phase 38 P03 | 25m | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,8 +67,8 @@ Last activity: 2026-11-08 — Phase 38 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-08T18:46:12.290Z
-**Stopped at:** Completed 38-02-PLAN.md
+**Last session:** 2026-11-08T19:02:45.106Z
+**Stopped at:** Completed 38-03-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
@@ -80,3 +81,4 @@ Last activity: 2026-11-08 — Phase 38 execution started
 - [v1.3]: Phase 38 corrige la CLASSE entière des flakes dimanche (helpers centralisés `debutSemaineIso`/`jourSemaine`, tests paramétriques 7 jours) — jamais d'horloge figée.
 - [Phase 38]: Prédicat de la garde semaine paramétré par l'ancrage : le cas rouge du plan (jourSemaine(debutSemaineIso('2026-11-08'),1)) tombait DANS la semaine courante et ne prouvait rien ; la forme réelle du défaut (day(1) d'un dimanche = 2026-11-09, dates figées) est utilisée à la place. — Un cas-qui-doit-échouer qui ne peut pas échouer est une tautologie (§2.7 D.3) ; l'ancrage figé rend la preuve indépendante du jour d'exécution.
 - [Phase 38]: Correction test-only des deux flocons timing du fichier household-store (protocole W-02) : WR-03 attend un etat via vi.waitFor au lieu d'un sommeil fixe de 1200 ms, harnais D-17 rendu fidele au contrat temporel de production (delegation synchrone des espions). — La reproduction 1/30 a frappe le test frere D-17, pas WR-03 accuse : sans reproduction avant fix, la correction WR-03 serait passee pour la guerison d'un mal qu'elle ne soignait pas. Un harnais qui delegue asynchronement a ce qui est synchrone en production ment sur la fenetre de course.
+- [Phase 38]: Bornage IN-02 par expense_id (.in) car expense_participants n'a pas de household_id (migration 0004) — borne = besoin réel du consommateur ; aucun SQL touché, test-db.sh non requis (I-03)
