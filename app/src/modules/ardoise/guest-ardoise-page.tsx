@@ -8,8 +8,10 @@ import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state
 import { MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
 import { formatEuro } from '@/lib/utils';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
+import { useIsAuthenticated } from '@/hooks/use-auth';
 import {
   fetchGuestLinkView,
+  joinArdoise,
   toServerBalances,
   toServerSettlements,
 } from './api';
@@ -25,6 +27,13 @@ import { SettlementsPanel } from './components/settlements-panel';
  * l'invité n'apparaît pas dans la répartition. Pour AVANCER des dépenses,
  * il faut un compte puis rejoindre l'ardoise (l'adhésion inscrit aux
  * dépenses à part zéro sur le passé).
+ *
+ * G-37-2 : un visiteur CONNECTÉ n'était traité nulle part. Il voit désormais
+ * une branche « Rejoindre via mon compte » qui appelle le chemin join réel —
+ * parité d'ENTRÉE avec cadeaux/voyages, sans en copier la sémantique :
+ * l'ardoise reste binaire (lien anonyme lecture seule ↔ rattachement membre
+ * du foyer). Le 403 serveur d'un non-membre est le comportement CORRECT du
+ * modèle binaire : il s'affiche tel quel, jamais maquillé en succès.
  */
 export default function GuestArdoisePage() {
   const [params] = useSearchParams();
@@ -34,6 +43,10 @@ export default function GuestArdoisePage() {
     return initial.length >= 22 ? initial : null;
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const isAuthenticated = useIsAuthenticated();
+  const [joinState, setJoinState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [joinMessage, setJoinMessage] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const viewQuery = useQuery({
     queryKey: ['ardoise', 'link-view', activeCode ?? ''],
@@ -61,6 +74,29 @@ export default function GuestArdoisePage() {
   const balances = view?.settlement ? toServerBalances(view.settlement, []) : [];
   const settlements = view?.settlement ? toServerSettlements(view.settlement) : [];
   const total = view?.expenses.reduce((sum, expense) => sum + expense.amount, 0) ?? 0;
+
+  /** Rattachement réel via le goulot `join` de l'Edge (G-37-2). */
+  const rejoindre = async () => {
+    if (activeCode === null) return;
+    setJoinState('loading');
+    setJoinMessage(null);
+    setJoinError(null);
+    try {
+      const result = await joinArdoise(activeCode);
+      setJoinMessage(
+        result.already_member
+          ? 'Vous participez déjà à cette ardoise : rien à faire.'
+          : 'Vous participez désormais à cette ardoise : elle apparaît dans votre module Ardoise.',
+      );
+      setJoinState('done');
+    } catch (cause) {
+      // Le 403 d'un non-membre est le comportement CORRECT du modèle
+      // binaire : on affiche le message serveur tel quel, sans le maquiller.
+      const message = cause instanceof Error ? cause.message : 'Rattachement impossible.';
+      setJoinError(message);
+      setJoinState('error');
+    }
+  };
 
   return (
     <ModuleShell module="ardoise">
@@ -141,18 +177,58 @@ export default function GuestArdoisePage() {
             <Panel
               id="guest-ardoise-join-panel"
               title="Participer ?"
-              description="La lecture est libre, mais avancer une dépense demande un compte."
+              description="La lecture est libre, mais avancer une dépense demande un compte. Le compteur d'utilisations du lien compte les rachats (redeem), pas les consultations."
             >
-              <p className="m-0 mb-3 text-[12px] text-muted">
-                Créez un compte, puis rejoignez l’ardoise : vous serez ajouté aux dépenses (part zéro sur le
-                passé, partage normal ensuite).
-              </p>
-              <Link
-                to="/connexion"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
-              >
-                Créer un compte
-              </Link>
+              {isAuthenticated ? (
+                <div className="grid gap-3">
+                  <p className="m-0 text-[12px] text-muted">
+                    Vous êtes connecté : rejoignez l'ardoise via votre compte pour avancer des dépenses (part zéro
+                    sur le passé, partage normal ensuite). Un non-membre du foyer recevra un refus explicite.
+                  </p>
+                  {joinMessage ? (
+                    <p className="m-0 rounded-[11px] bg-accent-faint px-3 py-2.5 text-[12px]" role="status">
+                      {joinMessage}
+                    </p>
+                  ) : null}
+                  {joinError ? (
+                    <div className="grid gap-1.5 rounded-[11px] bg-coral-soft px-3 py-2.5" role="alert">
+                      <p className="m-0 text-[12px]">{joinError}</p>
+                      {/foyer/i.test(joinError) ? (
+                        <p className="m-0 text-[12px] text-muted" role="status">
+                          Connectez-vous avec le bon compte : celui du foyer de cette ardoise.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {joinState === 'done' ? (
+                    <Link
+                      to="/ardoise"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
+                    >
+                      Ouvrir l’ardoise
+                    </Link>
+                  ) : (
+                    <div>
+                      <Button icon="arrow" disabled={joinState === 'loading'} onClick={() => void rejoindre()}>
+                        {joinState === 'loading' ? 'Rattachement…' : 'Rejoindre via mon compte'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="m-0 mb-3 text-[12px] text-muted">
+                    Créez un compte, puis rejoignez l’ardoise : vous serez ajouté aux dépenses (part zéro sur le
+                    passé, partage normal ensuite).
+                  </p>
+                  <Link
+                    to="/connexion"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-accent-strong px-[15px] text-[13px] font-[760] text-white"
+                  >
+                    Créer un compte
+                  </Link>
+                </>
+              )}
             </Panel>
           </div>
         )}

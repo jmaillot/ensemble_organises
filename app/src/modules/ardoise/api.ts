@@ -343,8 +343,13 @@ export async function fetchInviteSummary(ardoiseId: string): Promise<ArdoiseCode
   return callArdoiseInvite<ArdoiseCodeSummary | null>('summary', { ardoiseId });
 }
 
-/** Membre du foyer qui rejoint via code (idempotent). */
-export async function joinArdoise(code: string): Promise<{ ardoise_id: string }> {
+/**
+ * Membre du foyer qui rejoint via code (idempotent). L'Edge retourne déjà
+ * `already_member` (ardoise-invite, action `join`) — le client le déclare
+ * désormais pour distinguer rattachement et confirmation idempotente
+ * (G-37-2) ; aucun changement serveur.
+ */
+export async function joinArdoise(code: string): Promise<{ ardoise_id: string; already_member?: boolean }> {
   return callArdoiseInvite('join', { code: code.trim() });
 }
 
