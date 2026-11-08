@@ -305,9 +305,27 @@ async function callArdoiseInvite<T>(action: string, body: Record<string, unknown
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error((detail as { error?: string } | null)?.error ?? 'Partage impossible.');
+    // WR-02 (37-REVIEW) : le statut HTTP voyage avec l'erreur — un appelant ne
+    // peut plus deviner un 403 d'un 5xx en testant la COPIE du message (WR-01).
+    // Porteur de la même forme que SettlementRequestError, nom distinct : le
+    // périmètre est le partage (invite), pas le calcul des soldes.
+    throw new InviteRequestError(
+      typeof response.status === 'number' ? response.status : 0,
+      (detail as { error?: string } | null)?.error ?? 'Partage impossible.',
+    );
   }
   return (await response.json()) as T;
+}
+
+/** Échec de l'Edge `ardoise-invite` : le statut HTTP est porté, jamais perdu. */
+export class InviteRequestError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'InviteRequestError';
+    this.status = status;
+  }
 }
 
 export interface ArdoiseCode {

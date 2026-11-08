@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useIsAuthenticated } from '@/hooks/use-auth';
 import {
   fetchGuestLinkView,
+  InviteRequestError,
   joinArdoise,
   toServerBalances,
   toServerSettlements,
@@ -38,15 +39,30 @@ import { SettlementsPanel } from './components/settlements-panel';
 export default function GuestArdoisePage() {
   const [params] = useSearchParams();
   const [code, setCode] = useState(() => params.get('code') ?? '');
-  const [activeCode, setActiveCode] = useState(() => {
-    const initial = (params.get('code') ?? '').trim();
-    return initial.length >= 22 ? initial : null;
-  });
+  // WR-03 (37-REVIEW) : un code venu de l'URL ne contourne pas le garde de
+  // configuration que le chemin formulaire applique — sans backend configuré,
+  // l'URL aboutit au formulaire (même message que la saisie manuelle), pas à
+  // une requête promise à l'échec.
+  const fromUrl = (params.get('code') ?? '').trim();
+  const codeDepuisUrl = isSupabaseConfigured && fromUrl.length >= 22 ? fromUrl : null;
+  const [activeCode, setActiveCode] = useState<string | null>(codeDepuisUrl);
+  // Le code suit l'URL : naviguer de ?code=A vers ?code=B change d'ardoise
+  // dans le MÊME montage (défaut révéré par le test WR-05 — le state initial
+  // seul ne se recalcule jamais). La saisie formulaire reste maître quand
+  // l'URL ne porte pas de code : l'effet ne court que sur codeDepuisUrl.
+  useEffect(() => {
+    setActiveCode(codeDepuisUrl);
+  }, [codeDepuisUrl]);
   const [formError, setFormError] = useState<string | null>(null);
   const isAuthenticated = useIsAuthenticated();
   const [joinState, setJoinState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [joinMessage, setJoinMessage] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  // WR-01 (37-REVIEW) : l'aide « bon compte » est déclenchée par le STATUT
+  // HTTP (403 = non-membre, refus attendu du modèle binaire), jamais par un
+  // test sur la copie du message serveur — une reformulation côté Edge ne
+  // doit pas faire disparaître (ni inventer) l'aide.
+  const [joinIs403, setJoinIs403] = useState(false);
 
   const viewQuery = useQuery({
     queryKey: ['ardoise', 'link-view', activeCode ?? ''],
@@ -70,10 +86,35 @@ export default function GuestArdoisePage() {
     setActiveCode(trimmed);
   };
 
+  // WR-05 (37-REVIEW) : l'état du rattachement appartient à UN code — un
+  // succès ou une erreur de l'ardoise A ne doit pas survivre à l'affichage de
+  // l'ardoise B (le formulaire permet de repartir sur un autre code).
+  useEffect(() => {
+    setJoinState('idle');
+    setJoinMessage(null);
+    setJoinError(null);
+    setJoinIs403(false);
+  }, [activeCode]);
+
   const view = viewQuery.data ?? null;
   const balances = view?.settlement ? toServerBalances(view.settlement, []) : [];
   const settlements = view?.settlement ? toServerSettlements(view.settlement) : [];
   const total = view?.expenses.reduce((sum, expense) => sum + expense.amount, 0) ?? 0;
+
+  /**
+   * Message d'échec du lien, différencié par le STATUT porté par
+   * `InviteRequestError` (WR-02) : un 4xx est un lien réellement invalide
+   * (révoqué, expiré) ; tout le reste — 5xx, réseau, statut inconnu — ne
+   * permet PAS d'affirmer que le lien ne passe plus (WR-01 : ne plus juger
+   * sur la copie du message).
+   */
+  const messageEchecLien = !isSupabaseConfigured
+    ? 'Connexion au serveur indisponible pour le moment.'
+    : viewQuery.error instanceof InviteRequestError &&
+        viewQuery.error.status >= 400 &&
+        viewQuery.error.status < 500
+      ? 'Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur.'
+      : 'Impossible de charger cette ardoise pour le moment. Réessayez.';
 
   /** Rattachement réel via le goulot `join` de l'Edge (G-37-2). */
   const rejoindre = async () => {
@@ -92,8 +133,10 @@ export default function GuestArdoisePage() {
     } catch (cause) {
       // Le 403 d'un non-membre est le comportement CORRECT du modèle
       // binaire : on affiche le message serveur tel quel, sans le maquiller.
+      const status = cause instanceof InviteRequestError ? cause.status : 0;
       const message = cause instanceof Error ? cause.message : 'Rattachement impossible.';
       setJoinError(message);
+      setJoinIs403(status === 403);
       setJoinState('error');
     }
   };
@@ -127,10 +170,7 @@ export default function GuestArdoisePage() {
         ) : viewQuery.isLoading ? (
           <LoadingRows rows={3} />
         ) : viewQuery.isError || !view ? (
-          <ErrorState
-            message="Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur."
-            onRetry={() => setActiveCode(null)}
-          />
+          <ErrorState message={messageEchecLien} onRetry={() => setActiveCode(null)} />
         ) : (
           <div className="grid gap-[18px]">
             {view.ardoise.coverUrl ? (
@@ -193,7 +233,7 @@ export default function GuestArdoisePage() {
                   {joinError ? (
                     <div className="grid gap-1.5 rounded-[11px] bg-coral-soft px-3 py-2.5" role="alert">
                       <p className="m-0 text-[12px]">{joinError}</p>
-                      {/foyer/i.test(joinError) ? (
+                      {joinIs403 ? (
                         <p className="m-0 text-[12px] text-muted" role="status">
                           Connectez-vous avec le bon compte : celui du foyer de cette ardoise.
                         </p>

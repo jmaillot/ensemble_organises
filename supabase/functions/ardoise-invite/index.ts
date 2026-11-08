@@ -652,11 +652,24 @@ async function buildGuestView(
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false }),
     admin.from('expense_participants').select('expense_id,participant_type,member_id,guest_id,share_amount'),
-    admin.from('household_members').select('id,display_name'),
+    admin.from('household_members').select('id,display_name,role'),
     admin.from('ardoise_guests').select('id,display_name').eq('ardoise_id', ardoiseId),
   ]);
 
   const memberNames = new Map(((members ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]));
+  // WR-04 (37-REVIEW) : la vue PUBLIQUE ne divulgue aucun enfant — même
+  // exclusion que l'UI interne (`toServerBalances` filtre le rôle `enfant`),
+  // mais appliquée ICI car le client invité ne possède pas les rôles. Noms,
+  // participations, payeurs et lignes de solde/transfert d'un enfant sont
+  // retirés de la charge utile, jamais masqués côté navigateur. Contrepartie
+  // assumée : si un enfant participe malgré tout, la compensation affichée
+  // sous-compte — l'UI interne ne propose de toute façon pas un enfant comme
+  // participant d'ardoise, donc la donnée filtrée est une donnée anormale.
+  const enfantIds = new Set(
+    ((members ?? []) as { id: string; role?: string }[])
+      .filter((m) => m.role === 'enfant')
+      .map((m) => m.id),
+  );
   const guestNames = new Map(((guests ?? []) as { id: string; display_name: string }[]).map((g) => [g.id, g.display_name]));
   const displayName = (kind: string, memberId: string | null, guestId: string | null): string => {
     if (kind === 'guest') return (guestId && guestNames.get(guestId)) || 'Invité';
@@ -672,6 +685,8 @@ async function buildGuestView(
     share_amount: number | string;
   }[]) {
     if (!expenseIds.has(part.expense_id)) continue;
+    // Enfant : sa ligne de participation ne quitte jamais le serveur (WR-04).
+    if (part.member_id && enfantIds.has(part.member_id)) continue;
     const list = partsByExpense.get(part.expense_id) ?? [];
     list.push({
       name: displayName(part.participant_type, part.member_id, part.guest_id),
@@ -696,7 +711,9 @@ async function buildGuestView(
       date: expense.expense_date,
       paidByName: paidByGuest
         ? displayName('guest', null, paidByGuest)
-        : displayName('membre', expense.paid_by, null),
+        : // Un payeur enfant tombe sur le générique « Membre » (WR-04) : son
+          // identité ne traverse pas la frontière publique.
+          displayName('membre', expense.paid_by && !enfantIds.has(expense.paid_by) ? expense.paid_by : null, null),
       participants: partsByExpense.get(expense.id) ?? [],
     };
   });
@@ -707,6 +724,25 @@ async function buildGuestView(
       : { p_actor_id: null, p_ardoise_id: ardoiseId, p_ticket_hash: null, p_open_access: true };
   const { data: settlement, error: settlementError } = await admin.rpc('ardoise_settlement', settlementArgs);
   if (settlementError) throw translateRpcError(settlementError);
+
+  // WR-04 : les lignes de solde et de transfert d'un enfant sont retirées de
+  // la charge utile PUBLIQUE, symétrique du filtre `toServerBalances` de l'UI
+  // interne. Le RPC calcule sur tous les participants ; on ne le re-calcule
+  // pas, on retire les lignes identifiées — une compensation impliquant un
+  // enfant disparaît de l'affichage plutôt que de divulguer son nom.
+  type SettlementRow = { kind?: string; participant_id?: string; from_kind?: string; from_id?: string; to_kind?: string; to_id?: string };
+  const rawSettlement = (settlement ?? null) as (Record<string, unknown> & { balances?: SettlementRow[]; settlements?: SettlementRow[] }) | null;
+  const estEnfant = (kind: string | undefined, id: string | undefined): boolean =>
+    kind === 'membre' && typeof id === 'string' && enfantIds.has(id);
+  const publicSettlement = rawSettlement
+    ? {
+        ...rawSettlement,
+        balances: (rawSettlement.balances ?? []).filter((row) => !estEnfant(row.kind, row.participant_id)),
+        settlements: (rawSettlement.settlements ?? []).filter(
+          (row) => !estEnfant(row.from_kind, row.from_id) && !estEnfant(row.to_kind, row.to_id),
+        ),
+      }
+    : null;
 
   // Le nom dit la nature de la valeur : la colonne porte un CHEMIN de bucket
   // (`cover_url`), la charge utile porte une URL servable (`coverUrl`). Un
@@ -727,7 +763,7 @@ async function buildGuestView(
     },
     guest: guestDisplayName ? { display_name: guestDisplayName } : null,
     expenses: viewExpenses,
-    settlement: settlement ?? null,
+    settlement: publicSettlement,
   });
 }
 

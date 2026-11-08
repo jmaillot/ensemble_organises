@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import GuestArdoisePage from './guest-ardoise-page';
+import { InviteRequestError } from './api';
 
 const { authed, joinArdoiseMock } = vi.hoisted(() => ({
   authed: { value: false },
@@ -57,7 +58,10 @@ function mockViewFetch(calls: string[], ok = true, payload: unknown = viewPayloa
     vi.fn().mockImplementation(async (_url: unknown, init?: RequestInit) => {
       const body = (JSON.parse((init?.body as string) ?? '{}') as { action?: string; code?: string }) ?? {};
       calls.push(`${body.action ?? '?'}`);
-      if (!ok) return { ok: false, json: async () => ({ error: 'Lien invalide.' }) };
+      // `status: 404` est porté comme l'Edge le fait : la page distingue un
+      // lien réellement invalide (4xx → « ne passe plus ») d'un échec serveur
+      // (5xx → message générique, WR-01/WR-03).
+      if (!ok) return { ok: false, status: 404, json: async () => ({ error: 'Lien invalide.' }) };
       return { ok: true, json: async () => payload };
     }),
   );
@@ -154,6 +158,30 @@ describe('GuestArdoisePage', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  /**
+   * WR-01/WR-03 (37-REVIEW) : un 5xx n'est PAS un lien révoqué. Affirmer
+   * « ce lien ne passe plus » sur une panne serveur serait un mensonge qui
+   * envoie l'invité redemander un lien valide. Le statut porté par
+   * `InviteRequestError` décide, jamais la copie du message.
+   */
+  it('échec serveur 5xx : message générique, pas le verdict « lien révoqué »', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: 'Erreur interne.' }),
+      })),
+    );
+    try {
+      renderGuest(CODE);
+      expect(await screen.findByText(/Impossible de charger/)).toBeInTheDocument();
+      expect(screen.queryByText(/ne passe plus/)).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
@@ -205,12 +233,13 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
   it('succès du join : confirmation + lien vers le module ; déjà membre : message idempotent', async () => {
     const calls: string[] = [];
     mockViewFetch(calls);
+    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
     const user = userEvent.setup();
     try {
       authed.value = true;
       renderGuest(CODE);
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
-      expect(await screen.findByRole('status')).toHaveTextContent(/participe désormais/);
+      expect(await screen.findByRole('status')).toHaveTextContent(/participez désormais/);
       expect(screen.getByRole('link', { name: 'Ouvrir l’ardoise' })).toBeInTheDocument();
       expect(joinArdoiseMock).toHaveBeenCalledWith(CODE);
     } finally {
@@ -222,7 +251,7 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
     const calls: string[] = [];
     mockViewFetch(calls);
     const serveur = 'Vous n’appartenez pas au foyer de cette ardoise : utilisez le lien invité.';
-    joinArdoiseMock.mockRejectedValue(new Error(serveur));
+    joinArdoiseMock.mockRejectedValue(new InviteRequestError(403, serveur));
     const user = userEvent.setup();
     try {
       authed.value = true;
@@ -230,9 +259,87 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(serveur);
       // Le 403 est le comportement CORRECT pour un non-membre : la page le
-      // surface sans le maquiller, et propose l'aide « bon compte ».
+      // surface sans le maquiller, et propose l'aide « bon compte » —
+      // déclenchée par le STATUT (WR-01), pas par le texte du message.
       expect(screen.getByRole('status')).toHaveTextContent(/bon compte/i);
       expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /**
+   * WR-01 : un 5xx n'est pas un refus de membership. Le message serveur
+   * s'affiche, mais SANS l'aide « bon compte » — elle serait un conseil faux
+   * (le compte est peut-être le bon, c'est le serveur qui est en panne).
+   */
+  it('rejet 500 : message serveur affiché, aide « bon compte » absente', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    joinArdoiseMock.mockRejectedValue(new InviteRequestError(500, 'Erreur interne.'));
+    const user = userEvent.setup();
+    try {
+      authed.value = true;
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Erreur interne.');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /**
+   * WR-05 (37-REVIEW) : l'état du rattachement appartient à UN code. Un
+   * succès (message + lien « Ouvrir l'ardoise ») obtenu sur l'ardoise A ne
+   * doit pas survivre à l'affichage de l'ardoise B dans le même montage.
+   */
+  it('changement de code : l’état du join est réinitialisé', async () => {
+    const CODE_B = 'code-second-123456789012345';
+    const viewB = {
+      ...viewPayload,
+      ardoise: { ...viewPayload.ardoise, id: 'ardoise-2', name: 'Barbecue' },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (_url: unknown, init?: RequestInit) => {
+        const body = (JSON.parse((init?.body as string) ?? '{}') as { code?: string }) ?? {};
+        return { ok: true, json: async () => (body.code === CODE_B ? viewB : viewPayload) };
+      }),
+    );
+    function NavToB() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(`/invitation/ardoise?code=${CODE_B}`)}>aller-B</button>;
+    }
+    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
+    const user = userEvent.setup();
+    try {
+      authed.value = true;
+      renderWithProviders(
+        <Routes>
+          <Route
+            path="/invitation/ardoise"
+            element={
+              <>
+                <GuestArdoisePage />
+                <NavToB />
+              </>
+            }
+          />
+        </Routes>,
+        { route: `/invitation/ardoise?code=${CODE}`, withHousehold: false },
+      );
+      await screen.findByText('Week-end');
+      await user.click(screen.getByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(await screen.findByRole('status')).toHaveTextContent(/participez désormais/);
+      expect(screen.getByRole('link', { name: 'Ouvrir l’ardoise' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'aller-B' }));
+      expect(await screen.findByText('Barbecue')).toBeInTheDocument();
+      // Le résidu du succès sur A a disparu : message et lien retombés.
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Rejoindre via mon compte' })).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }
