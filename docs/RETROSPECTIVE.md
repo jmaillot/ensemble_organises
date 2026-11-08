@@ -817,3 +817,74 @@ même fichier, l'une contre le throttle de 1 000 ms (WR-03 : sommeil fixe de
 délégation asynchrone du mock), les deux ne se manifestant que sous charge,
 les deux corrigeables côté test seul.
 
+## 13. Les corrections : attente d'état et harnais fidèle, preuve par répétition
+
+Les deux corrections sont **test-only** — le code de production
+(`household-store.ts`, `query-persistence.ts`) n'a pas été modifié : la
+preuve d'innocence du protocole a tenu, aucune course n'a été désignée dans
+la production (le garde `cancelled` de Pitfall 6 et le `stopPersisting`
+synchrone font leur travail ; c'est le harnais qui simulait
+imparfaitement la synchronie).
+
+- **WR-03 durci (3895197).** Le sommeil de 1 200 ms est remplacé par une
+  attente d'état bornée — `vi.waitFor(() => expect(get(...)).resolves
+  .toContain('post-switch'), { timeout: 5_000, interval: 50 })`, patron
+  déjà utilisé par `route-error.test.tsx:39`. Le test attend l'écriture
+  réelle du persister throttlé, quelle que soit l'échéance du throttle :
+  la course de 200 ms disparaît par construction. Le commentaire de contrat
+  de course (« la fenêtre couvre son échéance ») a été supprimé avec le
+  mécanisme qu'il décrivait, remplacé par la désignation du défaut
+  d'origine.
+- **Harnais D-17 rendu fidèle (même commit).** Les espions d'ordre
+  (`purgeCacheSpy`, `stopPersistingSpy`) délègent désormais à des
+  références réelles capturées UNE FOIS par la factory du mock — appel
+  synchrone, comme le `stopPersisting` de production. Le pont
+  `vi.importActual` re-évalué dans chaque `mockImplementation` (délégation
+  asynchrone) est supprimé : la fenêtre de mise en silence qu'il ouvrait
+  sous charge n'existe plus.
+
+Preuve par répétition (§2.7 F) : **20 exécutions consécutives chargées de
+`household-store.test.ts` (5 en parallèle) après correction : 20/20
+vertes.** Le taux de l'arbre de base (1/30) et le taux post-fix (20/20)
+sont cités ensemble, conformément au protocole : reproduction, correction,
+repreuve.
+
+## 14. Le flake menu du dimanche : date, pas timing — correction portée par 38-01
+
+Le second flocon « du dimanche » signalé par v1.2 est de nature DIFFÉRENTE :
+la cause y est la DATE, pas le timing. Le semis du menu `demoMealEntries`
+recalait les repas avec `day(0..2)` (addDays depuis le jour courant), tandis
+que la grille de la page semaine est ancrée lundi → dimanche. Six jours sur
+sept, `day(1)` tombe dans la semaine courante et la page affiche les repas ;
+le dimanche, `day(0)` = dimanche, `day(1)` = lundi de la semaine SUIVANTE —
+la grille de la semaine courante ne les voit plus. Le profil « 1 rouge
+occasional, tous les dimanches » s'explique exactement : le défaut ne peut
+se manifester qu'un dimanche.
+
+Conformément au même protocole (preuve paramétrique des 7 ISO plutôt
+qu'attente d'un dimanche réel), la correction est portée par le **plan 38-01**
+(helpers centralisés `debutSemaineIso`/`jourSemaine` dans `datetime.ts`,
+`weekStartOf` délégué — une seule source, S-03 ; semis recalé sur
+`jourSemaine(debutSemaineIso(todayIso()), n)` avec garde anti-récidive
+paramétrique 7 jours, commits `4f88b89`, `8dace2c`, `4f45e83`). La campagne
+v1.3 documente le défaut et désigne le correctif ; la preuve paramétrique
+vit dans les tests livrés par 38-01, jamais une horloge figée (S-02).
+
+## 15. La discipline (continuité du flocon test D de la phase 37)
+
+Les trois gestes de D-01 (phase 37) ont été rejoués à l'identique, dans
+l'ordre : reproduction mesurée AVANT toute correction (1/30 consigné, le
+rouge vu avant le vert) ; preuve d'innocence du code de production par
+lecture et par traceur puis par répétition post-fix (20/20) ; correction du
+seul code de test. Deux leçons nouvelles pour la campagne :
+
+- **Un harnais qui délègue asynchronement à ce qui est synchrone en
+  production ment sur la fenêtre de course.** La fidélité du mock au
+  contrat temporel du réel compte autant que sa fidélité comportementale.
+- **Le flake ne frappe pas toujours le test qu'on accuse.** Le protocole a
+  reproduit le défaut sur un test frère partageant l'état module — sans la
+  reproduction exigée avant fix (§2.7 B), la correction de WR-03 serait
+  passée pour la guérison d'un mal qu'elle ne soignait pas forcément, et la
+  fenêtre D-17 serait restée ouverte.
+
+
