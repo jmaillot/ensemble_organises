@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { format } from 'date-fns';
-import { instantOfDatetimeLocal, instantToLocalInput } from './datetime';
+import { debutSemaineIso, instantOfDatetimeLocal, instantToLocalInput, jourSemaine } from './datetime';
 
 /**
  * Fuseau épinglé : les deux directions sont par construction sensibles au
@@ -109,5 +109,47 @@ describe('aller-retour instant → valeur locale → instant', () => {
   it('la valeur relue est celle que `date-fns` rend pour le même instant (pas de format divergent)', () => {
     const iso = '2026-10-15T16:30:00.000Z';
     expect(instantToLocalInput(iso)).toBe(format(new Date(iso), "yyyy-MM-dd'T'HH:mm"));
+  });
+});
+
+describe('semaine lundi → dimanche — helpers de production (flake menu du dimanche)', () => {
+  /**
+   * La date est une ENTRÉE (S-02, jamais d'horloge figée) : le défaut
+   * d'origine (seed.ts `day(0..2)`, grille lundi→dimanche du module menu)
+   * ne se montrait que le dimanche — `demoMealEntries` tombait alors sur la
+   * semaine suivante. Les sept ISO injectés prouvent que la classe est
+   * corrigée pour CHAQUE jour de semaine, dimanche en dernier : le jour qui
+   * cassait avant le fix.
+   */
+  const semaine = [
+    { iso: '2026-11-02', jour: 'lundi' },
+    { iso: '2026-11-03', jour: 'mardi' },
+    { iso: '2026-11-04', jour: 'mercredi' },
+    { iso: '2026-11-05', jour: 'jeudi' },
+    { iso: '2026-11-06', jour: 'vendredi' },
+    { iso: '2026-11-07', jour: 'samedi' },
+    { iso: '2026-11-08', jour: 'dimanche — le jour qui cassait avant le fix' },
+  ] as const;
+
+  it.each(semaine)('debutSemaineIso($iso) ($jour) rend le lundi 2026-11-02', ({ iso }) => {
+    expect(debutSemaineIso(iso)).toBe('2026-11-02');
+  });
+
+  it.each([0, 1, 2, 3, 4, 5, 6])('jourSemaine("2026-11-02", %i) décale de %i jour(s) depuis le lundi', (index) => {
+    expect(jourSemaine('2026-11-02', index)).toBe(`2026-11-0${2 + index}`);
+  });
+
+  it('aller-retour : le dimanche d’une semaine reboucle sur son propre lundi', () => {
+    const debut = '2026-11-02';
+    expect(debutSemaineIso(jourSemaine(debut, 6))).toBe(debut);
+  });
+
+  it('aller-retour sur la semaine courante : le lundi calculé depuis aujourd’hui est stable', () => {
+    // Propriété générale, pas de fixture de lundi figé (Pitfall 2) : pour un
+    // jour quelconque, debutSemaineIso(jourSemaine(debut, 6)) === debut.
+    for (const { iso } of semaine) {
+      const debut = debutSemaineIso(iso);
+      expect(debutSemaineIso(jourSemaine(debut, 6))).toBe(debut);
+    }
   });
 });

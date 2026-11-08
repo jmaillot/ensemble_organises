@@ -38,3 +38,45 @@ export function instantOfDatetimeLocal(value: string | null | undefined): string
   const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
+
+// ---------------------------------------------------------------------------
+// Semaine lundi → dimanche, arithmétique ISO pure en UTC.
+//
+// Le défaut d'origine (flake « menu du dimanche ») : le semis de
+// démonstration posait ses repas avec `day(0..2)` (relatif au jour, seed.ts)
+// alors que la page menu les relit sur une grille lundi → dimanche. Du lundi
+// au samedi les trois repas restaient visibles ; le dimanche, ils tombaient
+// sur la semaine suivante et disparaissaient de l'écran. Les deux helpers
+// ci-dessous (`debutSemaineIso`, `jourSemaine`) sont la SEULE source de cette
+// arithmétique : le module menu (`weekStartOf`) et le semis délèguent ici —
+// aucune copie (AGENTS.md §2.7 E).
+// ---------------------------------------------------------------------------
+
+const toUtcDate = (iso: string): Date => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+};
+
+const isoOfUtc = (date: Date): string => date.toISOString().slice(0, 10);
+
+/**
+ * Lundi de la semaine contenant la date ISO donnée. Aucune horloge figée :
+ * la date est une entrée, le résultat est recalé à chaque appel.
+ */
+export function debutSemaineIso(isoDate: string): string {
+  const date = toUtcDate(isoDate);
+  const offset = (date.getUTCDay() + 6) % 7; // lundi = 0 … dimanche = 6
+  date.setUTCDate(date.getUTCDate() - offset);
+  return isoOfUtc(date);
+}
+
+/**
+ * Jour d'index `index` (0 = lundi … 6 = dimanche) de la semaine commençant
+ * au lundi ISO donné. Forme unidimensionnelle de `weekDatesOf` : le semis
+ * n'a besoin que d'un jour précis, pas des sept.
+ */
+export function jourSemaine(debutSemaineIso: string, index: number): string {
+  const date = toUtcDate(debutSemaineIso);
+  date.setUTCDate(date.getUTCDate() + index);
+  return isoOfUtc(date);
+}
