@@ -81,9 +81,21 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
-## Current Milestone
+## Current Milestone: v1.3 Solde de la dette
 
-*(aucun — le prochain jalon démarre par /gsd-new-milestone)*
+**Goal:** Fermer toutes les dettes consignées de v1.1/v1.2 plus l'évolution produit ardoise — aucun report ne survit au jalon.
+
+**Target features:**
+- **Ardoise** : le lien de partage propose « Rejoindre via mon compte » → réutilise le flux d'invitation du foyer existant (token HMAC, transaction serveur)
+- **GATE-01 équivalent planifiable** : simuler file vide + nouvelle version SW en local/dev pour valider le chemin runtime de la gate de mise à jour
+- **CACHE-01** : phase décision produit maxAge 24 h — lire le panneau diagnostic, arbitrer, documenter
+- **Flakes dimanche** : semis menu-page (day(1) vs semaine lundi→dimanche) et household-store WR-03 corrigés à la racine
+- **Spec e2e join-token** : réécrite ou supprimée (périmée depuis refonte 31-03)
+- **Amorçage offline** : mesurer le cold start (~30-40 s), corriger ce que le profilage désigne
+- **Smoke-test** : mode prod réel via API Admin (création comptes e2e sans autoconfirm)
+- **Infos review 37** : IN-01 (garde mort api.ts:315) + IN-02 (select service_role non borné index.ts:656) corrigées
+
+**Out of scope :** toute autre nouvelle fonctionnalité produit ; GATE-01 en conditions réelles reste un observatoire événementiel (re-test à consigner à la première utilisation observée).
 
 ## État v0.9.0 (historique)
 
@@ -108,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-07 after Phase 36 (milestone v1.2 en cours)*
+*Last updated: 2026-11-08 — jalon v1.3 « Solde de la dette » démarré*

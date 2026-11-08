@@ -1,20 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.2
-milestone_name: Finition de la dette offline
-current_phase: 37
-status: completed
-stopped_at: Phase 37 complete — all phases complete
-last_updated: "2026-11-08T10:37:19.220Z"
+milestone: v1.3
+milestone_name: Solde de la dette
+status: planning
+last_updated: "2026-11-08T11:34:13.146Z"
 last_activity: 2026-11-08
-last_activity_desc: Phase 37 complete
-state_head: b8295a38ead8613a3e2ec7a4e0464e5c602a7e31
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -28,16 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-07)
 
 ## Current Position
 
-Phase: 37
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-11-08 — Phase 37 complete
-
-**Progress bar:**
-
-```
-[■■■■■■■■■■] Phase 36 (Outbox) + Phase 37 (Filet de tests) plans 2/2 — TEST-03 en attente d'identifiants réels
-```
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-11-08 — Milestone v1.3 started
 
 ## Performance Metrics
 
