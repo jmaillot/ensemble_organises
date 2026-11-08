@@ -28,7 +28,13 @@ Summary checklist:
   2. La chaîne §2.7 complète (typecheck, tests, build, e2e, check-sql-statique) est verte — plus aucun rouge préexistant assumé dans le jalon
   3. IN-01 : la garde morte de `api.ts:315` n'existe plus (supprimée, pas commentée) ; IN-02 : le select `service_role` d'`index.ts:656` est borné, avec `sh scripts/test-db.sh` vert si du SQL a été touché — ou l'absence de Docker consignée explicitement
   4. Les helpers `debutSemaineIso`/`jourSemaine` de `lib/datetime.ts` sont la seule source de semis de semaine lundi→dimanche (classe corrigée, pas l'instance)
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 38-01-PLAN.md — Helpers `debutSemaineIso`/`jourSemaine` + preuve 7 jours + recalage des semis semaine (menu, seed) + garde anti-récidive
+- [ ] 38-02-PLAN.md — Flake WR-03 : protocole W-02 (reproduction → preuve d'innocence → attente d'état) + diagnostic rétrospectif
+- [ ] 38-03-PLAN.md — Dette review 37 : suppression IN-01, bornage IN-02 dans la requête, balayage I-01 du fichier entier
+- [ ] 38-04-PLAN.md — Chaîne §2.7 complète + signature e2e (join-token seul rouge, J-01/J-02) + gardes statiques de discipline
 
 ### Phase 39: Outillage prod de vérification
 **Goal**: Le projet dispose du moyen de créer et purger ses propres comptes e2e en mode prod réel (sans autoconfirm), et la couverture e2e du parcours join-token correspond au flux actuel.
