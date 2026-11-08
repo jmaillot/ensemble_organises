@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { MealEntryRow } from '@/types';
+import { debutSemaineIso } from '@/lib/datetime';
 
 /**
  * Menu de la semaine (vague 3.1) : un repas par date et par moment de la
@@ -63,12 +64,14 @@ const toUtcDate = (iso: string): Date => {
 
 const isoOfUtc = (date: Date): string => date.toISOString().slice(0, 10);
 
-/** Lundi de la semaine contenant la date ISO donnée. */
+/**
+ * Lundi de la semaine contenant la date ISO donnée. Délégation à
+ * `debutSemaineIso` (lib/datetime.ts) : l'arithmétique semaine n'a qu'une
+ * source de vérité, partagée avec le semis de démonstration (AGENTS.md
+ * §2.7 E) — toute copie locale est une récidive en attente.
+ */
 export function weekStartOf(isoDate: string): string {
-  const date = toUtcDate(isoDate);
-  const offset = (date.getUTCDay() + 6) % 7; // lundi = 0
-  date.setUTCDate(date.getUTCDate() - offset);
-  return isoOfUtc(date);
+  return debutSemaineIso(isoDate);
 }
 
 /** Les sept dates de la semaine commençant au lundi donné. */
