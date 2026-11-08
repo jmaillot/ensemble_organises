@@ -47,9 +47,11 @@ Plans:
   3. L'e2e offline-shared-device (2 comptes réels sur un même appareil) est rédigé, dé-skipé et exécuté au vert — plus aucun `skip` par manque de comptes
   4. Une purge invité ne laisse plus de clé GoTrue résiduelle — vérifié par test (lecture brute du stockage après purge)
 
-**Plans**: 1/2 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
+- [x] 37-03-PLAN.md
+
 **Wave 1**
 - [x] 37-01-PLAN.md — Purge GoTrue au chokepoint signOut (purgerStockageSession), test unitaire rouge→vert, extension e2e localStorage (TEST-04)
 
@@ -61,4 +63,4 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Outbox — plus jamais d'effacement silencieux | 2/2 | Complete    | 2026-11-07 |
-| 37. Filet de tests fiable | 1/2 | In Progress|  |
+| 37. Filet de tests fiable | 3/3 | In Progress|  |
