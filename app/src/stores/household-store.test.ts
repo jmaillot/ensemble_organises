@@ -11,13 +11,26 @@ const { useHouseholdStore } = householdStore;
  * délégation à l'implémentation réelle (fake-indexeddb actif), avec journal
  * pour prouver l'ordre stop → purge → clear (Pitfall 5/6).
  */
-const { purgeCacheSpy, stopPersistingSpy } = vi.hoisted(() => ({
+const { purgeCacheSpy, stopPersistingSpy, realQP } = vi.hoisted(() => ({
   purgeCacheSpy: vi.fn(),
   stopPersistingSpy: vi.fn(),
+  // Références réelles capturées dans la factory du mock (ci-dessous) : la
+  // délégation des espions doit être SYNCHRONE comme le code de production
+  // (`stopPersisting` est un void sync). La délégation historique via
+  // `vi.importActual` dans chaque `mockImplementation` était un pont
+  // ASYNCHRONE : la mise en silence du persister glissait de quelques tâches
+  // sous charge, rouvrant la fenêtre que Pitfall 6 avait fermée — flake D-17
+  // reproduit 1/30 (protocole W-02, RETROSPECTIVE.md campagne v1.3).
+  realQP: { purgeCache: null, stopPersisting: null } as {
+    purgeCache: typeof import('@/lib/offline/query-persistence')['purgeCache'] | null;
+    stopPersisting: typeof import('@/lib/offline/query-persistence')['stopPersisting'] | null;
+  },
 }));
 
 vi.mock('@/lib/offline/query-persistence', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/offline/query-persistence')>();
+  realQP.purgeCache = actual.purgeCache;
+  realQP.stopPersisting = actual.stopPersisting;
   return {
     ...actual,
     purgeCache: (...args: Parameters<typeof actual.purgeCache>) => purgeCacheSpy(...args),
@@ -187,19 +200,15 @@ describe('switchWithPurge — ordre purge → clear → switch (OFFR-04, D-04)',
   beforeEach(() => {
     purgeCacheSpy.mockReset();
     stopPersistingSpy.mockReset();
+    // Délégation SYNCHRONE aux références réelles capturées par la factory du
+    // mock : la simulation du harnais colle à la synchronie de production
+    // (stopPersisting est un void sync), sans le pont vi.importActual.
     purgeCacheSpy.mockImplementation(
-      async (...args: Parameters<typeof import('@/lib/offline/query-persistence')['purgeCache']>) => {
-        const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
-          '@/lib/offline/query-persistence',
-        );
-        return actual.purgeCache(...args);
-      },
+      (...args: Parameters<typeof import('@/lib/offline/query-persistence')['purgeCache']>) =>
+        realQP.purgeCache?.(...args),
     );
-    stopPersistingSpy.mockImplementation(async () => {
-      const actual = await vi.importActual<typeof import('@/lib/offline/query-persistence')>(
-        '@/lib/offline/query-persistence',
-      );
-      actual.stopPersisting();
+    stopPersistingSpy.mockImplementation(() => {
+      realQP.stopPersisting?.();
     });
   });
 
@@ -324,11 +333,18 @@ describe('switchWithPurge — ordre purge → clear → switch (OFFR-04, D-04)',
     await useHouseholdStore.getState().switchWithPurge('h-new', 'Nouveau Foyer', client, 'u1');
 
     // Écriture post-switch : elle doit partir vers la clé du NOUVEAU foyer —
-    // la souscription de sauvegarde a bien repris. Le throttle par défaut du
-    // persister est 1 s : la fenêtre couvre son échéance.
+    // la souscription de sauvegarde a bien repris. WR-03 (revue 33) : le
+    // défaut d'origine de CE test était un sommeil fixe de 1 200 ms face au
+    // throttle de 1 000 ms du persister (query-persistence.ts, marge 200 ms)
+    // — flocon sous charge, reproduit 1/30 par le protocole W-02 (voir
+    // RETROSPECTIVE.md, campagne v1.3). L'attente d'état ci-dessous remplace
+    // la course assumée : le test attend l'écriture réelle du persister
+    // throttlé, quelle que soit l'échéance du throttle.
     client.setQueryData(['tasks', 'h-new', {}, null], [{ id: 't1', name: 'post-switch' }]);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    await expect(get(cacheKey('u1', 'h-new'), probeStore)).resolves.toContain('post-switch');
+    await vi.waitFor(
+      () => expect(get(cacheKey('u1', 'h-new'), probeStore)).resolves.toContain('post-switch'),
+      { timeout: 5_000, interval: 50 },
+    );
     // Le restore du nouveau foyer a eu lieu avant la souscription : vide ici,
     // mais l'appel est passé (aucune erreur, cache cohérent).
     expect(client.getQueryData(['tasks', 'h-new', {}, null])).toEqual([{ id: 't1', name: 'post-switch' }]);
