@@ -756,3 +756,64 @@ Cette campagne tests v1.2 est consignée en un seul endroit (D-10) — trois det
   dans `.planning/phases/37-filet-de-tests-fiable/deferred-items.md` :
   « passé » présumé n'a jamais été revendiqué ici, et le filet de v1.2 l'a
   exactement attrapé comme il est censé le faire.
+
+---
+
+# Campagne tests v1.3 — filet de tests fiable : les deux flocons dimanche, soldés par le protocole W-02
+
+**Shipped:** 2026-11-08 · **Phases:** 38 (4 plans) · TEST-01, TEST-03 fermés
+
+La phase 37 avait établi la discipline du flocon test (D-01 : reproduction
+mesurée → preuve d'innocence du code de production par répétition sous
+charge → correction du test seul → consignation). La campagne v1.3 la
+réapplique à deux flocons « du dimanche » signalés par le filet de v1.2 :
+WR-03 (household-store) et le flake menu (semis hebdomadaire).
+
+## 12. WR-03 : reproduction avant fix (protocole W-02, §2.7 B)
+
+Le protocole de reproduction a été exécuté sur l'arbre de base, AVANT tout
+correctif. La cause date est exclue par lecture : le test ne dépend d'aucune
+date (identifiants fixes `h-old`/`h-new`/`u1`, aucun horloge consultée) — la
+cause candidate est le timing : le test WR-03 dort 1 200 ms
+(`household-store.test.ts:330`, `setTimeout(resolve, 1200)`) pendant que le
+throttle par défaut du persister est 1 000 ms
+(`query-persistence.ts:71`, `buildPersister(..., throttleTime = 1000)`) — une
+marge de 200 ms que la charge CPU comprime.
+
+Résultat du protocole (30 exécutions de `npx vitest run
+src/stores/household-store.test.ts`, 5 en parallèle — la concurrence des
+processus est elle-même la charge, faute de `stress-ng` sur la machine) :
+
+- **1 échec sur 30** sous charge. Le rouge a bien été vu avant le vert
+  (§2.7 B) — mais pas sur le test WR-03 lui-même : l'échec a frappé le test
+  frère D-17 (« la purge du foyer quitté emporte l'outbox persistée »,
+  l.266) avec exactement le profil inversé attendu — l'assertion d'ABSENCE
+  a reçu une écriture : `expected '{"buster":"v2",…,"clientState":{"mutations":[],"queries":[]}}'
+  to be undefined`. Un état vide, réécrit sur la clé du foyer quitté APRÈS
+  la purge.
+- Le test WR-03 lui-même : **0 rouge en 30 exécutions** du fichier, et 0/12
+  en isolation (`-t "rétablit la persistance"`). Dit explicitement (§2.7 F) :
+  l'absence de reproduction du test visé n'invalide pas le diagnostic — la
+  marge de 200 ms est prouvée par lecture des deux lignes ci-dessus, et le
+  sommeil fixe est le même anti-pattern que le waitFor nu de la phase 37.
+- Le test D-17 en isolation : 0/12 — la course exige l'état module laissé
+  par les tests précédents (fichier partagé), pas un défaut isolé.
+- 37 exécutions supplémentaires avec un traceur temporaire sur
+  `setItem` (patch de diagnostic, retiré après — production intacte) ont
+  capturé la classe du défaut : une écriture d'ÉTAT VIDE sur la clé
+  `h-old` part d'un persister dont la souscription a survécu à son point de
+  mise en silence. En production, `stopPersisting` est un void SYNCHRONE
+  (unsubscribe + annulation en un seul appel) — la fenêtre n'existe pas. Le
+  harnais de test, lui, délègue l'espion `stopPersistingSpy` à
+  l'implémentation réelle via `vi.importActual` — un pont ASYNCHRONE — si
+  bien que la mise en silence du persister peut glisser de quelques
+  microtâches/tâches sous charge, rouvrant exactement la fenêtre que
+  Pitfall 6 avait fermée. Le code de production est innocent : c'est le
+  harnais qui simule imparfaitement la synchronie de production.
+
+Conclusion de cause (W-02) : **timing, pas date** — deux courses dans le
+même fichier, l'une contre le throttle de 1 000 ms (WR-03 : sommeil fixe de
+1 200 ms), l'autre contre la fenêtre de mise en silence du persister (D-17 :
+délégation asynchrone du mock), les deux ne se manifestant que sous charge,
+les deux corrigeables côté test seul.
+
