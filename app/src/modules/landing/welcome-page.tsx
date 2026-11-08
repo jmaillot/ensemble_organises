@@ -1,8 +1,20 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/shared/icon';
+import { useSignOutWithConfirm } from '@/hooks/use-sign-out';
 
 export default function WelcomePage() {
+  const navigate = useNavigate();
+  // G-37-2 : un utilisateur connecté SANS foyer n'a aucun chemin de
+  // déconnexion atteignable — la purge GoTrue (D-07, session-store.signOut →
+  // purgerStockageSession, prouvée en 37-01) est correcte mais inatteignable
+  // depuis cette page. Un Link vers /connexion ne purge rien : le signe-out
+  // doit être RÉEL, via le goulot unique useSignOutWithConfirm (scan D-17
+  // inclus). /connexion et /foyer/nouveau|rejoindre restent intouchés :
+  // /foyer est la page d'atterrissage de RequireHousehold, un seul point de
+  // déconnexion suffit (classe, pas instance).
+  const { signOut, dialog, busy } = useSignOutWithConfirm(() => navigate('/connexion'));
+
   return (
     <div className="mx-auto grid min-h-screen max-w-[900px] place-items-center px-5 py-12 max-[650px]:items-start max-[650px]:px-[15px]">
       <div className="w-full">
@@ -48,11 +60,12 @@ export default function WelcomePage() {
           <Link to="/accueil" className="inline-flex items-center gap-1.5 font-semibold text-accent-strong">
             <Icon name="arrowLeft" size="sm" /> Retour au tableau de bord
           </Link>
-          <Button asChild variant="ghost" size="sm" icon="logout">
-            <Link to="/connexion">Changer de compte</Link>
+          <Button variant="ghost" size="sm" icon="logout" disabled={busy} onClick={() => void signOut()}>
+            Se déconnecter
           </Button>
         </div>
       </div>
+      {dialog}
     </div>
   );
 }
