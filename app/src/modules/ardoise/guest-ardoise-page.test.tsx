@@ -5,6 +5,20 @@ import { Route, Routes } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import GuestArdoisePage from './guest-ardoise-page';
 
+const { authed, joinArdoiseMock } = vi.hoisted(() => ({
+  authed: { value: false },
+  joinArdoiseMock: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-auth', () => ({
+  useIsAuthenticated: () => authed.value,
+}));
+
+vi.mock('./api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./api')>()),
+  joinArdoise: joinArdoiseMock,
+}));
+
 vi.mock('@/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
   supabase: { auth: { getSession: async () => ({ data: { session: null } }) } },
@@ -136,6 +150,89 @@ describe('GuestArdoisePage', () => {
       await user.click(screen.getByRole('button', { name: /Réessayer/ }));
       expect(screen.getByLabelText(/Code d’invitation/)).toBeInTheDocument();
       expect(calls).toEqual(['link-view']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+    authed.value = false;
+    joinArdoiseMock.mockReset();
+  });
+
+  /**
+   * Le modèle de partage ardoise reste BINAIRE : lien anonyme lecture seule
+   * ↔ rattachement réservé aux membres du foyer. Un visiteur CONNECTÉ voit
+   * une branche « Rejoindre via mon compte » (parité d'entrée avec
+   * cadeaux/voyages, sans en copier la sémantique) ; un non-membre reçoit le
+   * message serveur 403 EXPLICITE — aucun faux succès, aucune permission
+   * intermédiaire inventée, aucun appel redeem-guest déguisé.
+   */
+  it('visiteur non authentifié : vue lecture seule inchangée, sans bouton de rattachement', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    try {
+      renderGuest(CODE);
+      expect(await screen.findByText('Courses')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Créer un compte' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Rejoindre via mon compte' })).not.toBeInTheDocument();
+      expect(joinArdoiseMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('visiteur authentifié : bouton « Rejoindre via mon compte » qui appelle joinArdoise(code)', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
+    const user = userEvent.setup();
+    try {
+      authed.value = true;
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(joinArdoiseMock).toHaveBeenCalledTimes(1);
+      expect(joinArdoiseMock).toHaveBeenCalledWith(CODE);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('succès du join : confirmation + lien vers le module ; déjà membre : message idempotent', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    const user = userEvent.setup();
+    try {
+      authed.value = true;
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(await screen.findByRole('status')).toHaveTextContent(/participe désormais/);
+      expect(screen.getByRole('link', { name: 'Ouvrir l’ardoise' })).toBeInTheDocument();
+      expect(joinArdoiseMock).toHaveBeenCalledWith(CODE);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rejet 403 : le message serveur s’affiche TEL QUEL, aucun faux succès', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    const serveur = 'Vous n’appartenez pas au foyer de cette ardoise : utilisez le lien invité.';
+    joinArdoiseMock.mockRejectedValue(new Error(serveur));
+    const user = userEvent.setup();
+    try {
+      authed.value = true;
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(serveur);
+      // Le 403 est le comportement CORRECT pour un non-membre : la page le
+      // surface sans le maquiller, et propose l'aide « bon compte ».
+      expect(screen.getByRole('status')).toHaveTextContent(/bon compte/i);
+      expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }
