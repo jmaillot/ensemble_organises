@@ -644,15 +644,33 @@ async function buildGuestView(
   const ardoiseHousehold = (ardoise as { household_id?: unknown }).household_id;
   const householdId = typeof ardoiseHousehold === 'string' ? ardoiseHousehold : null;
 
-  const [{ data: expenses }, { data: parts }, { data: members }, { data: guests }] = await Promise.all([
+  // Bornage IN-02 (T-38-01, Information Disclosure) : la clé service_role
+  // court-circuite la RLS — chaque lecture est bornée DANS la requête
+  // PostgREST, jamais un filtrage JS après lecture complète de la table
+  // entière (§2.6, I-01/I-02). `expenses` est lue d'abord : ses identifiants
+  // bornent `expense_participants` via `.in('expense_id', …)`, la table ne
+  // portant pas de `household_id` (migration 0004) ; la borne est le besoin
+  // réel du consommateur — la vue invité ne rend que les participants des
+  // dépenses de CETTE ardoise. `household_members` est borné au foyer de
+  // l'ardoise (l.645) avec un ordre déterministe (I-02).
+  const { data: expenses } = await admin
+    .from('expenses')
+    .select('id,title,amount,expense_date,paid_by,paid_by_guest')
+    .eq('ardoise_id', ardoiseId)
+    .order('expense_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  const expenseIds = ((expenses ?? []) as { id: string }[]).map((e) => e.id);
+
+  const [{ data: parts }, { data: members }, { data: guests }] = await Promise.all([
     admin
-      .from('expenses')
-      .select('id,title,amount,expense_date,paid_by,paid_by_guest')
-      .eq('ardoise_id', ardoiseId)
-      .order('expense_date', { ascending: false })
-      .order('created_at', { ascending: false }),
-    admin.from('expense_participants').select('expense_id,participant_type,member_id,guest_id,share_amount'),
-    admin.from('household_members').select('id,display_name,role'),
+      .from('expense_participants')
+      .select('expense_id,participant_type,member_id,guest_id,share_amount')
+      .in('expense_id', expenseIds),
+    admin
+      .from('household_members')
+      .select('id,display_name,role')
+      .eq('household_id', householdId)
+      .order('id', { ascending: true }),
     admin.from('ardoise_guests').select('id,display_name').eq('ardoise_id', ardoiseId),
   ]);
 
@@ -675,7 +693,7 @@ async function buildGuestView(
     if (kind === 'guest') return (guestId && guestNames.get(guestId)) || 'Invité';
     return (memberId && memberNames.get(memberId)) || 'Membre';
   };
-  const expenseIds = new Set(((expenses ?? []) as { id: string }[]).map((e) => e.id));
+  const expenseIdSet = new Set(expenseIds);
   const partsByExpense = new Map<string, { name: string; share: number }[]>();
   for (const part of (parts ?? []) as {
     expense_id: string;
@@ -684,7 +702,7 @@ async function buildGuestView(
     guest_id: string | null;
     share_amount: number | string;
   }[]) {
-    if (!expenseIds.has(part.expense_id)) continue;
+    if (!expenseIdSet.has(part.expense_id)) continue;
     // Enfant : sa ligne de participation ne quitte jamais le serveur (WR-04).
     if (part.member_id && enfantIds.has(part.member_id)) continue;
     const list = partsByExpense.get(part.expense_id) ?? [];
