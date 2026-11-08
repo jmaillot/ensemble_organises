@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
 current_phase: 38
-current_phase_name: filet-de-tests-fiable
-status: planning
-stopped_at: Phase 38 context gathered
-last_updated: "2026-11-08T17:12:09.654Z"
+current_phase_name: Filet de tests fiable
+status: executing
+stopped_at: Completed 38-02-PLAN.md
+last_updated: "2026-11-08T18:46:31.534Z"
 last_activity: 2026-11-08
-last_activity_desc: Roadmap v1.3 créée (5 phases, 12 exigences, couverture 12/12)
-state_head: c68bada8338f57f8aa3c6442575c81b7e814f0e3
+last_activity_desc: Phase 38 execution started
+state_head: b4a19efe9e7339b8abe9f158d83581d7ebc85335
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 2
 ---
 
 # Project State
@@ -28,16 +28,23 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 
 ## Current Position
 
-Phase: 38 (filet-de-tests-fiable) — READY TO EXECUTE
-Plan: —
-Status: Roadmap v1.3 créée, en attente d'approbation
-Last activity: 2026-11-08 — Roadmap v1.3 créée (5 phases, 12 exigences, couverture 12/12)
+Phase: 38 (Filet de tests fiable) — EXECUTING
+Plan: 3 of 4
+Status: Ready to execute
+Last activity: 2026-11-08 — Phase 38 execution started
 
 ## Performance Metrics
 
 - v1.1 : 4 phases, 25 plans, 17 tasks, 145 commits, audit tech_debt 16/16
 - v1.2 : 2 phases, 5 plans, 6 exigences, audit tech_debt 6/6
 - v1.3 : 5 phases (38-42), 12 exigences — filet → outillage prod → ardoise → gate SW → cold start/cache
+
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 38 P01 | 14min | 3 tasks | 5 files |
+| Phase 38 P02 | 80min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -59,9 +66,9 @@ Last activity: 2026-11-08 — Roadmap v1.3 créée (5 phases, 12 exigences, couv
 
 ## Session Continuity
 
-**Last session:** 2026-11-08T16:34:57.074Z
-**Stopped at:** Phase 38 context gathered
-**Resume file:** .planning/phases/38-filet-de-tests-fiable/38-CONTEXT.md
+**Last session:** 2026-11-08T18:46:12.290Z
+**Stopped at:** Completed 38-02-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : approbation, puis `/gsd-plan-phase 38`.
@@ -71,3 +78,5 @@ Last activity: 2026-11-08 — Roadmap v1.3 créée (5 phases, 12 exigences, couv
 
 - [v1.3]: Ordre des phases = dépendance de preuve, pas de code : chaque phase utilise le filet de tests fiable de la 38, la 40 utilise les comptes prod de la 39, la 42 instrumente un système stabilisé.
 - [v1.3]: Phase 38 corrige la CLASSE entière des flakes dimanche (helpers centralisés `debutSemaineIso`/`jourSemaine`, tests paramétriques 7 jours) — jamais d'horloge figée.
+- [Phase 38]: Prédicat de la garde semaine paramétré par l'ancrage : le cas rouge du plan (jourSemaine(debutSemaineIso('2026-11-08'),1)) tombait DANS la semaine courante et ne prouvait rien ; la forme réelle du défaut (day(1) d'un dimanche = 2026-11-09, dates figées) est utilisée à la place. — Un cas-qui-doit-échouer qui ne peut pas échouer est une tautologie (§2.7 D.3) ; l'ancrage figé rend la preuve indépendante du jour d'exécution.
+- [Phase 38]: Correction test-only des deux flocons timing du fichier household-store (protocole W-02) : WR-03 attend un etat via vi.waitFor au lieu d'un sommeil fixe de 1200 ms, harnais D-17 rendu fidele au contrat temporel de production (delegation synchrone des espions). — La reproduction 1/30 a frappe le test frere D-17, pas WR-03 accuse : sans reproduction avant fix, la correction WR-03 serait passee pour la guerison d'un mal qu'elle ne soignait pas. Un harnais qui delegue asynchronement a ce qui est synchrone en production ment sur la fenetre de course.
