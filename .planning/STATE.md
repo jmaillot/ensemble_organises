@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
 status: planning
-last_updated: "2026-11-08T11:34:13.146Z"
+last_updated: "2026-11-08T12:00:00.000Z"
 last_activity: 2026-11-08
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,62 +17,53 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-07)
+See: .planning/PROJECT.md (updated 2026-11-08)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 37 — Filet de tests fiable
+**Current focus:** Phase 38 — Filet de tests fiable
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 38 (Filet de tests fiable) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-11-08 — Milestone v1.3 started
+Status: Roadmap v1.3 créée, en attente d'approbation
+Last activity: 2026-11-08 — Roadmap v1.3 créée (5 phases, 12 exigences, couverture 12/12)
 
 ## Performance Metrics
 
 - v1.1 : 4 phases, 25 plans, 17 tasks, 145 commits, audit tech_debt 16/16
-- v1.2 : 2 phases planifiées, 6 exigences, dette/fiabilité uniquement (zéro nouvelle surface produit hors messages d'échec outbox)
-
-**Per-Plan Metrics:**
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 37 P01 | 6 min | 3 tasks | 4 files |
-| Phase 37 P02 | ~25 min | 3 tasks (T3 différée) | 2 files |
+- v1.2 : 2 phases, 5 plans, 6 exigences, audit tech_debt 6/6
+- v1.3 : 5 phases (38-42), 12 exigences — filet → outillage prod → ardoise → gate SW → cold start/cache
 
 ## Accumulated Context
 
 ### Decisions (this milestone)
 
-- Jalon volontairement 100 % dette : pas de phase de features, deux phases seulement (OBOX, TEST) — la granularité naturelle du travail.
-- GATE-01 (gate SW runtime) hors jalon : observatoire événementiel lié au prochain déploiement naturel, pas planifiable. Consigné dans ROADMAP (Deferred) et REQUIREMENTS (Future).
-- CACHE-01 (maxAge 24 h) et matrice iOS : hors jalon assumé (voir PROJECT.md).
-- Phase 36 : le toast d'échec terminal D-12 est retiré — le badge est l'unique signal actif, le panneau l'unique canal de détail (36-02).
-- Phase 36 : libellés d'échec dérivés d'un catalogue code→famille→libellé dans `outbox.ts`, jamais d'un message PostgREST brut (36-01).
+- Roadmap v1.3 dérivée de l'ordre de recherche convergent (ARCHITECTURE §Suggested Build Order + PITFALLS) : filet de tests d'abord (tout le jalon en dépend pour prouver), outillage prod ensuite (comptes e2e réels servant l'ardoise), surface produit (ardoise), gate SW, instrumentation cold start en DERNIER (mesures invalidées par tout changement d'imports antérieur).
+- Phase 40 (ardoise) exige une décision produit en discuss-phase AVANT plan-phase : parcours exact de conversion + réconciliation `invite:`→`membre:` transactionnelle ou refusée avec justification consignée.
+- CACHE-01 tranchée avec les données du panneau diagnostic on-device (jamais l'émulateur) ; biais d'ordre connu : le maxAge influence le volume réhydraté mesuré — l'ordre instrumentation/décision sera consigné.
+- Anti-features refusées : adhésion foyer implicite au clic, réactivation autoconfirm pour tests, gate SW en autoUpdate, maxAge global 30 jours.
 
 ### Todos
 
-- Rejouer GATE-01 (tests 32-UAT 7 et 35-UAT 2) lors de la prochaine mise en production — hors cycle de ce jalon.
+- Rejouer GATE-01 (tests 32-UAT 7 et 35-UAT 2) lors de la prochaine mise en production naturelle — observatoire hors jalon (GATE-PROD).
 
 ### Blockers
 
-- e2e offline-shared-device (TEST-03) : nécessite 2 comptes réels avec données Tier 1 — différé au checkpoint du plan 37-02 ; véhicule de re-test prêt (spec étendu plan 37-01), skip conditionnel D-04 conservé. Planifier la disponibilité de l'humain.
-- Flocon sibling household-store WR-03 (household-store.test.ts:331) : échoue ~1–2/243 sous charge parallèle, vert en isolation — découvert en clôture 37-02, hors périmètre phase 37 ; consigné dans deferred-items.md de la phase 37. Traitement suggéré : même recette que TEST-01.
-- ⚠️ [Phase 36] 2 échecs e2e préexistants « rejoindre un foyer / format du token » (prouvés sur baseline b02e0a0) — consignés dans `deferred-items.md` de la phase 36 ; à traiter en phase 37 (filet de tests).
+- Phase 42 : machine on-device requise pour les mesures cold start et la décision CACHE-01 (le protocole l'exige ; consigner si différé).
+- Phase 40 : decision produit ardoise ouverte — passer `--discuss-phase` avant `--plan-phase`.
 
 ## Session Continuity
 
-**Last session:** 2026-11-08T08:45:23.905Z
-**Stopped at:** Phase 37 complete — all phases complete
+**Last session:** 2026-11-08T12:00:00.000Z
+**Stopped at:** Roadmap v1.3 écrite — en attente d'approbation utilisateur
 **Resume file:** None
 
-- Roadmap v1.2 créée le 2026-11-07 par gsd-roadmapper (subagent /gsd-new-project).
-- Prochain pas : `/gsd-plan-phase 36`.
-- Exigences : OBOX-01, OBOX-02 → Phase 36 ; TEST-01..04 → Phase 37 (traceability dans REQUIREMENTS.md).
+- Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
+- Prochain pas : approbation, puis `/gsd-plan-phase 38`.
+- Exigences : TEST-01, TEST-03, DEBT-01 → Phase 38 ; SMOKE-01, TEST-02 → Phase 39 ; ARD-01..03 → Phase 40 ; GATE-01 → Phase 41 ; COLD-01, COLD-02, CACHE-01 → Phase 42 (traceability dans REQUIREMENTS.md).
 
 ## Decisions
 
-- [Phase 37]: TEST-04 : purgerStockageSession() (clé GoTrue + chunks, dérivation cleStockageSession D-07) branchée au chokepoint signOut après les purges disque/mémoire ; preuve rouge-avant-vert D-09 capturée
-- [Phase 37]: TEST-01 : flocon test D (~1/367) traité par waitFor à options explicites { timeout: 5_000, interval: 50 } bornées au seul test D — jamais de tolérance globale dans vite.config.ts (D-01, b0c9c3d)
-- [Phase 37]: TEST-03 différé assumé : e2e offline-shared-device non exécuté faute de 2 comptes réels — aucune credential inventée, skip conditionnel D-04 conservé, dette tracée dans REQUIREMENTS/RETROSPECTIVE (checkpoint plan 37-02)
+- [v1.3]: Ordre des phases = dépendance de preuve, pas de code : chaque phase utilise le filet de tests fiable de la 38, la 40 utilise les comptes prod de la 39, la 42 instrumente un système stabilisé.
+- [v1.3]: Phase 38 corrige la CLASSE entière des flakes dimanche (helpers centralisés `debutSemaineIso`/`jourSemaine`, tests paramétriques 7 jours) — jamais d'horloge figée.
