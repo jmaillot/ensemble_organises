@@ -10,7 +10,7 @@
 ## Phases
 
 - [x] **Phase 36: Outbox — plus jamais d'effacement silencieux** - Le rejeu de l'outbox classe tout échec (404, 400, 403 RLS, 42501, …) terminal/retryable et le surface avec un message visible (completed 2026-11-07)
-- [ ] **Phase 37: Filet de tests fiable** - La dette tests de v1.1 est soldée : flocon épinglé, tests rouges verts, e2e offline-shared-device exécuté, clé GoTrue résiduelle éliminée
+- [x] **Phase 37: Filet de tests fiable** - La dette tests de v1.1 est soldée : flocon épinglé, tests rouges verts, e2e offline-shared-device exécuté, clé GoTrue résiduelle éliminée (completed 2026-11-08)
 
 ## Deferred / Hors jalon
 
@@ -47,7 +47,7 @@ Plans:
   3. L'e2e offline-shared-device (2 comptes réels sur un même appareil) est rédigé, dé-skipé et exécuté au vert — plus aucun `skip` par manque de comptes
   4. Une purge invité ne laisse plus de clé GoTrue résiduelle — vérifié par test (lecture brute du stockage après purge)
 
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans complete
 
 Plans:
 - [x] 37-03-PLAN.md
@@ -63,4 +63,4 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Outbox — plus jamais d'effacement silencieux | 2/2 | Complete    | 2026-11-07 |
-| 37. Filet de tests fiable | 3/3 | In Progress|  |
+| 37. Filet de tests fiable | 3/3 | Complete    | 2026-11-08 |
