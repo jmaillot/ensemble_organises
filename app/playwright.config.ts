@@ -5,6 +5,13 @@ const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
+  // La spec réelle join-token appartient au run séparé contre la stack
+  // déployée (scripts/test-join-token-real.sh, JT-01) : elle ne fait PAS
+  // partie du run standard (mode démonstration, build + preview) où elle
+  // n'aurait ni stack ni comptes — son échec nommé y serait du bruit, pas une
+  // information. Ce n'est pas un skip : le wrapper pose E2E_BASE_URL et la
+  // spec est incluse dans SON run ; le standard reste 100 % vert sans elle.
+  testIgnore: process.env.E2E_BASE_URL ? [] : ['**/join-token-real.spec.ts'],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
