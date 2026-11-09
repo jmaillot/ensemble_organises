@@ -167,7 +167,11 @@ smoke_accounts_create() {
   domain="$(smoke_accounts_domain)"
   email="e2e+${run_id}-${index}@${domain}"
   password="${SMOKE_ACCOUNT_PASSWORD:-Mot-de-passe-de-test-2026!}"
-  body="{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true,\"data\":{\"full_name\":\"$name\"}}"
+  # Clé `user_metadata` (doc self-hosting POST /admin/users) : le SDK auth-js
+  # traduit `data` en `user_metadata`, mais ce curl brut ne doit pas compter sur
+  # cette traduction — sinon le trigger handle_new_user perd full_name et le
+  # profil naît avec la partie locale de l'email (run réel du 2026-11-09).
+  body="{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true,\"user_metadata\":{\"full_name\":\"$name\"}}"
   target="$SMOKE_LIB_TMP/creation-body"
 
   create_once() {
