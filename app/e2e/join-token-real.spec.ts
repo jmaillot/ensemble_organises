@@ -81,6 +81,15 @@ async function seConnecter(page: Page, email: string, password: string): Promise
   await page.getByLabel('Mot de passe').fill(password);
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await page.waitForURL(/\/(accueil|foyer)$/);
+  // D-17 : un compte neuf n'a jamais attesté son âge — la modale CGU bloque
+  // toute la page jusqu'à confirmation. Le spec atteste comme un utilisateur
+  // réel (JT-02) : cocher la case 15+, confirmer, et attendre la fermeture.
+  const attestation = page.getByRole('dialog');
+  if (await attestation.getByText('Une dernière étape avant de commencer').isVisible().catch(() => false)) {
+    await attestation.getByRole('checkbox').check();
+    await attestation.getByRole('button', { name: 'Confirmer' }).click();
+    await expect(attestation).toBeHidden();
+  }
 }
 
 test.describe.configure({ mode: 'serial' });
