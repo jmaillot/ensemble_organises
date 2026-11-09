@@ -76,6 +76,20 @@ if [ -z "$PUBLISHABLE_KEY" ]; then
   exit 1
 fi
 
+# --- Bibliothèque comptes e2e (CS-04) ----------------------------------------
+# Un seul chemin d'accès à SUPABASE_SECRET_KEY : création/purge/liste passent
+# toutes par la bibliothèque, dont les appels Admin portent la clé via un
+# fichier curl -K en 0600 — jamais en argv.
+. "$SCRIPT_DIR/lib-smoke-accounts.sh"
+SMOKE_API="$API"
+SMOKE_STACK_ENV="$STACK_ENV"
+
+# Domaine des emails e2e (EE-01) : lu du .env de la stack, défaut aligné sur le
+# déploiement réel (A2 — aucun DNS requis, les comptes admin n'envoient aucun
+# email).
+E2E_MAIL_DOMAIN="${E2E_MAIL_DOMAIN:-$(stack_value E2E_MAIL_DOMAIN)}"
+E2E_MAIL_DOMAIN="${E2E_MAIL_DOMAIN:-ensemble.jeremymaillot.fr}"
+
 # --- Outils ------------------------------------------------------------------
 uuid() {
   # /proc est toujours présent sur l'hôte Linux, contrairement à uuidgen.
@@ -169,10 +183,17 @@ json_rows() {
   printf '%s' "$1" | grep -o '{' | wc -l | tr -d ' '
 }
 
-RUN="$(date +%s)$$"
-ALICE_MAIL="alice-$RUN@example.fr"
-BOB_MAIL="bob-$RUN@example.fr"
+RUN="$(date +%s)$$" : le runid porte l'entropy $$ (deux runs à
+# la même seconde ne collisionnent pas), et le + isole ces adresses de tout vrai
+# destinataire.
+ALICE_MAIL="e2e+${RUN}-1@${E2E_MAIL_DOMAIN}"
+BOB_MAIL="e2e+${RUN}-2@${E2E_MAIL_DOMAIN}"
 PASSWORD='Mot-de-passe-de-test-2026!'
+
+# Le mot de passe est partagé entre la bibliothèque (création) et le smoke
+# (session par mot de passe en mode admin) : il ne doit diverger nulle part.
+SMOKE_ACCOUNT_PASSWORD="$PASSWORD"
+smoke_accounts_init
 
 # Renseignés par l'étape 3, depuis la réponse de la fonction. Le test ne les
 # devine pas : il lit ce que le serveur a réellement créé, comme le ferait le
@@ -189,13 +210,6 @@ cleanup() {
   echo
   echo "── Nettoyage"
 
-  if [ -z "$ALICE_ID" ] && [ -z "$BOB_ID" ]; then
-    echo "   (aucun compte n'a été créé, rien à nettoyer)"
-    return 0
-  fi
-
-  [ -n "$SECRET_KEY" ] || { echo "   (pas de clé secrète : comptes laissés en place)"; return 0; }
-
   # Le foyer d'abord : `households.created_by` est en `on delete set null`, le
   # foyer survivrait à la suppression du compte. Les membres, en revanche, sont
   # en cascade depuis `auth.users`.
@@ -206,12 +220,21 @@ cleanup() {
       || echo "   ! foyer non supprimé (code $CODE)"
   fi
 
-  for uid in "$ALICE_ID" "$BOB_ID"; do
-    [ -n "$uid" ] || continue
-    curl -sS -o /dev/null -X DELETE "$API/auth/v1/admin/users/$uid" \
-      -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SECRET_KEY" 2>/dev/null || true
-  done
-  [ -n "$ALICE_ID" ] && echo "   ✓ comptes de test supprimés"
+  # Purge vérifiée (§2.7 F) : chaque suppression est prouvée par un re-delete
+  # dont le 404 est exigé — la purge muette d'hier (`|| true` + echo
+  # inconditionnel) faisait passer un échec HTTP pour un succès. Bornée aux
+  # uids du run courant (EE-02). Un compte qui survit fait échouer le run.
+  if [ -s "$SMOKE_ACCOUNTS_LOG" ]; then
+    if smoke_accounts_purge "$RUN"; then
+      echo "   ✓ comptes purgés, purge prouvée (re-delete → 404)"
+    else
+      echo "   ✗ purge incomplète : un compte du run a survécu (voir ci-dessus)" >&2
+      exit 1
+    fi
+  else
+    echo "   (aucun compte créé, rien à purger)"
+  fi
+  smoke_accounts_tmp_clean
 }
 trap cleanup EXIT
 
@@ -231,53 +254,88 @@ else
   exit 1
 fi
 
+# Détection du mode par la sonde publique (CS-01) : GET /auth/v1/settings est
+# sans effet de bord, et c'est la stack réellement ciblée qui répond — pas une
+# lecture de config locale qui pourrait diverger.
+MODE="$(smoke_accounts_mode)" || {
+  echo
+  echo "  Impossible de détecter le mode (mailer_autoconfirm). Le parcours n'a"
+  echo "  pas de sens sans lui : abandon avant tout compte créé."
+  exit 1
+}
+if [ "$MODE" = "admin" ]; then
+  echo "   mode prod : création via l'Admin GoTrue (autoconfirm désactivé)"
+else
+  echo "   mode dev : création via /auth/v1/signup (autoconfirm actif)"
+fi
+
 # ----------------------------------------------------------------------------
 step "2. Inscription d'un premier compte"
 # ----------------------------------------------------------------------------
-call "/auth/v1/signup" POST \
-  "{\"email\":\"$ALICE_MAIL\",\"password\":\"$PASSWORD\",\"data\":{\"full_name\":\"Alice Martin\"}}" ""
-
-case "$CODE" in
-  200|201)
-    ALICE_JWT="$(json_string "$BODY" access_token)"
-    ALICE_ID="$(json_string "$BODY" id)"
-    if [ -n "$ALICE_JWT" ] && [ -n "$ALICE_ID" ]; then
-      pass "Alice est connectée (confirmation de courriel désactivée)"
+if [ "$MODE" = "admin" ]; then
+  # prod : ENABLE_EMAIL_AUTOCONFIRM=false — la création passe par l'Admin API
+  # avec email_confirm:true (SMOKE-01). Jamais de demande de réactiver
+  # l'autoconfirm : c'est la config prod, elle reste ce qu'elle est (CS-01).
+  if smoke_accounts_create "$RUN" 1 "Alice Martin"; then
+    ALICE_ID="$SMOKE_CREATED_ID"
+    ALICE_MAIL="$SMOKE_CREATED_EMAIL"
+    # L'Admin ne renvoie pas de jeton : la session s'obtient par le grant
+    # password, possible car le compte est déjà confirmé (A1).
+    if smoke_accounts_session "$ALICE_MAIL" "$PASSWORD"; then
+      ALICE_JWT="$SMOKE_SESSION_JWT"
+      pass "Alice créée via l'Admin GoTrue (email_confirm:true) et connectée par mot de passe"
     else
-      fail "inscription acceptée mais aucun jeton renvoyé — ENABLE_EMAIL_AUTOCONFIRM ?"
+      fail "compte admin créé mais session impossible (grant_type=password)"
     fi
-    ;;
-  422|400)
-    fail "inscription refusée (code $CODE) : $BODY"
-    ;;
-  500)
-    # Cas observé sur une stack sans SMTP : GoTrue crée le compte puis échoue
-    # en tentant l'envoi, et remonte une 500. Le corps est ici plus utile que le
-    # code — c'est lui qui nomme la cause.
-    fail "GoTrue n'a pas su envoyer le courriel de confirmation (code $CODE)"
-    case "$BODY" in
-      *confirmation*)
-        echo "    Aucun service SMTP n'est branché, ou ses variables sont encore"
-        echo "    celles de l'exemple du snapshot."
-        echo
-        echo "    Pour valider la chaîne tout de suite, dans .env :"
-        echo "      ENABLE_EMAIL_AUTOCONFIRM=true"
-        echo "    puis redémarrer GoTrue : sh run.sh up -d"
-        echo
-        echo "    À ne pas laisser en production : un compte créé sans confirmation"
-        echo "    porte une adresse non vérifiée, et cette adresse sert à partager"
-        echo "    une liste de cadeaux. Un vrai SMTP reste nécessaire — un service"
-        echo "    d'envoi transactionnel suffit, avec une clé d'API."
-        ;;
-      *)
-        echo "    $BODY"
-        ;;
-    esac
-    ;;
-  *)
-    fail "inscription inattendue (code $CODE) : $BODY"
-    ;;
-esac
+  else
+    fail "création admin d'Alice refusée (voir le corps nommé ci-dessus)"
+  fi
+else
+  call "/auth/v1/signup" POST \
+    "{\"email\":\"$ALICE_MAIL\",\"password\":\"$PASSWORD\",\"data\":{\"full_name\":\"Alice Martin\"}}" ""
+
+  case "$CODE" in
+    200|201)
+      ALICE_JWT="$(json_string "$BODY" access_token)"
+      ALICE_ID="$(json_string "$BODY" id)"
+      if [ -n "$ALICE_JWT" ] && [ -n "$ALICE_ID" ]; then
+        pass "Alice est connectée (confirmation de courriel désactivée)"
+      else
+        fail "inscription acceptée mais aucun jeton renvoyé — ENABLE_EMAIL_AUTOCONFIRM ?"
+      fi
+      ;;
+    422|400)
+      fail "inscription refusée (code $CODE) : $BODY"
+      ;;
+    500)
+      # Cas observé sur une stack sans SMTP : GoTrue crée le compte puis échoue
+      # en tentant l'envoi, et remonte une 500. Le corps est ici plus utile que
+      # le code — c'est lui qui nomme la cause.
+      fail "GoTrue n'a pas su envoyer le courriel de confirmation (code $CODE)"
+      case "$BODY" in
+        *confirmation*)
+          echo "    Aucun service SMTP n'est branché, ou ses variables sont encore"
+          echo "    celles de l'exemple du snapshot."
+          echo
+          echo "    Pour valider la chaîne tout de suite, dans .env :"
+          echo "      ENABLE_EMAIL_AUTOCONFIRM=true"
+          echo "    puis redémarrer GoTrue : sh run.sh up -d"
+          echo
+          echo "    À ne pas laisser en production : un compte créé sans confirmation"
+          echo "    porte une adresse non vérifiée, et cette adresse sert à partager"
+          echo "    une liste de cadeaux. Un vrai SMTP reste nécessaire — un service"
+          echo "    d'envoi transactionnel suffit, avec une clé d'API."
+          ;;
+        *)
+          echo "    $BODY"
+          ;;
+      esac
+      ;;
+    *)
+      fail "inscription inattendue (code $CODE) : $BODY"
+      ;;
+  esac
+fi
 
 if [ -z "$ALICE_JWT" ]; then
   echo
