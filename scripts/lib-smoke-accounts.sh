@@ -118,7 +118,13 @@ smoke_admin_config() {
 
 smoke_accounts_mode() {
   api="$(smoke_accounts_api)" || return 1
-  response="$(curl -sS -w '\n%{http_code}' "$api/auth/v1/settings" 2>/dev/null \
+  # La gateway exige la clé publiable sur toute route /auth — sans elle, 401
+  # avant même GoTrue (constaté au run réel du 2026-11-09).
+  if [ -z "$SMOKE_PUBLISHABLE_KEY" ]; then
+    SMOKE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$(smoke_stack_value SUPABASE_PUBLISHABLE_KEY)}" || return 1
+  fi
+  response="$(curl -sS -w '\n%{http_code}' "$api/auth/v1/settings" \
+    -H "apikey: $SMOKE_PUBLISHABLE_KEY" 2>/dev/null \
     || printf '\n000')"
   code="$(printf '%s' "$response" | tail -n 1)"
   body="$(printf '%s' "$response" | sed '$d')"

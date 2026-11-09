@@ -101,7 +101,11 @@ fi
 # --- Refus sans stack joignable (JT-01, JT-03) --------------------------------
 # Une sonde qui échoue est une cause nommée, pas un skip : le run s'arrête
 # avant tout compte créé.
-health_code="$(curl -sS -o /dev/null -w '%{http_code}' "$API/auth/v1/health" 2>/dev/null || printf '000')"
+# La sonde porte la clé publiable : la gateway exige apikey sur toute route
+# /auth, un curl nu prend un 401 avant même GoTrue (constaté au run réel
+# du 2026-11-09). La clé publique n'est pas un secret (§2.7 H).
+health_code="$(curl -sS -o /dev/null -w '%{http_code}' "$API/auth/v1/health" \
+  -H "apikey: $PUBLISHABLE_KEY" 2>/dev/null || printf '000')"
 if [ "$health_code" != "200" ]; then
   echo "test-join-token-real.sh: la stack ne répond pas ($API/auth/v1/health → code $health_code)." >&2
   echo "  Le run réel exige une stack déployée joignable (DS-01) : vérifiez que" >&2
