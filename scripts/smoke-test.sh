@@ -198,9 +198,9 @@ json_rows() {
   printf '%s' "$1" | grep -o '{' | wc -l | tr -d ' '
 }
 
-RUN="$(date +%s)$$" : le runid porte l'entropy $$ (deux runs à
-# la même seconde ne collisionnent pas), et le + isole ces adresses de tout vrai
-# destinataire.
+# Le runid porte l'entropy $$ (deux runs à la même seconde ne collisionnent pas),
+# et le + isole ces adresses de tout vrai destinataire.
+RUN="$(date +%s)$$"
 ALICE_MAIL="e2e+${RUN}-1@${E2E_MAIL_DOMAIN}"
 BOB_MAIL="e2e+${RUN}-2@${E2E_MAIL_DOMAIN}"
 PASSWORD='Mot-de-passe-de-test-2026!'
