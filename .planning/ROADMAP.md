@@ -69,9 +69,13 @@ Plans:
 
 **Plans**: 3 plans (40-01 wave 1 ; 40-02 et 40-03 wave 2 en parallèle)
 Plans:
+**Wave 1**
 - [ ] 40-01-PLAN.md — Tracer : migration 0180 (table pont + RPC bridge), action Edge `household-token`, chemin frontend dialog → `/foyer/rejoindre` → `/ardoise`
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 40-02-PLAN.md — Migration 0181 : réconciliation `invite:`→`membre:` transactionnelle dans redeem + tests SQL positifs/négatifs (ARD-02/03)
 - [ ] 40-03-PLAN.md — UI-SPEC : prop `icon` ConfirmDialog, copy dialog, retrait copy « part zéro », tests RTL ARD-01
+
 **UI hint**: yes
 
 ### Phase 41: Gate SW simulable
