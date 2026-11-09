@@ -2,19 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
-current_phase: 40
-status: completed
-stopped_at: Completed 40-03-PLAN.md (phase 40 terminée)
-last_updated: "2026-11-09T14:21:20.068Z"
+current_phase: 41
+current_phase_name: Gate SW simulable
+status: planning
+stopped_at: Phase 40 complete, ready to plan Phase 41
+last_updated: "2026-11-09T15:25:42.237Z"
 last_activity: 2026-11-09
-last_activity_desc: Phase 40 marked complete
-state_head: 9a656b36bd20d027b4d88778053cc7b05649a897
+last_activity_desc: Phase 40 complete, transitioned to Phase 41
+state_head: 9098f5e1d046d1a467e4392caf6d5786bf0add2f
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
   completed_plans: 9
-current_phase_name: Ardoise « Rejoindre via mon compte »
+  percent: 60
 ---
 
 # Project State
@@ -28,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 
 ## Current Position
 
-Phase: 40 — COMPLETE
-Plan: 3 of 3
-Status: Phase 40 complete
-Last activity: 2026-11-09 — Phase 40 marked complete
+Phase: 41 — Gate SW simulable
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-09 — Phase 40 complete, transitioned to Phase 41
 
 ## Performance Metrics
 
@@ -74,7 +75,7 @@ Last activity: 2026-11-09 — Phase 40 marked complete
 ## Session Continuity
 
 **Last session:** 2026-11-09T14:21:03.937Z
-**Stopped at:** Completed 40-03-PLAN.md (phase 40 terminée)
+**Stopped at:** Phase 40 complete, ready to plan Phase 41
 **Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
