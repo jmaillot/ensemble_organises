@@ -1,10 +1,11 @@
 ---
 phase: "40"
 slug: "ardoise-rejoindre-via-mon-compte"
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: "2026-11-09"
+reviewed_at: "2026-11-09"
 ---
 
 # Phase 40 — UI Design Contract
@@ -136,6 +137,7 @@ Copy sur `/foyer/rejoindre` (pré-écran existant, consommé tel quel) : aucun n
 | error | code invalide / réseau / 403 déjà membre | ✅ covered | les trois branches existent déjà (WR-02, différenciation par statut HTTP) — la phase les conserve, ne les réécrit pas |
 | zero-one-many | nom du foyer dans le dialog | ⚠ unresolved | la vue invitée enrichie peut-elle renvoyer un nom absent (foyer renommé/supprimé entre-temps) ? Le planner définit le titre de repli (proposition : « Vous allez rejoindre le foyer de cette ardoise ») — décision à planifier, pas à improviser à l'exécution |
 | long-text | nom de foyer long dans le titre du dialog | 🧪 backstop | titre wrappe sur plusieurs lignes dans la largeur max 440px — test e2e/backstop visuel |
+| long-text | liste des dépenses côté invité (libellés longs) | 🧪 backstop | layout existant de la liste (`guest-ardoise-page`, wrap + `gap-2`) inchangé — couvert par la suite e2e mobile Chromium comme le reste du module |
 | overflow | dialog sur mobile 320px | 🧪 backstop | le dialog est `w-[calc(100vw-40px)] max-w-[440px]` (existant) — backstop e2e mobile Chromium comme le reste de la suite |
 
 ---
@@ -167,12 +169,12 @@ Séquence normative, issue des décisions verrouillées du CONTEXT.md (aucune re
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
+- [x] Dimension 7 Inventory Provenance: PASS
 
-**Approval:** pending
+**Approval:** approved (re-verification 2026-11-09, révision 1/2 — bloc « Annuler » corrigé en « Ne pas rejoindre », ancrage visuel déclaré)
