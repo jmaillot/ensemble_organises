@@ -76,6 +76,21 @@ if [ -z "$PUBLISHABLE_KEY" ]; then
   exit 1
 fi
 
+# Refus sans secret, dans les DEUX modes (CS-02, §2.7 F) : sans la clé secrète,
+# ni la création admin ni la purge vérifiée ne peuvent s'exécuter — le fallback
+# d'hier (« pas de clé secrète : comptes laissés en place ») produisait un smoke
+# partiel muet, c'est-à-dire un échec inexpliqué.
+if [ -z "$SECRET_KEY" ]; then
+  echo "smoke-test.sh: SUPABASE_SECRET_KEY absent de $STACK_ENV." >&2
+  echo "  Le smoke crée ET purge ses comptes via l'Admin GoTrue : sans la clé" >&2
+  echo "  secrète, aucun compte ne peut être créé ni supprimé — le run serait" >&2
+  echo "  muet, donc mensonger." >&2
+  echo "  Lancez le smoke depuis l'hôte de la stack, où le .env porte la clé :" >&2
+  echo "    sh scripts/smoke-test.sh" >&2
+  echo "  (Autre emplacement : STACK_ENV=/chemin/vers/.env)" >&2
+  exit 1
+fi
+
 # --- Bibliothèque comptes e2e (CS-04) ----------------------------------------
 # Un seul chemin d'accès à SUPABASE_SECRET_KEY : création/purge/liste passent
 # toutes par la bibliothèque, dont les appels Admin portent la clé via un
@@ -218,6 +233,15 @@ cleanup() {
     [ "$CODE" = "204" ] || [ "$CODE" = "200" ] \
       && echo "   ✓ foyer supprimé" \
       || echo "   ! foyer non supprimé (code $CODE)"
+  fi
+
+  # Détection résiduelle (EE-02) : les comptes e2e hors de ce run sont
+  # SIGNALÉS, jamais supprimés par ce run — la purge est bornée à ses propres
+  # runids, un run concurrent ne doit pas être touché. Un résidu relève d'une
+  # action humaine, pas d'une purge auto-réparatrice.
+  if residus="$(smoke_accounts_list 2>/dev/null)" && [ -n "$residus" ]; then
+    echo "   ! comptes e2e résiduels hors de ce run (à traiter à la main) :" >&2
+    printf '     %s\n' "$residus" >&2
   fi
 
   # Purge vérifiée (§2.7 F) : chaque suppression est prouvée par un re-delete
@@ -413,11 +437,29 @@ fi
 # ----------------------------------------------------------------------------
 step "5. Un compte de foyer voisin ne voit rien"
 # ----------------------------------------------------------------------------
-call "/auth/v1/signup" POST \
-  "{\"email\":\"$BOB_MAIL\",\"password\":\"$PASSWORD\",\"data\":{\"full_name\":\"Bob Martin\"}}" ""
-BOB_JWT="$(json_string "$BODY" access_token)"
-BOB_ID="$(json_string "$BODY" id)"
-[ -n "$BOB_JWT" ] && pass "Bob est connecté" || fail "inscription de Bob refusée : $BODY"
+# Les DEUX comptes passent par le même chemin (CS-04) : en mode admin, Bob est
+# créé sérialisé après Alice, puis connecté par le grant password — même
+# interface, même discipline de secrets, jamais une seconde implémentation.
+if [ "$MODE" = "admin" ]; then
+  if smoke_accounts_create "$RUN" 2 "Bob Martin"; then
+    BOB_ID="$SMOKE_CREATED_ID"
+    BOB_MAIL="$SMOKE_CREATED_EMAIL"
+    if smoke_accounts_session "$BOB_MAIL" "$PASSWORD"; then
+      BOB_JWT="$SMOKE_SESSION_JWT"
+      pass "Bob créé via l'Admin GoTrue (email_confirm:true) et connecté par mot de passe"
+    else
+      fail "compte admin de Bob créé mais session impossible (grant_type=password)"
+    fi
+  else
+    fail "création admin de Bob refusée (voir le corps nommé ci-dessus)"
+  fi
+else
+  call "/auth/v1/signup" POST \
+    "{\"email\":\"$BOB_MAIL\",\"password\":\"$PASSWORD\",\"data\":{\"full_name\":\"Bob Martin\"}}" ""
+  BOB_JWT="$(json_string "$BODY" access_token)"
+  BOB_ID="$(json_string "$BODY" id)"
+  [ -n "$BOB_JWT" ] && pass "Bob est connecté" || fail "inscription de Bob refusée : $BODY"
+fi
 
 call "/rest/v1/households?id=eq.$HOUSEHOLD_ID" GET "" "$BOB_JWT"
 rows="$(json_rows "$BODY")"
