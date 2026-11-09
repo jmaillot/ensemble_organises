@@ -120,24 +120,12 @@ test.describe('Connexion et foyer', () => {
     await expect(page.locator('main').getByText(/Foyer Martin/)).toBeVisible();
   });
 
-  test('créer un foyer génère un token copiable et un QR code', async ({ page }) => {
-    await page.goto('/connexion');
-    await page.getByRole('button', { name: 'Entrer dans la démonstration' }).click();
-    await page.goto('/foyer/nouveau');
-    await page.getByLabel('Nom du foyer').fill('Foyer de test');
-    await page.getByRole('button', { name: 'Créer mon foyer' }).click();
-    await expect(page.getByRole('heading', { name: 'Votre foyer est prêt' })).toBeVisible();
-    await expect(page.getByRole('img', { name: 'QR code du token d’invitation' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Copier' })).toBeVisible();
-  });
+  // Les 2 tests join-token historiques (token copiable/QR, validation du
+  // format) sont supprimés le 2026-11-09 (phase 39, JT-03) : ils testaient le
+  // mode démo pré-31-03 — le flux RÉEL est vérifié contre la stack déployée
+  // par `app/e2e/join-token-real.spec.ts`, run séparé orchestré par
+  // `scripts/test-join-token-real.sh`.
 
-  test('rejoindre un foyer valide le format du token', async ({ page }) => {
-    await openDemoSession(page);
-    await page.goto('/foyer/rejoindre');
-    await page.getByLabel('Token d’invitation').fill('court');
-    await page.getByRole('button', { name: 'Rejoindre le foyer' }).click();
-    await expect(page.getByText(/token fait au moins 22 caractères/)).toBeVisible();
-  });
 });
 
 test.describe('Parcours des modules', () => {
