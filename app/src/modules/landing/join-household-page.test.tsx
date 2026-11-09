@@ -7,7 +7,9 @@ import { demoUser } from '@/hooks/use-auth';
 import { useSessionStore } from '@/stores/session-store';
 import {
   clearPendingInviteToken,
+  getArdoiseLanding,
   getPendingInviteToken,
+  setArdoiseLanding,
   setPendingInviteToken,
 } from '@/lib/invites';
 
@@ -287,6 +289,45 @@ describe('Redeem authentifié — messages D-17 et atterrissage D-09', () => {
     // La traversée a échoué : la mémoire du token s'est effacée.
     expect(getPendingInviteToken()).toBeNull();
   }, 10_000);
+});
+
+
+describe('Atterrissage conditionnel ardoise (phase 40, ARD-01)', () => {
+  it('avec marqueur posé : atterrissage sur /ardoise, marqueur lu-et-effacé', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    setArdoiseLanding();
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    await waitFor(() => expect(probe().dataset.pathname).toBe('/ardoise'));
+    // Un passage n'y laisse rien traîner : le marqueur est lu PUIS effacé —
+    // un atterrissage ultérieur ordinaire ne retourne pas sur l'ardoise.
+    expect(getArdoiseLanding()).toBe(false);
+  });
+
+  it('sans marqueur : atterrissage ordinaire sur /accueil', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    await waitFor(() => expect(probe().dataset.pathname).toBe('/accueil'));
+    expect(getArdoiseLanding()).toBe(false);
+  });
+
+  it('aucun redeem au montage, marqueur posé ou non (D-08)', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    setArdoiseLanding();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    // La page s'affiche (preview chargée) SANS redeem : la consultation ne
+    // consomme pas un token à usage compté.
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(redeemInviteTokenMock).not.toHaveBeenCalled();
+    expect(getArdoiseLanding()).not.toBeNull();
+    window.sessionStorage.clear();
+  });
 });
 
 afterEach(() => {

@@ -378,3 +378,131 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
     }
   });
 });
+
+describe('GuestArdoisePage — dialog UI-SPEC (phase 40, ARD-01)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+    authed.value = true;
+    exchangeMock.mockReset();
+  });
+
+  /** « Ne pas rejoindre » referme le dialog sans AUCUN appel réseau. */
+  it('annuler ferme le dialog, toujours aucun appel Edge', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Ne pas rejoindre' }));
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(exchangeMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /** L'état « Adhésion en cours… » est visible pendant l'échange (bouton désactivé). */
+  it('confirmation : bouton « Adhésion en cours… » désactivé pendant l’échange, puis navigation', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    let resolveExchange: (v: { token: string }) => void = () => {};
+    exchangeMock.mockReturnValue(
+      new Promise<{ token: string }>((resolve) => {
+        resolveExchange = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    function SondeLocale() {
+      const [params] = useSearchParams();
+      return <p>token-probe:{params.get('token') ?? 'aucun'}</p>;
+    }
+    try {
+      renderWithProviders(
+        <Routes>
+          <Route path="/invitation/ardoise" element={<GuestArdoisePage />} />
+          <Route path="/foyer/rejoindre" element={<SondeLocale />} />
+        </Routes>,
+        { route: `/invitation/ardoise?code=${CODE}`, withHousehold: false },
+      );
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
+      const enCours = screen.getByRole('button', { name: 'Adhésion en cours…' });
+      expect(enCours).toBeDisabled();
+      resolveExchange({ token: 'tok_def-456' });
+      expect(await screen.findByText('token-probe:tok_def-456')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /** householdName absent : le titre de repli s'affiche (décision verrouillée UI-SPEC). */
+  it('householdName null : titre de repli « foyer de cette ardoise »', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls, true, { ...viewPayload, householdName: null });
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      expect(screen.getByText('Vous allez rejoindre le foyer de cette ardoise')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /** L'icône de la pastille est l'adhésion (users), pas la corbeille (trash). */
+  it('l’icône du dialog est l’adhésion, pas la corbeille', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      // Ancrage sur le littéral du jeu d'icônes export (icon.tsx) : la pastille
+      // du dialog doit porter le chemin `users`, jamais celui de `trash`.
+      const path = document.querySelector('[class*="bg-coral-soft"] svg path');
+      expect(path).not.toBeNull();
+      const d = path?.getAttribute('d') ?? '';
+      expect(d).toContain('M9 9m-3');
+      expect(d).not.toContain('M5 7h14');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /** 401 : session expirée — message tel quel, sans l'aide « bon compte ». */
+  it('rejet 401 : message serveur tel quel, aide « bon compte » absente', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    exchangeMock.mockRejectedValue(new InviteRequestError(401, 'Session expirée.'));
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Session expirée.');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  /** 404 : code mort (D-03) — message uniforme tel quel. */
+  it('rejet 404 : « Lien invalide. » tel quel, aide « bon compte » absente', async () => {
+    const calls: string[] = [];
+    mockViewFetch(calls);
+    exchangeMock.mockRejectedValue(new InviteRequestError(404, 'Lien invalide.'));
+    const user = userEvent.setup();
+    try {
+      renderGuest(CODE);
+      await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Lien invalide.');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
