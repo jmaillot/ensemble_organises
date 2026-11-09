@@ -571,16 +571,36 @@ async function handleHouseholdToken(admin: AdminClient, userId: string, body: Re
 
   const { data: ardoise } = await admin
     .from('ardoises')
-    .select('id,household_id,is_active,expires_at')
+    .select('id,household_id,is_active,expires_at,use_count,max_uses')
     .eq('invite_hash', codeHash)
     .maybeSingle();
   const row = ardoise as
-    | { id: string; household_id: string; is_active: boolean; expires_at: string | null }
+    | {
+        id: string;
+        household_id: string;
+        is_active: boolean;
+        expires_at: string | null;
+        use_count: number | null;
+        max_uses: number | null;
+      }
     | null;
   if (!row || !row.is_active) throw new ArdoiseInviteError(404, 'Lien invalide.');
   if (row.expires_at && row.expires_at <= new Date().toISOString()) {
     throw new ArdoiseInviteError(404, 'Lien invalide.');
   }
+  // CR-01 : le quota du code porte sur CE chemin aussi — un code épuisé
+  // (use_count >= max_uses, toujours actif) ne peut pas minter des tokens
+  // foyer. Miroir du refus de `redeem_ardoise_invite` (0113), même 404
+  // uniforme : pas d'oracle entre inconnu/révoqué/expiré/épuisé.
+  if (row.max_uses !== null && row.use_count !== null && row.use_count >= row.max_uses) {
+    throw new ArdoiseInviteError(404, 'Lien invalide.');
+  }
+
+  // WR-02 : garde enfant (D-03) — même contrat que les autres actions
+  // `user` : rôle résolu côté serveur, refus de la famille `code` (404
+  // uniforme) avant tout RPC. Un enfant sans foyer résolu passe vers le
+  // RPC, seul détenteur des oracles.
+  await refuseEnfant(admin, userId, row.household_id, 'code');
 
   const token = generateToken();
   const tokenHash = await hmacSha256Hex(token, checkInviteSecret());

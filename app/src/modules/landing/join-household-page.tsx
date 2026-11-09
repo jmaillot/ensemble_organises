@@ -6,6 +6,7 @@ import { Icon } from '@/components/shared/icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import {
+  clearArdoiseLanding,
   clearPendingInviteToken,
   getArdoiseLanding,
   getPendingInviteToken,
@@ -163,6 +164,10 @@ export default function JoinHouseholdPage() {
       setError(translateRedeemError(joinError instanceof Error ? joinError.message : ''));
       // Échec de l'application : la traversée est terminée, la mémoire aussi.
       clearPendingInviteToken();
+      // WR-01 (revue 40) : le marqueur ardoise ne survit pas à un échec —
+      // sinon une future adhésion quelconque atterrirait sur /ardoise d'un
+      // foyer qui n'a rien à voir avec ce parcours.
+      clearArdoiseLanding();
       // D-09 : le message reste lisible, puis atterrissage sur l'état normal.
       window.setTimeout(() => navigate('/foyer'), DELAI_ATERRISSAGE_MS);
     } finally {

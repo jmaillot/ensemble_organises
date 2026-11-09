@@ -316,6 +316,20 @@ describe('Atterrissage conditionnel ardoise (phase 40, ARD-01)', () => {
     expect(getArdoiseLanding()).toBe(false);
   });
 
+  it('échec du redeem : le marqueur ardoise est nettoyé (WR-01)', async () => {
+    useSessionStore.setState({ status: 'authenticated', user: demoUser });
+    setArdoiseLanding();
+    redeemInviteTokenMock.mockRejectedValue(new Error('Ce token est expiré.'));
+    const user = userEvent.setup();
+    renderPage(`/foyer/rejoindre?token=${TOKEN}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejoindre le foyer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ce lien a expiré.');
+    // WR-01 : le marqueur ne survit pas à l'échec — sinon une future adhésion
+    // quelconque atterrirait sur /ardoise d'un foyer sans rapport.
+    expect(getArdoiseLanding()).toBe(false);
+  });
+
   it('aucun redeem au montage, marqueur posé ou non (D-08)', async () => {
     useSessionStore.setState({ status: 'authenticated', user: demoUser });
     setArdoiseLanding();
