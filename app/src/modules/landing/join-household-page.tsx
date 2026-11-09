@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import {
   clearPendingInviteToken,
+  getArdoiseLanding,
   getPendingInviteToken,
   previewHouseholdInvite,
   redeemInviteToken,
@@ -149,7 +150,13 @@ export default function JoinHouseholdPage() {
       // Application réussie : la traversée est terminée, la mémoire s'efface.
       clearPendingInviteToken();
       toast('Vous avez rejoint le foyer.');
-      navigate('/accueil');
+      // Atterrissage conditionnel (phase 40, ARD-01) : un parcours venu de la
+      // page invitée ardoise (marqueur lu-et-effacé, un passage n'y laisse
+      // rien traîner) atterrit sur l'ardoise du foyer, pas le dashboard.
+      // La lecture n'arrive qu'APRÈS loadHousehold() : la garde
+      // RequireHousehold est déjà passée. D-08 reste intact : le redeem a eu
+      // lieu sur clic explicite, jamais au chargement.
+      navigate(getArdoiseLanding() ? '/ardoise' : '/accueil');
     } catch (joinError) {
       // D-17 : le motif serveur devient le verbatim dédié — jamais le message
       // technique brut (« token », statut HTTP) ni un détail exposé.

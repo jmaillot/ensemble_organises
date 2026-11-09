@@ -243,6 +243,46 @@ export function clearPendingInviteToken(): void {
 }
 
 /**
+ * Atterrissage post-adhésion ardoise (phase 40, ARD-01) : après le redeem du
+ * token bridge, le pré-écran foyer redirige vers /ardoise au lieu de
+ * /accueil. Miroir exact du pattern pending-* ci-dessus : posé avant de
+ * quitter la page invitée, lu-et-effacé par le pré-écran (un passage n'y
+ * laisse rien traîner). Forgeable côté client sans effet d'autorisation :
+ * ne contrôle qu'une destination de navigation (T-40-04, accept).
+ */
+const ARDOISE_LANDING_KEY = 'ensemble-organises-pending-ardoise-landing';
+
+export function setArdoiseLanding(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(ARDOISE_LANDING_KEY, '1');
+  } catch {
+    // Stockage plein ou refusé : l'atterrissage retombera sur /accueil.
+  }
+}
+
+/** Lit le marqueur et l'efface dans le MÊME passage (getPendingInviteToken est une lecture pure ; ici, l'effet attendu est unique). */
+export function getArdoiseLanding(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    const raw = sessionStorage.getItem(ARDOISE_LANDING_KEY);
+    sessionStorage.removeItem(ARDOISE_LANDING_KEY);
+    return raw !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function clearArdoiseLanding(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.removeItem(ARDOISE_LANDING_KEY);
+  } catch {
+    // Sans objet : le nettoyage est un confort, pas un requis.
+  }
+}
+
+/**
  * D-17 — traduction du motif serveur d'un redeem authentifié en verbatim
  * dédié. Les messages serveur sont ceux de `household-invite`
  * (`translateRpcError`, 31-02) : introuvable 404, révoqué/expiré/épuisé 410.

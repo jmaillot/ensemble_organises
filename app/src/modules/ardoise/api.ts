@@ -371,6 +371,16 @@ export async function joinArdoise(code: string): Promise<{ ardoise_id: string; a
   return callArdoiseInvite('join', { code: code.trim() });
 }
 
+/**
+ * Pont invité→foyer (phase 40) : échange du code de partage ardoise contre un
+ * token d'invitation foyer à usage unique, émis côté serveur APRÈS la
+ * confirmation explicite de l'utilisateur (aucun appel avant onConfirm).
+ * Le token brut n'est rendu qu'une fois — jamais persisté ni journalisé.
+ */
+export async function exchangeArdoiseCodeForHouseholdToken(code: string): Promise<{ token: string }> {
+  return callArdoiseInvite('household-token', { code: code.trim() });
+}
+
 export interface GuestExpenseView {
   id: string;
   title: string;
@@ -388,6 +398,8 @@ export interface GuestArdoiseView {
    * valeur est déjà prête à servir.
    */
   ardoise: { id: string; name: string; description: string | null; coverUrl: string | null; is_active: boolean };
+  /** Nom du foyer de l'ardoise (phase 40) : titre du dialog pré-adhésion ; null = foyer supprimé (repli côté UI). */
+  householdName: string | null;
   /** NULL en accès anonyme par lien (aucun nom demandé). */
   guest: { display_name: string } | null;
   expenses: GuestExpenseView[];

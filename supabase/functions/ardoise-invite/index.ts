@@ -141,6 +141,16 @@ const requestSchema = z.discriminatedUnion('action', [
       .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.'),
   }),
   z.object({
+    action: z.literal('household-token'),
+    /** Code brut de partage ardoise, échangé contre un token foyer (phase 40). */
+    code: z
+      .string()
+      .trim()
+      .min(22, 'Un code fait au moins 22 caractères.')
+      .max(512)
+      .regex(/^[A-Za-z0-9_-]+$/, 'Code invalide.'),
+  }),
+  z.object({
     action: z.literal('redeem-guest'),
     code: z
       .string()
@@ -238,7 +248,7 @@ async function hmacSha256Hex(code: string, secret: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 const WINDOW_MS = 60_000;
-const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30, 'link-view': 30, 'add-guest': 20 };
+const LIMITS: Record<string, number> = { 'redeem-guest': 8, join: 8, 'household-token': 8, create: 20, 'create-ardoise': 10, revoke: 20, summary: 30, 'guest-view': 30, 'link-view': 30, 'add-guest': 20 };
 const MAX_TRACKED_CLIENTS = 5_000;
 
 const counters = new Map<string, { count: number; resetAt: number }>();
@@ -310,6 +320,31 @@ function checkSecret(): string {
     throw new ArdoiseInviteError(500, 'ARDOISE_HMAC_SECRET doit faire au moins 256 bits.');
   }
   return secret;
+}
+
+/**
+ * Secret des TOKENS FOYER (distinct du secret ardoise, espaces de clés
+ * séparés — ARD-03) : lu ici uniquement, jamais rendu ni journalisé. Sans
+ * lui, l'émission bridge est impossible — erreur 500 explicite, jamais un
+ * secret de substitution.
+ */
+function checkInviteSecret(): string {
+  const secret = env('INVITE_TOKEN_HMAC_SECRET');
+  if (secret.length < 32) {
+    throw new ArdoiseInviteError(500, 'INVITE_TOKEN_HMAC_SECRET doit faire au moins 256 bits.');
+  }
+  return secret;
+}
+
+/** 24 octets aléatoires → 32 caractères base64url (≥ 128 bits, ≥ 22 caractères). */
+function generateToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -514,6 +549,51 @@ async function handleRedeemGuest(admin: AdminClient, body: RequestBody & { actio
 
   const redeemed = (data ?? {}) as { ardoise_id?: string; guest_ticket?: string };
   return json({ ardoise_id: redeemed.ardoise_id ?? null, guest_ticket: redeemed.guest_ticket ?? null });
+}
+
+/**
+ * Pont invité→foyer (phase 40, « Rejoindre via mon compte ») : un utilisateur
+ * CONNECTÉ qui présente un code de partage ardoise valide reçoit un token
+ * d'invitation foyer à usage unique (max_uses=1, 15 minutes — bornes en dur
+ * dans le RPC 0180b). L'autorisation vient du code (contrôle d'accès ardoise)
+ * + de la session — JAMAIS d'une adhésion de foyer préalable.
+ *
+ * D-03 : code inconnu, révoqué ou expiré reçoivent la MÊME réponse 404
+ * « Lien invalide. » — aucune énumération de codes possible.
+ *
+ * Le RPC remplit aussi la table pont private.ardoise_bridge_identities
+ * (OPTION B, inatteignable depuis PostgREST) : l'Edge n'a qu'un appel.
+ * Le token brut est rendu UNE fois dans la réponse — jamais journalisé.
+ */
+async function handleHouseholdToken(admin: AdminClient, userId: string, body: RequestBody & { action: 'household-token' }) {
+  const secret = checkSecret();
+  const codeHash = await hmacSha256Hex(body.code, secret);
+
+  const { data: ardoise } = await admin
+    .from('ardoises')
+    .select('id,household_id,is_active,expires_at')
+    .eq('invite_hash', codeHash)
+    .maybeSingle();
+  const row = ardoise as
+    | { id: string; household_id: string; is_active: boolean; expires_at: string | null }
+    | null;
+  if (!row || !row.is_active) throw new ArdoiseInviteError(404, 'Lien invalide.');
+  if (row.expires_at && row.expires_at <= new Date().toISOString()) {
+    throw new ArdoiseInviteError(404, 'Lien invalide.');
+  }
+
+  const token = generateToken();
+  const tokenHash = await hmacSha256Hex(token, checkInviteSecret());
+
+  const { error } = await admin.rpc('create_household_bridge_token', {
+    p_household_id: row.household_id,
+    p_token_hash: tokenHash,
+    p_ardoise_id: row.id,
+    p_user_id: userId,
+  });
+  if (error) throw translateRpcError(error);
+
+  return json({ token });
 }
 
 /**
@@ -771,6 +851,14 @@ async function buildGuestView(
     ? await resolveGuestCoverUrl(admin, (ardoise as { cover_url: string | null }).cover_url, householdId)
     : null;
 
+  // Nom du foyer pour le dialog pré-adhésion (phase 40, décision 2) : lu en
+  // service_role sur la ligne foyer, `null` si le foyer a disparu (Pitfall 5)
+  // — le client affiche alors le titre de repli.
+  const { data: householdRow } = householdId
+    ? await admin.from('households').select('name').eq('id', householdId).maybeSingle()
+    : { data: null };
+  const householdName = ((householdRow ?? null) as { name?: string } | null)?.name ?? null;
+
   return json({
     ardoise: {
       id: (ardoise as { id: string }).id,
@@ -779,6 +867,7 @@ async function buildGuestView(
       coverUrl,
       is_active: (ardoise as { is_active: boolean }).is_active,
     },
+    householdName,
     guest: guestDisplayName ? { display_name: guestDisplayName } : null,
     expenses: viewExpenses,
     settlement: publicSettlement,
@@ -847,6 +936,7 @@ Deno.serve(
         return json({ error: 'Connectez-vous pour rejoindre une ardoise.' }, 401);
       }
 
+      if (body.action === 'household-token') return await handleHouseholdToken(admin, userId, body);
       if (body.action === 'create-ardoise') return await handleCreateArdoise(admin, userId, body);
       if (body.action === 'create') return await handleCreate(admin, userId, body);
       if (body.action === 'revoke') return await handleRevoke(admin, userId, body);

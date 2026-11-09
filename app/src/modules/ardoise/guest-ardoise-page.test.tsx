@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useNavigate, useSearchParams } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import GuestArdoisePage from './guest-ardoise-page';
 import { InviteRequestError } from './api';
 
-const { authed, joinArdoiseMock } = vi.hoisted(() => ({
+const { authed, exchangeMock } = vi.hoisted(() => ({
   authed: { value: false },
-  joinArdoiseMock: vi.fn(),
+  exchangeMock: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-auth', () => ({
@@ -17,7 +17,7 @@ vi.mock('@/hooks/use-auth', () => ({
 
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
-  joinArdoise: joinArdoiseMock,
+  exchangeArdoiseCodeForHouseholdToken: exchangeMock,
 }));
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -32,6 +32,7 @@ const CODE = 'code-partage-12345678901234';
 
 const viewPayload = {
   ardoise: { id: 'ardoise-1', name: 'Week-end', description: null, coverUrl: null, is_active: true },
+  householdName: 'Foyer Test',
   guest: null,
   expenses: [
     {
@@ -189,7 +190,7 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
     localStorage.clear();
     vi.unstubAllGlobals();
     authed.value = false;
-    joinArdoiseMock.mockReset();
+    exchangeMock.mockReset();
   });
 
   /**
@@ -208,40 +209,63 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
       expect(await screen.findByText('Courses')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Créer un compte' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Rejoindre via mon compte' })).not.toBeInTheDocument();
-      expect(joinArdoiseMock).not.toHaveBeenCalled();
+      expect(exchangeMock).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('visiteur authentifié : bouton « Rejoindre via mon compte » qui appelle joinArdoise(code)', async () => {
+  /**
+   * Phase 40 (ARD-01) : le clic n'ouvre QUE le dialog de confirmation —
+   * aucun appel Edge tant que la personne n'a pas confirmé explicitement
+   * (anti-feature « adhésion implicite », REQUIREMENTS v1.3). À la
+   * confirmation, l'échange code→token est appelé avec le code actif.
+   */
+  it('visiteur authentifié : le clic ouvre le dialog, aucun appel Edge avant confirmation', async () => {
     const calls: string[] = [];
     mockViewFetch(calls);
-    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
+    exchangeMock.mockResolvedValue({ token: 'tok_abc' });
     const user = userEvent.setup();
     try {
       authed.value = true;
       renderGuest(CODE);
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
-      expect(joinArdoiseMock).toHaveBeenCalledTimes(1);
-      expect(joinArdoiseMock).toHaveBeenCalledWith(CODE);
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+      expect(screen.getByText(/Vous allez rejoindre le foyer Foyer Test/)).toBeInTheDocument();
+      expect(exchangeMock).not.toHaveBeenCalled();
+      expect(calls).toEqual(['link-view']);
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
+      expect(exchangeMock).toHaveBeenCalledTimes(1);
+      expect(exchangeMock).toHaveBeenCalledWith(CODE);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('succès du join : confirmation + lien vers le module ; déjà membre : message idempotent', async () => {
+  function SondeAtterrissage() {
+    const [params] = useSearchParams();
+    return <p>token-probe:{params.get('token') ?? 'aucun'}</p>;
+  }
+
+  /** Succès : le pré-écran foyer existant prend le relais avec le token bridge. */
+  it('succès de l’échange : navigation vers /foyer/rejoindre?token=…', async () => {
     const calls: string[] = [];
     mockViewFetch(calls);
-    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
+    exchangeMock.mockResolvedValue({ token: 'tok_abc-123' });
     const user = userEvent.setup();
     try {
       authed.value = true;
-      renderGuest(CODE);
+      renderWithProviders(
+        <Routes>
+          <Route path="/invitation/ardoise" element={<GuestArdoisePage />} />
+          <Route path="/foyer/rejoindre" element={<SondeAtterrissage />} />
+        </Routes>,
+        { route: `/invitation/ardoise?code=${CODE}`, withHousehold: false },
+      );
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
-      expect(await screen.findByRole('status')).toHaveTextContent(/participez désormais/);
-      expect(screen.getByRole('link', { name: 'Ouvrir l’ardoise' })).toBeInTheDocument();
-      expect(joinArdoiseMock).toHaveBeenCalledWith(CODE);
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
+      expect(await screen.findByText('token-probe:tok_abc-123')).toBeInTheDocument();
+      expect(exchangeMock).toHaveBeenCalledWith(CODE);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -251,12 +275,14 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
     const calls: string[] = [];
     mockViewFetch(calls);
     const serveur = 'Vous n’appartenez pas au foyer de cette ardoise : utilisez le lien invité.';
-    joinArdoiseMock.mockRejectedValue(new InviteRequestError(403, serveur));
+    exchangeMock.mockRejectedValue(new InviteRequestError(403, serveur));
     const user = userEvent.setup();
     try {
       authed.value = true;
       renderGuest(CODE);
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      // L'échange ne part qu'à la confirmation du dialog (ARD-01).
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(serveur);
       // Le 403 est le comportement CORRECT pour un non-membre : la page le
       // surface sans le maquiller, et propose l'aide « bon compte » —
@@ -276,12 +302,14 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
   it('rejet 500 : message serveur affiché, aide « bon compte » absente', async () => {
     const calls: string[] = [];
     mockViewFetch(calls);
-    joinArdoiseMock.mockRejectedValue(new InviteRequestError(500, 'Erreur interne.'));
+    exchangeMock.mockRejectedValue(new InviteRequestError(500, 'Erreur interne.'));
     const user = userEvent.setup();
     try {
       authed.value = true;
       renderGuest(CODE);
       await user.click(await screen.findByRole('button', { name: 'Rejoindre via mon compte' }));
+      // L'échange ne part qu'à la confirmation du dialog (ARD-01).
+      await user.click(screen.getByRole('button', { name: 'Rejoindre le foyer' }));
       expect(await screen.findByRole('alert')).toHaveTextContent('Erreur interne.');
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
@@ -312,7 +340,7 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
       const navigate = useNavigate();
       return <button onClick={() => navigate(`/invitation/ardoise?code=${CODE_B}`)}>aller-B</button>;
     }
-    joinArdoiseMock.mockResolvedValue({ ardoise_id: 'ardoise-1', already_member: false });
+    exchangeMock.mockResolvedValue({ token: 'tok_abc' });
     const user = userEvent.setup();
     try {
       authed.value = true;
@@ -332,13 +360,18 @@ describe('GuestArdoisePage — branche authentifiée (G-37-2)', () => {
       );
       await screen.findByText('Week-end');
       await user.click(screen.getByRole('button', { name: 'Rejoindre via mon compte' }));
-      expect(await screen.findByRole('status')).toHaveTextContent(/participez désormais/);
-      expect(screen.getByRole('link', { name: 'Ouvrir l’ardoise' })).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'aller-B' }));
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+      // Radix pose `aria-hidden` sur le contenu hors dialog : `dom-accessibility-api`
+      // renvoie alors un nom vide pour ce bouton, même avec `hidden: true`
+      // (timing de pose de l'attribut). `getByText` ne passe pas par le nom
+      // accessible ; `fireEvent` (et non userEvent) car le bouton est derrière
+      // l'overlay — scénario voulu : navigation PENDANT un dialog ouvert
+      // sur A, qui doit le fermer (WR-05 : dialog appartient à un code).
+      fireEvent.click(screen.getByText('aller-B'));
       expect(await screen.findByText('Barbecue')).toBeInTheDocument();
-      // Le résidu du succès sur A a disparu : message et lien retombés.
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Ouvrir l’ardoise' })).not.toBeInTheDocument();
+      // Le résidu du dialog ouvert sur A a disparu : pas de dialog fantôme
+      // sur l'ardoise B, le bouton repart de l'état neutre.
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Rejoindre via mon compte' })).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();

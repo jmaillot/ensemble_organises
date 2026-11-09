@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/ui/empty-state';
 import { MetricRow, ModuleShell, Panel } from '@/components/shared/module-shell';
 import { formatEuro } from '@/lib/utils';
+import { setArdoiseLanding } from '@/lib/invites';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useIsAuthenticated } from '@/hooks/use-auth';
 import {
+  exchangeArdoiseCodeForHouseholdToken,
   fetchGuestLinkView,
   InviteRequestError,
-  joinArdoise,
   toServerBalances,
   toServerSettlements,
 } from './api';
@@ -38,6 +40,7 @@ import { SettlementsPanel } from './components/settlements-panel';
  */
 export default function GuestArdoisePage() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const [code, setCode] = useState(() => params.get('code') ?? '');
   // WR-03 (37-REVIEW) : un code venu de l'URL ne contourne pas le garde de
   // configuration que le chemin formulaire applique — sans backend configuré,
@@ -56,7 +59,6 @@ export default function GuestArdoisePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const isAuthenticated = useIsAuthenticated();
   const [joinState, setJoinState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [joinMessage, setJoinMessage] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   // WR-01 (37-REVIEW) : l'aide « bon compte » est déclenchée par le STATUT
   // HTTP (403 = non-membre, refus attendu du modèle binaire), jamais par un
@@ -88,12 +90,14 @@ export default function GuestArdoisePage() {
 
   // WR-05 (37-REVIEW) : l'état du rattachement appartient à UN code — un
   // succès ou une erreur de l'ardoise A ne doit pas survivre à l'affichage de
-  // l'ardoise B (le formulaire permet de repartir sur un autre code).
+  // l'ardoise B (le formulaire permet de repartir sur un autre code). Le
+  // dialog de confirmation suit la même règle : ouvert sur A, il ne doit pas
+  // hanter l'ardoise B.
   useEffect(() => {
     setJoinState('idle');
-    setJoinMessage(null);
     setJoinError(null);
     setJoinIs403(false);
+    setConfirmOpen(false);
   }, [activeCode]);
 
   const view = viewQuery.data ?? null;
@@ -116,25 +120,29 @@ export default function GuestArdoisePage() {
       ? 'Ce lien ne passe plus (code révoqué ou expiré). Demandez un nouveau lien à l’organisateur.'
       : 'Impossible de charger cette ardoise pour le moment. Réessayez.';
 
-  /** Rattachement réel via le goulot `join` de l'Edge (G-37-2). */
+  /**
+   * Pont invité→foyer (phase 40) : le clic n'OUVRE QUE le dialog — aucun
+   * appel Edge tant que la personne n'a pas confirmé (anti-feature
+   * « adhésion implicite », REQUIREMENTS v1.3). À la confirmation, l'échange
+   * code→token serveur délivre un token foyer à usage unique, le marqueur
+   * d'atterrissage est posé, et le pré-écran foyer existant prend le relais
+   * (/foyer/rejoindre?token=…). Les échecs (401 session expirée, 403 déjà
+   * membre du foyer, 404 code mort) s'affichent tels quels, WR-02.
+   */
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const rejoindre = async () => {
     if (activeCode === null) return;
     setJoinState('loading');
-    setJoinMessage(null);
     setJoinError(null);
     try {
-      const result = await joinArdoise(activeCode);
-      setJoinMessage(
-        result.already_member
-          ? 'Vous participez déjà à cette ardoise : rien à faire.'
-          : 'Vous participez désormais à cette ardoise : elle apparaît dans votre module Ardoise.',
-      );
-      setJoinState('done');
+      const { token } = await exchangeArdoiseCodeForHouseholdToken(activeCode);
+      setArdoiseLanding();
+      navigate(`/foyer/rejoindre?token=${encodeURIComponent(token)}`);
     } catch (cause) {
-      // Le 403 d'un non-membre est le comportement CORRECT du modèle
-      // binaire : on affiche le message serveur tel quel, sans le maquiller.
+      // Le statut HTTP porte la distinction (WR-02) : le message serveur
+      // s'affiche tel quel, jamais maquillé en succès.
       const status = cause instanceof InviteRequestError ? cause.status : 0;
-      const message = cause instanceof Error ? cause.message : 'Rattachement impossible.';
+      const message = cause instanceof Error ? cause.message : 'Adhésion impossible.';
       setJoinError(message);
       setJoinIs403(status === 403);
       setJoinState('error');
@@ -225,11 +233,6 @@ export default function GuestArdoisePage() {
                     Vous êtes connecté : rejoignez l'ardoise via votre compte pour avancer des dépenses (part zéro
                     sur le passé, partage normal ensuite). Un non-membre du foyer recevra un refus explicite.
                   </p>
-                  {joinMessage ? (
-                    <p className="m-0 rounded-[11px] bg-accent-faint px-3 py-2.5 text-[12px]" role="status">
-                      {joinMessage}
-                    </p>
-                  ) : null}
                   {joinError ? (
                     <div className="grid gap-1.5 rounded-[11px] bg-coral-soft px-3 py-2.5" role="alert">
                       <p className="m-0 text-[12px]">{joinError}</p>
@@ -249,8 +252,8 @@ export default function GuestArdoisePage() {
                     </Link>
                   ) : (
                     <div>
-                      <Button icon="arrow" disabled={joinState === 'loading'} onClick={() => void rejoindre()}>
-                        {joinState === 'loading' ? 'Rattachement…' : 'Rejoindre via mon compte'}
+                      <Button icon="arrow" disabled={joinState === 'loading'} onClick={() => setConfirmOpen(true)}>
+                        {joinState === 'loading' ? 'Adhésion en cours…' : 'Rejoindre via mon compte'}
                       </Button>
                     </div>
                   )}
@@ -273,6 +276,23 @@ export default function GuestArdoisePage() {
           </div>
         )}
       </Panel>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => setConfirmOpen(open)}
+        title={
+          view?.householdName
+            ? `Vous allez rejoindre le foyer ${view.householdName}`
+            : 'Vous allez rejoindre le foyer de cette ardoise'
+        }
+        description="Vous deviendrez membre du foyer et votre participation passée à cette ardoise sera rattachée à votre compte."
+        confirmLabel="Rejoindre le foyer"
+        cancelLabel="Ne pas rejoindre"
+        destructive={false}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void rejoindre();
+        }}
+      />
     </ModuleShell>
   );
 }
