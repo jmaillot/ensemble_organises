@@ -1,7 +1,7 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
-import { Icon } from '@/components/shared/icon';
+import { Icon, type IconName } from '@/components/shared/icon';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -11,6 +11,13 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /**
+   * Icône de la pastille : `trash` par défaut (toutes les confirmations
+   * destructrices existantes restent identiques) ; une action non
+   * destructive — adhésion, changement de propriétaire — peut porter une
+   * sémantique différente (ex. `users` pour rejoindre un foyer).
+   */
+  icon?: IconName;
   onConfirm: () => void;
   children?: React.ReactNode;
 }
@@ -27,6 +34,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirmer',
   cancelLabel = 'Annuler',
   destructive = true,
+  icon = 'trash',
   onConfirm,
   children,
 }: ConfirmDialogProps) {
@@ -41,7 +49,7 @@ export function ConfirmDialog({
           )}
         >
           <div className="mb-4 grid size-12 place-items-center rounded-[16px] bg-coral-soft text-coral-text">
-            <Icon name="trash" size="lg" />
+            <Icon name={icon} size="lg" />
           </div>
           <AlertDialogPrimitive.Title className="mb-2 font-display text-xl tracking-[-0.035em]">
             {title}
