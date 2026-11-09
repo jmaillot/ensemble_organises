@@ -6,15 +6,15 @@ current_phase: 40
 current_phase_name: Ardoise « Rejoindre via mon compte »
 status: executing
 stopped_at: Completed 40-01-PLAN.md
-last_updated: "2026-11-09T13:40:46.231Z"
+last_updated: "2026-11-09T13:57:02.863Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 40 execution resumed (wave continue)
-state_head: 48a18120f6db7d6f6f31b48e9c9f2974a3d0af01
+state_head: 15e4f7ac9d33e1d4479bcb887b3aab1cf4b43d57
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 ## Current Position
 
 Phase: 40 (Ardoise « Rejoindre via mon compte ») — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 
@@ -50,6 +50,7 @@ Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 | Phase 39 P39-01 | 70m | 3 tasks | 3 files |
 | Phase 39 P39-02 | 30m | 3 tasks | 4 files |
 | Phase 40 P01 | 3h | 3 tasks | 8 files |
+| Phase 40 P02 | 1h30 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -90,3 +91,4 @@ Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 - [Phase 39]: Wrapper test-join-token-real.sh routé par testIgnore sur E2E_BASE_URL (Rule 3, JT-01) — la spec réelle vit dans son run séparé, le run standard reste vert
 - [Phase 39]: Secret SUPABASE_SECRET_KEY ne circule que via curl -K 0600 dans lib-smoke-accounts.sh (T-39-01/07) ; jamais en argv ni en env exportée
 - [Phase 40]: 40-01: remplissage du pont d'identité descendu dans le RPC (0180b) — PostgREST n'expose pas private.*
+- [Phase 40]: 40-02: fusion = report de part (trigger différé somme=montant) ; réconciliation aussi en already_member ; vocabulaire réel 'guest'

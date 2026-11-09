@@ -67,13 +67,13 @@ Plans:
   3. Les espaces de clés sont distincts (partage ardoise ≠ invitation foyer), aucune colonne `household_id` n'a été ajoutée au modèle de partage, et les tests SQL négatifs passent : déjà admin, déjà membre, double redemption concurrente (`FOR UPDATE`), rôle forcé côté serveur uniquement
   4. La réconciliation des participations `invite:` → `membre:` à l'adhésion est tranchée : soit implémentée transactionnellement et prouvée, soit refusée avec la justification produit consignée dans PROJECT.md — aucun orphelin silencieux
 
-**Plans**: 1/3 plans executed (40-01 wave 1 ; 40-02 et 40-03 wave 2 en parallèle)
+**Plans**: 2/3 plans executed (40-01 wave 1 ; 40-02 et 40-03 wave 2 en parallèle)
 Plans:
 **Wave 1**
 - [x] 40-01-PLAN.md — Tracer : migration 0180 (table pont + RPC bridge), action Edge `household-token`, chemin frontend dialog → `/foyer/rejoindre` → `/ardoise`
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 40-02-PLAN.md — Migration 0181 : réconciliation `invite:`→`membre:` transactionnelle dans redeem + tests SQL positifs/négatifs (ARD-02/03)
+- [x] 40-02-PLAN.md — Migration 0181 : réconciliation `invite:`→`membre:` transactionnelle dans redeem + tests SQL positifs/négatifs (ARD-02/03)
 - [ ] 40-03-PLAN.md — UI-SPEC : prop `icon` ConfirmDialog, copy dialog, retrait copy « part zéro », tests RTL ARD-01
 
 **UI hint**: yes
@@ -110,7 +110,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
-| 40. Ardoise « Rejoindre via mon compte » | 1/3 | In Progress|  |
+| 40. Ardoise « Rejoindre via mon compte » | 2/3 | In Progress|  |
 | 41. Gate SW simulable | 0/? | Not started | - |
 | 42. Cold start + décision cache | 0/? | Not started | - |
 
