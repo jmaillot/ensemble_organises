@@ -11,6 +11,28 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * Les sélecteurs consomment le DOM réel de `join-household-page.tsx`,
  * `sign-in-page.tsx` et `create-household-page.tsx` — jamais de doublon.
+ *
+ * BORNAGE — CE QUE CETTE SPEC VÉRIFIE, ET CE QU'ELLE NE PEUT PAS VÉRIFIER
+ *   Les 6 points JT-02 du flux 31-03 : (1) création de foyer depuis l'UI avec
+ *   token copiable + QR ; (2) pré-écran public nommant l'invitant (D-20, via
+ *   la preview Edge publishable) ; (3) traversée D-06 — token posé en
+ *   sessionStorage AVANT la navigation vers /connexion en mode inscription ;
+ *   (4) redeem authentifié D-08 par le CTA explicite, retour au pré-écran par
+ *   la mémoire du parcours (D-07) ; (5) atterrissage non bloquant D-09 après
+ *   un échec de redeem (message D-17 d'abord, navigation ensuite) ;
+ *   (6) message uniforme sur token mort — D-03 en pré-écran public, verbatim
+ *   D-17 au redeem authentifié.
+ *
+ *   Elle ne peut PAS vérifier le passage réel par l'email de confirmation de
+ *   l'inscription : aucun accès IMAP, et le contournement `generate_link` de
+ *   l'Admin GoTrue ferait emprunter un chemin qu'aucun vrai utilisateur
+ *   n'emprunte — volontairement non contourné. Le testage de la traversée
+ *   s'arrête donc au hand-off sessionStorage (D-06) ; le redeem est effectué
+ *   par un compte pré-confirmé via l'Admin (grant password, A1).
+ *
+ *   Aucun marquage conditionnel d'omission dans ce fichier : sans stack, le
+ *   wrapper refuse et la spec échoue — elle ne s'ignore jamais (JT-03 ;
+ *   contre-modèle explicite : offline-shared-device.spec.ts l.38).
  */
 
 // La spec échoue nommément sans ses entrées : un échec est une information,
