@@ -481,8 +481,11 @@ fi
 step "6. Alice crée une tâche, Bob ne la voit pas"
 # ----------------------------------------------------------------------------
 TASK_ID="task_$(uuid)"
+# `client_key` est NOT NULL depuis 0177 (phase 34, idempotence du rejeu
+# client) et typé uuid : une valeur propre au run, comme le client réel qui
+# génère la sienne — jamais le `id` textuel du smoke.
 call "/rest/v1/tasks" POST \
-  "{\"id\":\"$TASK_ID\",\"household_id\":\"$HOUSEHOLD_ID\",\"name\":\"Valider le carnet\",\"status\":\"a_faire\",\"created_by\":\"$MEMBER_ID\"}" \
+  "{\"id\":\"$TASK_ID\",\"client_key\":\"$(uuid)\",\"household_id\":\"$HOUSEHOLD_ID\",\"name\":\"Valider le carnet\",\"status\":\"a_faire\",\"created_by\":\"$MEMBER_ID\"}" \
   "$ALICE_JWT"
 [ "$CODE" = "201" ] || [ "$CODE" = "200" ] \
   && pass "la tâche est créée" \
@@ -499,8 +502,11 @@ fi
 # ----------------------------------------------------------------------------
 step "7. Alice émet un token d'invitation"
 # ----------------------------------------------------------------------------
+# `expiresAt` est exigé par le schéma Zod de la fonction (action create) :
+# le client réel envoie toujours une échéance — le smoke fait de même.
+INVITE_EXPIRES_AT="$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)"
 call "/functions/v1/household-invite" POST \
-  "{\"action\":\"create\",\"householdId\":\"$HOUSEHOLD_ID\"}" \
+  "{\"action\":\"create\",\"householdId\":\"$HOUSEHOLD_ID\",\"expiresAt\":\"$INVITE_EXPIRES_AT\"}" \
   "$ALICE_JWT"
 TOKEN="$(json_string "$BODY" token)"
 if [ -n "$TOKEN" ]; then

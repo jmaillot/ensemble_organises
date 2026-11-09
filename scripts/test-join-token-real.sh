@@ -248,10 +248,11 @@ if [ "$hcode" != "200" ] && [ "$hcode" != "201" ] || [ -z "$HOUSEHOLD_ID" ]; the
 fi
 echo "   ✓ foyer d'échange créé ($HOUSEHOLD_ID)"
 
+# `expiresAt` est exigé par le schéma Zod de l'action create — comme l'app.
 tresp="$(curl -sS -w '\n%{http_code}' -X POST "$API/functions/v1/household-invite" \
   -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $INVITER_JWT" \
   -H 'Content-Type: application/json' \
-  --data "{\"action\":\"create\",\"householdId\":\"$HOUSEHOLD_ID\"}" 2>/dev/null \
+  --data "{\"action\":\"create\",\"householdId\":\"$HOUSEHOLD_ID\",\"expiresAt\":\"$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)\"}" 2>/dev/null \
   || printf '\n000')"
 tcode="$(printf '%s' "$tresp" | tail -n 1)"
 tbody="$(printf '%s' "$tresp" | sed '$d')"
