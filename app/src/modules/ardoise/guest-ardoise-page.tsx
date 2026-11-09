@@ -29,7 +29,8 @@ import { SettlementsPanel } from './components/settlements-panel';
  * non expiré). Aucune ligne invitée créée, compteur d'utilisations intact,
  * l'invité n'apparaît pas dans la répartition. Pour AVANCER des dépenses,
  * il faut un compte puis rejoindre l'ardoise (l'adhésion inscrit aux
- * dépenses à part zéro sur le passé).
+ * il faut un compte puis rejoindre l'ardoise (l'adhésion rattache la
+ * participation passée au compte).
  *
  * G-37-2 : un visiteur CONNECTÉ n'était traité nulle part. Il voit désormais
  * une branche « Rejoindre via mon compte » qui appelle le chemin join réel —
@@ -230,8 +231,9 @@ export default function GuestArdoisePage() {
               {isAuthenticated ? (
                 <div className="grid gap-3">
                   <p className="m-0 text-[12px] text-muted">
-                    Vous êtes connecté : rejoignez l'ardoise via votre compte pour avancer des dépenses (part zéro
-                    sur le passé, partage normal ensuite). Un non-membre du foyer recevra un refus explicite.
+                    Vous êtes connecté : rejoignez l'ardoise via votre compte pour avancer des dépenses — votre
+                    participation passée sera rattachée à votre compte à l'adhésion. Un non-membre du foyer recevra
+                    un refus explicite.
                   </p>
                   {joinError ? (
                     <div className="grid gap-1.5 rounded-[11px] bg-coral-soft px-3 py-2.5" role="alert">
@@ -261,8 +263,8 @@ export default function GuestArdoisePage() {
               ) : (
                 <>
                   <p className="m-0 mb-3 text-[12px] text-muted">
-                    Créez un compte, puis rejoignez l’ardoise : vous serez ajouté aux dépenses (part zéro sur le
-                    passé, partage normal ensuite).
+                    Créez un compte, puis rejoignez l’ardoise : votre participation passée sera rattachée à votre
+                    compte à l’adhésion.
                   </p>
                   <Link
                     to="/connexion"
@@ -292,6 +294,7 @@ export default function GuestArdoisePage() {
           setConfirmOpen(false);
           void rejoindre();
         }}
+        icon="users"
       />
     </ModuleShell>
   );
