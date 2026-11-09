@@ -143,7 +143,10 @@ smoke_accounts_mode() {
 }
 
 smoke_accounts_domain() {
-  if [ -n "$SMOKE_MAIL_DOMAIN" ]; then
+  # Les appelants tournent sous `set -u` : la variable d'override doit être
+  # bornée, sinon le test d'existence lui-même aborte sous dash (run réel
+  # du 2026-11-09 : « SMOKE_MAIL_DOMAIN: parameter not set » → email tronqué).
+  if [ -n "${SMOKE_MAIL_DOMAIN:-}" ]; then
     printf '%s' "$SMOKE_MAIL_DOMAIN"
     return 0
   fi
