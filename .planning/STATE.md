@@ -5,16 +5,16 @@ milestone_name: Solde de la dette
 current_phase: 40
 current_phase_name: Ardoise « Rejoindre via mon compte »
 status: executing
-stopped_at: Phase 40 UI-SPEC approved
-last_updated: "2026-11-09T12:36:29.072Z"
+stopped_at: Completed 40-01-PLAN.md
+last_updated: "2026-11-09T13:40:46.231Z"
 last_activity: 2026-11-09
-last_activity_desc: Phase 39 complete, transitioned to Phase 40
-state_head: f348daa7ad5152a5aa4f85b445e3454d092c669c
+last_activity_desc: Phase 40 execution resumed (wave continue)
+state_head: 48a18120f6db7d6f6f31b48e9c9f2974a3d0af01
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-08)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 39 — Outillage prod de vérification
+**Current focus:** Phase 40 — Ardoise « Rejoindre via mon compte »
 
 ## Current Position
 
-Phase: 40 (Ardoise « Rejoindre via mon compte ») — READY TO EXECUTE
-Plan: Not started
+Phase: 40 (Ardoise « Rejoindre via mon compte ») — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-11-09 — Phase 39 complete, transitioned to Phase 40
+Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Last activity: 2026-11-09 — Phase 39 complete, transitioned to Phase 40
 | Phase 38 P04 | 25min | 2 tasks | 1 files |
 | Phase 39 P39-01 | 70m | 3 tasks | 3 files |
 | Phase 39 P39-02 | 30m | 3 tasks | 4 files |
+| Phase 40 P01 | 3h | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -70,9 +71,9 @@ Last activity: 2026-11-09 — Phase 39 complete, transitioned to Phase 40
 
 ## Session Continuity
 
-**Last session:** 2026-11-09T12:20:29.303Z
-**Stopped at:** Phase 40 UI-SPEC approved
-**Resume file:** .planning/phases/40-ardoise-rejoindre-via-mon-compte/40-UI-SPEC.md
+**Last session:** 2026-11-09T13:40:46.185Z
+**Stopped at:** Completed 40-01-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : approbation, puis `/gsd-plan-phase 38`.
@@ -88,3 +89,4 @@ Last activity: 2026-11-09 — Phase 39 complete, transitioned to Phase 40
 - [Phase 38]: Signature e2e phase 38 consignée (38-E2E-SIGNATURE.md) : 165 passed / 9 skipped / 1 seul test rouge (join-token l.134 chromium+mobile, J-01, soldé en 39 via TEST-02) ; 8 skips préexistants datés par preuve git comme baseline légitime. — Un rouge documenté noir sur blanc reste une absence affirmée, pas un silence ; le baseline de skips daté par git log -S empêche toute confusion future avec un skip introduit.
 - [Phase 39]: Wrapper test-join-token-real.sh routé par testIgnore sur E2E_BASE_URL (Rule 3, JT-01) — la spec réelle vit dans son run séparé, le run standard reste vert
 - [Phase 39]: Secret SUPABASE_SECRET_KEY ne circule que via curl -K 0600 dans lib-smoke-accounts.sh (T-39-01/07) ; jamais en argv ni en env exportée
+- [Phase 40]: 40-01: remplissage du pont d'identité descendu dans le RPC (0180b) — PostgREST n'expose pas private.*
