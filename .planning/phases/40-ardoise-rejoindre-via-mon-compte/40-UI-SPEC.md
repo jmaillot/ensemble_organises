@@ -96,6 +96,8 @@ Reprise des tokens `@theme` existants :
 
 Accent réservé exclusivement à : bouton de confirmation du dialog, bouton/lien « Ouvrir l'ardoise », Lien « Créer un compte » (existant). Jamais de texte de corps en accent.
 
+**Ancrage visuel :** quand le ConfirmDialog est ouvert, il est le seul ancre visuel de la page invitée (overlay + focus piégé, contenu reposant hors d'atteinte) — la vue et le panneau « Participer ? » passent au second plan sans autre mise en valeur. Vue de base (dialog fermé) : le panneau « Participer ? », avec son CTA accent « Rejoindre via mon compte », est l'ancre visuelle de la page invitée — tout le reste (titre de module, liste des dépenses) reste au niveau de lecture existant.
+
 Erreurs : `bg-coral-soft` + texte `--color-fg`/`--color-coral-text` (pattern existant `role="alert"` de la page invitée, contraste vérifié §tokens). Info / message de succès : `bg-accent-faint` (`role="status"`, pattern existant).
 
 ---
@@ -110,7 +112,7 @@ Langue : français, ton tutoiement existant du module. Le principe WR-01 s'appli
 | Dialog title | « Vous allez rejoindre le foyer {nom} » — {nom} vient de la vue invitée `link-view` enrichie |
 | Dialog description | « Vous deviendrez membre du foyer et votre participation passée à cette ardoise sera rattachée à votre compte. » |
 | Dialog confirm | « Rejoindre le foyer » (variant primary, `destructive={false}`) |
-| Dialog cancel | « Annuler » — ferme le dialog, aucune requête lancée |
+| Dialog cancel | « Ne pas rejoindre » — ferme le dialog, aucune requête lancée |
 | État chargement (pendant l'échange code→token) | « Adhésion en cours… » (remplace le label du bouton, bouton désactivé) |
 | Succès post-adhésion | Redirection vers `/ardoise` — pas de message intermédiaire nécessaire (atterrissage = preuve) ; conserver le lien existant « Ouvrir l'ardoise » comme filet si la redirection échoue |
 | Erreur : déjà membre du foyer | message serveur affiché tel quel + aide existante « Connectez-vous avec le bon compte… » si 403 |
