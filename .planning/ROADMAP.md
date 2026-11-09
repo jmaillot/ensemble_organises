@@ -13,7 +13,7 @@ Summary checklist:
 
 - [x] **Phase 38: Filet de tests fiable** - Flakes dimanche corrigés à la racine + dette review 37 (IN-01/IN-02) ; la chaîne §2.7 devient un instrument de confiance pour tout le jalon (completed 2026-11-08)
 - [x] **Phase 39: Outillage prod de vérification** - Smoke-test en mode prod réel via API Admin + spec e2e join-token refondue contre le flux 31-03 (completed 2026-11-09)
-- [ ] **Phase 40: Ardoise « Rejoindre via mon compte »** - L'unique surface produit du jalon : un invité sans foyer rejoint le foyer via le flux d'invitation existant, atterrit dans l'ardoise partagée
+- [x] **Phase 40: Ardoise « Rejoindre via mon compte »** - L'unique surface produit du jalon : un invité sans foyer rejoint le foyer via le flux d'invitation existant, atterrit dans l'ardoise partagée
 - [ ] **Phase 41: Gate SW simulable** - Le chemin runtime de la gate « file vide » validé e2e contre build+preview réel (GATE-01 planifiable)
 - [ ] **Phase 42: Cold start mesuré puis corrigé + décision cache** - Instrumentation en dernier, corrections désignées par le profil, décision CACHE-01 tranchée avec les données on-device
 
@@ -67,14 +67,14 @@ Plans:
   3. Les espaces de clés sont distincts (partage ardoise ≠ invitation foyer), aucune colonne `household_id` n'a été ajoutée au modèle de partage, et les tests SQL négatifs passent : déjà admin, déjà membre, double redemption concurrente (`FOR UPDATE`), rôle forcé côté serveur uniquement
   4. La réconciliation des participations `invite:` → `membre:` à l'adhésion est tranchée : soit implémentée transactionnellement et prouvée, soit refusée avec la justification produit consignée dans PROJECT.md — aucun orphelin silencieux
 
-**Plans**: 2/3 plans executed (40-01 wave 1 ; 40-02 et 40-03 wave 2 en parallèle)
+**Plans**: 3/3 plans executed (40-01 wave 1 ; 40-02 et 40-03 wave 2 en parallèle)
 Plans:
 **Wave 1**
 - [x] 40-01-PLAN.md — Tracer : migration 0180 (table pont + RPC bridge), action Edge `household-token`, chemin frontend dialog → `/foyer/rejoindre` → `/ardoise`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 40-02-PLAN.md — Migration 0181 : réconciliation `invite:`→`membre:` transactionnelle dans redeem + tests SQL positifs/négatifs (ARD-02/03)
-- [ ] 40-03-PLAN.md — UI-SPEC : prop `icon` ConfirmDialog, copy dialog, retrait copy « part zéro », tests RTL ARD-01
+- [x] 40-03-PLAN.md — UI-SPEC : prop `icon` ConfirmDialog, copy dialog, retrait copy « part zéro », tests RTL ARD-01
 
 **UI hint**: yes
 
@@ -110,7 +110,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
-| 40. Ardoise « Rejoindre via mon compte » | 2/3 | In Progress|  |
+| 40. Ardoise « Rejoindre via mon compte » | 3/3 | Done |  |
 | 41. Gate SW simulable | 0/? | Not started | - |
 | 42. Cold start + décision cache | 0/? | Not started | - |
 

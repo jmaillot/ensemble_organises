@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
 current_phase: 40
-current_phase_name: Ardoise « Rejoindre via mon compte »
-status: executing
-stopped_at: Completed 40-01-PLAN.md
-last_updated: "2026-11-09T13:57:02.863Z"
+status: completed
+stopped_at: Completed 40-03-PLAN.md (phase 40 terminée)
+last_updated: "2026-11-09T14:21:20.068Z"
 last_activity: 2026-11-09
-last_activity_desc: Phase 40 execution resumed (wave continue)
-state_head: 15e4f7ac9d33e1d4479bcb887b3aab1cf4b43d57
+last_activity_desc: Phase 40 marked complete
+state_head: 9a656b36bd20d027b4d88778053cc7b05649a897
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
+current_phase_name: Ardoise « Rejoindre via mon compte »
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 
 ## Current Position
 
-Phase: 40 (Ardoise « Rejoindre via mon compte ») — EXECUTING
+Phase: 40 — COMPLETE
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
+Status: Phase 40 complete
+Last activity: 2026-11-09 — Phase 40 marked complete
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 | Phase 39 P39-02 | 30m | 3 tasks | 4 files |
 | Phase 40 P01 | 3h | 3 tasks | 8 files |
 | Phase 40 P02 | 1h30 | 3 tasks | 2 files |
+| Phase 40 P03 | 1h15 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -72,8 +73,8 @@ Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 
 ## Session Continuity
 
-**Last session:** 2026-11-09T13:40:46.185Z
-**Stopped at:** Completed 40-01-PLAN.md
+**Last session:** 2026-11-09T14:21:03.937Z
+**Stopped at:** Completed 40-03-PLAN.md (phase 40 terminée)
 **Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
@@ -92,3 +93,4 @@ Last activity: 2026-11-09 — Phase 40 execution resumed (wave continue)
 - [Phase 39]: Secret SUPABASE_SECRET_KEY ne circule que via curl -K 0600 dans lib-smoke-accounts.sh (T-39-01/07) ; jamais en argv ni en env exportée
 - [Phase 40]: 40-01: remplissage du pont d'identité descendu dans le RPC (0180b) — PostgREST n'expose pas private.*
 - [Phase 40]: 40-02: fusion = report de part (trigger différé somme=montant) ; réconciliation aussi en already_member ; vocabulaire réel 'guest'
+- [Phase 40]: 40-03: ConfirmDialog icon rétro-compatible (users pour l'adhésion) ; copy « rattachée au compte » ; e2e = backstop de l'atterrissage RTL
