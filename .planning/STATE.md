@@ -4,17 +4,17 @@ milestone: v1.3
 milestone_name: Solde de la dette
 current_phase: 39
 current_phase_name: Outillage prod de vérification
-status: planning
-stopped_at: Phase 39 context gathered
-last_updated: "2026-11-09T09:24:39.337Z"
-last_activity: 2026-11-08
-last_activity_desc: Phase 38 complete, transitioned to Phase 39
-state_head: 5ec29f89f697ae48717528a4a65ad82025765d03
+status: executing
+stopped_at: Completed 39-01-PLAN.md and 39-02-PLAN.md
+last_updated: "2026-11-09T11:06:08.591Z"
+last_activity: 2026-11-09
+last_activity_desc: Phase 39 execution started
+state_head: 339a80b34e0d300fcb432f52501401e895c31cf3
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-08)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 38 — Filet de tests fiable
+**Current focus:** Phase 39 — Outillage prod de vérification
 
 ## Current Position
 
-Phase: 39 — Outillage prod de vérification
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-08 — Phase 38 complete, transitioned to Phase 39
+Phase: 39 (Outillage prod de vérification) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-11-09 — Phase 39 execution started
 
 ## Performance Metrics
 
@@ -47,6 +47,8 @@ Last activity: 2026-11-08 — Phase 38 complete, transitioned to Phase 39
 | Phase 38 P02 | 80min | 3 tasks | 2 files |
 | Phase 38 P03 | 25m | 3 tasks | 2 files |
 | Phase 38 P04 | 25min | 2 tasks | 1 files |
+| Phase 39 P39-01 | 70m | 3 tasks | 3 files |
+| Phase 39 P39-02 | 30m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -68,9 +70,9 @@ Last activity: 2026-11-08 — Phase 38 complete, transitioned to Phase 39
 
 ## Session Continuity
 
-**Last session:** 2026-11-09T09:24:39.279Z
-**Stopped at:** Phase 39 context gathered
-**Resume file:** .planning/phases/39-outillage-prod-de-v-rification/39-CONTEXT.md
+**Last session:** 2026-11-09T11:06:07.025Z
+**Stopped at:** Completed 39-01-PLAN.md and 39-02-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : approbation, puis `/gsd-plan-phase 38`.
@@ -84,3 +86,5 @@ Last activity: 2026-11-08 — Phase 38 complete, transitioned to Phase 39
 - [Phase 38]: Correction test-only des deux flocons timing du fichier household-store (protocole W-02) : WR-03 attend un etat via vi.waitFor au lieu d'un sommeil fixe de 1200 ms, harnais D-17 rendu fidele au contrat temporel de production (delegation synchrone des espions). — La reproduction 1/30 a frappe le test frere D-17, pas WR-03 accuse : sans reproduction avant fix, la correction WR-03 serait passee pour la guerison d'un mal qu'elle ne soignait pas. Un harnais qui delegue asynchronement a ce qui est synchrone en production ment sur la fenetre de course.
 - [Phase 38]: Bornage IN-02 par expense_id (.in) car expense_participants n'a pas de household_id (migration 0004) — borne = besoin réel du consommateur ; aucun SQL touché, test-db.sh non requis (I-03)
 - [Phase 38]: Signature e2e phase 38 consignée (38-E2E-SIGNATURE.md) : 165 passed / 9 skipped / 1 seul test rouge (join-token l.134 chromium+mobile, J-01, soldé en 39 via TEST-02) ; 8 skips préexistants datés par preuve git comme baseline légitime. — Un rouge documenté noir sur blanc reste une absence affirmée, pas un silence ; le baseline de skips daté par git log -S empêche toute confusion future avec un skip introduit.
+- [Phase 39]: Wrapper test-join-token-real.sh routé par testIgnore sur E2E_BASE_URL (Rule 3, JT-01) — la spec réelle vit dans son run séparé, le run standard reste vert
+- [Phase 39]: Secret SUPABASE_SECRET_KEY ne circule que via curl -K 0600 dans lib-smoke-accounts.sh (T-39-01/07) ; jamais en argv ni en env exportée

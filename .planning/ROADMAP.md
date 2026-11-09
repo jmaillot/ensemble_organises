@@ -53,6 +53,8 @@ Plans:
   4. La spec e2e join-token est soit réécrite contre le flux 31-03 actuel (et verte), soit supprimée avec la couverture perdue consignée par écrit — jamais « réparée au vert » par tatillage
 
 **Plans**: TBD
+- [x] 39-01-PLAN.md
+- [x] 39-02-PLAN.md
 
 ### Phase 40: Ardoise « Rejoindre via mon compte »
 
@@ -99,7 +101,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
-| 39. Outillage prod de vérification | 0/? | Not started | - |
+| 39. Outillage prod de vérification | 2/2 | In Progress|  |
 | 40. Ardoise « Rejoindre via mon compte » | 0/? | Not started | - |
 | 41. Gate SW simulable | 0/? | Not started | - |
 | 42. Cold start + décision cache | 0/? | Not started | - |
