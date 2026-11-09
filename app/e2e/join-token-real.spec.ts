@@ -82,10 +82,16 @@ async function seConnecter(page: Page, email: string, password: string): Promise
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await page.waitForURL(/\/(accueil|foyer)$/);
   // D-17 : un compte neuf n'a jamais attesté son âge — la modale CGU bloque
-  // toute la page jusqu'à confirmation. Le spec atteste comme un utilisateur
-  // réel (JT-02) : cocher la case 15+, confirmer, et attendre la fermeture.
+  // toute la page jusqu'à confirmation. Elle ne monte qu'APRÈS la requête
+  // profil (garde RequireAttestation) : un isVisible() instantané ratait
+  // l'ouverture (run réel du 2026-11-09). On attend l'ouverture comme un
+  // utilisateur réel (JT-02) : cocher la case 15+, confirmer, attendre la
+  // fermeture — et si elle n'ouvre pas en 10 s, le compte était déjà attesté.
   const attestation = page.getByRole('dialog');
-  if (await attestation.getByText('Une dernière étape avant de commencer').isVisible().catch(() => false)) {
+  const attestationOuverte = await attestation
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true, () => false);
+  if (attestationOuverte) {
     await attestation.getByRole('checkbox').check();
     await attestation.getByRole('button', { name: 'Confirmer' }).click();
     await expect(attestation).toBeHidden();
