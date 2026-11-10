@@ -119,7 +119,7 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 
 ### 7.1 Runs avant correction
 
-**Campagne reprise le 2026-11-10 (même journée, après le différé initial)** : l'utilisateur a lancé 2 runs sur l'appareil Android réel avant d'interrompre la campagne (« laisse tomber on a fait 2 runs c'est bon »). La campagne est **partielle** : le protocole exige N = 5 avec médiane par segment — avec 2 runs, **aucune médiane n'est calculée, aucune conclusion de profilage ni décision CACHE-01 n'en est tirée**. Les valeurs sont dictées depuis la section « Amorçage » du panneau offline — aucune n'est inventée. COLD-02 et CACHE-01 restent ouverts.
+**Campagne clôturée le 2026-11-10 — abandon des runs 3/4/5 (décision produit de l'utilisateur)** : les 2 runs dictés restent la totalité de la campagne. Le protocole N=5 n'est pas atteint et ne le sera pas dans cette phase : **aucune médiane, aucune conclusion de profilage, aucune décision CACHE-01**. COLD-02 et CACHE-01 sont **reportés hors phase**, leur état documenté dans PROJECT.md. Les valeurs sont dictées depuis la section « Amorçage » du panneau offline — aucune n'est inventée.
 
 | Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
 |---|---|---|---|---|---|---|---|
