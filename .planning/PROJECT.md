@@ -86,6 +86,8 @@ produit UAT test 2).
 
 **Goal:** Fermer toutes les dettes consignées de v1.1/v1.2 plus l'évolution produit ardoise — aucun report ne survit au jalon.
 
+**État de la décision CACHE-01 (plan 42-03, campagne 2026-11-10) :** CACHE-01 reste **ouverte** — la campagne de mesure on-device n'a pas eu lieu (différé d'appareil consigné dans `docs/MESURES-COLD-START-42.md` §7.1/§7.5, aucune valeur inventée §2.7 I). Les critères d'arbitrage par famille (CA-01/CA-02) sont écrits et contraignants dans la section 5 du doc mesures ; `app/src/lib/query-policy.ts` n'a PAS été modifié (statu quo de fait, pas une décision CA-03 — la décision exige la lecture du panneau). La campagne future remplira §7.3/§7.4 du doc mesures et la section « Décision CACHE-01 » ci-dessous.
+
 **Target features:**
 - **Ardoise** : le lien de partage propose « Rejoindre via mon compte » → réutilise le flux d'invitation du foyer existant (token HMAC, transaction serveur)
 - **GATE-01 équivalent planifiable** : simuler file vide + nouvelle version SW en local/dev pour valider le chemin runtime de la gate de mise à jour
