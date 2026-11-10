@@ -108,10 +108,12 @@ export function marquerSegmentFin(segment: SegmentAmorcage): void {
   const duree = performance.now() - (debut ?? fin);
   useBootMarks.setState({ [segment]: duree } as Partial<BootMarksState>);
   if (segment === 'auth') {
-    // Total borne à borne (Pattern 2) : la fenêtre réelle du démarrage, pas
-    // la somme de segments qui se chevauchent. Sans borne entry (passage
-    // partiel), le total reste `null` — afficher un total dérivé d'une borne
+    // Mark de fin de démarrage complet : la référence du total borne à
+    // borne (Pattern 2) — `boot:done − boot:entry:debut`, jamais la somme
+    // de segments qui se chevauchent. Sans borne entry (passage partiel),
+    // le total reste `null` — afficher un total dérivé d'une borne
     // manquante serait une valeur fausse avec assurance.
+    poserMark('boot:done');
     useBootMarks.setState({ totalMs: bornesDebut.entry === undefined ? null : performance.now() - bornesDebut.entry });
   }
 }
