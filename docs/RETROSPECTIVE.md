@@ -888,3 +888,20 @@ seul code de test. Deux leçons nouvelles pour la campagne :
   fenêtre D-17 serait restée ouverte.
 
 
+
+## 16. Campagne v1.3 — clôture du jalon « Solde de la dette »
+
+**Shipped :** 2026-11-10 · 5 phases (38-42), 13 plans · audit tech_debt (10/12 exigences, 2 deferred)
+
+### Ce qui a marché
+- La chaîne §2.7 en tant qu'instrument de confiance : les quatre campagnes de défauts franchissant migration/test/relecture (doc §2.7) ont trouvé leur contre-mesure — le contrôle statique SQL a prouvé sa valeur à nouveau sur ce jalon, et chaque plan a rejoué la chaîne complète avant de conclure.
+- Le protocole W-02 (reproduction mesurée avant fix) appliqué dès l'ouverture : WR-03 n'aurait jamais été corrigé proprement sans la preuve d'innocence du code de production.
+- L'architecture bridge ardoise (0180/0181) : réutiliser le flux d'invitation existant au lieu d'un second flux — la réconciliation transactionnelle a tenu les 8 cas SQL négatifs, vus rouges avant verts.
+
+### Ce qui a été inefficace
+- Le protocole de mesure on-device a été écrit (42-02) mais la campagne n'a jamais atteint N=5 : la séquence de purge de l'étape 4 était défaillante (réinstallation PWA en mode avion impossible), et « Effacer le stockage » détruit la session hors ligne — deux découvertes d'exécution qui auraient dû être faites en discuss-phase avec l'appareil en main. La campagne a été arrêtée à 2 runs par décision produit ; l'instrumentation attendra un jalon futur.
+- Le statut de vérification « stale » a coûté plusieurs allers-retours : le digest de couverture ne peut pas hacher les artefacts gitignorés de `.planning/phases/` — trois phases ont dû être re-fingerprintées à la main à la clôture du jalon.
+
+### Leçons
+- **Une exigence de mesure exige l'appareil avant la planification** : le protocole le plus rigoureux ne produit rien sans le geste physique validé (purge, mode avion). Tester la séquence de purge en discuss-phase, pas en exécution.
+- **« Effacer le stockage » n'est pas « Vider le cache »** : la première est la purge froide sûre pour le SW mais tue la session hors ligne ; la seconde préserve la session au prix d'un run potentiellement pas froid. Les critères de froid à deux faits (panneau vide + section Amorçage) restent le juge.
