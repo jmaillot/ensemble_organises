@@ -3,8 +3,8 @@
 **Exigence couverte :** COLD-01 (partie protocole) — le protocole et les critères sont écrits AVANT toute mesure (CA-02).
 **Phase :** 42-cold-start-mesuré-puis-corrigé-décision-cache
 **Écrit le :** 2026-11-10
-**Exécuté par :** _à remplir au Plan 03 (première campagne de mesure)_
-**Estampille du build mesuré :** _à remplir au Plan 03 — sortie de `check-version-stamp.sh`, estampille quatre canaux_
+**Exécuté par :** Plan 03 — campagne 2026-11-10, **différé d'appareil consigné (§7.1, §7.5)** : les 5 runs n'ont pas été réalisés, aucune valeur n'est inventée (§2.7 I)
+**Estampille du build mesuré :** aucun build mesuré on-device dans cette campagne — la validité de l'estampille quatre canaux du SHA `a31e965…` est prouvée par `check-version-stamp.sh` (§7.6)
 **Discipline de preuve :** même forme que `38-E2E-SIGNATURE.md` — chaque étape est citée avec sa commande et son résultat ; un succès muet est un échec inexpliqué (§2.7 F).
 
 Ce document est la référence des mesures (PM-03) : les mesures ne persistent PAS dans l'app — le panneau « Amorçage » ne porte que la session en cours (PD-02), la référence versionnée est ce fichier.
@@ -119,7 +119,9 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 
 ### 7.1 Runs avant correction
 
-Condition : _estampille du build_ — à remplir.
+**Différé consigné (2026-11-10) — aucune mesure de cette campagne.**
+
+L'appareil Android réel est requis (PM-01 : aucun fallback émulateur). Les 5 runs n'ont pas été réalisés dans cette campagne : l'utilisateur a préparé la purge (consignée §2.1 et §7.5) mais n'a pas dicté de valeurs de mesure. Conformément au protocole et à la discipline §2.7 I (une absence affirmée est une affirmation) : **les tableaux ci-dessous restent vides, aucune valeur n'est inventée, aucune valeur d'émulateur n'est consignée.** COLD-02 (corrections désignées par le profil) et CACHE-01 (décision maxAge par famille) restent ouverts, leur état documenté dans le SUMMARY du plan 42-03 — ils seront clos par une campagne de mesure ultérieure, au même protocole sans modification.
 
 | Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
 |---|---|---|---|---|---|---|---|
@@ -131,6 +133,8 @@ Condition : _estampille du build_ — à remplir.
 | **Médiane** | — | — | | | | | |
 
 ### 7.2 Runs après correction
+
+**Différé consigné :** aucune correction livrée — le profilage (segments du panneau on-device) n'existe pas sans mesure, et aucune correction ne peut désigner son segment source (CU-02) sans le profil. Les colonnes « après » restent vides pour la même raison que §7.1.
 
 Condition : _estampille du build_ — à remplir. Correction livrée et axe désigné par le profil : _à remplir_.
 
@@ -144,6 +148,8 @@ Condition : _estampille du build_ — à remplir. Correction livrée et axe dés
 | **Médiane** | — | — | | | | | |
 
 ### 7.3 Volumes réhydratés par famille (lecture panneau, CACHE-01)
+
+**Différé consigné :** la lecture du panneau (inspectPersistedCache) exige l'appareil — la campagne 2026-11-10 n'a pas produit de lecture (cf. §7.1). Les critères §5 restent écrits et contraignants ; la décision §7.4 n'est PAS rendue à partir d'aucune donnée absente (CA-02 — jamais « parce que le panneau montre… » sans panneau).
 
 Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à remplir (N = 5, médiane).
 
@@ -163,7 +169,7 @@ Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à re
 
 ### 7.4 Décision CACHE-01 par famille
 
-À remplir : pour chaque famille — décision (statu quo justifié / nouvelle valeur), justification par les critères (a)(b)(c), et report de la valeur retenue dans PROJECT.md le cas échéant.
+**Différé consigné :** CACHE-01 n'est PAS tranchée dans cette campagne — aucune donnée du panneau (§7.3), et l'ordre consigné §6 interdit de décider sans lecture (CA-04). Les critères §5 écrits avant toute mesure demeurent la grille de décision de la campagne future ; PROJECT.md ne porte pas de section « Décision CACHE-01 » tant qu'aucune donnée ne la justifie (§2.7 I). À remplir : pour chaque famille — décision (statu quo justifié / nouvelle valeur), justification par les critères (a)(b)(c), et report de la valeur retenue dans PROJECT.md le cas échéant.
 
 | Famille | Décision | Justification (critères a/b/c) |
 |---|---|---|
@@ -184,3 +190,21 @@ Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à re
 À remplir : toute correction hors profil, tout recours au wipe « site data » à la place de la désinstallation, tout déplacement de borne de segment, tout run refait et sa cause.
 
 - **Purge par paramètres Android (consignée 2026-11-10) :** la purge de la campagne utilise « vider le cache » via les paramètres applications Android au lieu de la désinstallation complète (alternative documentée §2.1). Chaque run est validé froid par les deux faits de §2.1 ; tout run non froid est refait après purge renforcée (« Effacer le stockage » ou désinstallation) et consigné ici.
+- **Différé d'appareil (2026-11-10) :** aucune mesure de la campagne — cf. §7.1. Ce différé est la consignation de l'absence (§2.7 I), jamais un maquillage : aucune valeur de mesure, aucune valeur d'émulateur, aucune décision CACHE-01 sans données.
+
+### 7.6 Chaîne §2.7 exécutée à l'état final du dépôt (2026-11-10)
+
+Chaque étape citée avec son résultat (§2.7 F — un succès muet est un échec inexpliqué). Docker **disponible** : les e2e réels ont été exécutés, leur absence n'a pas à être consignée.
+
+| Étape | Commande | Résultat |
+|---|---|---|
+| Estampille quatre canaux | `sh scripts/check-version-stamp.sh` | **OK** — canaux égaux au SHA `a31e965…` avec estampille, `unknown` sans, les deux familles différentes |
+| Gate SW simulable | `sh scripts/test-sw-gate.sh` | **4/4 verts** (deux builds réels, même origin) |
+| Typecheck | `cd app && npm run typecheck` | **OK** |
+| Tests unitaires | `cd app && npm test` | **2006 passed / 245 fichiers** — 0 failed |
+| Build prod | `cd app && npm run build` | **OK** — precache 152 entrées (2751,51 KiB) |
+| e2e (Docker disponible) | `cd app && npm run test:e2e` | **163 passed / 9 skipped** (skips = baseline préexistante datée, 38-E2E-SIGNATURE.md) |
+| Contrôle SQL statique | `python3 ../scripts/check-sql-statique.py` | **aucun défaut** — 231 fonctions effectives sur 182 migrations, 107 tests ; aucune migration ajoutée dans la phase 42, son absence de requête est un fait vérifié |
+| Auto-exercice du contrôle | `python3 ../scripts/test-check-sql-statique.py` | **OK** (cas qui doivent échouer refusés) |
+
+**CHAINE-42-VERTE** — affichée en fin de chaîne, état du dépôt après les deux commits du plan 42-03 (`17bbca0` boot:done, `a31e965` purge §2.1).
