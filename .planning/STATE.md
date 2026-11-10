@@ -4,18 +4,17 @@ milestone: v1.3
 milestone_name: Solde de la dette
 current_phase: 41
 current_phase_name: Gate SW simulable
-status: planning
-stopped_at: Phase 40 complete, ready to plan Phase 41
-last_updated: "2026-11-09T15:25:42.237Z"
-last_activity: 2026-11-09
-last_activity_desc: Phase 40 complete, transitioned to Phase 41
-state_head: 9098f5e1d046d1a467e4392caf6d5786bf0add2f
+status: executing
+stopped_at: Completed 41-01-PLAN.md
+last_updated: "2026-11-10T08:59:36.568Z"
+last_activity: 2026-11-10
+last_activity_desc: Phase 41 execution started
+state_head: 9b99cbf3f84a11f3c41df19677e0d23b178ea1c3
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 9
+  total_plans: 10
   completed_plans: 9
-  percent: 60
 ---
 
 # Project State
@@ -25,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-08)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 40 — Ardoise « Rejoindre via mon compte »
+**Current focus:** Phase 41 — Gate SW simulable
 
 ## Current Position
 
-Phase: 41 — Gate SW simulable
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-09 — Phase 40 complete, transitioned to Phase 41
+Phase: 41 (Gate SW simulable) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 41
+Last activity: 2026-11-10 — Phase 41 execution started
 
 ## Performance Metrics
 
@@ -53,6 +52,7 @@ Last activity: 2026-11-09 — Phase 40 complete, transitioned to Phase 41
 | Phase 40 P01 | 3h | 3 tasks | 8 files |
 | Phase 40 P02 | 1h30 | 3 tasks | 2 files |
 | Phase 40 P03 | 1h15 | 3 tasks | 5 files |
+| Phase 41 P01 | 12m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -74,8 +74,8 @@ Last activity: 2026-11-09 — Phase 40 complete, transitioned to Phase 41
 
 ## Session Continuity
 
-**Last session:** 2026-11-09T14:21:03.937Z
-**Stopped at:** Phase 40 complete, ready to plan Phase 41
+**Last session:** 2026-11-10T08:59:36.516Z
+**Stopped at:** Completed 41-01-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).
@@ -95,3 +95,5 @@ Last activity: 2026-11-09 — Phase 40 complete, transitioned to Phase 41
 - [Phase 40]: 40-01: remplissage du pont d'identité descendu dans le RPC (0180b) — PostgREST n'expose pas private.*
 - [Phase 40]: 40-02: fusion = report de part (trigger différé somme=montant) ; réconciliation aussi en already_member ; vocabulaire réel 'guest'
 - [Phase 40]: 40-03: ConfirmDialog icon rétro-compatible (users pour l'adhésion) ; copy « rattachée au compte » ; e2e = backstop de l'atterrissage RTL
+- [Phase 41]: Harnais e2e gate SW flag-compilé (VITE_E2E_SW_HARNESS), file écrite via enqueueOutbox sur le queryClient — jamais réimplémentée
+- [Phase 41]: Attente d'état nommé : worker A « activated » avant tout reload de commutation (sans lui le build B s'active directement, aucun bandeau)

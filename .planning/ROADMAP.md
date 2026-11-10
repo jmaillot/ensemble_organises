@@ -89,7 +89,7 @@ Plans:
   3. La simulation passe par le harnais dev-only qui injecte dans le store existant — la logique de gate de `sw-register.ts` n'a pas été forkée ni mockée
   4. Le re-test en conditions réelles à la prochaine utilisation observée reste consigné comme observatoire hors jalon (GATE-PROD), non confondu avec cette validation
 
-**Plans:** 1 plan
+**Plans:** 0/1 plans executed
 
 Plans:
 - [ ] 41-01-PLAN.md — Tracer deux-builds + bandeau (wrapper test-sw-gate.sh, spec e2e, harnais dev-only), fermeture de la gate (file non vide/vide), GATE-PROD observatoire
@@ -114,7 +114,7 @@ Plans:
 | 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
 | 40. Ardoise « Rejoindre via mon compte » | 3/3 | Complete    | 2026-11-09 |
-| 41. Gate SW simulable | 0/? | Not started | - |
+| 41. Gate SW simulable | 0/1 | Planned    |  |
 | 42. Cold start + décision cache | 0/? | Not started | - |
 
 ---
