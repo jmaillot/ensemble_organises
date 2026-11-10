@@ -82,23 +82,23 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
-## Current Milestone: v1.3 Solde de la dette
+## Current Milestone: (aucun — planifier le prochain avec /gsd-new-milestone)
 
-**Goal:** Fermer toutes les dettes consignées de v1.1/v1.2 plus l'évolution produit ardoise — aucun report ne survit au jalon.
+## État v1.3 (shipped 2026-11-10)
 
-**État de la décision CACHE-01 (plan 42-03, campagne 2026-11-10) :** CACHE-01 est **reportée hors phase 42 par décision produit (2026-11-10)** — la campagne on-device a produit 2 runs puis l'utilisateur a abandonné les runs 3/4/5 (protocole N=5 non atteint, aucune médiane, aucune décision). Les critères d'arbitrage par famille (CA-01/CA-02) restent écrits et contraignants dans la section 5 de `docs/MESURES-COLD-START-42.md` ; `app/src/lib/query-policy.ts` n'a PAS été modifié (statu quo de fait, pas une décision CA-03). Une campagne future (jalon ou backlog) appliquera le même protocole : purge « Vider le cache » avec session conservée, §7.1 à compléter de 3 runs minimum, puis §7.3/§7.4 et la section « Décision CACHE-01 » ci-dessous.
+Jalon dette soldé : 5 phases, 13 plans, 12 tâches. 10/12 exigences satisfaites, 2 deferred par décision produit. Audit : tech_debt (voir [milestones/v1.3-MILESTONE-AUDIT.md](milestones/v1.3-MILESTONE-AUDIT.md)).
 
-**Target features:**
-- **Ardoise** : le lien de partage propose « Rejoindre via mon compte » → réutilise le flux d'invitation du foyer existant (token HMAC, transaction serveur)
-- **GATE-01 équivalent planifiable** : simuler file vide + nouvelle version SW en local/dev pour valider le chemin runtime de la gate de mise à jour
-- **CACHE-01** : phase décision produit maxAge 24 h — lire le panneau diagnostic, arbitrer, documenter
-- **Flakes dimanche** : semis menu-page (day(1) vs semaine lundi→dimanche) et household-store WR-03 corrigés à la racine
-- **Spec e2e join-token** : réécrite ou supprimée (périmée depuis refonte 31-03)
-- **Amorçage offline** : mesurer le cold start (~30-40 s), corriger ce que le profilage désigne
-- **Smoke-test** : mode prod réel via API Admin (création comptes e2e sans autoconfirm)
-- **Infos review 37** : IN-01 (garde mort api.ts:315) + IN-02 (select service_role non borné index.ts:656) corrigées
+**Livré :**
+- Ardoise : un invité sans foyer rejoint le foyer via « Rejoindre via mon compte » (table pont 0180, bridge token HMAC usage unique, réconciliation transactionnelle des participations) — l'unique surface produit du jalon
+- Filet de tests fiable : flakes du dimanche corrigés à la racine (helpers `debutSemaineIso`), spec join-token réécrite et prouvée en prod, chaîne §2.7 redevenue un instrument de confiance
+- Smoke-test en mode prod réel (API Admin GoTrue, création+purge prouvée, autoconfirm resté false)
+- Gate SW « file vide » devenue planifiable (harnais e2e, `scripts/test-sw-gate.sh`, 4 cas contre build+preview réel)
+- Cold start instrumenté (4 segments `performance.mark`, panneau « Amorçage ») + protocole de mesure versionné
 
-**Out of scope :** toute autre nouvelle fonctionnalité produit ; GATE-01 en conditions réelles reste un observatoire événementiel (re-test à consigner à la première utilisation observée).
+**Dette reportée hors jalon (décision produit) :**
+- COLD-02 : corrections profilées du cold start — campagne on-device interrompue après 2 runs (protocole `docs/MESURES-COLD-START-42.md`, reprise avec purge « Vider le cache » seule)
+- CACHE-01 : décision maxAge par famille — critères §5 contraignants, `query-policy.ts` inchangé (statu quo de fait)
+- W1 : surface bridge ardoise sans preuve niveau prod (tests SQL + RTL uniquement) — étendre `test-join-token-real.sh` ou spec navigateur réel
 
 ## État v0.9.0 (historique)
 
@@ -123,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-10 after Phase 41 — GATE-01 simulable prouvée e2e (jalon v1.3 « Solde de la dette »)*
+*Last updated: 2026-11-10 after v1.3 milestone « Solde de la dette »*
