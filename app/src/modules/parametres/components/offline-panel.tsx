@@ -20,6 +20,7 @@ import {
   type RestoreOutcome,
 } from '@/lib/offline/query-persistence';
 import { useSwState, updateSW } from '@/lib/sw-register';
+import { useBootMarks } from '@/lib/boot-marks';
 import { dataModeLabel } from '../types';
 
 // `unknown` signale « construit hors pipeline estampillé » (D-02) : sans
@@ -76,6 +77,16 @@ function libelleDureeConservation(maxAgeMs: number): string {
   return `${heures} h`;
 }
 
+/**
+ * Phase 42 (COLD-01) : durée de boot en millisecondes, seconde au-delà —
+ * même patron que `libelleAgeCache` : l'unité honnête pour l'ordre de
+ * grandeur affiché.
+ */
+function libelleMs(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 function libelleIssueRestore(outcome: RestoreOutcome | null): string {
   if (!outcome) return 'Restauration pas encore passée sur cette session';
   if (outcome.failure) return `Dernière restauration : échec — ${outcome.failure}`;
@@ -95,6 +106,12 @@ export function OfflinePanel() {
   // D-12 : point d'observation unique de l'état SW. `useSwState` renvoie l'objet
   // de test mocké (vi.hoisted) ou le store zustand réel.
   const sw = useSwState();
+  // Phase 42 (COLD-01) : les durées d'amorçage du DERNIER démarrage, lues au
+  // montage du panneau uniquement (Pitfall 1) — aucune subscription ne
+  // réagit pendant le démarrage, ajouter du rendu au moment où l'on mesure
+  // fausserait la mesure. PD-02 : le store est session seule, jamais
+  // persisté — la référence reste le doc mesures versionné (PM-03).
+  const amorcage = useBootMarks();
   const { isEmpty } = useOutboxGate();
   const [swVersion, setSwVersion] = useState<string | null>(null);
   // D-11 (plan 34-04) : la liste des écritures vient de la SOURCE UNIQUE
@@ -248,6 +265,42 @@ export function OfflinePanel() {
               Installer l’application
             </Button>
           ) : null}
+        </div>
+      </Panel>
+
+      {/*
+        Phase 42 (COLD-01, PD-01) : section « Amorçage » — les 4 segments du
+        dernier démarrage + le total borne à borne. D-11 : la section
+        n'affiche QUE des durées — aucun identifiant, aucune clé de cache.
+        Repli honnête quand un segment n'a pas été mesuré sur ce démarrage
+        (Pitfall 3 : l'activation SW peut être absente au cold start hors
+        ligne) — jamais de valeur fictive.
+      */}
+      <Panel
+        title="Amorçage"
+        description="Durées du dernier démarrage complet de l’application, mesurées sur cet appareil."
+      >
+        <div className="grid gap-0">
+          <div className="flex items-center justify-between gap-2.5 py-[13px] text-xs">
+            <span className="text-muted">Entry chunk</span>
+            <strong>{amorcage.entry === null ? 'Pas encore mesuré sur ce démarrage' : libelleMs(amorcage.entry)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+            <span className="text-muted">Activation du service worker</span>
+            <strong>{amorcage.sw === null ? 'Pas encore mesuré sur ce démarrage' : libelleMs(amorcage.sw)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+            <span className="text-muted">Restore IndexedDB</span>
+            <strong>{amorcage.idb === null ? 'Pas encore mesuré sur ce démarrage' : libelleMs(amorcage.idb)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+            <span className="text-muted">Bootstrap auth</span>
+            <strong>{amorcage.auth === null ? 'Pas encore mesuré sur ce démarrage' : libelleMs(amorcage.auth)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-2.5 border-t border-border py-[13px] text-xs">
+            <span className="text-muted">Total du démarrage</span>
+            <strong>{amorcage.totalMs === null ? 'Pas encore mesuré sur ce démarrage' : libelleMs(amorcage.totalMs)}</strong>
+          </div>
         </div>
       </Panel>
 

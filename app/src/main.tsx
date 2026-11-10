@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 // L'enregistrement du SW (mode prompt, D-09) est extrait dans sw-register :
 // il pousse le bandeau de mise à jour via le store, accessible hors-React.
 import '@/lib/sw-register';
+// Les bornes de démarrage (phase 42, COLD-01) sont importées STATIQUEMENT et
+// posées au niveau module : le mark `boot:entry:debut` doit être la PREMIÈRE
+// chose que le bundle évalue — un import dynamique décalerait la borne
+// commune des segments SW et auth, et donc toute la mesure.
+import { marquerSegmentDebut, marquerSegmentFin } from '@/lib/boot-marks';
 import { AppRouter } from '@/app/router';
 import { Button } from '@/components/ui/button';
 import { useAuthBootstrap } from '@/hooks/use-auth';
@@ -18,6 +23,15 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/fraunces/wght-italic.css';
 import '@fontsource-variable/inter-tight';
 import '@/styles/app.css';
+
+// L'instrumentation de démarrage (phase 42, COLD-01) pose ici la borne
+// commune de TOUT le démarrage — `boot:entry:debut` — au niveau module, avant
+// le moindre travail de démarrage : les segments « activation SW » et « auth
+// bootstrap » démarrent avec le bundle, leur borne de début EST celle-ci.
+// PD-03 : le mark est TOUJOURS posé — aucun flag de build ne le conditionne,
+// le panneau offline doit rester lisible dans un build prod réel, là où la
+// décision CACHE-01 est tranchée.
+marquerSegmentDebut('entry');
 
 // L'état réseau est amorcé ICI, au niveau module, avant le premier rendu : le
 // bandeau hors ligne doit dire la vérité dès la première peinture, et l'état
@@ -89,3 +103,8 @@ createRoot(container).render(
     <Root />
   </StrictMode>,
 );
+// La borne de fin de l'entry chunk se pose APRÈS l'appel `render()` : la
+// durée du segment « entry chunk » couvre l'évaluation complète du bundle
+// (imports, exécution module-scope) jusqu'au démarrage du premier rendu —
+// c'est la définition du segment pour le protocole de mesure (COLD-01).
+marquerSegmentFin('entry');

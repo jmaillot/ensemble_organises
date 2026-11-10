@@ -8,6 +8,7 @@ import { useSessionStore, assertSignOutAllowed } from '@/stores/session-store';
 import { DEMO_HOUSEHOLD_ID, demoMembers, demoProfile } from '@/lib/data/seed';
 import { useHouseholdStore } from '@/stores/household-store';
 import { connectOfflineCache } from '@/lib/offline/query-persistence';
+import { marquerSegmentDebut, marquerSegmentFin } from '@/lib/boot-marks';
 import type { HouseholdMemberRow, HouseholdRow, ProfileRow, SessionUser } from '@/types';
 
 export function useIsAuthenticated() {
@@ -258,16 +259,28 @@ export function useAuthBootstrap(): AuthBootstrap {
         const userId = useSessionStore.getState().user?.id;
         const householdId = useHouseholdStore.getState().householdId;
         if (userId && householdId) {
+          // Segment « restore IndexedDB » (phase 42, COLD-01, OQ-1) : les
+          // bornes entourent l'APPEL de `connectOfflineCache` ICI, dans
+          // use-auth — la branche hors-ligne ET la chaîne normale portent
+          // leur propre paire début/fin, quel que soit le chemin emprunté.
+          marquerSegmentDebut('idb');
           try {
             await connectOfflineCache(queryClient, userId, householdId);
           } catch (causeRestore) {
             console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', causeRestore);
           }
+          marquerSegmentFin('idb');
         }
       } catch (causeImport) {
         console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', causeImport);
       }
       if (!active) return;
+      // Fin du segment « auth bootstrap » (COLD-01) : APRÈS le garde
+      // `active` — un mark posé sur un effet déjà mort enregistrerait une
+      // durée d'un amorçage abandonné (Pitfall 4). Hors ligne, ce segment
+      // absorbe les délais de repli (sonde 4 s, gardien 10 s) : c'est un
+      // fait que le protocole consigne, pas un défaut à lisser.
+      marquerSegmentFin('auth');
       setReady(true);
     };
 
@@ -398,11 +411,17 @@ export function useAuthBootstrap(): AuthBootstrap {
         const userId = useSessionStore.getState().user?.id;
         const householdId = useHouseholdStore.getState().householdId;
         if (userId && householdId) {
+          // Segment « restore IndexedDB » — chaîne normale (COLD-01, OQ-1) :
+          // même paire de bornes que la branche hors-ligne, autour de l'APPEL
+          // (le fichier `query-persistence.ts` reste inchangé — seul
+          // boot-marks.ts touche `performance`).
+          marquerSegmentDebut('idb');
           try {
             await connectOfflineCache(queryClient, userId, householdId);
           } catch (cause) {
             console.error('[offline] restore du cache impossible, démarrage avec un cache vide :', cause);
           }
+          marquerSegmentFin('idb');
         }
         if (!active) return;
         // La session ET le foyer sont posés avant le premier rendu : `setReady`
@@ -411,6 +430,11 @@ export function useAuthBootstrap(): AuthBootstrap {
         // `/connexion` un utilisateur pourtant connecté (rechargement). Le
         // contrat est étendu au cache offline : restore + prune sont faits
         // avant ce point (OFFR-01, commentaire au-dessus).
+        // Fin du segment « auth bootstrap » (COLD-01) — même convention que
+        // la branche hors-ligne : APRÈS le garde `active`, un mark sur un
+        // effet mort enregistrerait une durée d'un amorçage abandonné
+        // (Pitfall 4).
+        marquerSegmentFin('auth');
         setReady(true);
       })
       .catch((cause) => {
