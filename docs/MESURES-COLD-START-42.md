@@ -119,18 +119,17 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 
 ### 7.1 Runs avant correction
 
-**Différé consigné (2026-11-10) — aucune mesure de cette campagne.**
-
-L'appareil Android réel est requis (PM-01 : aucun fallback émulateur). Les 5 runs n'ont pas été réalisés dans cette campagne : l'utilisateur a préparé la purge (consignée §2.1 et §7.5) mais n'a pas dicté de valeurs de mesure. Conformément au protocole et à la discipline §2.7 I (une absence affirmée est une affirmation) : **les tableaux ci-dessous restent vides, aucune valeur n'est inventée, aucune valeur d'émulateur n'est consignée.** COLD-02 (corrections désignées par le profil) et CACHE-01 (décision maxAge par famille) restent ouverts, leur état documenté dans le SUMMARY du plan 42-03 — ils seront clos par une campagne de mesure ultérieure, au même protocole sans modification.
+**Campagne reprise le 2026-11-10 (même journée, après le différé initial)** : l'utilisateur a lancé 2 runs sur l'appareil Android réel avant d'interrompre la campagne (« laisse tomber on a fait 2 runs c'est bon »). La campagne est **partielle** : le protocole exige N = 5 avec médiane par segment — avec 2 runs, **aucune médiane n'est calculée, aucune conclusion de profilage ni décision CACHE-01 n'en est tirée**. Les valeurs sont dictées depuis la section « Amorçage » du panneau offline — aucune n'est inventée. COLD-02 et CACHE-01 restent ouverts.
 
 | Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
 |---|---|---|---|---|---|---|---|
-| 1 | | | | | | | |
-| 2 | | | | | | | |
-| 3 | | | | | | | |
-| 4 | | | | | | | |
-| 5 | | | | | | | |
-| **Médiane** | — | — | | | | | |
+| 1 | v1.2-71- | hors ligne (mode avion) | 3 ms | 20 ms | 6 ms | 437 ms | 437 ms |
+| 2 | v1.2-71- | hors ligne (mode avion) | 1 ms | 9 ms | 20 ms | 17 200 ms | 17 200 ms |
+| 3–5 | — | — | — | — | — | — | — |
+
+**Observations consignées (sans conclusion, N insuffisant)** : le segment auth domine le total aux deux runs et sa variance est extrême (437 ms → 17 200 ms, ×39) — le run 2 colle au comportement documenté du protocole (Pitfall 4 : hors ligne, l'auth absorbe la sonde de joignabilité 4 s et le gardien d'amorçage 10 s). Les segments entry chunk / SW / idb restent négligeables (< 30 ms) aux deux runs.
+
+**Écart procédure consigné (§7.5)** : après un « Effacer le stockage », la session hors ligne est détruite — le lancement suivant en mode avion atterrit sur l'écran de connexion (aucune session à restaurer) et le run n'est plus comparable (branche « session absente », non mesurée ici). Procédure de reprise après purge complète : reconnexion réseau → connexion → mode avion → « Vider le cache » seul (préserve la session dans IndexedDB) → run froid comparable.
 
 ### 7.2 Runs après correction
 
