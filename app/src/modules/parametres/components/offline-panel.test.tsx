@@ -139,6 +139,21 @@ vi.mock('@/lib/offline/outbox-replay', () => ({
   retryOutboxEntry: (...args: Parameters<typeof retryOutboxEntrySpy>) => retryOutboxEntrySpy(...args),
 }));
 
+// Phase 42 (COLD-01) : le store d'amorçage est mocké (patron vi.hoisted du
+// mock D-12 ci-dessus) — le panneau lit `useBootMarks()` au montage, les
+// tests peuplent ou vident l'objet pour piloter la section « Amorçage ».
+const bootMarks = vi.hoisted(() => ({
+  entry: null as number | null,
+  sw: null as number | null,
+  idb: null as number | null,
+  auth: null as number | null,
+  totalMs: null as number | null,
+}));
+
+vi.mock('@/lib/boot-marks', () => ({
+  useBootMarks: () => bootMarks,
+}));
+
 const MOCK_SW_VERSION = 'precache-push-v2';
 const MOCK_REGISTRATION = {
   active: { postMessage: () => {} },
@@ -562,5 +577,47 @@ describe('OfflinePanel — Cache hors-ligne (35-09, G-35-5)', () => {
     await waitFor(() => {
       expect(screen.getByText('Hors ligne')).toBeTruthy();
     });
+  });
+});
+
+/**
+ * Phase 42 (COLD-01, PD-01) : section « Amorçage » — 4 segments + total.
+ * Repli honnête (D-11) quand une valeur n'a pas été mesurée sur ce
+ * démarrage : jamais de valeur fictive (Pitfall 3).
+ */
+describe('OfflinePanel — section Amorçage (COLD-01)', () => {
+  afterEach(() => {
+    bootMarks.entry = null;
+    bootMarks.sw = null;
+    bootMarks.idb = null;
+    bootMarks.auth = null;
+    bootMarks.totalMs = null;
+  });
+
+  it('rend 4 libellés de segment + total, avec les durées formatées par libelleMs', () => {
+    bootMarks.entry = 850;
+    bootMarks.sw = 40;
+    bootMarks.idb = 1200;
+    bootMarks.auth = 2200;
+    bootMarks.totalMs = 2300;
+    renderWithProviders(<OfflinePanel />);
+
+    expect(screen.getByText('Entry chunk').parentElement?.textContent).toContain('850 ms');
+    expect(screen.getByText('Activation du service worker').parentElement?.textContent).toContain('40 ms');
+    // ≥ 1 s → l'unité honnête est la seconde, une décimale.
+    expect(screen.getByText('Restore IndexedDB').parentElement?.textContent).toContain('1.2 s');
+    expect(screen.getByText('Bootstrap auth').parentElement?.textContent).toContain('2.2 s');
+    expect(screen.getByText('Total du démarrage').parentElement?.textContent).toContain('2.3 s');
+  });
+
+  it('store vide : le repli « Pas encore mesuré sur ce démarrage » apparaît 5 fois (4 segments + total)', () => {
+    renderWithProviders(<OfflinePanel />);
+
+    expect(screen.getAllByText('Pas encore mesuré sur ce démarrage')).toHaveLength(5);
+    expect(screen.getByText('Entry chunk')).toBeTruthy();
+    expect(screen.getByText('Activation du service worker')).toBeTruthy();
+    expect(screen.getByText('Restore IndexedDB')).toBeTruthy();
+    expect(screen.getByText('Bootstrap auth')).toBeTruthy();
+    expect(screen.getByText('Total du démarrage')).toBeTruthy();
   });
 });
