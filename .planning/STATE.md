@@ -2,19 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
-current_phase: 42
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 42 complete — all phases complete
-last_updated: "2026-11-10T16:19:00.854Z"
+last_updated: "2026-11-10T16:38:25.959Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 42 complete
-state_head: 3edd15b72dafbe3913df2db242b83d619e5c2d15
+last_activity_desc: Milestone v1.3 completed and archived
+state_head: 41003e239d33597e44f98d3a511f7eea1c6f5dea
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 13
+  total_plans: 0
   completed_plans: 13
-  percent: 100
+current_phase: 42
 ---
 
 # Project State
@@ -28,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 
 ## Current Position
 
-Phase: 42
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-11-10 — Phase 42 complete
+Phase: Milestone v1.3 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-10 — Milestone v1.3 completed and archived
 
 ## Performance Metrics
 
@@ -97,3 +96,7 @@ Last activity: 2026-11-10 — Phase 42 complete
 - [Phase 40]: 40-03: ConfirmDialog icon rétro-compatible (users pour l'adhésion) ; copy « rattachée au compte » ; e2e = backstop de l'atterrissage RTL
 - [Phase 41]: Harnais e2e gate SW flag-compilé (VITE_E2E_SW_HARNESS), file écrite via enqueueOutbox sur le queryClient — jamais réimplémentée
 - [Phase 41]: Attente d'état nommé : worker A « activated » avant tout reload de commutation (sans lui le build B s'active directement, aucun bandeau)
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
