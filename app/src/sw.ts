@@ -123,7 +123,16 @@ async function writePushRotationReceipt(receipt: PushRotationReceipt): Promise<v
   }
 }
 
-self.skipWaiting();
+// PAS de `self.skipWaiting()` ici : l'enregistrement est en mode `prompt`
+// (D-09, « aucun reload sans action de l'utilisateur ») et le plugin ne pousse
+// le bandeau « Une mise à jour est disponible » que sur l'événement `waiting`
+// du worker suivant. Un skipWaiting activait le nouveau worker immédiatement :
+// la gate D-10 (le bandeau et son bouton « Recharger », désactivé tant que la
+// file sortante n'est pas vide) était inatteignable — le worker s'installait
+// puis s'activait en silence, sans jamais PROPOSER la mise à jour. C'est le
+// défaut que la phase 41 (GATE-01) expose : la gate n'avait jamais été prouvée
+// avec un vrai worker en attente. L'application passe par `updateSW`
+// (`messageSkipWaiting`, retour de `registerSW`), action utilisateur explicite.
 clientsClaim();
 
 // --- Précache et navigation -------------------------------------------------
@@ -284,7 +293,19 @@ self.addEventListener('pushsubscriptionchange', (event: PushSubscriptionChangeEv
 
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
   const data = event.data as { type?: unknown } | null;
-  if (!data || data.type !== 'EO_VERSION') return;
+  if (!data) return;
+  // `SKIP_WAITING` est le message que `updateSW` (retour de `registerSW`,
+  // `wb.messageSkipWaiting()`) envoie au worker en attente : le mode
+  // `generateSW` installait cet écouteur automatiquement, `injectManifest` le
+  // laisse à la main au fichier — sans lui, le clic « Recharger » du bandeau
+  // ne fait RIEN (le worker attend pour toujours, la mise à jour ne part
+  // jamais). Le skipWaiting au DÉMARRAGE reste proscrit (D-09, gate prompt) :
+  // c'est l'application EXPLICITE par l'utilisateur qui l'autorise.
+  if (data.type === 'SKIP_WAITING') {
+    void self.skipWaiting();
+    return;
+  }
+  if (data.type !== 'EO_VERSION') return;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

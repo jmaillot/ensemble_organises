@@ -72,6 +72,18 @@ export function Root() {
 const container = document.getElementById('root');
 if (!container) throw new Error('Élément racine introuvable.');
 
+// Harnais e2e de la gate SW (phase 41, GATE-01) : chargé SEULEMENT quand la
+// variable de build `VITE_E2E_SW_HARNESS` vaut '1'. Aucune chaîne de
+// production ne pose cette variable (compose.app.yaml et le Dockerfile §8.2
+// ne passent que les deux VITE_* Supabase) : le tree-shaking Rollup sur la
+// constante d'environnement élimine l'import dynamique des autres builds —
+// preuve exigée par le wrapper (`scripts/test-sw-gate.sh`) par grep du bundle
+// du build standard (A2), jamais supposée. La logique de gate dans
+// `sw-register.ts` reste inchangée : le harnais n'ouvre pas la porte.
+if (import.meta.env.VITE_E2E_SW_HARNESS === '1') {
+  void import('@/lib/e2e-sw-harness');
+}
+
 createRoot(container).render(
   <StrictMode>
     <Root />
