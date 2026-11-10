@@ -105,7 +105,12 @@ Plans:
   3. Toute correction livrée est désignée par le profilage (jamais au doigt mouillé avant la trace) — si l'axe corrigé n'est pas celui du profil, c'est consigné comme écart
   4. La décision CACHE-01 est tranchée par famille offline avec les données du panneau diagnostic on-device, documentée dans PROJECT.md (valeur + justification), et la purge outbox reste indépendante du maxAge (tests à jour)
 
-**Plans**: TBD
+**Plans**: 2/3 plans executed
+
+Plans:
+- [x] 42-01-PLAN.md — Marks `performance.mark` aux 4 segments (boot-marks.ts) + section « Amorçage » du panneau offline + tests (COLD-01)
+- [x] 42-02-PLAN.md — Protocole de mesure + critères CACHE-01 par famille écrits avant les mesures, doc versionné (COLD-01, CA-02)
+- [ ] 42-03-PLAN.md — Boucle mesure on-device → corrections désignées par le profil → re-mesure → décision CACHE-01 dans PROJECT.md (COLD-02, CACHE-01)
 
 ## Progress
 
@@ -115,7 +120,7 @@ Plans:
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
 | 40. Ardoise « Rejoindre via mon compte » | 3/3 | Complete    | 2026-11-09 |
 | 41. Gate SW simulable | 1/1 | Complete    | 2026-11-10 |
-| 42. Cold start + décision cache | 0/? | Not started | - |
+| 42. Cold start + décision cache | 2/3 | In Progress|  |
 
 ---
 
