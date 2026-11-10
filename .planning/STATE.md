@@ -2,19 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.3
 milestone_name: Solde de la dette
-current_phase: 41
-current_phase_name: Gate SW simulable
-status: executing
-stopped_at: Completed 41-01-PLAN.md
-last_updated: "2026-11-10T08:59:36.568Z"
+current_phase: 42
+current_phase_name: Cold start mesuré puis corrigé + décision cache
+status: planning
+stopped_at: Phase 41 complete, ready to plan Phase 42
+last_updated: "2026-11-10T09:20:08.596Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 41 execution started
-state_head: 9b99cbf3f84a11f3c41df19677e0d23b178ea1c3
+last_activity_desc: Phase 41 complete, transitioned to Phase 42
+state_head: a8b627cee933d2e2ad720486b31ab3fe45e13c81
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
+  percent: 80
 ---
 
 # Project State
@@ -28,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-08)
 
 ## Current Position
 
-Phase: 41 (Gate SW simulable) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 41
-Last activity: 2026-11-10 — Phase 41 execution started
+Phase: 42 — Cold start mesuré puis corrigé + décision cache
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-10 — Phase 41 complete, transitioned to Phase 42
 
 ## Performance Metrics
 
@@ -75,7 +76,7 @@ Last activity: 2026-11-10 — Phase 41 execution started
 ## Session Continuity
 
 **Last session:** 2026-11-10T08:59:36.516Z
-**Stopped at:** Completed 41-01-PLAN.md
+**Stopped at:** Phase 41 complete, ready to plan Phase 42
 **Resume file:** None
 
 - Roadmap v1.3 créée le 2026-11-08 par gsd-roadmapper (subagent /gsd-new-project).

@@ -14,7 +14,7 @@ Summary checklist:
 - [x] **Phase 38: Filet de tests fiable** - Flakes dimanche corrigés à la racine + dette review 37 (IN-01/IN-02) ; la chaîne §2.7 devient un instrument de confiance pour tout le jalon (completed 2026-11-08)
 - [x] **Phase 39: Outillage prod de vérification** - Smoke-test en mode prod réel via API Admin + spec e2e join-token refondue contre le flux 31-03 (completed 2026-11-09)
 - [x] **Phase 40: Ardoise « Rejoindre via mon compte »** - L'unique surface produit du jalon : un invité sans foyer rejoint le foyer via le flux d'invitation existant, atterrit dans l'ardoise partagée
-- [ ] **Phase 41: Gate SW simulable** - Le chemin runtime de la gate « file vide » validé e2e contre build+preview réel (GATE-01 planifiable)
+- [x] **Phase 41: Gate SW simulable** - Le chemin runtime de la gate « file vide » validé e2e contre build+preview réel (GATE-01 planifiable) (completed 2026-11-10)
 - [ ] **Phase 42: Cold start mesuré puis corrigé + décision cache** - Instrumentation en dernier, corrections désignées par le profil, décision CACHE-01 tranchée avec les données on-device
 
 ## Phase Details
@@ -89,10 +89,10 @@ Plans:
   3. La simulation passe par le harnais dev-only qui injecte dans le store existant — la logique de gate de `sw-register.ts` n'a pas été forkée ni mockée
   4. Le re-test en conditions réelles à la prochaine utilisation observée reste consigné comme observatoire hors jalon (GATE-PROD), non confondu avec cette validation
 
-**Plans:** 0/1 plans executed
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 41-01-PLAN.md — Tracer deux-builds + bandeau (wrapper test-sw-gate.sh, spec e2e, harnais dev-only), fermeture de la gate (file non vide/vide), GATE-PROD observatoire
+- [x] 41-01-PLAN.md — Tracer deux-builds + bandeau (wrapper test-sw-gate.sh, spec e2e, harnais dev-only), fermeture de la gate (file non vide/vide), GATE-PROD observatoire
 
 ### Phase 42: Cold start mesuré puis corrigé + décision cache
 
@@ -114,7 +114,7 @@ Plans:
 | 38. Filet de tests fiable | 4/4 | Complete    | 2026-11-08 |
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
 | 40. Ardoise « Rejoindre via mon compte » | 3/3 | Complete    | 2026-11-09 |
-| 41. Gate SW simulable | 0/1 | Planned    |  |
+| 41. Gate SW simulable | 1/1 | Complete    | 2026-11-10 |
 | 42. Cold start + décision cache | 0/? | Not started | - |
 
 ---
