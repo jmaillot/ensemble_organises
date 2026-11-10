@@ -45,6 +45,7 @@ playwright-report/
 blob-report/
 playwright/.cache/
 shots/
+.vitest/
 
 # Sortie du serveur Playwright piloté par l'agent (instantanés de page,
 # journaux de console) : un artefact de session, jamais du produit. Les
