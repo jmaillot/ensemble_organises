@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-08)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 41 — Gate SW simulable
+**Current focus:** Phase 42 — Cold start mesuré puis corrigé + décision cache
 
 ## Current Position
 
