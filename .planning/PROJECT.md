@@ -70,8 +70,9 @@ signOut — atteignable depuis /foyer pour un visiteur connecté sans foyer
 (G-37-2), re-testé on-device le 2026-11-08. Audit tech_debt : 6/6 exigences,
 intégration 3/3, flux 3/3. Déploiement v1.1-34-g20bbcbd+ effectué le
 2026-11-08 (bouton « Rejoindre via mon compte » et déconnexion réelle en
-prod) — le re-test GATE-01 reste à consigner à la première utilisation
-observée.
+prod) — GATE-01 simulable validée en phase 41 (harnais e2e, 4/4 vert) ; le
+re-test en conditions réelles reste un observatoire à consigner à la première
+utilisation observée.
 
 **Dette reportée au jalon suivant :** GATE-01 (re-test gate SW au prochain
 déploiement naturel), CACHE-01 (maxAge 24 h, décision produit), flake
@@ -120,4 +121,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-08 — jalon v1.3 « Solde de la dette » démarré*
+*Last updated: 2026-11-10 after Phase 41 — GATE-01 simulable prouvée e2e (jalon v1.3 « Solde de la dette »)*
