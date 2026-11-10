@@ -38,6 +38,15 @@ L'ordre exact, identique pour chaque run :
 
 Chaque run reprend la séquence depuis l'étape 1. Le comportement attendu au premier lancement post-purge : le panneau cache part d'un état « rien de persisté » ; c'est aussi la vérification A3 de la RESEARCH (la désinstallation efface bien `eo-offline-cache`).
 
+### 2.1 Purge réellement utilisée (campagne 2026-11-10) — consignation
+
+La campagne de mesure du Plan 03 utilise comme purge l'alternative documentée de l'étape 4, via les **paramètres Android** : « vider le cache » de l'application installée (wipe du storage système) à la place de la désinstallation complète. **Limite connue et vérifiée à chaque run :** selon la version d'Android, « Vider le cache » peut effacer le storage/IndexedDB tout en laissant le service worker et le précache intacts ou partiels. Une purge n'est donc déclarée **froide** que si les deux faits sont vrais au lancement mesuré :
+
+1. le panneau cache affiche « rien de persisté » (vérification A3 de la RESEARCH) ;
+2. le segment SW du panneau Amorçage est absent ou ~0 ms OU le lancement ne réactive pas de SW résiduel.
+
+Si l'un des deux faits manque, **le run n'est pas froid** : il est consigné comme écart (§7.5) et la purge est refaite avec **« Effacer le stockage »** (et non seulement « Vider le cache ») ou la désinstallation complète de l'étape 4 — puis le run est refait. Aucune mesure prise sur un run non froid n'entre dans les médianes.
+
 ## 3. Définition des segments
 
 Les 4 segments sont bornés par des `performance.mark` posés dans la séquence de démarrage réelle (instrumentation du plan 42-01, `app/src/lib/boot-marks.ts`). Ce que chaque segment contient :
@@ -173,3 +182,5 @@ Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à re
 ### 7.5 Écarts (CU-03)
 
 À remplir : toute correction hors profil, tout recours au wipe « site data » à la place de la désinstallation, tout déplacement de borne de segment, tout run refait et sa cause.
+
+- **Purge par paramètres Android (consignée 2026-11-10) :** la purge de la campagne utilise « vider le cache » via les paramètres applications Android au lieu de la désinstallation complète (alternative documentée §2.1). Chaque run est validé froid par les deux faits de §2.1 ; tout run non froid est refait après purge renforcée (« Effacer le stockage » ou désinstallation) et consigné ici.
