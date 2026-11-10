@@ -15,7 +15,7 @@ Summary checklist:
 - [x] **Phase 39: Outillage prod de vérification** - Smoke-test en mode prod réel via API Admin + spec e2e join-token refondue contre le flux 31-03 (completed 2026-11-09)
 - [x] **Phase 40: Ardoise « Rejoindre via mon compte »** - L'unique surface produit du jalon : un invité sans foyer rejoint le foyer via le flux d'invitation existant, atterrit dans l'ardoise partagée
 - [x] **Phase 41: Gate SW simulable** - Le chemin runtime de la gate « file vide » validé e2e contre build+preview réel (GATE-01 planifiable) (completed 2026-11-10)
-- [ ] **Phase 42: Cold start mesuré puis corrigé + décision cache** - Instrumentation en dernier, corrections désignées par le profil, décision CACHE-01 tranchée avec les données on-device
+- [x] **Phase 42: Cold start mesuré puis corrigé + décision cache** - Instrumentation en dernier, corrections désignées par le profil, décision CACHE-01 tranchée avec les données on-device (completed 2026-11-10)
 
 ## Phase Details
 
@@ -105,7 +105,7 @@ Plans:
   3. Toute correction livrée est désignée par le profilage (jamais au doigt mouillé avant la trace) — si l'axe corrigé n'est pas celui du profil, c'est consigné comme écart
   4. La décision CACHE-01 est tranchée par famille offline avec les données du panneau diagnostic on-device, documentée dans PROJECT.md (valeur + justification), et la purge outbox reste indépendante du maxAge (tests à jour)
 
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans complete
 
 Plans:
 - [x] 42-01-PLAN.md — Marks `performance.mark` aux 4 segments (boot-marks.ts) + section « Amorçage » du panneau offline + tests (COLD-01)
@@ -120,7 +120,7 @@ Plans:
 | 39. Outillage prod de vérification | 2/2 | Complete    | 2026-11-09 |
 | 40. Ardoise « Rejoindre via mon compte » | 3/3 | Complete    | 2026-11-09 |
 | 41. Gate SW simulable | 1/1 | Complete    | 2026-11-10 |
-| 42. Cold start + décision cache | 3/3 | In Progress|  |
+| 42. Cold start + décision cache | 3/3 | Complete    | 2026-11-10 |
 
 ---
 
