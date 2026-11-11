@@ -113,29 +113,80 @@ L'ordre des opérations est consigné et non négociable :
 
 Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé** — une famille à maxAge court élaguera plus au restore et montrera un volume réhydraté plus faible, qui n'est pas un argument en soi pour la raccourcir ou l'allonger. Les critères (b) et (c), écrits avant la lecture des données, sont ceux qui tranchent ; le volume réhydraté (a) est un fait d'instrumentation, pas un critère de décision à lui seul. Modifier un maxAge change ce que le panneau montrera à la lecture suivante : la décision s'applique donc aux critères, jamais à l'inversion « le panneau montre peu → j'allonge ».
 
-## 7. Résultats (vides à ce stade — à remplir au Plan 03)
+## 7. Résultats (squelettes de consignation — campagne 44)
 
-> Les sections ci-dessous sont des emplacements de consignation. Aucune valeur n'y figure tant que les N = 5 runs du Plan 03 n'ont pas tourné sur l'appareil de référence.
+> Squelettes préparés le 2026-11-11 (plan 44-01, D-01) : le jour J, l'utilisateur dicte uniquement les valeurs mesurées depuis le panneau. Le document est réécrit à chaque campagne (D-04), historique conservé par git — les différés de la campagne 2026-11-10 sont remplacés. Aucune valeur n'y figure tant que la campagne N = 5 n'a pas tourné sur l'appareil de référence.
 
 ### 7.1 Runs avant correction
 
-**Campagne clôturée le 2026-11-10 — abandon des runs 3/4/5 (décision produit de l'utilisateur)** : les 2 runs dictés restent la totalité de la campagne. Le protocole N=5 n'est pas atteint et ne le sera pas dans cette phase : **aucune médiane, aucune conclusion de profilage, aucune décision CACHE-01**. COLD-02 et CACHE-01 sont **reportés hors phase**, leur état documenté dans PROJECT.md. Les valeurs sont dictées depuis la section « Amorçage » du panneau offline — aucune n'est inventée.
+**Procédure de campagne résumée** (la séquence §2 reste la référence contraignante — ce résumé ne la remplace pas) :
+
+1. Purge froide §2.1 (purge par paramètres Android : « Vider le cache »), puis les **deux validations froides** de §2.1 vérifiées avant le run ;
+2. Mode avion, lancement mesuré de l'app ;
+3. Lecture du panneau **« Amorçage »** (estampille, branche auth, 4 segments, total borne à borne), puis du panneau **« Cache hors-ligne »** (lecture par famille via `inspectPersistedCache`) ;
+4. Dictée des valeurs dans les tableaux ci-dessous.
+
+**Reprise après purge complète** (« Effacer le stockage » ou désinstallation — écart procédural consigné le 2026-11-10) : la session hors ligne est détruite, le lancement suivant en mode avion atterrit sur l'écran de connexion. Procédure de reprise pour un run comparable : **reconnexion réseau → connexion → mode avion → « Vider le cache » seul** (préserve la session dans IndexedDB) → **run froid comparable**.
+
+**Question ouverte du protocole §1, à trancher sur place le jour J :** N = 5 par condition §1 — décider sur place si les runs avant correction ont déjà une couverture suffisante via §7.3 (la lecture CACHE-01 est la condition de la campagne 44).
+
+<!-- Règle §2.1 : un run non froid n'entre pas dans les médianes. -->
+
+**Run 1**
 
 | Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
 |---|---|---|---|---|---|---|---|
-| 1 | v1.2-71- | hors ligne (mode avion) | 3 ms | 20 ms | 6 ms | 437 ms | 437 ms |
-| 2 | v1.2-71- | hors ligne (mode avion) | 1 ms | 9 ms | 20 ms | 17 200 ms | 17 200 ms |
-| 3–5 | — | — | — | — | — | — | — |
+| 1 | | | | | | | |
 
-**Observations consignées (sans conclusion, N insuffisant)** : le segment auth domine le total aux deux runs et sa variance est extrême (437 ms → 17 200 ms, ×39) — le run 2 colle au comportement documenté du protocole (Pitfall 4 : hors ligne, l'auth absorbe la sonde de joignabilité 4 s et le gardien d'amorçage 10 s). Les segments entry chunk / SW / idb restent négligeables (< 30 ms) aux deux runs.
+<!-- Validations « froid » §2.1 à cocher avant d'entrer dans les médianes : -->
+- [ ] Panneau cache : rien de persisté
+- [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
 
-**Écart procédure consigné (§7.5)** : après un « Effacer le stockage », la session hors ligne est détruite — le lancement suivant en mode avion atterrit sur l'écran de connexion (aucune session à restaurer) et le run n'est plus comparable (branche « session absente », non mesurée ici). Procédure de reprise après purge complète : reconnexion réseau → connexion → mode avion → « Vider le cache » seul (préserve la session dans IndexedDB) → run froid comparable.
+**Run 2**
+
+| Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
+|---|---|---|---|---|---|---|---|
+| 2 | | | | | | | |
+
+<!-- Validations « froid » §2.1 à cocher avant d'entrer dans les médianes : -->
+- [ ] Panneau cache : rien de persisté
+- [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
+
+**Run 3**
+
+| Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
+|---|---|---|---|---|---|---|---|
+| 3 | | | | | | | |
+
+<!-- Validations « froid » §2.1 à cocher avant d'entrer dans les médianes : -->
+- [ ] Panneau cache : rien de persisté
+- [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
+
+**Run 4**
+
+| Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
+|---|---|---|---|---|---|---|---|
+| 4 | | | | | | | |
+
+<!-- Validations « froid » §2.1 à cocher avant d'entrer dans les médianes : -->
+- [ ] Panneau cache : rien de persisté
+- [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
+
+**Run 5**
+
+| Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
+|---|---|---|---|---|---|---|---|
+| 5 | | | | | | | |
+
+<!-- Validations « froid » §2.1 à cocher avant d'entrer dans les médianes : -->
+- [ ] Panneau cache : rien de persisté
+- [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
+
+**Valeur de la condition :** médiane des 5 runs — à remplir (ni minimum ni maximum ; un run aberrant est un fait à consigner §7.5, jamais lissé).
 
 ### 7.2 Runs après correction
 
-**Différé consigné :** aucune correction livrée — le profilage (segments du panneau on-device) n'existe pas sans mesure, et aucune correction ne peut désigner son segment source (CU-02) sans le profil. Les colonnes « après » restent vides pour la même raison que §7.1.
-
-Condition : _estampille du build_ — à remplir. Correction livrée et axe désigné par le profil : _à remplir_.
+Condition : _estampille du build_ — à remplir le jour J, seulement si une correction a été livrée. Correction livrée et axe désigné par le profil (CU-02) : _à remplir_. Sans correction livrée, cette section reste vide et cela se consigne comme un fait, jamais comme une absence maquillée (§2.7 I).
 
 | Run | Estampille | Branche auth | entry chunk | SW | idb | auth | Total (borne à borne) |
 |---|---|---|---|---|---|---|---|
@@ -148,9 +199,7 @@ Condition : _estampille du build_ — à remplir. Correction livrée et axe dés
 
 ### 7.3 Volumes réhydratés par famille (lecture panneau, CACHE-01)
 
-**Différé consigné :** la lecture du panneau (inspectPersistedCache) exige l'appareil — la campagne 2026-11-10 n'a pas produit de lecture (cf. §7.1). Les critères §5 restent écrits et contraignants ; la décision §7.4 n'est PAS rendue à partir d'aucune donnée absente (CA-02 — jamais « parce que le panneau montre… » sans panneau).
-
-Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à remplir (N = 5, médiane).
+La lecture vient du **panneau « Cache hors-ligne »**, alimenté par `inspectPersistedCache` (`app/src/lib/offline/query-persistence.ts`) : par famille, l'âge de la mise en cache (`ageMs`), la durée de conservation en vigueur (`maxAgeMs`) et l'éligibilité à la prune (`pruneEligible`) ; le delta de prune de la dernière restauration vient de `getRestoreOutcome` (compté avant/après par `connectOfflineCache`). À remplir le jour J, N = 5, médiane.
 
 | Famille | maxAge | Lignes restaurées (médiane) | pruneEligible (médiane) | Delta prune |
 |---|---|---|---|---|
@@ -168,7 +217,7 @@ Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à re
 
 ### 7.4 Décision CACHE-01 par famille
 
-**Différé consigné :** CACHE-01 n'est PAS tranchée dans cette campagne — aucune donnée du panneau (§7.3), et l'ordre consigné §6 interdit de décider sans lecture (CA-04). Les critères §5 écrits avant toute mesure demeurent la grille de décision de la campagne future ; PROJECT.md ne porte pas de section « Décision CACHE-01 » tant qu'aucune donnée ne la justifie (§2.7 I). À remplir : pour chaque famille — décision (statu quo justifié / nouvelle valeur), justification par les critères (a)(b)(c), et report de la valeur retenue dans PROJECT.md le cas échéant.
+Grille à remplir les données sous les yeux (D-06 — campagne et décision dans la même session, biais d'ordre §6 respecté). Rappel des critères contraignants §5 : la décision (statu quo justifié / nouvelle valeur) est justifiée par **(a) volume observé, (b) tolérance produit écrite §5, (c) coût re-fetch borné foyer** — l'ordre §6 interdit de décider sur (a) seule : ce sont (b) et (c) qui tranchent, jamais la lecture du panneau seule. Un statu quo justifié est une décision valide (CA-03). PROJECT.md ne porte de section « Décision CACHE-01 » qu'une fois cette grille remplie avec des données réelles (§2.7 I).
 
 | Famille | Décision | Justification (critères a/b/c) |
 |---|---|---|
@@ -186,24 +235,24 @@ Via `inspectPersistedCache` + `getRestoreOutcome` au lancement mesuré — à re
 
 ### 7.5 Écarts (CU-03)
 
-À remplir : toute correction hors profil, tout recours au wipe « site data » à la place de la désinstallation, tout déplacement de borne de segment, tout run refait et sa cause.
+À remplir le jour J : toute correction hors profil, tout recours au wipe « site data » à la place de la désinstallation, tout déplacement de borne de segment, tout run refait et sa cause, tout run non froid (il n'entre pas dans les médianes — §2.1).
 
-- **Purge par paramètres Android (consignée 2026-11-10) :** la purge de la campagne utilise « vider le cache » via les paramètres applications Android au lieu de la désinstallation complète (alternative documentée §2.1). Chaque run est validé froid par les deux faits de §2.1 ; tout run non froid est refait après purge renforcée (« Effacer le stockage » ou désinstallation) et consigné ici.
-- **Différé d'appareil (2026-11-10) :** aucune mesure de la campagne — cf. §7.1. Ce différé est la consignation de l'absence (§2.7 I), jamais un maquillage : aucune valeur de mesure, aucune valeur d'émulateur, aucune décision CACHE-01 sans données.
+- **Purge par paramètres Android (consignée 2026-11-10, portée dans le squelette de campagne)** : la purge utilise « Vider le cache » via les paramètres applications Android au lieu de la désinstallation complète (alternative documentée §2.1). Chaque run est validé froid par les deux faits de §2.1 ; tout run non froid est refait après purge renforcée (« Effacer le stockage » ou désinstallation) et consigné ici.
+- **Différé d'appareil de la campagne 2026-11-10 :** remplacé par la campagne 44 — ce différé n'a plus cours ; son remplacement sans données nouvelles sera consigné ici le jour J (§2.7 I).
 
-### 7.6 Chaîne §2.7 exécutée à l'état final du dépôt (2026-11-10)
+### 7.6 Chaîne §2.7 exécutée à l'état final du dépôt (squelette — D-08)
 
-Chaque étape citée avec son résultat (§2.7 F — un succès muet est un échec inexpliqué). Docker **disponible** : les e2e réels ont été exécutés, leur absence n'a pas à être consignée.
+Chaque étape citée avec son résultat (§2.7 F — un succès muet est un échec inexpliqué). La chaîne est exécutée **UNE fois à l'état final du dépôt**, après le dernier commit de famille — pas de chaîne par commit (le SQL n'est pas touché). Étapes attendues (mêmes que la chaîne de la campagne 42) :
 
 | Étape | Commande | Résultat |
 |---|---|---|
-| Estampille quatre canaux | `sh scripts/check-version-stamp.sh` | **OK** — canaux égaux au SHA `a31e965…` avec estampille, `unknown` sans, les deux familles différentes |
-| Gate SW simulable | `sh scripts/test-sw-gate.sh` | **4/4 verts** (deux builds réels, même origin) |
-| Typecheck | `cd app && npm run typecheck` | **OK** |
-| Tests unitaires | `cd app && npm test` | **2006 passed / 245 fichiers** — 0 failed |
-| Build prod | `cd app && npm run build` | **OK** — precache 152 entrées (2751,51 KiB) |
-| e2e (Docker disponible) | `cd app && npm run test:e2e` | **163 passed / 9 skipped** (skips = baseline préexistante datée, 38-E2E-SIGNATURE.md) |
-| Contrôle SQL statique | `python3 ../scripts/check-sql-statique.py` | **aucun défaut** — 231 fonctions effectives sur 182 migrations, 107 tests ; aucune migration ajoutée dans la phase 42, son absence de requête est un fait vérifié |
-| Auto-exercice du contrôle | `python3 ../scripts/test-check-sql-statique.py` | **OK** (cas qui doivent échouer refusés) |
+| Estampille quatre canaux | `sh scripts/check-version-stamp.sh` | à remplir |
+| Gate SW simulable | `sh scripts/test-sw-gate.sh` | à remplir |
+| Typecheck | `cd app && npm run typecheck` | à remplir |
+| Tests unitaires | `cd app && npm test` | à remplir |
+| Build prod | `cd app && npm run build` | à remplir |
+| e2e (Docker disponible) | `cd app && npm run test:e2e` | à remplir (si Docker indisponible : absence consignée, forme 38-E2E-SIGNATURE) |
+| Contrôle SQL statique | `python3 ../scripts/check-sql-statique.py` | à remplir (aucune migration ajoutée en phase 44 — la vérification reste exigée) |
+| Auto-exercice du contrôle | `python3 ../scripts/test-check-sql-statique.py` | à remplir |
 
-**CHAINE-42-VERTE** — affichée en fin de chaîne, état du dépôt après les deux commits du plan 42-03 (`17bbca0` boot:done, `a31e965` purge §2.1).
+**CHAINE-44-VERTE** — à afficher en fin de chaîne, état du dépôt après le dernier commit de la phase 44.
