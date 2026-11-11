@@ -888,7 +888,12 @@ if [ -z "$FOYER_B" ] || [ -z "$MEMBRE_B_ID" ]; then
   exit 1
 fi
 printf '%s\n' "$FOYER_B" >>"$FOYERS_LISTE"
-corps_ardoise_b="$(corps_secret '{"action":"create-ardoise","name":"Ardoise second foyer e2e"}')"
+# householdId EXPLICITE : sans lui, l'Edge choisit households[0]
+# (premier foyer par created_at, handleCreateArdoise l.415). L'invité a rejoint
+# le foyer A à l'étape 8 AVANT de créer le foyer B : sans le champ, l'ardoise
+# « B » naîtrait dans le foyer A et create_expense(FOYER_B, ARDOISE_B)
+# échouerait en 400 (ardoise d'un autre foyer) — cause racine du run 6.
+corps_ardoise_b="$(corps_secret "{\"action\":\"create-ardoise\",\"name\":\"Ardoise second foyer e2e\",\"householdId\":\"$FOYER_B\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ardoise_b" "$SMOKE_LIB_TMP/ardoise-b.json")"
 etape 14 POST /functions/v1/ardoise-invite "$statut" "create-ardoise — ardoise du second foyer"
 garde_app "$statut" "$API/functions/v1/ardoise-invite"
