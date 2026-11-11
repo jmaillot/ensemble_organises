@@ -449,10 +449,18 @@ cleanup() {
   # Détection résiduelle (EE-02) : les comptes e2e hors de ce run sont
   # SIGNALÉS, jamais supprimés par ce run.
   RESIDUS=''
-  if residus="$(smoke_accounts_list 2>/dev/null)" && [ -n "$residus" ]; then
-    RESIDUS="$residus"
-    echo "   ! comptes e2e résiduels hors de ce run (à traiter à la main) :" >&2
-    printf '     %s\n' "$residus" >&2
+  sonde_ok=true
+  if residus="$(smoke_accounts_list)"; then
+    if [ -n "$residus" ]; then
+      RESIDUS="$residus"
+      echo "   ! comptes e2e résiduels hors de ce run (à traiter à la main) :" >&2
+      printf '     %s\n' "$residus" >&2
+    fi
+  else
+    # Un échec de la sonde n'est pas une absence : le nommer (§2.7 F),
+    # sinon un "silence" serait imprimé comme un succès sans résiduel.
+    sonde_ok=false
+    echo "   ! détection des résiduels impossible (échec smoke_accounts_list) — ne pas conclure à l'absence" >&2
   fi
 
   # Purge comptes — filet SQL préalable : tout foyer dont un compte du run

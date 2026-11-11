@@ -286,6 +286,14 @@ smoke_accounts_list() {
     fi
     grep -o '"email": *"[^"]*"' "$SMOKE_LIB_TMP/liste-body" \
       | sed 's/^"email": *"//; s/"$//' >"$SMOKE_LIB_TMP/page-emails"
+    # GoTrue borne page au maximum : au-delà, il renvoie la dernière page à
+    # l'infini. Une page identique à la précédente = fin réelle de liste,
+    # sinon chaque résiduel serait listé deux fois (vu au run 10).
+    if [ -s "$SMOKE_LIB_TMP/page-emails" ] \
+      && cmp -s "$SMOKE_LIB_TMP/page-emails" "$SMOKE_LIB_TMP/page-emails-prec" 2>/dev/null; then
+      break
+    fi
+    cp "$SMOKE_LIB_TMP/page-emails" "$SMOKE_LIB_TMP/page-emails-prec"
     trouves="$(grep -c . "$SMOKE_LIB_TMP/page-emails" || true)"
     cat "$SMOKE_LIB_TMP/page-emails" >>"$emails"
     [ "${trouves:-0}" -gt 0 ] 2>/dev/null || break
