@@ -2,9 +2,14 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Preuve & décision
+current_phase: 43
+current_phase_name: defining
 status: defining
-last_updated: "2026-11-11T08:30:00.000Z"
+stopped_at: Phase 43 context gathered
+last_updated: "2026-11-11T09:11:28.791Z"
 last_activity: 2026-11-11
+last_activity_desc: Milestone v1.4 roadmap créée
+state_head: 935539a9e95e294ba07d4bb4be273267f7d9e5b6
 progress:
   total_phases: 2
   completed_phases: 0
@@ -57,9 +62,9 @@ Last activity: 2026-11-11 — Milestone v1.4 roadmap créée
 
 ## Session Continuity
 
-**Last session:** 2026-11-11
-**Stopped at:** Roadmap v1.4 créée (Phase 43 + Phase 44), en attente d'approbation
-**Resume file:** — (aucune phase démarrée)
+**Last session:** 2026-11-11T09:11:28.767Z
+**Stopped at:** Phase 43 context gathered
+**Resume file:** .planning/phases/43-preuve-prod-du-bridge-ardoise-w1/43-CONTEXT.md
 
 - Roadmap v1.4 créée le 2026-11-11 par gsd-roadmapper (subagent /gsd-new-project).
 - Prochain pas : approbation, puis `/gsd-plan-phase 43`.
