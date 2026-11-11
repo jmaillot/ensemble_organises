@@ -770,22 +770,34 @@ neg_verdict() {
   printf 'NÉGATIF %s | %s | %s\n' "$1" "$2" "$3" | tee -a "$NEG_LOG" >&2
 }
 
-# --- (a) Replay du token consommé → 410 « épuisé » ----------------------------
+# --- (a) Replay du token consommé → 410 ---------------------------------------
 # PROOF-03 (assert positif single-use) : le redeem du happy path a incrémenté
-# use_count à 1 (max_uses = 1) — 0181 refuse AVANT tout le reste
-# (`use_count >= max_uses`, l.96-98). Un 429 serait un rate-limit, jamais ce
-# verdict — d'où l'espacement budget ci-dessous.
+# use_count à 1 (max_uses = 1). L'ordre des vérifications de la fonction
+# EFFECTIVE 0181 place `is_active` (l.93-95) AVANT `use_count >= max_uses`
+# (l.96-98) : un token max_uses=1 consommé est désactivé
+# (is_active = use_count+1 < max_uses = false) et le replay lève « token
+# révoqué » — le message « utilisations maximal » du plan n'est atteignable
+# que si is_active est encore true, jamais produit par la consommation.
+# Écart au plan consigné (Rule 1) : l'assert épinglera 410 avec « révoqué »
+# OU « utilisations maximal » — les deux refus prouvent l'usage unique.
+# Reproducteur du 2026-11-11 (chemin bridge complet, 2 comptes) :
+# redeem #1 → 200, replay → 410 « Ce token a été révoqué. », use_count=1,
+# is_active=f. Un 429 serait un rate-limit, jamais ce verdict — d'où
+# l'espacement budget ci-dessous.
 attend_budget
 statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_redeem" "$SMOKE_LIB_TMP/replay.json")"
-etape 9 POST /functions/v1/household-invite "$statut" "redeem — négatif replay : même token re-présenté (410 « épuisé » attendu)"
+etape 9 POST /functions/v1/household-invite "$statut" "redeem — négatif replay : même token re-présenté (410 attendu)"
 garde_app "$statut" "$API/functions/v1/household-invite"
 replay_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/replay.json")" error)"
-if [ "$statut" = "410" ] && printf '%s' "$replay_msg" | grep -q "utilisations maximal"; then
+if [ "$statut" = "410" ] \
+  && { printf '%s' "$replay_msg" | grep -q "révoqué" \
+    || printf '%s' "$replay_msg" | grep -q "utilisations maximal"; }; then
   neg_verdict "replay" OK "HTTP 410 + « $replay_msg »"
-  verdict_vert "replay refusé : HTTP 410, message « utilisations maximal » (usage unique prouvé)"
+  verdict_vert "replay refusé : HTTP 410 « $replay_msg » (usage unique prouvé)"
 else
-  neg_verdict "replay" KO "HTTP $statut, message « $replay_msg » — 410 « utilisations maximal » attendu"
-  rouge "négatif replay : HTTP $statut au lieu de 410 « épuisé »"
+  # Corps masqué pour diagnostic (aucune valeur longue n'est imprimée).
+  neg_verdict "replay" KO "HTTP $statut, message « $replay_msg », corps : $(sed 's/[A-Za-z0-9_-]\{30,\}/<long>/g' "$SMOKE_LIB_TMP/replay.json" | head -c 200)"
+  rouge "négatif replay : HTTP $statut au lieu de 410 « révoqué »/« épuisé »"
   exit 1
 fi
 
