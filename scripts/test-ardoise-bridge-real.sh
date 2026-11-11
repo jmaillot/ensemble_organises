@@ -560,13 +560,18 @@ if [ "$statut" != "200" ]; then
 fi
 # Le préfixe distingue foyer et membre : l'ordre JSON n'est pas contractuel
 # (voir json_id_prefixe). Les deux identifiants portent les assertions bornées.
-FOYER_A="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" household)"
-MEMBRE_A_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" member)"
-printf '%s\n' "$FOYER_A" >>"$FOYERS_LISTE"
+FOYER_A="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" household_)"
+MEMBRE_A_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" member_)"
+# La capture est validée AVANT l'enregistrement du foyer dans la liste de
+# purge : une capture vide y écrivait une ligne vide et la boucle de purge la
+# sautait en silence — le foyer survivait, et la suppression du compte admin
+# échouait ensuite en 500 (FK on delete set null de 0166 + CHECK enfant de
+# 0145 : une ligne membre admin sans user_id viole chk_members_managed_child).
 if [ -z "$FOYER_A" ] || [ -z "$MEMBRE_A_ID" ]; then
   rouge "create_household : foyer ou membre admin non capturés"
   exit 1
 fi
+printf '%s\n' "$FOYER_A" >>"$FOYERS_LISTE"
 verdict_vert "foyer éphémère créé : household_id=$FOYER_A, payeur admin (membre $MEMBRE_A_ID)"
 echo "$FOYER_A" >"$SMOKE_LIB_TMP/foyer-a"
 
@@ -591,7 +596,7 @@ if [ "$statut" != "200" ]; then
   rouge "create-ardoise a échoué (HTTP $statut)"
   exit 1
 fi
-ARDOISE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise.json")" ardoise)"
+ARDOISE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise.json")" ardoise_)"
 if [ -z "$ARDOISE_ID" ]; then
   rouge "create-ardoise : ardoise_id non capturé"
   exit 1
@@ -649,7 +654,7 @@ if [ "$statut" != "200" ]; then
   rouge "lecture ardoise_guests a échoué (HTTP $statut)"
   exit 1
 fi
-GUEST_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests.json")" ardoise-guest)"
+GUEST_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests.json")" ardoise-guest_)"
 if [ -z "$GUEST_ID" ]; then
   rouge "guest_id non capturé avant la dépense"
   exit 1
@@ -668,7 +673,7 @@ if [ "$statut" != "200" ]; then
   rouge "create_expense a échoué (HTTP $statut)"
   exit 1
 fi
-EXPENSE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/depense.json")" expense)"
+EXPENSE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/depense.json")" expense_)"
 if [ -z "$EXPENSE_ID" ]; then
   rouge "create_expense : expense_id non capturé"
   exit 1
@@ -836,13 +841,13 @@ if [ "$statut" != "200" ]; then
   rouge "create_household (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
 fi
-FOYER_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" household)"
-MEMBRE_B_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" member)"
-printf '%s\n' "$FOYER_B" >>"$FOYERS_LISTE"
+FOYER_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" household_)"
+MEMBRE_B_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" member_)"
 if [ -z "$FOYER_B" ] || [ -z "$MEMBRE_B_ID" ]; then
   rouge "2ᵉ foyer : identifiants non capturés"
   exit 1
 fi
+printf '%s\n' "$FOYER_B" >>"$FOYERS_LISTE"
 corps_ardoise_b="$(corps_secret '{"action":"create-ardoise","name":"Ardoise second foyer e2e"}')"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ardoise_b" "$SMOKE_LIB_TMP/ardoise-b.json")"
 etape 14 POST /functions/v1/ardoise-invite "$statut" "create-ardoise — ardoise du second foyer"
@@ -851,7 +856,7 @@ if [ "$statut" != "200" ]; then
   rouge "create-ardoise (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
 fi
-ARDOISE_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise-b.json")" ardoise)"
+ARDOISE_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise-b.json")" ardoise_)"
 corps_code_b="$(corps_secret "{\"action\":\"create\",\"ardoiseId\":\"$ARDOISE_B\",\"expiresAt\":\"$expires_futur\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_code_b" "$SMOKE_LIB_TMP/code-b.json")"
 etape 15 POST /functions/v1/ardoise-invite "$statut" "create — code de partage du second foyer"
@@ -873,7 +878,7 @@ fi
 statut="$(get_json "$API/rest/v1/ardoise_guests?ardoise_id=eq.$ARDOISE_B&select=id" "$SMOKE_LIB_TMP/guests-b.json" "$cfg_invite")"
 etape 17 GET /rest/v1/ardoise_guests "$statut" "lecture du guest_id du second foyer"
 garde_app "$statut" "$API/rest/v1/ardoise_guests"
-GUEST_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests-b.json")" ardoise-guest)"
+GUEST_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests-b.json")" ardoise-guest_)"
 if [ -z "$GUEST_B" ]; then
   rouge "guest_id du second foyer non capturé"
   exit 1
