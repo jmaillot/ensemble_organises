@@ -106,8 +106,17 @@ fi
 # --- Refus sans stack joignable ------------------------------------------------
 # Une sonde qui échoue est une cause nommée, pas un skip : le run s'arrête
 # avant tout compte créé (§2.7 F). La clé publiable n'est pas un secret.
-health_code="$(curl -sS -o /dev/null -w '%{http_code}' "$API/auth/v1/health" \
-  -H "apikey: $PUBLISHABLE_KEY" 2>/dev/null || printf '000')"
+# `curl -w` imprime `000` même sur échec réseau (exit ≠ 0) : le `||` ajoutait
+# un second `000` (« 000000 », vu au run réel). Le statut se lit seul, jamais
+# complété par un second printf.
+http_code_ou_000() {
+  code="$(curl "$@" || true)"
+  [ -n "$code" ] || code=000
+  printf '%s' "$code"
+}
+
+health_code="$(http_code_ou_000 -sS -o /dev/null -w '%{http_code}' "$API/auth/v1/health" \
+  -H "apikey: $PUBLISHABLE_KEY" 2>/dev/null)"
 if [ "$health_code" != "200" ]; then
   echo "test-ardoise-bridge-real.sh: REFUS — la stack ne répond pas ($API/auth/v1/health → code $health_code)." >&2
   echo "  Le run réel exige une stack déployée joignable : vérifiez que la stack" >&2
@@ -184,26 +193,26 @@ corps_secret() {
 post_json() {
   url="$1" config="$2" corps="$3" out="$4"
   if [ -n "$config" ] && [ -n "$corps" ]; then
-    curl -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
-      -X POST -H 'content-type: application/json' -K "$config" --data @"$corps" "$url" 2>"$SMOKE_LIB_TMP/curl-err" \
-      || { cat "$SMOKE_LIB_TMP/curl-err" >&2; printf '000'; }
+    code="$(http_code_ou_000 -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
+      -X POST -H 'content-type: application/json' -K "$config" --data @"$corps" "$url" 2>"$SMOKE_LIB_TMP/curl-err")"
   elif [ -n "$config" ]; then
-    curl -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
-      -X POST -H 'content-type: application/json' -K "$config" "$url" 2>"$SMOKE_LIB_TMP/curl-err" \
-      || { cat "$SMOKE_LIB_TMP/curl-err" >&2; printf '000'; }
+    code="$(http_code_ou_000 -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
+      -X POST -H 'content-type: application/json' -K "$config" "$url" 2>"$SMOKE_LIB_TMP/curl-err")"
   else
-    curl -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
-      -X POST -H 'content-type: application/json' --data @"$corps" "$url" 2>"$SMOKE_LIB_TMP/curl-err" \
-      || { cat "$SMOKE_LIB_TMP/curl-err" >&2; printf '000'; }
+    code="$(http_code_ou_000 -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
+      -X POST -H 'content-type: application/json' --data @"$corps" "$url" 2>"$SMOKE_LIB_TMP/curl-err")"
   fi
+  # Un échec réseau (000) n'est jamais muet : la cause curl est imprimée.
+  if [ "$code" = "000" ] && [ -s "$SMOKE_LIB_TMP/curl-err" ]; then
+    cat "$SMOKE_LIB_TMP/curl-err" >&2
+  fi
+  printf '%s' "$code"
 }
 
-# GET authentifié : statut sur stdout, corps dans $2, en-têtes pour D-10.
+# GET authentifié : statut sur stdout, corps dans $2, config -K dans $3.
 get_json() {
-  url="$1" out="$2" config="$3"
-  curl -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$out" -w '%{http_code}' \
-    -K "$config" "$url" 2>"$SMOKE_LIB_TMP/curl-err" \
-    || { cat "$SMOKE_LIB_TMP/curl-err" >&2; printf '000'; }
+  http_code_ou_000 -sS -D "$SMOKE_LIB_TMP/derniers-headers" -o "$2" -w '%{http_code}' \
+    -K "$3" "$1" 2>"$SMOKE_LIB_TMP/curl-err"
 }
 
 # --- Reporting attribuable (PROOF-01, PROOF-04) --------------------------------
@@ -241,13 +250,19 @@ rouge() {
   printf 'VERDICT ROUGE | %s\n' "$1" >>"$RUN_LOG"
 }
 
-# Garde D-10 factuelle sur le dernier appel : CORS présent, pas de 3xx, pas de
-# 429 hors budget (un 429 est un rate-limit, jamais la preuve d'une propriété).
+# Garde D-10 factuelle sur le dernier appel : CORS présent (sur les Edge
+# Functions uniquement — un RPC PostgREST appelé sans en-tête Origin ne renvoie
+# pas d'ACAO en prod, ce n'est pas un décalage de chemin : calibrage affiné au
+# run réel du 2026-11-11), pas de 3xx, pas de 429 hors budget.
 garde_app() {
-  statut="$1"
-  if ! grep -qi '^access-control-allow-origin' "$SMOKE_LIB_TMP/derniers-headers" 2>/dev/null; then
-    signal_d10 "en-tête access-control-allow-origin absent sur la réponse HTTP $statut"
-  fi
+  statut="$1" url="$2"
+  case "$url" in
+    */functions/*)
+      if ! grep -qi '^access-control-allow-origin' "$SMOKE_LIB_TMP/derniers-headers" 2>/dev/null; then
+        signal_d10 "en-tête access-control-allow-origin absent sur la réponse HTTP $statut"
+      fi
+      ;;
+  esac
   case "$statut" in
     3*) signal_d10 "redirect non suivi (HTTP $statut) — l'app réelle ne suit pas de redirect ici" ;;
     429) signal_d10 "429 rate-limit inattendu — un run nerveux ne prouve rien, espacez les appels" ;;
@@ -262,8 +277,8 @@ garde_app() {
 estampille() {
   stamp_body="$SMOKE_LIB_TMP/version.json"
   stamp_headers="$SMOKE_LIB_TMP/version-headers"
-  stamp_code="$(curl -sS -D "$stamp_headers" -o "$stamp_body" -w '%{http_code}' \
-    "$E2E_BASE_URL/version.json" 2>/dev/null || printf '000')"
+  stamp_code="$(http_code_ou_000 -sS -D "$stamp_headers" -o "$stamp_body" -w '%{http_code}' \
+    "$E2E_BASE_URL/version.json" 2>/dev/null)"
   if [ "$stamp_code" = "200" ]; then
     ETAMPILLE="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$stamp_body" | head -n 1)"
     X_APP_VERSION="$(grep -i '^x-app-version:' "$stamp_headers" 2>/dev/null \
@@ -336,19 +351,19 @@ rediger_doc() {
     printf '\n'
     printf '## 4. Ce qui n'"'"'est PAS prouvé (D-09)\n'
     printf '\n'
-    printf '- Le dialog de copie du lien et le rendu du panneau invité : surfaces UI\n'
+    printf '%s\n' '- Le dialog de copie du lien et le rendu du panneau invité : surfaces UI'
     printf '  non couvertes — le script traverse le fil HTTP, pas le navigateur.\n'
-    printf '- L'"'"'e2e navigateur du parcours invité (W2) : déclenché par besoin\n'
+    printf '%s\n' "- L'e2e navigateur du parcours invité (W2) : déclenché par besoin"
     printf '  (PROOF-07), jamais préventif — le verdict humain tranche si un seam\n'
     printf '  apparaît via les signaux DÉCALAGE CHEMIN APP.\n'
-    printf '- L'"'"'estampille de l'"'"'Edge Function : pas de canal dédié — seule\n'
+    printf '%s\n' "- L'estampille de l'Edge Function : pas de canal dédié — seule"
     printf '  l'"'"'estampille frontend (/version.json) est capturée. '
     if [ -n "$ETAMPILLE" ]; then
       printf 'Valeur de ce run : %s.\n' "$ETAMPILLE"
     else
       printf 'INDISPONIBLE sur ce run (canal non joignable — nommé plus haut).\n'
     fi
-    printf '- Les signaux DÉCALAGE CHEMIN APP émis sur ce run : %s\n' "$DECALAGES"
+    printf '%s\n' "- Les signaux DÉCALAGE CHEMIN APP émis sur ce run : $DECALAGES"
     printf '\n'
     printf '## 5. Verdict + self-check\n'
     printf '\n'
@@ -359,8 +374,12 @@ rediger_doc() {
     fi
     printf '\n'
     printf 'Self-check purge (PROOF-06) : %s\n' "${SELF_CHECK_PURGE:-non exécuté (run avorté avant la purge)}"
+    if [ -n "${RESIDUS:-}" ]; then
+      printf '\nComptes e2e résiduels hors de ce run (signalés, non supprimés — EE-02, à traiter à la main) :\n'
+      printf '%s\n' "$RESIDUS" | while IFS= read -r r; do printf '%s\n' "- $r"; done
+    fi
     printf '\n'
-    printf -- '---\n'
+    printf '%s\n' '---'
     printf '*Phase 43 — généré automatiquement, aucune main humaine n'"'"'édite ce fichier.*\n'
   } >"$doc"
 }
@@ -388,7 +407,6 @@ cleanup() {
       [ -n "$hid" ] || continue
       printf "delete from public.households where id = :'foyer';\n" >>"$purge_sql"
     done <"$FOYERS_LISTE"
-    printf "select 'expenses_restants', count(*) from public.expenses where household_id in (select id from public.households where false);\n" >>"$purge_sql"
     purge_sql_controles="$SMOKE_LIB_TMP/purge-controles.sql"
     {
       printf "select 'expenses_restants', count(*) from public.expenses where household_id = :'foyer';\n"
@@ -397,17 +415,25 @@ cleanup() {
     } >"$purge_sql_controles"
     while IFS= read -r hid; do
       [ -n "$hid" ] || continue
-      del_out="$(sh "$SCRIPT_DIR/psql.sh" -v foyer="$hid" <"$purge_sql" 2>&1 </dev/null || true)"
-      if printf '%s' "$del_out" | grep -q '^DELETE'; then
+      # Une seule redirection d'entrée : le fichier SQL. Le `</dev/null` de
+      # contexte, posé après, écrasait le stdin (run réel du 2026-11-11 : psql
+      # ne lisait RIEN, sortie vide, « non supprimé » sans raison — et le
+      # contrôle des orphelins passait faussement vert sur une sortie vide).
+      del_out="$(sh "$SCRIPT_DIR/psql.sh" -v foyer="$hid" <"$purge_sql" 2>&1 || true)"
+      if printf '%s' "$del_out" | grep -q '^DELETE 1'; then
         verdict_vert "foyer $hid supprimé (cascade)"
       else
-        printf '   ! foyer %s non supprimé : %s\n' "$hid" "$del_out" >&2
+        printf '   ! foyer %s non supprimé (sortie psql : %s)\n' "$hid" "${del_out:-<vide>}" >&2
         purge_ko=1
       fi
-      ctrl_out="$(sh "$SCRIPT_DIR/psql.sh" -v foyer="$hid" <"$purge_sql_controles" 2>&1 </dev/null || true)"
-      # Chaque ligne de contrôle est « <nom> | <n> » : un n ≠ 0 est un orphelin.
-      if printf '%s' "$ctrl_out" | grep -E '\| [1-9]' >/dev/null; then
-        printf '   ! orphelins après cascade pour %s : %s\n' "$hid" "$(printf '%s' "$ctrl_out" | grep -E '\| [1-9]' | tr '\n' ' ')" >&2
+      ctrl_out="$(sh "$SCRIPT_DIR/psql.sh" -A -t -v foyer="$hid" <"$purge_sql_controles" 2>&1 || true)"
+      # Sortie vide = échec inexpliqué, jamais un vert (§2.7 F). Chaque ligne
+      # est « <nom>|<n> » (-A -t) : un n ≠ 0 est un orphelin.
+      if [ -z "$ctrl_out" ]; then
+        printf '   ! contrôle orphelins %s sans sortie — psql a échoué\n' "$hid" >&2
+        purge_ko=1
+      elif printf '%s' "$ctrl_out" | grep -E '\|[1-9]' >/dev/null; then
+        printf '   ! orphelins après cascade pour %s : %s\n' "$hid" "$(printf '%s' "$ctrl_out" | grep -E '\|[1-9]' | tr '\n' ' ')" >&2
         purge_ko=1
       else
         verdict_vert "foyer $hid : 0 ligne résiduelle (expenses/ardoises/tokens)"
@@ -417,7 +443,9 @@ cleanup() {
 
   # Détection résiduelle (EE-02) : les comptes e2e hors de ce run sont
   # SIGNALÉS, jamais supprimés par ce run.
+  RESIDUS=''
   if residus="$(smoke_accounts_list 2>/dev/null)" && [ -n "$residus" ]; then
+    RESIDUS="$residus"
     echo "   ! comptes e2e résiduels hors de ce run (à traiter à la main) :" >&2
     printf '     %s\n' "$residus" >&2
   fi
@@ -471,6 +499,15 @@ json_val() {
     | sed "s/\"$2\": *\"//; s/\"$//"
 }
 
+# Extraction d'un id métier PAR PRÉFIXE — l'ordre des objets dans une réponse
+# (create_household renvoie foyer + membre) n'est PAS contractuel, et l'inversion
+# au run réel (p_household_id = member_…) a causé un 403 à l'étape 6. Les ids
+# portent des préfixes univoques (0001 : new_id préfixe), on capture par eux.
+json_id_prefixe() {
+  printf '%s' "$1" | grep -o "\"id\": *\"$2-[^\"]*\"" | head -n 1 \
+    | sed 's/"id": *"//; s/"$//'
+}
+
 # Fichier -K portant la seule clé publiable (pas un secret : §2.7 H ne
 # l'exclut pas d'argv, mais le canal -K uniformise tous les appels).
 config_pub="$SMOKE_LIB_TMP/config-pub"
@@ -516,15 +553,15 @@ verdict_vert "2 comptes e2e créés et sessions obtenues (payeur, invité)"
 corps_foyer="$(corps_secret '{"p_name":"Foyer éphémère e2e 43","p_avatar_color":"accent"}')"
 statut="$(post_json "$API/rest/v1/rpc/create_household" "$cfg_payeur" "$corps_foyer" "$SMOKE_LIB_TMP/foyer.json")"
 etape 1 POST /rest/v1/rpc/create_household "$statut" "création du foyer éphémère du payeur"
-garde_app "$statut"
+garde_app "$statut" "$API/rest/v1/rpc/create_household"
 if [ "$statut" != "200" ]; then
   rouge "create_household a échoué (HTTP $statut)"
   exit 1
 fi
-# Le premier "id" du JSON est celui du foyer, le second celui du membre admin
-# (le payeur). Les deux identifiants portent les assertions bornées du run.
-FOYER_A="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer.json")" | grep -o '"id": *"[^"]*"' | sed -n '1p' | sed 's/.*"\([^"]*\)"$/\1/')"
-MEMBRE_A_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer.json")" | grep -o '"id": *"[^"]*"' | sed -n '2p' | sed 's/.*"\([^"]*\)"$/\1/')"
+# Le préfixe distingue foyer et membre : l'ordre JSON n'est pas contractuel
+# (voir json_id_prefixe). Les deux identifiants portent les assertions bornées.
+FOYER_A="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" household)"
+MEMBRE_A_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer.json")" member)"
 printf '%s\n' "$FOYER_A" >>"$FOYERS_LISTE"
 if [ -z "$FOYER_A" ] || [ -z "$MEMBRE_A_ID" ]; then
   rouge "create_household : foyer ou membre admin non capturés"
@@ -548,13 +585,13 @@ echo "$FOYER_A" >"$SMOKE_LIB_TMP/foyer-a"
 # qu'une fois dans la réponse, il va direct en fichier 0600.
 corps_ardoise="$(corps_secret '{"action":"create-ardoise","name":"Ardoise éphémère e2e"}')"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_payeur" "$corps_ardoise" "$SMOKE_LIB_TMP/ardoise.json")"
-etape 2 POST /functions/v1/ardoise-invite 'create-ardoise' "$statut" "création de l'ardoise du foyer"
-garde_app "$statut"
+etape 2 POST /functions/v1/ardoise-invite "$statut" "create-ardoise — création de l'ardoise du foyer"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "create-ardoise a échoué (HTTP $statut)"
   exit 1
 fi
-ARDOISE_ID="$(json_val "$(cat "$SMOKE_LIB_TMP/ardoise.json")" id)"
+ARDOISE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise.json")" ardoise)"
 if [ -z "$ARDOISE_ID" ]; then
   rouge "create-ardoise : ardoise_id non capturé"
   exit 1
@@ -569,8 +606,8 @@ expires_futur="$(date -u -d '+2 days' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
   || date -u -v+2d '+%Y-%m-%dT%H:%M:%SZ')"
 corps_code="$(corps_secret "{\"action\":\"create\",\"ardoiseId\":\"$ARDOISE_ID\",\"expiresAt\":\"$expires_futur\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_payeur" "$corps_code" "$SMOKE_LIB_TMP/code.json")"
-etape 3 POST /functions/v1/ardoise-invite 'create' "$statut" "émission du code de partage ardoise (expiration +2 jours)"
-garde_app "$statut"
+etape 3 POST /functions/v1/ardoise-invite "$statut" "create — émission du code de partage ardoise (expiration +2 jours)"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "create (code de partage) a échoué (HTTP $statut)"
   exit 1
@@ -588,8 +625,8 @@ verdict_vert "code de partage émis et scellé en fichier 0600 (jamais imprimé)
 attend_budget
 corps_guest="$(corps_secret "{\"action\":\"redeem-guest\",\"code\":\"$CODE_ARDOISE\",\"displayName\":\"Invité ponté e2e\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$config_pub" "$corps_guest" "$SMOKE_LIB_TMP/guest.json")"
-etape 4 POST /functions/v1/ardoise-invite 'redeem-guest' "$statut" "adhésion invitée sans compte (clé publiable seule)"
-garde_app "$statut"
+etape 4 POST /functions/v1/ardoise-invite "$statut" "redeem-guest — adhésion invitée sans compte (clé publiable seule)"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "redeem-guest a échoué (HTTP $statut)"
   exit 1
@@ -607,12 +644,12 @@ verdict_vert "invité adhéré, guest_ticket scellé en fichier 0600"
 # payload `p_parts` du RPC create_expense (expensePartsPayload, api.ts:594).
 statut="$(get_json "$API/rest/v1/ardoise_guests?ardoise_id=eq.$ARDOISE_ID&select=id" "$SMOKE_LIB_TMP/guests.json" "$cfg_payeur")"
 etape 5 GET /rest/v1/ardoise_guests "$statut" "lecture du guest_id par le payeur (canal app)"
-garde_app "$statut"
+garde_app "$statut" "$API/rest/v1/ardoise_guests"
 if [ "$statut" != "200" ]; then
   rouge "lecture ardoise_guests a échoué (HTTP $statut)"
   exit 1
 fi
-GUEST_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/guests.json")" | grep -o '"id": *"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+GUEST_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests.json")" ardoise-guest)"
 if [ -z "$GUEST_ID" ]; then
   rouge "guest_id non capturé avant la dépense"
   exit 1
@@ -626,12 +663,12 @@ part_montant='2400'
 corps_depense="$(corps_secret "{\"p_household_id\":\"$FOYER_A\",\"p_ardoise_id\":\"$ARDOISE_ID\",\"p_title\":\"Courses pontées e2e\",\"p_amount\":$part_montant,\"p_paid_by\":\"$MEMBRE_A_ID\",\"p_paid_by_guest\":null,\"p_expense_date\":\"$(date -u '+%Y-%m-%d')\",\"p_split_type\":\"egal\",\"p_parts\":[{\"participant_type\":\"guest\",\"member_id\":null,\"guest_id\":\"$GUEST_ID\",\"share_amount\":$part_montant}]}")"
 statut="$(post_json "$API/rest/v1/rpc/create_expense" "$cfg_payeur" "$corps_depense" "$SMOKE_LIB_TMP/depense.json")"
 etape 6 POST /rest/v1/rpc/create_expense "$statut" "dépense 24,00 € participant guest AVANT household-token (D-05)"
-garde_app "$statut"
+garde_app "$statut" "$API/rest/v1/rpc/create_expense"
 if [ "$statut" != "200" ]; then
   rouge "create_expense a échoué (HTTP $statut)"
   exit 1
 fi
-EXPENSE_ID="$(json_val "$(cat "$SMOKE_LIB_TMP/depense.json")" id)"
+EXPENSE_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/depense.json")" expense)"
 if [ -z "$EXPENSE_ID" ]; then
   rouge "create_expense : expense_id non capturé"
   exit 1
@@ -653,8 +690,8 @@ verdict_vert "identifiants du pont capturés avant redeem : foyer=$BRIDGE_FOYER 
 attend_budget
 corps_ht="$(corps_secret "{\"action\":\"household-token\",\"code\":\"$CODE_ARDOISE\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ht" "$SMOKE_LIB_TMP/token.json")"
-etape 7 POST /functions/v1/ardoise-invite 'household-token' "$statut" "échange code → token foyer (JWT invité)"
-garde_app "$statut"
+etape 7 POST /functions/v1/ardoise-invite "$statut" "household-token — échange code → token foyer (JWT invité)"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "household-token a échoué (HTTP $statut)"
   exit 1
@@ -672,8 +709,8 @@ verdict_vert "token foyer reçu et scellé en fichier 0600"
 attend_budget
 corps_redeem="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$BRIDGE_TOKEN\"}")"
 statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_redeem" "$SMOKE_LIB_TMP/redeem.json")"
-etape 8 POST /functions/v1/household-invite 'redeem' "$statut" "redemption du token foyer : adhésion + réconciliation guest"
-garde_app "$statut"
+etape 8 POST /functions/v1/household-invite "$statut" "redeem — redemption du token foyer : adhésion + réconciliation guest"
+garde_app "$statut" "$API/functions/v1/household-invite"
 if [ "$statut" != "200" ]; then
   rouge "household-invite redeem a échoué (HTTP $statut)"
   exit 1
@@ -712,8 +749,8 @@ neg_verdict() {
 # verdict — d'où l'espacement budget ci-dessous.
 attend_budget
 statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_redeem" "$SMOKE_LIB_TMP/replay.json")"
-etape 9 POST /functions/v1/household-invite 'redeem' "$statut" "négatif replay : même token re-présenté (410 « épuisé » attendu)"
-garde_app "$statut"
+etape 9 POST /functions/v1/household-invite "$statut" "redeem — négatif replay : même token re-présenté (410 « épuisé » attendu)"
+garde_app "$statut" "$API/functions/v1/household-invite"
 replay_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/replay.json")" error)"
 if [ "$statut" = "410" ] && printf '%s' "$replay_msg" | grep -q "utilisations maximal"; then
   neg_verdict "replay" OK "HTTP 410 + « $replay_msg »"
@@ -734,8 +771,8 @@ fi
 attend_budget
 corps_mute="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$token_mute\"}")"
 statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_mute" "$SMOKE_LIB_TMP/mute.json")"
-etape 10 POST /functions/v1/household-invite 'redeem' "$statut" "négatif token muté : 1 caractère changé (404 « introuvable » attendu)"
-garde_app "$statut"
+etape 10 POST /functions/v1/household-invite "$statut" "redeem — négatif token muté : 1 caractère changé (404 « introuvable » attendu)"
+garde_app "$statut" "$API/functions/v1/household-invite"
 mute_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/mute.json")" error)"
 if [ "$statut" = "404" ] && printf '%s' "$mute_msg" | grep -q "introuvable"; then
   neg_verdict "token-mute" OK "HTTP 404 + « $mute_msg »"
@@ -755,8 +792,8 @@ fi
 attend_budget
 corps_ht2="$(corps_secret "{\"action\":\"household-token\",\"code\":\"$CODE_ARDOISE\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ht2" "$SMOKE_LIB_TMP/token2.json")"
-etape 11 POST /functions/v1/ardoise-invite 'household-token' "$statut" "ré-émission d'un token frais pour le négatif d'expiration"
-garde_app "$statut"
+etape 11 POST /functions/v1/ardoise-invite "$statut" "household-token — ré-émission d'un token frais pour le négatif d'expiration"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "ré-émission household-token a échoué (HTTP $statut)"
   exit 1
@@ -772,8 +809,8 @@ sleep 1020
 attend_budget
 corps_exp="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$TOKEN_EXPIRE\"}")"
 statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_exp" "$SMOKE_LIB_TMP/exp.json")"
-etape 12 POST /functions/v1/household-invite 'redeem' "$statut" "négatif token expiré : attente réelle 1020 s puis re-redeem (410 « expiré » attendu)"
-garde_app "$statut"
+etape 12 POST /functions/v1/household-invite "$statut" "redeem — négatif token expiré : attente réelle 1020 s puis re-redeem (410 « expiré » attendu)"
+garde_app "$statut" "$API/functions/v1/household-invite"
 exp_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/exp.json")" error)"
 if [ "$statut" = "410" ] && printf '%s' "$exp_msg" | grep -q "expiré"; then
   neg_verdict "token-expires" OK "HTTP 410 + « $exp_msg » (après attente réelle 1020 s)"
@@ -794,13 +831,13 @@ fi
 corps_foyer_b="$(corps_secret '{"p_name":"Second foyer e2e 43","p_avatar_color":"coral"}')"
 statut="$(post_json "$API/rest/v1/rpc/create_household" "$cfg_invite" "$corps_foyer_b" "$SMOKE_LIB_TMP/foyer-b.json")"
 etape 13 POST /rest/v1/rpc/create_household "$statut" "fixture cross-household : second foyer, invité payeur/admin"
-garde_app "$statut"
+garde_app "$statut" "$API/rest/v1/rpc/create_household"
 if [ "$statut" != "200" ]; then
   rouge "create_household (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
 fi
-FOYER_B="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" | grep -o '"id": *"[^"]*"' | sed -n '1p' | sed 's/.*"\([^"]*\)"$/\1/')"
-MEMBRE_B_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" | grep -o '"id": *"[^"]*"' | sed -n '2p' | sed 's/.*"\([^"]*\)"$/\1/')"
+FOYER_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" household)"
+MEMBRE_B_ID="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" member)"
 printf '%s\n' "$FOYER_B" >>"$FOYERS_LISTE"
 if [ -z "$FOYER_B" ] || [ -z "$MEMBRE_B_ID" ]; then
   rouge "2ᵉ foyer : identifiants non capturés"
@@ -808,17 +845,17 @@ if [ -z "$FOYER_B" ] || [ -z "$MEMBRE_B_ID" ]; then
 fi
 corps_ardoise_b="$(corps_secret '{"action":"create-ardoise","name":"Ardoise second foyer e2e"}')"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ardoise_b" "$SMOKE_LIB_TMP/ardoise-b.json")"
-etape 14 POST /functions/v1/ardoise-invite 'create-ardoise' "$statut" "ardoise du second foyer"
-garde_app "$statut"
+etape 14 POST /functions/v1/ardoise-invite "$statut" "create-ardoise — ardoise du second foyer"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "create-ardoise (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
 fi
-ARDOISE_B="$(json_val "$(cat "$SMOKE_LIB_TMP/ardoise-b.json")" id)"
+ARDOISE_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/ardoise-b.json")" ardoise)"
 corps_code_b="$(corps_secret "{\"action\":\"create\",\"ardoiseId\":\"$ARDOISE_B\",\"expiresAt\":\"$expires_futur\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_code_b" "$SMOKE_LIB_TMP/code-b.json")"
-etape 15 POST /functions/v1/ardoise-invite 'create' "$statut" "code de partage du second foyer"
-garde_app "$statut"
+etape 15 POST /functions/v1/ardoise-invite "$statut" "create — code de partage du second foyer"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "create (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
@@ -827,16 +864,16 @@ CODE_B="$(json_val "$(cat "$SMOKE_LIB_TMP/code-b.json")" code)"
 attend_budget
 corps_guest_b="$(corps_secret "{\"action\":\"redeem-guest\",\"code\":\"$CODE_B\",\"displayName\":\"Invité second foyer e2e\"}")"
 statut="$(post_json "$API/functions/v1/ardoise-invite" "$config_pub" "$corps_guest_b" "$SMOKE_LIB_TMP/guest-b.json")"
-etape 16 POST /functions/v1/ardoise-invite 'redeem-guest' "$statut" "invité sans compte du second foyer"
-garde_app "$statut"
+etape 16 POST /functions/v1/ardoise-invite "$statut" "redeem-guest — invité sans compte du second foyer"
+garde_app "$statut" "$API/functions/v1/ardoise-invite"
 if [ "$statut" != "200" ]; then
   rouge "redeem-guest (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
 fi
 statut="$(get_json "$API/rest/v1/ardoise_guests?ardoise_id=eq.$ARDOISE_B&select=id" "$SMOKE_LIB_TMP/guests-b.json" "$cfg_invite")"
 etape 17 GET /rest/v1/ardoise_guests "$statut" "lecture du guest_id du second foyer"
-garde_app "$statut"
-GUEST_B="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/guests-b.json")" | grep -o '"id": *"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+garde_app "$statut" "$API/rest/v1/ardoise_guests"
+GUEST_B="$(json_id_prefixe "$(cat "$SMOKE_LIB_TMP/guests-b.json")" ardoise-guest)"
 if [ -z "$GUEST_B" ]; then
   rouge "guest_id du second foyer non capturé"
   exit 1
@@ -844,7 +881,7 @@ fi
 corps_depense_b="$(corps_secret "{\"p_household_id\":\"$FOYER_B\",\"p_ardoise_id\":\"$ARDOISE_B\",\"p_title\":\"Dépense second foyer\",\"p_amount\":1500,\"p_paid_by\":\"$MEMBRE_B_ID\",\"p_paid_by_guest\":null,\"p_expense_date\":\"$(date -u '+%Y-%m-%d')\",\"p_split_type\":\"egal\",\"p_parts\":[{\"participant_type\":\"guest\",\"member_id\":null,\"guest_id\":\"$GUEST_B\",\"share_amount\":1500}]}")"
 statut="$(post_json "$API/rest/v1/rpc/create_expense" "$cfg_invite" "$corps_depense_b" "$SMOKE_LIB_TMP/depense-b.json")"
 etape 18 POST /rest/v1/rpc/create_expense "$statut" "dépense participant guest du second foyer (borne cross-household)"
-garde_app "$statut"
+garde_app "$statut" "$API/rest/v1/rpc/create_expense"
 if [ "$statut" != "200" ]; then
   rouge "create_expense (2ᵉ foyer) a échoué (HTTP $statut)"
   exit 1
@@ -862,18 +899,18 @@ verdict_vert "fixture cross-household en place : foyer B=$FOYER_B avec une part 
 # ============================================================================
 sql_apres="$SMOKE_LIB_TMP/apres-coup.sql"
 {
-  printf -- "-- Lectures après coup, bornées par foyer (variables :'foyer' :'guest' :'invite' :'foyer_b')\n"
-  printf -- "-- (i) parts guest pontées restantes dans le foyer du run : attendu 0\n"
+  printf "%s\n" "-- Lectures après coup, bornées par foyer (variables :'foyer' :'guest' :'invite' :'foyer_b')\n"
+  printf "%s\n" "-- (i) parts guest pontées restantes dans le foyer du run : attendu 0\n"
   printf "select 'parts_guest_pontees_restantes', count(*) from public.expense_participants ep where ep.participant_type = 'guest' and ep.guest_id = :'guest' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer');\n"
-  printf -- "-- (ii) duplication : aucune dépense du foyer avec plus d'une part membre pour le nouveau membre : attendu 0\n"
+  printf "%s\n" "-- (ii) duplication : aucune dépense du foyer avec plus d'une part membre pour le nouveau membre : attendu 0\n"
   printf "select 'depenses_dupliquees_membre', count(*) from (select e.id from public.expenses e join public.expense_participants ep on ep.expense_id = e.id where e.household_id = :'foyer' and ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') group by e.id having count(*) > 1) d;\n"
-  printf -- "-- (iii) part membre convertie du nouveau membre : attendu exactement 1\n"
+  printf "%s\n" "-- (iii) part membre convertie du nouveau membre : attendu exactement 1\n"
   printf "select 'parts_membre_converties', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer');\n"
-  printf -- "-- (iii bis) token consommé : use_count = 1, max_uses = 1, is_active = false\n"
+  printf "%s\n" "-- (iii bis) token consommé : use_count = 1, max_uses = 1, is_active = false\n"
   printf "select 'token_use_count', use_count from public.household_invite_tokens where household_id = :'foyer';\n"
   printf "select 'token_max_uses', max_uses from public.household_invite_tokens where household_id = :'foyer';\n"
   printf "select 'token_actifs', count(*) from public.household_invite_tokens where household_id = :'foyer' and is_active;\n"
-  printf -- "-- (iv) borne cross-household : la part guest du 2ᵉ foyer reste guest (attendu 1), rien n'y est converti (attendu 0)\n"
+  printf "%s\n" "-- (iv) borne cross-household : la part guest du 2ᵉ foyer reste guest (attendu 1), rien n'y est converti (attendu 0)\n"
   printf "select 'parts_guest_restantes_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'guest' and ep.guest_id = :'guest_b' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
   printf "select 'parts_membre_converties_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
 } >"$sql_apres"
@@ -881,7 +918,7 @@ sql_apres="$SMOKE_LIB_TMP/apres-coup.sql"
 sql_out="$(sh "$SCRIPT_DIR/psql.sh" -A -t \
   -v foyer="$FOYER_A" -v guest="$BRIDGE_GUEST" -v invite="$INVITE_UID" \
   -v foyer_b="$FOYER_B" -v guest_b="$GUEST_B" \
-  <"$sql_apres" 2>&1 </dev/null || true)"
+  <"$sql_apres" 2>&1 || true)"
 printf '%s\n' "$sql_out" | tee -a "$SQL_LOG" >&2
 
 sql_val() {

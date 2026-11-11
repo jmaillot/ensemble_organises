@@ -223,8 +223,25 @@ smoke_accounts_purge() {
   status=0
   while IFS='	' read -r uid email; do
     [ -n "$uid" ] || continue
-    code="$(curl -sS -o /dev/null -w '%{http_code}' \
-      -X DELETE "$api/auth/v1/admin/users/$uid" -K "$config")"
+    code=""
+    # Retry borné sur 5xx : GoTrue renvoie parfois un 500 éphémère sur la
+    # suppression d'un compte ayant une session active (run réel du
+    # 2026-11-11 : code 500 sur le 2ᵉ compte, disparu au retry). Trois
+    # tentatives espacées de 3 s, jamais de backoff générique.
+    tentatives=0
+    while [ "$tentatives" -lt 3 ]; do
+      code="$(curl -sS -o /dev/null -w '%{http_code}' \
+        -X DELETE "$api/auth/v1/admin/users/$uid" -K "$config")"
+      case "$code" in
+        500|502|503|504)
+          tentatives=$((tentatives + 1))
+          [ "$tentatives" -lt 3 ] && sleep 3
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
     case "$code" in
       200|204)
         code2="$(curl -sS -o /dev/null -w '%{http_code}' \
