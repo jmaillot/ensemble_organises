@@ -152,6 +152,8 @@ KO_RAISON=''
 CORPS_N=0
 ETAPES_N=0
 FOYERS_LISTE="$SMOKE_LIB_TMP/foyers-du-run"
+NEG_LOG="$SMOKE_LIB_TMP/negatifs.log"
+SQL_LOG="$SMOKE_LIB_TMP/sql-apres-coup.log"
 
 # Fichier des en-têtes de session pour curl -K (0600) — le JWT ne passe jamais
 # en argv ni en variable d'environnement (§2.7 H : `ps` ne doit rien montrer).
@@ -227,6 +229,9 @@ signal_d10() {
 
 verdict_vert() {
   printf '   ✓ %s\n' "$1"
+  # Chaque verdict vert est consigné pour les sections 2 et 3 du document
+  # (aucun succès muet : le doc cite la ligne, il ne la résume pas).
+  printf 'VERDICT VERT | %s\n' "$1" >>"$RUN_LOG"
 }
 
 rouge() {
@@ -307,11 +312,27 @@ rediger_doc() {
     printf '\n'
     printf '## 2. Négatifs red-team (PROOF-02)\n'
     printf '\n'
-    printf '_Section rédigée par le script à la fin du run._\n'
+    if [ -s "$NEG_LOG" ]; then
+      printf 'Ordre fixe D-01/D-02 : replay → token muté → token expiré → cross-household.\n'
+      printf '\n'
+      printf '```\n'
+      cat "$NEG_LOG"
+      printf '```\n'
+    else
+      printf '_Négatifs non exécutés — run avorté avant la séquence red-team._\n'
+    fi
     printf '\n'
     printf '## 3. Lecture SQL après coup (PROOF-03)\n'
     printf '\n'
-    printf '_Section rédigée par le script à la fin du run._\n'
+    if [ -s "$SQL_LOG" ]; then
+      printf 'Lectures psql.sh (stdin, rôle postgres) bornées par foyer du run.\n'
+      printf '\n'
+      printf '```\n'
+      cat "$SQL_LOG"
+      printf '```\n'
+    else
+      printf '_Lectures SQL après coup non exécutées — run avorté avant._\n'
+    fi
     printf '\n'
     printf '## 4. Ce qui n'"'"'est PAS prouvé (D-09)\n'
     printf '\n'
@@ -664,7 +685,236 @@ if [ "$FOYER_REDEEM" != "$BRIDGE_FOYER" ]; then
 fi
 verdict_vert "redeem vert : invité membre du foyer $FOYER_REDEEM, réconciliation déclenchée"
 
-# Les négatifs (replay, token muté, token expiré, cross-household), la
-# réconciliation bornée après coup et la purge vérifiée sont ajoutés par la
-# tâche 3 du plan — le run s'arrête ici sans verdict global.
-exit 1
+# ============================================================================
+# NÉGATIFS RED-TEAM (tâche 3) — ORDRE FIXE D-01/D-02, justifié :
+#   (a) replay      d'abord : il prouve l'usage unique SUR LE TOKEN du happy
+#                   path, avant toute ré-émission qui créerait d'autres tokens
+#                   dans le foyer et brouillerait l'assert use_count = 1 ;
+#   (b) token muté  ensuite : 1 caractère changé → hash différent → 404
+#                   « introuvable », indépendant de l'état du premier token ;
+#   (c) token expiré en dernier des redeem : il exige une RÉ-ÉMISSION (nouveau
+#                   household-token) puis l'attente RÉELLE des 15 minutes en
+#                   dur de 0180b — le plus coûteux, il n'influence pas (a)/(b) ;
+#   (d) cross-household enfin : fixture séparée, uniquement lu après coup.
+# Chaque négatif est indépendant du happy path : aucun ne le rejoue, chacun
+# part d'un état reconstruit (token capturé, token ré-émis, second foyer).
+# ============================================================================
+
+neg_verdict() {
+  # $1 = nom du négatif, $2 = ok|ko, $3 = détail citable.
+  printf 'NÉGATIF %s | %s | %s\n' "$1" "$2" "$3" | tee -a "$NEG_LOG" >&2
+}
+
+# --- (a) Replay du token consommé → 410 « épuisé » ----------------------------
+# PROOF-03 (assert positif single-use) : le redeem du happy path a incrémenté
+# use_count à 1 (max_uses = 1) — 0181 refuse AVANT tout le reste
+# (`use_count >= max_uses`, l.96-98). Un 429 serait un rate-limit, jamais ce
+# verdict — d'où l'espacement budget ci-dessous.
+attend_budget
+statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_redeem" "$SMOKE_LIB_TMP/replay.json")"
+etape 9 POST /functions/v1/household-invite 'redeem' "$statut" "négatif replay : même token re-présenté (410 « épuisé » attendu)"
+garde_app "$statut"
+replay_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/replay.json")" error)"
+if [ "$statut" = "410" ] && printf '%s' "$replay_msg" | grep -q "utilisations maximal"; then
+  neg_verdict "replay" OK "HTTP 410 + « $replay_msg »"
+  verdict_vert "replay refusé : HTTP 410, message « utilisations maximal » (usage unique prouvé)"
+else
+  neg_verdict "replay" KO "HTTP $statut, message « $replay_msg » — 410 « utilisations maximal » attendu"
+  rouge "négatif replay : HTTP $statut au lieu de 410 « épuisé »"
+  exit 1
+fi
+
+# --- (b) Token muté (1 caractère) → 404 « introuvable » -----------------------
+# Le hash HMAC du token muté ne correspond à aucune ligne : mapping Edge
+# (`token inconnu` → 404 « Ce token est introuvable. », l.321-325).
+token_mute="$(printf '%s' "$BRIDGE_TOKEN" | sed 's/^./X/')"
+if [ "$token_mute" = "$BRIDGE_TOKEN" ]; then
+  token_mute="$(printf '%s' "$BRIDGE_TOKEN" | sed 's/.$/Y/')"
+fi
+attend_budget
+corps_mute="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$token_mute\"}")"
+statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_mute" "$SMOKE_LIB_TMP/mute.json")"
+etape 10 POST /functions/v1/household-invite 'redeem' "$statut" "négatif token muté : 1 caractère changé (404 « introuvable » attendu)"
+garde_app "$statut"
+mute_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/mute.json")" error)"
+if [ "$statut" = "404" ] && printf '%s' "$mute_msg" | grep -q "introuvable"; then
+  neg_verdict "token-mute" OK "HTTP 404 + « $mute_msg »"
+  verdict_vert "token muté refusé : HTTP 404 « Ce token est introuvable. »"
+else
+  neg_verdict "token-mute" KO "HTTP $statut, message « $mute_msg » — 404 « introuvable » attendu"
+  rouge "négatif token muté : HTTP $statut au lieu de 404 « introuvable »"
+  exit 1
+fi
+
+# --- (c) Token expiré → 410 « expiré » après attente RÉELLE -------------------
+# Ré-émission d'un NOUVEAU token bridge (household-token, 2ᵉ appel de
+# l'action — budget 8/min espacé), puis attente des 15 MINUTES RÉELLES
+# (expiration en dur `interval '15 minutes'`, 0180b) + 120 s de marge
+# d'horloge. AUCUNE falsification SQL d'expires_at (D-01) : la durée ~20 min
+# du run est un choix assumé (D-03).
+attend_budget
+corps_ht2="$(corps_secret "{\"action\":\"household-token\",\"code\":\"$CODE_ARDOISE\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ht2" "$SMOKE_LIB_TMP/token2.json")"
+etape 11 POST /functions/v1/ardoise-invite 'household-token' "$statut" "ré-émission d'un token frais pour le négatif d'expiration"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "ré-émission household-token a échoué (HTTP $statut)"
+  exit 1
+fi
+TOKEN_EXPIRE="$(json_val "$(cat "$SMOKE_LIB_TMP/token2.json")" token)"
+if [ -z "$TOKEN_EXPIRE" ]; then
+  rouge "ré-émission : token non capturé"
+  exit 1
+fi
+verdict_vert "token frais ré-émis pour le négatif d'expiration"
+echo "Attente RÉELLE de l'expiration : 15 min (0180b) + 120 s de marge = 1020 s. Aucune falsification SQL (D-01)."
+sleep 1020
+attend_budget
+corps_exp="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$TOKEN_EXPIRE\"}")"
+statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_exp" "$SMOKE_LIB_TMP/exp.json")"
+etape 12 POST /functions/v1/household-invite 'redeem' "$statut" "négatif token expiré : attente réelle 1020 s puis re-redeem (410 « expiré » attendu)"
+garde_app "$statut"
+exp_msg="$(json_val "$(cat "$SMOKE_LIB_TMP/exp.json")" error)"
+if [ "$statut" = "410" ] && printf '%s' "$exp_msg" | grep -q "expiré"; then
+  neg_verdict "token-expires" OK "HTTP 410 + « $exp_msg » (après attente réelle 1020 s)"
+  verdict_vert "token expiré refusé : HTTP 410 « Ce token est expiré. » après l'attente réelle"
+else
+  neg_verdict "token-expires" KO "HTTP $statut, message « $exp_msg » — 410 « expiré » attendu"
+  rouge "négatif token expiré : HTTP $statut au lieu de 410 « expiré »"
+  exit 1
+fi
+
+# --- (d) Cross-household (OQ-1, tranché : borne de la réconciliation) --------
+# La borne du pont ET de la conversion est le couple (user_id, household_id)
+# (0181 l.137-139) : les parts guest d'un AUTRE foyer de l'invité ne sont
+# JAMAIS converties. Fixture : un 2ᵉ foyer dont l'invité est admin/payeur,
+# avec sa propre ardoise, son invité sans compte et une dépense participant
+# guest — après le run, cette part DOIT rester `guest`. Le choix OQ-1 (borne
+# de réconciliation plutôt qu'adhésion multi-foyer forcée) est appliqué ici.
+corps_foyer_b="$(corps_secret '{"p_name":"Second foyer e2e 43","p_avatar_color":"coral"}')"
+statut="$(post_json "$API/rest/v1/rpc/create_household" "$cfg_invite" "$corps_foyer_b" "$SMOKE_LIB_TMP/foyer-b.json")"
+etape 13 POST /rest/v1/rpc/create_household "$statut" "fixture cross-household : second foyer, invité payeur/admin"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create_household (2ᵉ foyer) a échoué (HTTP $statut)"
+  exit 1
+fi
+FOYER_B="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" | grep -o '"id": *"[^"]*"' | sed -n '1p' | sed 's/.*"\([^"]*\)"$/\1/')"
+MEMBRE_B_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer-b.json")" | grep -o '"id": *"[^"]*"' | sed -n '2p' | sed 's/.*"\([^"]*\)"$/\1/')"
+printf '%s\n' "$FOYER_B" >>"$FOYERS_LISTE"
+if [ -z "$FOYER_B" ] || [ -z "$MEMBRE_B_ID" ]; then
+  rouge "2ᵉ foyer : identifiants non capturés"
+  exit 1
+fi
+corps_ardoise_b="$(corps_secret '{"action":"create-ardoise","name":"Ardoise second foyer e2e"}')"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ardoise_b" "$SMOKE_LIB_TMP/ardoise-b.json")"
+etape 14 POST /functions/v1/ardoise-invite 'create-ardoise' "$statut" "ardoise du second foyer"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create-ardoise (2ᵉ foyer) a échoué (HTTP $statut)"
+  exit 1
+fi
+ARDOISE_B="$(json_val "$(cat "$SMOKE_LIB_TMP/ardoise-b.json")" id)"
+corps_code_b="$(corps_secret "{\"action\":\"create\",\"ardoiseId\":\"$ARDOISE_B\",\"expiresAt\":\"$expires_futur\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_code_b" "$SMOKE_LIB_TMP/code-b.json")"
+etape 15 POST /functions/v1/ardoise-invite 'create' "$statut" "code de partage du second foyer"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create (2ᵉ foyer) a échoué (HTTP $statut)"
+  exit 1
+fi
+CODE_B="$(json_val "$(cat "$SMOKE_LIB_TMP/code-b.json")" code)"
+attend_budget
+corps_guest_b="$(corps_secret "{\"action\":\"redeem-guest\",\"code\":\"$CODE_B\",\"displayName\":\"Invité second foyer e2e\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$config_pub" "$corps_guest_b" "$SMOKE_LIB_TMP/guest-b.json")"
+etape 16 POST /functions/v1/ardoise-invite 'redeem-guest' "$statut" "invité sans compte du second foyer"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "redeem-guest (2ᵉ foyer) a échoué (HTTP $statut)"
+  exit 1
+fi
+statut="$(get_json "$API/rest/v1/ardoise_guests?ardoise_id=eq.$ARDOISE_B&select=id" "$SMOKE_LIB_TMP/guests-b.json" "$cfg_invite")"
+etape 17 GET /rest/v1/ardoise_guests "$statut" "lecture du guest_id du second foyer"
+garde_app "$statut"
+GUEST_B="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/guests-b.json")" | grep -o '"id": *"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+if [ -z "$GUEST_B" ]; then
+  rouge "guest_id du second foyer non capturé"
+  exit 1
+fi
+corps_depense_b="$(corps_secret "{\"p_household_id\":\"$FOYER_B\",\"p_ardoise_id\":\"$ARDOISE_B\",\"p_title\":\"Dépense second foyer\",\"p_amount\":1500,\"p_paid_by\":\"$MEMBRE_B_ID\",\"p_paid_by_guest\":null,\"p_expense_date\":\"$(date -u '+%Y-%m-%d')\",\"p_split_type\":\"egal\",\"p_parts\":[{\"participant_type\":\"guest\",\"member_id\":null,\"guest_id\":\"$GUEST_B\",\"share_amount\":1500}]}")"
+statut="$(post_json "$API/rest/v1/rpc/create_expense" "$cfg_invite" "$corps_depense_b" "$SMOKE_LIB_TMP/depense-b.json")"
+etape 18 POST /rest/v1/rpc/create_expense "$statut" "dépense participant guest du second foyer (borne cross-household)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create_expense (2ᵉ foyer) a échoué (HTTP $statut)"
+  exit 1
+fi
+verdict_vert "fixture cross-household en place : foyer B=$FOYER_B avec une part guest vivante"
+
+# ============================================================================
+# LECTURE SQL APRÈS COUP (PROOF-03) — psql.sh stdin UNIQUEMENT (§2.7 C), rôle
+# postgres : la RLS est court-circuitée, donc CHAQUE requête est bornée à la
+# main par foyer du run via variables psql (§2.7 D.2). La borne guest_id est
+# issue de la CAPTURE PRÉ-REDEEM de la tâche 2 — sans elle, l'assert (i)
+# serait tautologique (le pont est purgé par 0181:327-329). Aucune tautologie
+# (pas de >= 0, pas de is not null sur colonne not null, §2.7 D.3) : chaque
+# attendu est un chiffre exact.
+# ============================================================================
+sql_apres="$SMOKE_LIB_TMP/apres-coup.sql"
+{
+  printf -- "-- Lectures après coup, bornées par foyer (variables :'foyer' :'guest' :'invite' :'foyer_b')\n"
+  printf -- "-- (i) parts guest pontées restantes dans le foyer du run : attendu 0\n"
+  printf "select 'parts_guest_pontees_restantes', count(*) from public.expense_participants ep where ep.participant_type = 'guest' and ep.guest_id = :'guest' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer');\n"
+  printf -- "-- (ii) duplication : aucune dépense du foyer avec plus d'une part membre pour le nouveau membre : attendu 0\n"
+  printf "select 'depenses_dupliquees_membre', count(*) from (select e.id from public.expenses e join public.expense_participants ep on ep.expense_id = e.id where e.household_id = :'foyer' and ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') group by e.id having count(*) > 1) d;\n"
+  printf -- "-- (iii) part membre convertie du nouveau membre : attendu exactement 1\n"
+  printf "select 'parts_membre_converties', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer');\n"
+  printf -- "-- (iii bis) token consommé : use_count = 1, max_uses = 1, is_active = false\n"
+  printf "select 'token_use_count', use_count from public.household_invite_tokens where household_id = :'foyer';\n"
+  printf "select 'token_max_uses', max_uses from public.household_invite_tokens where household_id = :'foyer';\n"
+  printf "select 'token_actifs', count(*) from public.household_invite_tokens where household_id = :'foyer' and is_active;\n"
+  printf -- "-- (iv) borne cross-household : la part guest du 2ᵉ foyer reste guest (attendu 1), rien n'y est converti (attendu 0)\n"
+  printf "select 'parts_guest_restantes_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'guest' and ep.guest_id = :'guest_b' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
+  printf "select 'parts_membre_converties_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
+} >"$sql_apres"
+
+sql_out="$(sh "$SCRIPT_DIR/psql.sh" -A -t \
+  -v foyer="$FOYER_A" -v guest="$BRIDGE_GUEST" -v invite="$INVITE_UID" \
+  -v foyer_b="$FOYER_B" -v guest_b="$GUEST_B" \
+  <"$sql_apres" 2>&1 </dev/null || true)"
+printf '%s\n' "$sql_out" | tee -a "$SQL_LOG" >&2
+
+sql_val() {
+  printf '%s\n' "$sql_out" | grep "^$1|" | head -n 1 | cut -d'|' -f2 | tr -d ' '
+}
+
+assert_sql() {
+  # $1 nom, $2 attendu — chaque écart est un verdict rouge nommé (§2.7 F).
+  trouve="$(sql_val "$1")"
+  if [ "$trouve" = "$2" ]; then
+    neg_verdict "sql-$1" OK "$1 = $trouve (attendu $2)"
+    verdict_vert "SQL après coup : $1 = $trouve (attendu $2)"
+  else
+    neg_verdict "sql-$1" KO "$1 = « $trouve » au lieu de $2"
+    rouge "SQL après coup : $1 = « $trouve » au lieu de $2"
+    exit 1
+  fi
+}
+
+assert_sql parts_guest_pontees_restantes 0
+assert_sql depenses_dupliquees_membre 0
+assert_sql parts_membre_converties 1
+assert_sql token_use_count 1
+assert_sql token_max_uses 1
+assert_sql token_actifs 0
+assert_sql parts_guest_restantes_foyer_b 1
+assert_sql parts_membre_converties_foyer_b 0
+
+# Purge de la fixture cross-household enregistrée dans FOYERS_LISTE : le trap
+# EXIT existant supprime les DEUX foyers (cascade) et re-vérifie 0 ligne sur
+# expenses/ardoises/household_invite_tokens, puis smoke_accounts_purge
+# re-delete → 404 (PROOF-06, Pitfall 7).
+
+verdict_vert "Tous les verdicts sont verts : happy path, 4 négatifs, réconciliation bornée"
+printf '\nPREUVE ÉTABLIE — PROOF-01..04 couverts par ce run (PROOF-05..06 : doc + purge ci-dessous).\n'
+exit 0
