@@ -59,8 +59,12 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
+**Wave 1**
 - [ ] 44-01-PLAN.md — Préparatoire : squelettes §7.1–7.5 du document MESURES, procédure de campagne, évaluation du seuil D-15, observabilité conditionnelle (CACHE-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 44-02-PLAN.md — Checkpoint appareil → campagne §6, grille §7.4 à chaud, commits de famille atomiques, chaîne §2.7 finale, report PROJECT.md (CACHE-01/02/03)
+
 **Success Criteria** (what must be TRUE):
   1. La campagne on-device suit le protocole §6 : appareil de référence, purge froide comparable §2.1, N=5 runs avec médiane — ou un différé honnêtement consigné (jamais l'émulateur, jamais de valeur inventée) ; la lecture du panneau « Amorçage » précède toute décision (les critères b/c tranchent, jamais la lecture a seule — biais d'ordre)
   2. La grille de décision §7.4 est remplie famille par famille avec la justification (a)(b)(c) AVANT toute édition de code, et la décision (y compris un statu quo justifié) est consignée dans PROJECT.md

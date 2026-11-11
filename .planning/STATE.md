@@ -4,18 +4,18 @@ milestone: v1.4
 milestone_name: Preuve & décision
 current_phase: 44
 current_phase_name: Décision cache maxAge par famille (CACHE-01)
-status: planning
+status: executing
 stopped_at: Phase 44 context gathered
-last_updated: "2026-11-11T19:15:34.733Z"
+last_updated: "2026-11-11T20:18:03.985Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 43 complete, transitioned to Phase 44
-state_head: c78f9a2ca8f28389ea075e143bb430632f161ffc
+state_head: 52fd59ebc81e53e986373eb02a2cb975e5c16910
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 1
+  total_plans: 3
   completed_plans: 1
-  percent: 50
+  percent: 33
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-11-11)
 
 ## Current Position
 
-Phase: 44 — Décision cache maxAge par famille (CACHE-01)
+Phase: 44 (Décision cache maxAge par famille (CACHE-01)) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Last activity: 2026-11-11 — Phase 43 complete, transitioned to Phase 44
 
 ## Performance Metrics
