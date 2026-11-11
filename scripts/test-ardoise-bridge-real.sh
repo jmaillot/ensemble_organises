@@ -435,6 +435,236 @@ echo "Run $RUN_ID. Deux comptes jetables e2e+$RUN_ID-{1,2}. Durée attendue ~20 
 # --- Estampille du build déployé ------------------------------------------------
 estampille
 
-# Le squelette s'arrête ici : les étapes fixtures → happy path → négatifs →
-# réconciliation bornée sont ajoutées par les tâches 2 et 3 du plan 43-01.
+# ============================================================================
+# FIXTURES → HAPPY PATH (tâche 2) — chaque étape passe par `etape`, canal
+# exact de l'app réelle : Edge `ardoise-invite`, Edge `household-invite`,
+# PostgREST RPC (`create_household`, `create_expense`). AUCUN appel direct
+# aux RPC service_role `create_household_bridge_token` /
+# `redeem_household_invite_token` (D-06 : le script ne parle qu'aux Edges).
+# ============================================================================
+
+# Extraction d'une valeur JSON chaîne par sa clé (les champs captés ici ne
+# sont jamais des secrets — les secrets restent dans les fichiers 0600).
+json_val() {
+  printf '%s' "$1" | grep -o "\"$2\": *\"[^\"]*\"" | head -n 1 \
+    | sed "s/\"$2\": *\"//; s/\"$//"
+}
+
+# Fichier -K portant la seule clé publiable (pas un secret : §2.7 H ne
+# l'exclut pas d'argv, mais le canal -K uniformise tous les appels).
+config_pub="$SMOKE_LIB_TMP/config-pub"
+printf 'header = "apikey: %s"\n' "$PUBLISHABLE_KEY" >"$config_pub"
+chmod 600 "$config_pub"
+
+# Budget rate-limit Edge : 8/min/IP par action (`household-token`,
+# `redeem-guest`, `redeem`). Le script espace ses appels répétés d'une même
+# action de 10 s minimum — 6/min maximum, jamais un 429.
+attend_budget() {
+  sleep 10
+}
+
+# --- (1) Deux comptes e2e (D-04) ---------------------------------------------
+if ! smoke_accounts_create "$RUN_ID" 1 "Payeur e2e"; then
+  rouge "création du compte payeur impossible"
+  exit 1
+fi
+PAYEUR_UID="$SMOKE_CREATED_ID"
+if ! smoke_accounts_create "$RUN_ID" 2 "Invité e2e"; then
+  rouge "création du compte invité impossible"
+  exit 1
+fi
+INVITE_UID="$SMOKE_CREATED_ID"
+
+if ! smoke_accounts_session "e2e+$RUN_ID-1@$(smoke_accounts_domain)" "$PASSWORD"; then
+  rouge "session du payeur impossible"
+  exit 1
+fi
+PAYEUR_JWT="$SMOKE_SESSION_JWT"
+cfg_payeur="$(config_session "$PAYEUR_JWT")"
+if ! smoke_accounts_session "e2e+$RUN_ID-2@$(smoke_accounts_domain)" "$PASSWORD"; then
+  rouge "session de l'invité impossible"
+  exit 1
+fi
+INVITE_JWT="$SMOKE_SESSION_JWT"
+cfg_invite="$(config_session "$INVITE_JWT")"
+verdict_vert "2 comptes e2e créés et sessions obtenues (payeur, invité)"
+
+# --- (2) Foyer éphémère du payeur : canal app réelle -------------------------
+# RPC `create_household` (supabase-adapter.ts:235) : le foyer et la ligne
+# `household_members` admin du payeur naissent dans UNE transaction SQL.
+corps_foyer="$(corps_secret '{"p_name":"Foyer éphémère e2e 43","p_avatar_color":"accent"}')"
+statut="$(post_json "$API/rest/v1/rpc/create_household" "$cfg_payeur" "$corps_foyer" "$SMOKE_LIB_TMP/foyer.json")"
+etape 1 POST /rest/v1/rpc/create_household "$statut" "création du foyer éphémère du payeur"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create_household a échoué (HTTP $statut)"
+  exit 1
+fi
+# Le premier "id" du JSON est celui du foyer, le second celui du membre admin
+# (le payeur). Les deux identifiants portent les assertions bornées du run.
+FOYER_A="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer.json")" | grep -o '"id": *"[^"]*"' | sed -n '1p' | sed 's/.*"\([^"]*\)"$/\1/')"
+MEMBRE_A_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/foyer.json")" | grep -o '"id": *"[^"]*"' | sed -n '2p' | sed 's/.*"\([^"]*\)"$/\1/')"
+printf '%s\n' "$FOYER_A" >>"$FOYERS_LISTE"
+if [ -z "$FOYER_A" ] || [ -z "$MEMBRE_A_ID" ]; then
+  rouge "create_household : foyer ou membre admin non capturés"
+  exit 1
+fi
+verdict_vert "foyer éphémère créé : household_id=$FOYER_A, payeur admin (membre $MEMBRE_A_ID)"
+echo "$FOYER_A" >"$SMOKE_LIB_TMP/foyer-a"
+
+# NOTE DE CONFORMITÉ AU PLAN (déviation Rule 1, consignée au SUMMARY) :
+# le plan demandait de « promouvoir le compte invité en membre admin du foyer
+# éphémère » AVANT le happy path. C'est contradictoire avec les assertions de
+# la même tâche 3 : le chemin already-member de redeem_household_invite_token
+# (0181) ne vérifie PAS use_count (« sortie idempotente … sans incrementation
+# de use_count ») — le replay reviendrait 200 et jamais 410 « épuisé », et
+# l'assert `use_count = 1 / is_active = false` serait fausse. L'invité rejoint
+# donc le foyer PAR LE PONT (c'est le comportement réel prouvé) : adhésion et
+# réconciliation dans la même transaction, au redeem du happy path.
+
+# --- (3) Ardoise + code de partage (canal Edge, JWT payeur) ------------------
+# `create-ardoise` (10/min) puis `create` (20/min) : le code brut n'existe
+# qu'une fois dans la réponse, il va direct en fichier 0600.
+corps_ardoise="$(corps_secret '{"action":"create-ardoise","name":"Ardoise éphémère e2e"}')"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_payeur" "$corps_ardoise" "$SMOKE_LIB_TMP/ardoise.json")"
+etape 2 POST /functions/v1/ardoise-invite 'create-ardoise' "$statut" "création de l'ardoise du foyer"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create-ardoise a échoué (HTTP $statut)"
+  exit 1
+fi
+ARDOISE_ID="$(json_val "$(cat "$SMOKE_LIB_TMP/ardoise.json")" id)"
+if [ -z "$ARDOISE_ID" ]; then
+  rouge "create-ardoise : ardoise_id non capturé"
+  exit 1
+fi
+verdict_vert "ardoise créée : ardoise_id=$ARDOISE_ID"
+
+attend_budget
+# expiresAt futur lointain : le code de partage ne doit PAS expirer pendant le
+# run — seul le TOKEN bridge (15 minutes en dur, 0180b) porte le négatif
+# d'expiration.
+expires_futur="$(date -u -d '+2 days' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
+  || date -u -v+2d '+%Y-%m-%dT%H:%M:%SZ')"
+corps_code="$(corps_secret "{\"action\":\"create\",\"ardoiseId\":\"$ARDOISE_ID\",\"expiresAt\":\"$expires_futur\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_payeur" "$corps_code" "$SMOKE_LIB_TMP/code.json")"
+etape 3 POST /functions/v1/ardoise-invite 'create' "$statut" "émission du code de partage ardoise (expiration +2 jours)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create (code de partage) a échoué (HTTP $statut)"
+  exit 1
+fi
+CODE_ARDOISE="$(json_val "$(cat "$SMOKE_LIB_TMP/code.json")" code)"
+if [ -z "$CODE_ARDOISE" ]; then
+  rouge "create : code brut non capturé"
+  exit 1
+fi
+verdict_vert "code de partage émis et scellé en fichier 0600 (jamais imprimé)"
+
+# --- (4) Guest : redeem-guest sans session (clé publiable seule) -------------
+# Chemin sans identité (ardoise-invite, dispatch 946-948) : c'est le canal
+# exact d'un invité externe sans compte. Budget 8/min : espacé.
+attend_budget
+corps_guest="$(corps_secret "{\"action\":\"redeem-guest\",\"code\":\"$CODE_ARDOISE\",\"displayName\":\"Invité ponté e2e\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$config_pub" "$corps_guest" "$SMOKE_LIB_TMP/guest.json")"
+etape 4 POST /functions/v1/ardoise-invite 'redeem-guest' "$statut" "adhésion invitée sans compte (clé publiable seule)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "redeem-guest a échoué (HTTP $statut)"
+  exit 1
+fi
+GUEST_TICKET="$(json_val "$(cat "$SMOKE_LIB_TMP/guest.json")" guest_ticket)"
+if [ -z "$GUEST_TICKET" ]; then
+  rouge "redeem-guest : guest_ticket non capturé"
+  exit 1
+fi
+verdict_vert "invité adhéré, guest_ticket scellé en fichier 0600"
+
+# --- (5) Dépense participant guest, AVANT household-token (D-05) -------------
+# LECTURE CANAL APP : le payeur (membre du foyer) lit ardoise_guests —
+# politique ardoise_guests_select (0057/0113). Le guest_id est nécessaire au
+# payload `p_parts` du RPC create_expense (expensePartsPayload, api.ts:594).
+statut="$(get_json "$API/rest/v1/ardoise_guests?ardoise_id=eq.$ARDOISE_ID&select=id" "$SMOKE_LIB_TMP/guests.json" "$cfg_payeur")"
+etape 5 GET /rest/v1/ardoise_guests "$statut" "lecture du guest_id par le payeur (canal app)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "lecture ardoise_guests a échoué (HTTP $statut)"
+  exit 1
+fi
+GUEST_ID="$(printf '%s' "$(cat "$SMOKE_LIB_TMP/guests.json")" | grep -o '"id": *"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+if [ -z "$GUEST_ID" ]; then
+  rouge "guest_id non capturé avant la dépense"
+  exit 1
+fi
+
+# D-05 — CONTRAINTE NON NÉGOCIABLE : la dépense participant guest EXISTE
+# avant l'appel `household-token`. Le pont (0180b) est rempli au moment du
+# household-token ; une dépense créée après rendrait la réconciliation
+# invérifiable et la capture pré-redeem tautologique.
+part_montant='2400'
+corps_depense="$(corps_secret "{\"p_household_id\":\"$FOYER_A\",\"p_ardoise_id\":\"$ARDOISE_ID\",\"p_title\":\"Courses pontées e2e\",\"p_amount\":$part_montant,\"p_paid_by\":\"$MEMBRE_A_ID\",\"p_paid_by_guest\":null,\"p_expense_date\":\"$(date -u '+%Y-%m-%d')\",\"p_split_type\":\"egal\",\"p_parts\":[{\"participant_type\":\"guest\",\"member_id\":null,\"guest_id\":\"$GUEST_ID\",\"share_amount\":$part_montant}]}")"
+statut="$(post_json "$API/rest/v1/rpc/create_expense" "$cfg_payeur" "$corps_depense" "$SMOKE_LIB_TMP/depense.json")"
+etape 6 POST /rest/v1/rpc/create_expense "$statut" "dépense 24,00 € participant guest AVANT household-token (D-05)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "create_expense a échoué (HTTP $statut)"
+  exit 1
+fi
+EXPENSE_ID="$(json_val "$(cat "$SMOKE_LIB_TMP/depense.json")" id)"
+if [ -z "$EXPENSE_ID" ]; then
+  rouge "create_expense : expense_id non capturé"
+  exit 1
+fi
+verdict_vert "dépense créée : expense_id=$EXPENSE_ID, participant guest=$GUEST_ID"
+
+# --- CAPTURE PRÉ-REDEEM des identifiants du pont (exigence tâche 2) ----------
+# La redemption purge private.ardoise_bridge_identities (0181:327-329) : les
+# assertions bornées de la tâche 3 (plus aucune part guest pontée dans le
+# foyer) dépendent de CES variables capturées ICI — sinon tautologie.
+BRIDGE_FOYER="$FOYER_A"
+BRIDGE_GUEST="$GUEST_ID"
+BRIDGE_ARDOISE="$ARDOISE_ID"
+verdict_vert "identifiants du pont capturés avant redeem : foyer=$BRIDGE_FOYER guest=$BRIDGE_GUEST"
+
+# --- (6) Happy path : household-token (JWT invité + code) --------------------
+# L'invité (compte réel, non membre du foyer) échange le code ardoise contre
+# un token foyer. Budget 8/min : premier appel de l'action, espacé quand même.
+attend_budget
+corps_ht="$(corps_secret "{\"action\":\"household-token\",\"code\":\"$CODE_ARDOISE\"}")"
+statut="$(post_json "$API/functions/v1/ardoise-invite" "$cfg_invite" "$corps_ht" "$SMOKE_LIB_TMP/token.json")"
+etape 7 POST /functions/v1/ardoise-invite 'household-token' "$statut" "échange code → token foyer (JWT invité)"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "household-token a échoué (HTTP $statut)"
+  exit 1
+fi
+BRIDGE_TOKEN="$(json_val "$(cat "$SMOKE_LIB_TMP/token.json")" token)"
+if [ -z "$BRIDGE_TOKEN" ]; then
+  rouge "household-token : token non capturé"
+  exit 1
+fi
+verdict_vert "token foyer reçu et scellé en fichier 0600"
+
+# --- (7) Redemption foyer : household-invite action redeem (D-06) ------------
+# SEUL canal de redemption : Edge `household-invite` action `redeem`. Les RPC
+# PostgREST directs sont service_role only — jamais appelés par ce script.
+attend_budget
+corps_redeem="$(corps_secret "{\"action\":\"redeem\",\"token\":\"$BRIDGE_TOKEN\"}")"
+statut="$(post_json "$API/functions/v1/household-invite" "$cfg_invite" "$corps_redeem" "$SMOKE_LIB_TMP/redeem.json")"
+etape 8 POST /functions/v1/household-invite 'redeem' "$statut" "redemption du token foyer : adhésion + réconciliation guest"
+garde_app "$statut"
+if [ "$statut" != "200" ]; then
+  rouge "household-invite redeem a échoué (HTTP $statut)"
+  exit 1
+fi
+FOYER_REDEEM="$(json_val "$(cat "$SMOKE_LIB_TMP/redeem.json")" household_id)"
+if [ "$FOYER_REDEEM" != "$BRIDGE_FOYER" ]; then
+  rouge "redeem : household_id retourné ($FOYER_REDEEM) ≠ foyer du pont ($BRIDGE_FOYER)"
+  exit 1
+fi
+verdict_vert "redeem vert : invité membre du foyer $FOYER_REDEEM, réconciliation déclenchée"
+
+# Les négatifs (replay, token muté, token expiré, cross-household), la
+# réconciliation bornée après coup et la purge vérifiée sont ajoutés par la
+# tâche 3 du plan — le run s'arrête ici sans verdict global.
 exit 1
