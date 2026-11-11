@@ -450,6 +450,27 @@ cleanup() {
     printf '     %s\n' "$residus" >&2
   fi
 
+  # Purge comptes — filet SQL préalable : tout foyer dont un compte du run
+  # est membre est supprimé (cascade), même si sa capture a échoué avant
+  # l'enregistrement dans FOYERS_LISTE. Sinon la suppression Admin du compte
+  # échoue en 500 (FK household_members.user_id on delete set null, 0166,
+  # + CHECK chk_members_managed_child, 0145 : ligne membre admin sans
+  # user_id = contrainte violée). Borné aux uids de CE run (pas
+  # d'interpolation libre, §2.7 D.2), via stdin uniquement.
+  if [ -s "$SMOKE_ACCOUNTS_LOG" ]; then
+    uid1="$(sed -n '1p' "$SMOKE_ACCOUNTS_LOG" | cut -f1)"
+    uid2="$(sed -n '2p' "$SMOKE_ACCOUNTS_LOG" | cut -f1)"
+    filet_sql="$SMOKE_LIB_TMP/purge-filet.sql"
+    printf "delete from public.households h where exists (select 1 from public.household_members m where m.household_id = h.id and m.user_id::text in (:'u1', :'u2'));\n" >"$filet_sql"
+    filet_out="$(sh "$SCRIPT_DIR/psql.sh" -v u1="$uid1" -v u2="$uid2" <"$filet_sql" 2>&1 || true)"
+    if printf '%s' "$filet_out" | grep -q '^DELETE'; then
+      verdict_vert "filet purge foyers des comptes du run : $filet_out"
+    else
+      printf '   ! filet purge foyers sans résultat attendu : %s\n' "${filet_out:-<vide>}" >&2
+      purge_ko=1
+    fi
+  fi
+
   # Purge vérifiée (§2.7 F) : re-delete → 404 exigé pour chaque compte du run.
   if [ -s "$SMOKE_ACCOUNTS_LOG" ]; then
     if smoke_accounts_purge "$RUN_ID"; then
