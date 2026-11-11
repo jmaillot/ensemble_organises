@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 43 — Preuve prod du bridge ardoise (W1)
+**Current focus:** Phase 44 — Décision cache maxAge par famille (CACHE-01)
 
 ## Current Position
 
@@ -60,7 +60,7 @@ Last activity: 2026-11-11 — Phase 43 complete, transitioned to Phase 44
 ### Todos
 
 - Rejouer GATE-01 (tests 32-UAT 7 et 35-UAT 2) lors de la prochaine mise en production naturelle — observatoire hors jalon.
-- Vérifier au plan-phase 43 : présence d'un job pg_cron sur le chemin bridge (sonde `net._http_response` hors sujet si jambes curl directes) ; colonnes max_uses/expiry sur la table pont 0180 (ne pas supposer, §2.7 I).
+- Purger à la main les 3 comptes e2e résiduels de runs antérieurs (e2e+1794223918703512-1/-2, e2e+1794223911703118-1) — signalés par le script, jamais supprimés par lui (borne : comptes du run uniquement).
 
 ### Blockers
 
@@ -68,17 +68,17 @@ Last activity: 2026-11-11 — Phase 43 complete, transitioned to Phase 44
 
 ## Session Continuity
 
-**Last session:** 2026-11-11T12:45:59.873Z
+**Last session:** 2026-11-11 (exécution + clôture de la phase 43)
 **Stopped at:** Phase 43 complete, ready to plan Phase 44
 **Resume file:** None
 
-- Roadmap v1.4 créée le 2026-11-11 par gsd-roadmapper (subagent /gsd-new-project).
-- Prochain pas : approbation, puis `/gsd-plan-phase 43`.
-- Exigences : PROOF-01..07 → Phase 43 ; CACHE-01..04 → Phase 44 (traceability dans REQUIREMENTS.md).
+- Phase 43 close (run 11 vert, gates tous passés) — voir PROJECT.md « État courant ».
+- Prochain pas : `/gsd-plan-phase 44` (CACHE-01, requiert l'appareil de référence pour la campagne).
+- Exigences : PROOF-01..07 ✓ Complete (Phase 43) ; CACHE-01..04 → Phase 44.
 
 ## Operator Next Steps
 
-- Approuver la roadmap, puis `/gsd-plan-phase 43`
+- `/gsd-plan-phase 44` — prévoir la disponibilité de l'appareil de référence (blocker consigné).
 
 ## Decisions
 

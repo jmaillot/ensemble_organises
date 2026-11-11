@@ -82,6 +82,28 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
+## État courant — phase 43 close le 2026-11-11 (W1 du jalon v1.4)
+
+**La surface bridge ardoise est désormais prouvée en prod** : la dette W1 de
+v1.3 est soldée par `scripts/test-ardoise-bridge-real.sh` (convention du
+dépôt : un script par preuve à ressource réelle). Trois runs complets verts
+(9, 10 idempotence, 11 post-review) : 18 étapes HTTP attribuables (Edge
+`ardoise-invite household-token` → Edge `household-invite redeem` →
+réconciliation), 4 négatifs red-team vus rouges sur le vrai fil (replay 410
+« révoqué », token muté 404, expiration 410 après attente réelle de 1020 s
+sans falsification SQL, borne cross-household), 9 asserts SQL exacts bornés
+par foyer, purge prouvée (foyers en cascade → 0 ligne, re-delete → 404).
+Gates : security SECURED (4/4 menaces T-43-* fermées), review 0 critique
+(WR-01 corrigé à la cause réelle : GoTrue duplique l'email dans
+`user_metadata.email` — extraction jq du champ racine, 4027d2c), nyquist
+7/7 COVERED, verification passed 6/6, UAT-1 PASS (0 signal D-10 : aucun seam
+client ne requiert d'e2e navigateur pour la W1 — verdict humain du 2026-11-11).
+Consignation : `docs/BRIDGE-ARDOISE-PREUVE.md` (réécrite à chaque run).
+Résiduels connus, hors-run, à traiter à la main : 3 comptes e2e antérieurs
+(e2e+179422391*). Reste au jalon : CACHE-01 (phase 44, décision maxAge par
+famille) ; W2 (spec navigateur Playwright) reste conditionné à un seam client
+révélé — aucun à ce jour.
+
 ## Current Milestone: v1.4 Preuve & décision
 
 **Goal:** Fermer les deux dettes priorisées de v1.3 — la surface bridge ardoise devient prouvée en prod et la décision de cache maxAge est tranchée famille par famille.
@@ -131,4 +153,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-11 at milestone start v1.4 « Preuve & décision »*
+*Last updated: 2026-11-11 after Phase 43 (W1 preuve prod bridge ardoise)*
