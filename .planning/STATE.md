@@ -5,11 +5,11 @@ milestone_name: Preuve & décision
 current_phase: 44
 current_phase_name: Décision cache maxAge par famille (CACHE-01)
 status: planning
-stopped_at: Phase 43 complete, ready to plan Phase 44
-last_updated: "2026-11-11T18:20:52.671Z"
+stopped_at: Phase 44 context gathered
+last_updated: "2026-11-11T19:15:34.733Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 43 complete, transitioned to Phase 44
-state_head: 4027d2c039b9ca96206190af597138952b8d0ba8
+state_head: c78f9a2ca8f28389ea075e143bb430632f161ffc
 progress:
   total_phases: 2
   completed_phases: 1
@@ -68,9 +68,9 @@ Last activity: 2026-11-11 — Phase 43 complete, transitioned to Phase 44
 
 ## Session Continuity
 
-**Last session:** 2026-11-11 (exécution + clôture de la phase 43)
-**Stopped at:** Phase 43 complete, ready to plan Phase 44
-**Resume file:** None
+**Last session:** 2026-11-11T19:15:34.697Z
+**Stopped at:** Phase 44 context gathered
+**Resume file:** .planning/phases/44-d-cision-cache-maxage-par-famille-cache-01/44-CONTEXT.md
 
 - Phase 43 close (run 11 vert, gates tous passés) — voir PROJECT.md « État courant ».
 - Prochain pas : `/gsd-plan-phase 44` (CACHE-01, requiert l'appareil de référence pour la campagne).
