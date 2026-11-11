@@ -504,7 +504,9 @@ json_val() {
 # au run réel (p_household_id = member_…) a causé un 403 à l'étape 6. Les ids
 # portent des préfixes univoques (0001 : new_id préfixe), on capture par eux.
 json_id_prefixe() {
-  printf '%s' "$1" | grep -o "\"id\": *\"$2-[^\"]*\"" | head -n 1 \
+  # Le préfixe passé en $2 se termine DÉJÀ par l'underscore de new_id
+  # (0001 : `p_prefix || '_'`) — aucun séparateur ajouté ici.
+  printf '%s' "$1" | grep -o "\"id\": *\"$2[^\"]*\"" | head -n 1 \
     | sed 's/"id": *"//; s/"$//'
 }
 
