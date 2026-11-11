@@ -56,6 +56,11 @@ Plans:
 **Goal**: Le maxAge du cache offline est tranché famille par famille selon les critères §5 contraignants de `docs/MESURES-COLD-START-42.md`, sur la campagne on-device prescrite §6 — la lecture du panneau précède toute décision, un statu quo justifié est une décision valide, et chaque famille modifiée est livrée en un commit atomique.
 **Depends on**: Nothing (aucune dépendance avec Phase 43 — ordre de risque : bloquée sur la disponibilité de l'appareil de référence, travail préparatoire seul tant qu'elle manque)
 **Requirements**: CACHE-01, CACHE-02, CACHE-03, CACHE-04
+**Plans:** 2 plans
+
+Plans:
+- [ ] 44-01-PLAN.md — Préparatoire : squelettes §7.1–7.5 du document MESURES, procédure de campagne, évaluation du seuil D-15, observabilité conditionnelle (CACHE-04)
+- [ ] 44-02-PLAN.md — Checkpoint appareil → campagne §6, grille §7.4 à chaud, commits de famille atomiques, chaîne §2.7 finale, report PROJECT.md (CACHE-01/02/03)
 **Success Criteria** (what must be TRUE):
   1. La campagne on-device suit le protocole §6 : appareil de référence, purge froide comparable §2.1, N=5 runs avec médiane — ou un différé honnêtement consigné (jamais l'émulateur, jamais de valeur inventée) ; la lecture du panneau « Amorçage » précède toute décision (les critères b/c tranchent, jamais la lecture a seule — biais d'ordre)
   2. La grille de décision §7.4 est remplie famille par famille avec la justification (a)(b)(c) AVANT toute édition de code, et la décision (y compris un statu quo justifié) est consignée dans PROJECT.md
