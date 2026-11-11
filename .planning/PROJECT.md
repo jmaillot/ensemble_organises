@@ -82,7 +82,15 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
-## Current Milestone: (aucun — planifier le prochain avec /gsd-new-milestone)
+## Current Milestone: v1.4 Preuve & décision
+
+**Goal:** Fermer les deux dettes priorisées de v1.3 — la surface bridge ardoise devient prouvée en prod et la décision de cache maxAge est tranchée famille par famille.
+
+**Target features:**
+- W1 : preuve niveau prod de la surface bridge ardoise (Edge household-token, RPC, réconciliation) via extension de `test-join-token-real.sh`
+- CACHE-01 : décision maxAge par famille appliquée selon les critères §5 de `docs/MESURES-COLD-START-42.md`, mise en œuvre dans `query-policy.ts`
+
+**Contraintes :** aucune nouvelle surface produit ; CACHE-01 requiert la machine on-device ; GATE-01 et COLD-02 restent observatoires hors jalon.
 
 ## État v1.3 (shipped 2026-11-10)
 
@@ -123,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-10 after v1.3 milestone « Solde de la dette »*
+*Last updated: 2026-11-11 at milestone start v1.4 « Preuve & décision »*

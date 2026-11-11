@@ -1,19 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.3
-milestone_name: Solde de la dette
-status: Awaiting next milestone
-stopped_at: Phase 42 complete — all phases complete
-last_updated: "2026-11-10T16:38:25.959Z"
-last_activity: 2026-11-10
-last_activity_desc: Milestone v1.3 completed and archived
-state_head: 41003e239d33597e44f98d3a511f7eea1c6f5dea
+milestone: v1.4
+milestone_name: Preuve & décision
+status: planning
+last_updated: "2026-11-11T07:59:43.831Z"
+last_activity: 2026-11-11
 progress:
-  total_phases: 5
-  completed_phases: 5
+  total_phases: 0
+  completed_phases: 0
   total_plans: 0
-  completed_plans: 13
-current_phase: 42
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-10)
 
 ## Current Position
 
-Phase: Milestone v1.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-11-10 — Milestone v1.3 completed and archived
+Status: Defining requirements
+Last activity: 2026-11-11 — Milestone v1.4 started
 
 ## Performance Metrics
 
