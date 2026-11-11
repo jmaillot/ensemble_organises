@@ -130,6 +130,13 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 
 **Question ouverte du protocole §1, à trancher sur place le jour J :** N = 5 par condition §1 — décider sur place si les runs avant correction ont déjà une couverture suffisante via §7.3 (la lecture CACHE-01 est la condition de la campagne 44).
 
+**Évaluation du seuil D-15 (observabilité conditionnelle CACHE-04) — consignée le 2026-11-11 :**
+
+- **Seuil énoncé (D-15) :** le panneau suffit s'il permet de répondre aux critères **(a) volume réhydraté** et **(c) coût re-fetch** PAR famille.
+- **Faits lus dans le code :** le panneau « Cache hors-ligne » affiche DÉJÀ par famille `ageMs` (`libelleAgeCache`), `maxAgeMs` (`libelleDureeConservation`) et `pruneEligible` (phrase d'écart) — `app/src/modules/parametres/components/offline-panel.tsx:378-386`. Le delta de prune est affiché globalement (`offline-panel.tsx:94-97`), et c'est la seule forme que la source de données expose : `RestoreOutcome` porte des comptes globaux (`restoredFamilies` / `prunedFamilies`), pas de delta par famille — `app/src/lib/offline/query-persistence.ts:468-473`. Or la définition opérationnelle du critère (a) §5 est précisément « lignes restaurées par famille via inspectPersistedCache (ageMs, maxAgeMs, pruneEligible par famille) et delta de prune via getRestoreOutcome » — c'est-à-dire exactement ce que le panneau expose déjà. Le critère (c) est évaluable depuis ces mêmes champs par famille (péremption + éligibilité à la prune) complétés par la borne foyer écrite §5.
+- **Conclusion :** **le panneau suffit pour les critères (a) et (c) par famille.**
+- **Conséquence (D-13/D-15) :** la tâche conditionnelle « détail par famille » du panneau offline n'est **pas déclenchée** — jamais d'observabilité préventive ; le statu quo du panneau est la décision correcte.
+
 <!-- Règle §2.1 : un run non froid n'entre pas dans les médianes. -->
 
 **Run 1**
