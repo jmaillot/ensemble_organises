@@ -56,11 +56,11 @@ Plans:
 **Goal**: Le maxAge du cache offline est tranché famille par famille selon les critères §5 contraignants de `docs/MESURES-COLD-START-42.md`, sur la campagne on-device prescrite §6 — la lecture du panneau précède toute décision, un statu quo justifié est une décision valide, et chaque famille modifiée est livrée en un commit atomique.
 **Depends on**: Nothing (aucune dépendance avec Phase 43 — ordre de risque : bloquée sur la disponibilité de l'appareil de référence, travail préparatoire seul tant qu'elle manque)
 **Requirements**: CACHE-01, CACHE-02, CACHE-03, CACHE-04
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 44-01-PLAN.md — Préparatoire : squelettes §7.1–7.5 du document MESURES, procédure de campagne, évaluation du seuil D-15, observabilité conditionnelle (CACHE-04)
+- [x] 44-01-PLAN.md — Préparatoire : squelettes §7.1–7.5 du document MESURES, procédure de campagne, évaluation du seuil D-15, observabilité conditionnelle (CACHE-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 44-02-PLAN.md — Checkpoint appareil → campagne §6, grille §7.4 à chaud, commits de famille atomiques, chaîne §2.7 finale, report PROJECT.md (CACHE-01/02/03)
@@ -81,4 +81,4 @@ Phases execute in numeric order: 43 → 44 (aucune dépendance croisée — para
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 43. Preuve prod du bridge ardoise (W1) | v1.4 | 1/1 | Complete    | 2026-11-11 |
-| 44. Décision cache maxAge par famille (CACHE-01) | v1.4 | 0/? | Not started | - |
+| 44. Décision cache maxAge par famille (CACHE-01) | v1.4 | 1/2 | In Progress|  |

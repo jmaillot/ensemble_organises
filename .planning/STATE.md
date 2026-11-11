@@ -5,17 +5,17 @@ milestone_name: Preuve & décision
 current_phase: 44
 current_phase_name: Décision cache maxAge par famille (CACHE-01)
 status: executing
-stopped_at: Phase 44 context gathered
-last_updated: "2026-11-11T20:32:04.693Z"
+stopped_at: Completed 44-01-PLAN.md
+last_updated: "2026-11-11T20:46:30.569Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 44 execution started
-state_head: 70f0cb0bca30f5901449012dcb84555d2e1dec6a
+state_head: 1f472afbe0c1be49d92dbd598b0d646ac9b0b0b6
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-11-11)
 ## Current Position
 
 Phase: 44 (Décision cache maxAge par famille (CACHE-01)) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 44
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-11-11 — Phase 44 execution started
 
 ## Performance Metrics
@@ -46,6 +46,7 @@ Last activity: 2026-11-11 — Phase 44 execution started
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 43 P01 | 5h | 3 tasks | 2 files |
+| Phase 44 P01 | 11 min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -68,9 +69,9 @@ Last activity: 2026-11-11 — Phase 44 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-11T19:15:34.697Z
-**Stopped at:** Phase 44 context gathered
-**Resume file:** .planning/phases/44-d-cision-cache-maxage-par-famille-cache-01/44-CONTEXT.md
+**Last session:** 2026-11-11T20:46:30.531Z
+**Stopped at:** Completed 44-01-PLAN.md
+**Resume file:** None
 
 - Phase 43 close (run 11 vert, gates tous passés) — voir PROJECT.md « État courant ».
 - Prochain pas : `/gsd-plan-phase 44` (CACHE-01, requiert l'appareil de référence pour la campagne).
@@ -85,3 +86,4 @@ Last activity: 2026-11-11 — Phase 44 execution started
 - [Phase 43]: Négatif replay épinglé à l'observable réel 410 « révoqué » (is_active vérifié avant use_count dans 0181)
 - [Phase 43]: config_session à étiquette unique — aucun compteur global en substitution de commande (sous-shell)
 - [Phase 43]: householdId explicite sur create-ardoise du foyer B (households[0] sinon)
+- [Phase 44]: Verdict D-15 : le panneau offline existant suffit pour les critères (a) et (c) par famille — observabilité conditionnelle D-14 non déclenchée, jamais préventive
