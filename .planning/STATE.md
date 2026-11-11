@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Preuve & décision
-current_phase: 43
-current_phase_name: Preuve prod du bridge ardoise (W1)
-status: verifying
-stopped_at: Completed 43-01-PLAN.md (runs 9+10 verts, idempotence prouvée)
-last_updated: "2026-11-11T12:45:59.900Z"
+current_phase: 44
+current_phase_name: Décision cache maxAge par famille (CACHE-01)
+status: planning
+stopped_at: Phase 43 complete, ready to plan Phase 44
+last_updated: "2026-11-11T18:20:52.671Z"
 last_activity: 2026-11-11
-last_activity_desc: Phase 43 execution started
-state_head: d7c910edb52d8876c6f9b54df71ebe549a851070
+last_activity_desc: Phase 43 complete, transitioned to Phase 44
+state_head: 4027d2c039b9ca96206190af597138952b8d0ba8
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
   completed_plans: 1
-  percent: 0
+  percent: 50
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-11)
 
 ## Current Position
 
-Phase: 43 (Preuve prod du bridge ardoise (W1)) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
-Last activity: 2026-11-11 — Phase 43 execution started
+Phase: 44 — Décision cache maxAge par famille (CACHE-01)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-11 — Phase 43 complete, transitioned to Phase 44
 
 ## Performance Metrics
 
@@ -69,7 +69,7 @@ Last activity: 2026-11-11 — Phase 43 execution started
 ## Session Continuity
 
 **Last session:** 2026-11-11T12:45:59.873Z
-**Stopped at:** Completed 43-01-PLAN.md (runs 9+10 verts, idempotence prouvée)
+**Stopped at:** Phase 43 complete, ready to plan Phase 44
 **Resume file:** None
 
 - Roadmap v1.4 créée le 2026-11-11 par gsd-roadmapper (subagent /gsd-new-project).

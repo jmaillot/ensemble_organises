@@ -29,7 +29,7 @@ Détail complet : [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
 
 Ordre de risque, pas de dépendance : aucune dépendance croisée entre les deux phases. W1 d'abord (aucune dépendance appareil — stack prod + accès SQL suffisent) ; CACHE-01 ensuite (bloquée sur la disponibilité physique de l'appareil de référence — travail préparatoire seul tant que l'appareil manque, différé consigné honnêtement si report, jamais de valeur inventée). Peuvent s'exécuter en parallèle si l'appareil se libère tôt.
 
-- [ ] **Phase 43: Preuve prod du bridge ardoise (W1)** - Script sœur `scripts/test-ardoise-bridge-real.sh` prouvant la surface bridge sur le fil HTTP réel (happy path attribuable, ≥ 3 négatifs red-team, réconciliation lue après coup, consignation datée)
+- [x] **Phase 43: Preuve prod du bridge ardoise (W1)** - Script sœur `scripts/test-ardoise-bridge-real.sh` prouvant la surface bridge sur le fil HTTP réel (happy path attribuable, ≥ 3 négatifs red-team, réconciliation lue après coup, consignation datée) (completed 2026-11-11)
 - [ ] **Phase 44: Décision cache maxAge par famille (CACHE-01)** - Campagne on-device selon le protocole MESURES-COLD-START-42 §6, décision tranchée par les critères §5, au plus un commit par famille modifiée d'`OFFLINE_FAMILIES`, décision consignée dans PROJECT.md
 
 ## Phase Details
@@ -46,7 +46,7 @@ Ordre de risque, pas de dépendance : aucune dépendance croisée entre les deux
   4. Le script est discipliné et propre : secrets uniquement via `curl -K` fichier 0600, comptes e2e via `lib-smoke-accounts.sh` avec purge vérifiée (re-delete → 404), foyer éphémère créé et purgé, et une réexécution après déploiement ne laisse aucun artifact accumulé (teardown automatique)
   5. Un document de consignation daté dans `docs/` (forme 38-E2E-SIGNATURE.md) écrit ce qui est prouvé, ce qui ne l'est pas, et le verdict de chaque étape — aucun succès muet ; si un seam client est suspecté pendant la preuve, un e2e navigateur réel du parcours invité est ajouté par besoin déclenché
 
-**Plans:** 1/1 plans executed
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 43-01-PLAN.md — Script sœur `scripts/test-ardoise-bridge-real.sh` : happy path HTTP attribuable + 4 négatifs red-team + réconciliation bornée + purge vérifiée + consignation auto-rédigée
@@ -71,5 +71,5 @@ Phases execute in numeric order: 43 → 44 (aucune dépendance croisée — para
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 43. Preuve prod du bridge ardoise (W1) | v1.4 | 1/1 | In Progress|  |
+| 43. Preuve prod du bridge ardoise (W1) | v1.4 | 1/1 | Complete    | 2026-11-11 |
 | 44. Décision cache maxAge par famille (CACHE-01) | v1.4 | 0/? | Not started | - |
