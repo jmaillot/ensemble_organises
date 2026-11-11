@@ -956,10 +956,19 @@ sql_apres="$SMOKE_LIB_TMP/apres-coup.sql"
   printf "select 'depenses_dupliquees_membre', count(*) from (select e.id from public.expenses e join public.expense_participants ep on ep.expense_id = e.id where e.household_id = :'foyer' and ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') group by e.id having count(*) > 1) d;\n"
   printf "%s\n" "-- (iii) part membre convertie du nouveau membre : attendu exactement 1\n"
   printf "select 'parts_membre_converties', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and ep.member_id = (select m.id from public.household_members m where m.user_id = :'invite' and m.household_id = :'foyer') and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer');\n"
-  printf "%s\n" "-- (iii bis) token consommé : use_count = 1, max_uses = 1, is_active = false\n"
-  printf "select 'token_use_count', use_count from public.household_invite_tokens where household_id = :'foyer';\n"
-  printf "select 'token_max_uses', max_uses from public.household_invite_tokens where household_id = :'foyer';\n"
-  printf "select 'token_actifs', count(*) from public.household_invite_tokens where household_id = :'foyer' and is_active;\n"
+  printf "%s\n" "-- (iii bis) token du pont consommé : use_count = 1, max_uses = 1, is_active = false.\n"
+  printf "%s\n" "-- BORNE : l'ÉTAPE 11 ré-émet un 2ᵉ token bridge pour le MÊME foyer (négatif\n"
+  printf "%s\n" "-- d'expiration) : nouvelle ligne household_invite_tokens (use_count=0,\n"
+  printf "%s\n" "-- is_active=true), expirée mais non encore purgée — prune_expired_invite_tokens\n"
+  printf "%s\n" "-- tourne une fois par jour (pg_cron, 0011). Les asserts portent donc sur LE\n"
+  printf "%s\n" "-- token consommé (borne : use_count >= 1, seul le happy path a consommé un\n"
+  printf "%s\n" "-- token avant la lecture) et sur le ré-émis isolément (actif, non expiré,\n"
+  printf "%s\n" "-- use_count = 0). Un comptage global des tokens actifs du foyer lirait le\n"
+  printf "%s\n" "-- ré-émis et lèverait un faux KO (cause racine du run 7).\n"
+  printf "select 'token_consomme_use_count', use_count from public.household_invite_tokens where household_id = :'foyer' and use_count >= 1;\n"
+  printf "select 'token_consomme_max_uses', max_uses from public.household_invite_tokens where household_id = :'foyer' and use_count >= 1;\n"
+  printf "select 'token_consomme_inactif', count(*) from public.household_invite_tokens where household_id = :'foyer' and use_count >= 1 and is_active;\n"
+  printf "select 'token_reemis_propre', count(*) from public.household_invite_tokens where household_id = :'foyer' and is_active and expires_at > now() and use_count = 0;\n"
   printf "%s\n" "-- (iv) borne cross-household : la part guest du 2ᵉ foyer reste guest (attendu 1), rien n'y est converti (attendu 0)\n"
   printf "select 'parts_guest_restantes_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'guest' and ep.guest_id = :'guest_b' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
   printf "select 'parts_membre_converties_foyer_b', count(*) from public.expense_participants ep where ep.participant_type = 'membre' and exists (select 1 from public.expenses e where e.id = ep.expense_id and e.household_id = :'foyer_b');\n"
@@ -991,9 +1000,10 @@ assert_sql() {
 assert_sql parts_guest_pontees_restantes 0
 assert_sql depenses_dupliquees_membre 0
 assert_sql parts_membre_converties 1
-assert_sql token_use_count 1
-assert_sql token_max_uses 1
-assert_sql token_actifs 0
+assert_sql token_consomme_use_count 1
+assert_sql token_consomme_max_uses 1
+assert_sql token_consomme_inactif 0
+assert_sql token_reemis_propre 1
 assert_sql parts_guest_restantes_foyer_b 1
 assert_sql parts_membre_converties_foyer_b 0
 
