@@ -166,22 +166,27 @@ SQL_LOG="$SMOKE_LIB_TMP/sql-apres-coup.log"
 
 # Fichier des en-têtes de session pour curl -K (0600) — le JWT ne passe jamais
 # en argv ni en variable d'environnement (§2.7 H : `ps` ne doit rien montrer).
+# $1 est une ÉTIQUETTE unique du porteur (payeur, invite, …) : le nom du
+# fichier en dérive. Aucun compteur global — un incrément dans $(config_session
+# …) vivrait dans un sous-shell et serait perdu, si bien que deux sessions
+# écrivaient le même fichier et que la seconde écrasait le JWT de la première
+# (cause racine des runs 4 et 5 : foyer créé par l'invité, redeem idempotent).
 config_session() {
-  CORPS_N=$((CORPS_N + 1))
-  file="$SMOKE_LIB_TMP/session-$CORPS_N"
+  file="$SMOKE_LIB_TMP/session-$1"
   {
     printf 'header = "apikey: %s"\n' "$PUBLISHABLE_KEY"
-    printf 'header = "Authorization: Bearer %s"\n' "$1"
+    printf 'header = "Authorization: Bearer %s"\n' "$2"
   } >"$file"
   chmod 600 "$file"
   printf '%s' "$file"
 }
 
 # Corps de requête porteur d'un secret (token, code) — fichier 0600, passé par
-# --data @fichier, jamais en argv.
+# --data @fichier, jamais en argv. mktemp garantit l'unicité même quand
+# l'appel est en substitution de commande (même piège de sous-shell que
+# config_session : un compteur global n'y survit pas).
 corps_secret() {
-  CORPS_N=$((CORPS_N + 1))
-  file="$SMOKE_LIB_TMP/corps-$CORPS_N"
+  file="$(mktemp "$SMOKE_LIB_TMP/corps-XXXXXXXX")"
   printf '%s\n' "$1" >"$file"
   chmod 600 "$file"
   printf '%s' "$file"
@@ -561,13 +566,13 @@ if ! smoke_accounts_session "e2e+$RUN_ID-1@$(smoke_accounts_domain)" "$PASSWORD"
   exit 1
 fi
 PAYEUR_JWT="$SMOKE_SESSION_JWT"
-cfg_payeur="$(config_session "$PAYEUR_JWT")"
+cfg_payeur="$(config_session payeur "$PAYEUR_JWT")"
 if ! smoke_accounts_session "e2e+$RUN_ID-2@$(smoke_accounts_domain)" "$PASSWORD"; then
   rouge "session de l'invité impossible"
   exit 1
 fi
 INVITE_JWT="$SMOKE_SESSION_JWT"
-cfg_invite="$(config_session "$INVITE_JWT")"
+cfg_invite="$(config_session invite "$INVITE_JWT")"
 verdict_vert "2 comptes e2e créés et sessions obtenues (payeur, invité)"
 
 # --- (2) Foyer éphémère du payeur : canal app réelle -------------------------
