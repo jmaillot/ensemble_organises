@@ -35,6 +35,7 @@ Ordre de risque, pas de dépendance : aucune dépendance croisée entre les deux
 ## Phase Details
 
 ### Phase 43: Preuve prod du bridge ardoise (W1)
+
 **Goal**: La surface bridge ardoise (Edge `ardoise-invite` action `household-token` → RPC `create_household_bridge_token` service_role → redeem 0181 réconciliant les participations) est prouvée en production réelle par un script sœur réexécutable — la preuve traverse le chemin HTTP complet, jamais SQL seul.
 **Depends on**: Nothing (first phase du jalon)
 **Requirements**: PROOF-01, PROOF-02, PROOF-03, PROOF-04, PROOF-05, PROOF-06, PROOF-07
@@ -44,12 +45,14 @@ Ordre de risque, pas de dépendance : aucune dépendance croisée entre les deux
   3. La réconciliation des participations (`invite:` → `membre:`) est prouvée par lecture d'état après coup bornée par foyer : participations converties sans duplication ni orphelin
   4. Le script est discipliné et propre : secrets uniquement via `curl -K` fichier 0600, comptes e2e via `lib-smoke-accounts.sh` avec purge vérifiée (re-delete → 404), foyer éphémère créé et purgé, et une réexécution après déploiement ne laisse aucun artifact accumulé (teardown automatique)
   5. Un document de consignation daté dans `docs/` (forme 38-E2E-SIGNATURE.md) écrit ce qui est prouvé, ce qui ne l'est pas, et le verdict de chaque étape — aucun succès muet ; si un seam client est suspecté pendant la preuve, un e2e navigateur réel du parcours invité est ajouté par besoin déclenché
-**Plans:** 1 plan
+
+**Plans:** 1/1 plans executed
 
 Plans:
-- [ ] 43-01-PLAN.md — Script sœur `scripts/test-ardoise-bridge-real.sh` : happy path HTTP attribuable + 4 négatifs red-team + réconciliation bornée + purge vérifiée + consignation auto-rédigée
+- [x] 43-01-PLAN.md — Script sœur `scripts/test-ardoise-bridge-real.sh` : happy path HTTP attribuable + 4 négatifs red-team + réconciliation bornée + purge vérifiée + consignation auto-rédigée
 
 ### Phase 44: Décision cache maxAge par famille (CACHE-01)
+
 **Goal**: Le maxAge du cache offline est tranché famille par famille selon les critères §5 contraignants de `docs/MESURES-COLD-START-42.md`, sur la campagne on-device prescrite §6 — la lecture du panneau précède toute décision, un statu quo justifié est une décision valide, et chaque famille modifiée est livrée en un commit atomique.
 **Depends on**: Nothing (aucune dépendance avec Phase 43 — ordre de risque : bloquée sur la disponibilité de l'appareil de référence, travail préparatoire seul tant qu'elle manque)
 **Requirements**: CACHE-01, CACHE-02, CACHE-03, CACHE-04
@@ -58,6 +61,7 @@ Plans:
   2. La grille de décision §7.4 est remplie famille par famille avec la justification (a)(b)(c) AVANT toute édition de code, et la décision (y compris un statu quo justifié) est consignée dans PROJECT.md
   3. Chaque famille modifiée d'`OFFLINE_FAMILIES` dans `query-policy.ts` arrive en au plus un commit contenant valeur + Test H vert + commentaire ; `gcTime` (7 j) reste ≥ au maxAge le plus long ; l'outbox, le bandeau offline et le SW restent intouchables
   4. Si l'observabilité avant/après devient nécessaire pour trancher, un détail cache par famille en lecture seule apparaît dans le panneau diagnostic — ajout déclenché par besoin, jamais préventif
+
 **Plans**: TBD
 
 ## Progress
@@ -67,5 +71,5 @@ Phases execute in numeric order: 43 → 44 (aucune dépendance croisée — para
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 43. Preuve prod du bridge ardoise (W1) | v1.4 | 0/? | Not started | - |
+| 43. Preuve prod du bridge ardoise (W1) | v1.4 | 1/1 | In Progress|  |
 | 44. Décision cache maxAge par famille (CACHE-01) | v1.4 | 0/? | Not started | - |
