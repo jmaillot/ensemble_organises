@@ -267,14 +267,17 @@ select use_count, is_active, max_uses from public.household_invite_tokens
 | A3 | La marge après les 15 min d'expiration : +60–120 s suffit (le refus est `expires_at <= now()` côté base) | Négatifs | faux rouge si marge trop juste ; prendre 2 min et consigner l'attente réelle |
 | A4 | Le SPA frontend sert `/version.json` depuis l'hôte app (pas l'API) — l'estampille du build **frontend** ; l'estampille Edge n'a pas de canal dédié connu | Pattern 2 | si un canal Edge existe et est attendu, le doc doit le dire ; sinon consigner cette limite dans « ce qui n'est pas prouvé » |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Observable exact du négatif cross-household (OQ-1)**
-   - What we know: D-01 exige une 2ᵉ fixture foyer ; le redeem ne prend pas de foyer en entrée — le foyer vient du token.
-   - What's unclear: faut-il prouver (a) que le redeem d'un invité déjà membre d'un autre foyer ne convertit que le foyer du token (borne du pont 0181 `(user_id, household_id)`), (b) qu'un token émis via l'ardoise du foyer A n'attribue jamais le foyer B, ou (c) les deux ?
-   - Recommendation: (a) — c'est la borne T-40-05 du code (0181 l.137-139), observable par psql après coup borné ; le (b) n'a pas de surface HTTP distincte à attaquer. Trancher au plan avec un commentaire français (D-02).
+    - What we know: D-01 exige une 2ᵉ fixture foyer ; le redeem ne prend pas de foyer en entrée — le foyer vient du token.
+    - What's unclear: faut-il prouver (a) que le redeem d'un invité déjà membre d'un autre foyer ne convertit que le foyer du token (borne du pont 0181 `(user_id, household_id)`), (b) qu'un token émis via l'ardoise du foyer A n'attribue jamais le foyer B, ou (c) les deux ?
+    - Recommendation: (a) — c'est la borne T-40-05 du code (0181 l.137-139), observable par psql après coup borné ; le (b) n'a pas de surface HTTP distincte à attaquer. Trancher au plan avec un commentaire français (D-02).
+    - **RESOLVED (43-01-PLAN)** : option (a) tranchée — voir `<corrections_to_context>` « Décision OQ-1 tranchée » et Task 3 négatif (d), commentaire français nommant le choix.
 2. **Statut attendu du replay avec pont purgé** — le replay post-redemption tombe sur `token épuisé` (410) car `use_count >= max_uses` est vérifié avant tout le reste (0181 l.96-98) ; aucune ambiguïté attendue, mais l'assert doit épingler le **message** (« a atteint son nombre d'utilisations maximal ») en plus du statut pour distinguer un 429 de rate-limit.
+    - **RESOLVED (43-01-PLAN)** : Task 3 négatif (a) épingle 410 **et** le message « a atteint son nombre d'utilisations maximal ».
 3. **Comment reconcilier le libellé PROOF-04 (net._http_response) avec la sortie curl** — recommandation : le plan écrit explicitement que la discipline d'attribution est satisfaite par les lignes de sortie par appel, avec référence au Todos STATE.md ; le doc de consignation le mentionne.
+    - **RESOLVED (43-01-PLAN)** : `<corrections_to_context>` « PROOF-04 résolu » — attribution = sortie curl par appel ; le doc de consignation mentionne ce choix.
 
 ## Environment Availability
 
