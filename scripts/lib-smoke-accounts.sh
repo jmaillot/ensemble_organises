@@ -284,11 +284,15 @@ smoke_accounts_list() {
       echo "lib-smoke-accounts: liste des utilisateurs impossible (code $code)" >&2
       return 1
     fi
-    grep -o '"email": *"[^"]*"' "$SMOKE_LIB_TMP/liste-body" \
-      | sed 's/^"email": *"//; s/"$//' >"$SMOKE_LIB_TMP/page-emails"
-    # GoTrue borne page au maximum : au-delà, il renvoie la dernière page à
-    # l'infini. Une page identique à la précédente = fin réelle de liste,
-    # sinon chaque résiduel serait listé deux fois (vu au run 10).
+    # Extraction par jq du champ racine uniquement : le body GoTrue duplique
+    # l'email dans user_metadata.email (copie de création), et un grep -o du
+    # motif "email": matchait les DEUX — chaque résiduel listé 2x (vu runs
+    # 10/11). La cause n'était pas la pagination clampée (hypothèse du review,
+    # invalidée : pages suivantes réellement vides au diag du 2026-11-11).
+    jq -r '.users[]?.email // empty' "$SMOKE_LIB_TMP/liste-body" \
+      >"$SMOKE_LIB_TMP/page-emails"
+    # Défense contre un clamp de pagination (GoTrue répéterait la dernière
+    # page) : une page identique à la précédente = fin réelle de liste.
     if [ -s "$SMOKE_LIB_TMP/page-emails" ] \
       && cmp -s "$SMOKE_LIB_TMP/page-emails" "$SMOKE_LIB_TMP/page-emails-prec" 2>/dev/null; then
       break
