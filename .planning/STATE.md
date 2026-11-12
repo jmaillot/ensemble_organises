@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 46
-current_phase_name: Fixes RLS majeurs
-status: planning
+current_phase_name: fixes-rls-majeurs
+status: executing
 stopped_at: Phase 46 context gathered
-last_updated: "2026-11-12T13:56:16.103Z"
+last_updated: "2026-11-12T16:42:06.822Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 45 complete, transitioned to Phase 46
-state_head: 8b7c1d2dd9c21210100d8a76e600dabdce5593a4
+state_head: dadb511066f1e624227f15c069d3e923c7083aa5
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
   percent: 13
 ---
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 46 — Fixes RLS majeurs
+Phase: 46 (fixes-rls-majeurs) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
 
 ## Performance Metrics
