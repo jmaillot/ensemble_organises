@@ -3,8 +3,8 @@
 **Exigence couverte :** COLD-01 (partie protocole) — le protocole et les critères sont écrits AVANT toute mesure (CA-02).
 **Phase :** 42-cold-start-mesuré-puis-corrigé-décision-cache
 **Écrit le :** 2026-11-10
-**Exécuté par :** Plan 03 — campagne 2026-11-10, **différé d'appareil consigné (§7.1, §7.5)** : les 5 runs n'ont pas été réalisés, aucune valeur n'est inventée (§2.7 I)
-**Estampille du build mesuré :** aucun build mesuré on-device dans cette campagne — la validité de l'estampille quatre canaux du SHA `a31e965…` est prouvée par `check-version-stamp.sh` (§7.6)
+**Exécuté par :** Plan 03 — campagne 2026-11-10, puis campagne 44 (2026-11-12) : **les DEUX campagnes sont des différés consignés (§7.1, §7.5)** — aucun run réalisé, aucune valeur n'est inventée (§2.7 I)
+**Estampille du build mesuré :** aucun build mesuré on-device dans ces campagnes — la validité de l'estampille quatre canaux du SHA `a31e965…` est prouvée par `check-version-stamp.sh` (§7.6)
 **Discipline de preuve :** même forme que `38-E2E-SIGNATURE.md` — chaque étape est citée avec sa commande et son résultat ; un succès muet est un échec inexpliqué (§2.7 F).
 
 Ce document est la référence des mesures (PM-03) : les mesures ne persistent PAS dans l'app — le panneau « Amorçage » ne porte que la session en cours (PD-02), la référence versionnée est ce fichier.
@@ -115,7 +115,7 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 
 ## 7. Résultats (squelettes de consignation — campagne 44)
 
-> Squelettes préparés le 2026-11-11 (plan 44-01, D-01) : le jour J, l'utilisateur dicte uniquement les valeurs mesurées depuis le panneau. Le document est réécrit à chaque campagne (D-04), historique conservé par git — les différés de la campagne 2026-11-10 sont remplacés. Aucune valeur n'y figure tant que la campagne N = 5 n'a pas tourné sur l'appareil de référence.
+> Squelettes préparés le 2026-11-11 (plan 44-01, D-01) : le jour J, l'utilisateur dicte uniquement les valeurs mesurées depuis le panneau. Le document est réécrit à chaque campagne (D-04), historique conservé par git — les différés de la campagne 2026-11-10 sont remplacés. **La campagne 44 (2026-11-12) est un différé consigné** : l'appareil de référence est déclaré disponible (checkpoint Task 1 résolu en session), mais l'utilisateur n'a pas pu mener les runs ni dicter de valeurs — aucune valeur n'y figure, aucun run n'a tourné (§2.7 I).
 
 ### 7.1 Runs avant correction
 
@@ -129,6 +129,10 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 **Reprise après purge complète** (« Effacer le stockage » ou désinstallation — écart procédural consigné le 2026-11-10) : la session hors ligne est détruite, le lancement suivant en mode avion atterrit sur l'écran de connexion. Procédure de reprise pour un run comparable : **reconnexion réseau → connexion → mode avion → « Vider le cache » seul** (préserve la session dans IndexedDB) → **run froid comparable**.
 
 **Question ouverte du protocole §1, à trancher sur place le jour J :** N = 5 par condition §1 — décider sur place si les runs avant correction ont déjà une couverture suffisante via §7.3 (la lecture CACHE-01 est la condition de la campagne 44).
+
+**Différé consigné (2026-11-12) — aucune mesure de cette campagne.**
+
+L'appareil de référence a été déclaré disponible au démarrage de la session (checkpoint du plan résolu en session, D-05/D-06), mais l'utilisateur n'a pas pu mener les runs ni dicter les valeurs du panneau — « campagne impossible maintenant », l'environnement de mesure (production réelle) n'étant pas accessible dans cette session. Conformément au protocole §1 et à la discipline §2.7 I : **aucune valeur n'est inventée, aucun run n'est consigné, la question ouverte §1 n'est pas tranchée** — elle le sera à la campagne suivante. Les tableaux ci-dessous restent les squelettes du plan 44-01, vides. CACHE-01 reste ouverte ; son état documenté dans le SUMMARY du plan 44-02.
 
 **Évaluation du seuil D-15 (observabilité conditionnelle CACHE-04) — consignée le 2026-11-11 :**
 
@@ -189,9 +193,11 @@ Le biais connu : **le maxAge en vigueur influence le volume réhydraté observé
 - [ ] Panneau cache : rien de persisté
 - [ ] Segment SW absent ou ~0 ms (ou lancement ne réactivant pas de SW résiduel)
 
-**Valeur de la condition :** médiane des 5 runs — à remplir (ni minimum ni maximum ; un run aberrant est un fait à consigner §7.5, jamais lissé).
+**Valeur de la condition :** médiane des 5 runs — **non remplie : différé consigné (2026-11-12)**, aucun run n'a tourné (ni minimum ni maximum ; un run aberrant est un fait à consigner §7.5, jamais lissé).
 
 ### 7.2 Runs après correction
+
+**Différé consigné (2026-11-12) :** aucune correction livrée — la décision CACHE-01 n'est pas rendue (§7.4), donc aucune valeur maxAge n'a été modifiée et aucune re-mesure n'est applicable. Les colonnes « après » restent vides pour la même raison que §7.1.
 
 Condition : _estampille du build_ — à remplir le jour J, seulement si une correction a été livrée. Correction livrée et axe désigné par le profil (CU-02) : _à remplir_. Sans correction livrée, cette section reste vide et cela se consigne comme un fait, jamais comme une absence maquillée (§2.7 I).
 
@@ -207,6 +213,8 @@ Condition : _estampille du build_ — à remplir le jour J, seulement si une cor
 ### 7.3 Volumes réhydratés par famille (lecture panneau, CACHE-01)
 
 La lecture vient du **panneau « Cache hors-ligne »**, alimenté par `inspectPersistedCache` (`app/src/lib/offline/query-persistence.ts`) : par famille, l'âge de la mise en cache (`ageMs`), la durée de conservation en vigueur (`maxAgeMs`) et l'éligibilité à la prune (`pruneEligible`) ; le delta de prune de la dernière restauration vient de `getRestoreOutcome` (compté avant/après par `connectOfflineCache`). À remplir le jour J, N = 5, médiane.
+
+**Différé consigné (2026-11-12) :** la lecture du panneau exige l'appareil de référence — la campagne 44 n'a produit aucune lecture (cf. §7.1). Les critères §5 restent écrits et contraignants ; la décision §7.4 n'est PAS rendue à partir d'aucune donnée absente (CA-04).
 
 | Famille | maxAge | Lignes restaurées (médiane) | pruneEligible (médiane) | Delta prune |
 |---|---|---|---|---|
@@ -225,6 +233,8 @@ La lecture vient du **panneau « Cache hors-ligne »**, alimenté par `inspectPe
 ### 7.4 Décision CACHE-01 par famille
 
 Grille à remplir les données sous les yeux (D-06 — campagne et décision dans la même session, biais d'ordre §6 respecté). Rappel des critères contraignants §5 : la décision (statu quo justifié / nouvelle valeur) est justifiée par **(a) volume observé, (b) tolérance produit écrite §5, (c) coût re-fetch borné foyer** — l'ordre §6 interdit de décider sur (a) seule : ce sont (b) et (c) qui tranchent, jamais la lecture du panneau seule. Un statu quo justifié est une décision valide (CA-03). PROJECT.md ne porte de section « Décision CACHE-01 » qu'une fois cette grille remplie avec des données réelles (§2.7 I).
+
+**Différé consigné (2026-11-12) :** CACHE-01 n'est PAS tranchée dans cette campagne — aucune donnée du panneau (§7.3), et l'ordre consigné §6 interdit de décider sans lecture (CA-04). Les critères §5 écrits avant toute mesure demeurent la grille de décision de la campagne future ; **PROJECT.md ne porte PAS de section « Décision CACHE-01 »** tant qu'aucune donnée ne la justifie (§2.7 I) — il n'est pas touché par la campagne 44. Les valeurs de `OFFLINE_FAMILIES` restent exactement celles en vigueur (aucun commit de famille, D-07 sans objet).
 
 | Famille | Décision | Justification (critères a/b/c) |
 |---|---|---|
@@ -245,21 +255,21 @@ Grille à remplir les données sous les yeux (D-06 — campagne et décision dan
 À remplir le jour J : toute correction hors profil, tout recours au wipe « site data » à la place de la désinstallation, tout déplacement de borne de segment, tout run refait et sa cause, tout run non froid (il n'entre pas dans les médianes — §2.1).
 
 - **Purge par paramètres Android (consignée 2026-11-10, portée dans le squelette de campagne)** : la purge utilise « Vider le cache » via les paramètres applications Android au lieu de la désinstallation complète (alternative documentée §2.1). Chaque run est validé froid par les deux faits de §2.1 ; tout run non froid est refait après purge renforcée (« Effacer le stockage » ou désinstallation) et consigné ici.
-- **Différé d'appareil de la campagne 2026-11-10 :** remplacé par la campagne 44 — ce différé n'a plus cours ; son remplacement sans données nouvelles sera consigné ici le jour J (§2.7 I).
+- **Différé d'appareil de la campagne 2026-11-10 :** remplacé par la campagne 44 — mais la campagne 44 est elle-même un **différé consigné (2026-11-12)** : l'appareil déclaré disponible au checkpoint du plan, l'utilisateur n'a pourtant pas pu mener les runs ni dicter les valeurs (« campagne impossible maintenant » — environnement de mesure de production inaccessible dans la session). Aucune donnée nouvelle n'a été produite par rapport au 2026-11-10 ; ce remplacement sans données est ici consigné (§2.7 I — jamais un maquillage) et la consignation de l'absence est faite en §7.1–7.4.
 
-### 7.6 Chaîne §2.7 exécutée à l'état final du dépôt (squelette — D-08)
+### 7.6 Chaîne §2.7 exécutée à l'état final du dépôt (2026-11-12 — différé consigné, aucun code modifié)
 
 Chaque étape citée avec son résultat (§2.7 F — un succès muet est un échec inexpliqué). La chaîne est exécutée **UNE fois à l'état final du dépôt**, après le dernier commit de famille — pas de chaîne par commit (le SQL n'est pas touché). Étapes attendues (mêmes que la chaîne de la campagne 42) :
 
 | Étape | Commande | Résultat |
 |---|---|---|
-| Estampille quatre canaux | `sh scripts/check-version-stamp.sh` | à remplir |
-| Gate SW simulable | `sh scripts/test-sw-gate.sh` | à remplir |
-| Typecheck | `cd app && npm run typecheck` | à remplir |
-| Tests unitaires | `cd app && npm test` | à remplir |
-| Build prod | `cd app && npm run build` | à remplir |
-| e2e (Docker disponible) | `cd app && npm run test:e2e` | à remplir (si Docker indisponible : absence consignée, forme 38-E2E-SIGNATURE) |
-| Contrôle SQL statique | `python3 ../scripts/check-sql-statique.py` | à remplir (aucune migration ajoutée en phase 44 — la vérification reste exigée) |
-| Auto-exercice du contrôle | `python3 ../scripts/test-check-sql-statique.py` | à remplir |
+| Estampille quatre canaux | `sh scripts/check-version-stamp.sh` | **OK** — canaux égaux au SHA `6ee99684…` avec estampille, `unknown` sans, les deux familles différentes |
+| Gate SW simulable | `sh scripts/test-sw-gate.sh` | **4/4 verts** (deux builds réels, même origin) |
+| Typecheck | `cd app && npm run typecheck` | **OK** |
+| Tests unitaires | `cd app && npm test` | **2006 passed / 245 fichiers** — 0 failed (208 s) |
+| Build prod | `cd app && npm run build` | **OK** — precache 152 entrées (2751,51 KiB) |
+| e2e (Docker disponible) | `cd app && npm run test:e2e` | **163 passed / 9 skipped** (2,9 min ; skips = baseline préexistante datée, 38-E2E-SIGNATURE.md) |
+| Contrôle SQL statique | `python3 ../scripts/check-sql-statique.py` | **aucun défaut** — 231 fonctions effectives sur 182 migrations, 107 tests ; aucune migration ajoutée en phase 44, son absence de requête est un fait vérifié |
+| Auto-exercice du contrôle | `python3 ../scripts/test-check-sql-statique.py` | **OK** — 6 cas, tous verts (cas qui doivent échouer refusés) |
 
-**CHAINE-44-VERTE** — à afficher en fin de chaîne, état du dépôt après le dernier commit de la phase 44.
+**CHAINE-44-VERTE** — affichée en fin de chaîne, état du dépôt après le dernier commit de la phase 44 : la campagne 44 est un **différé consigné** (§7.1–7.5), aucun commit de famille n'existe, aucune valeur de `OFFLINE_FAMILIES` n'a bougé, le buster `v2` est inchangé — la chaîne est verte sur ce même état.
