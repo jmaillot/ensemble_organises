@@ -66,7 +66,7 @@
 **Goal :** Auditer l'intégralité du dépôt (qualité, sécurité/RLS, performance, accessibilité) et corriger uniquement les constats majeurs — sans nouvelle fonctionnalité, sans rupture. Structure : audit-first-per-axis, ordre imposé par les dépendances (RLS d'abord = risque dominant ; audit qualité en dernier = revue finale des fixes eux-mêmes). Les exigences transverses TRA-01/02 s'ancrent dans la phase 45 (première SPEC d'audit qui définit le seuil et introduit les premiers vérificateurs prouvés) ; TRA-03 se clôt en phase 52 (chaîne §2.7 verte à l'état final du jalon).
 
 - [x] **Phase 45: Audit sécurité/RLS** - Rapport complet : matrice RLS 83 tables, 16 Edge Functions, secrets, Storage, tokens — read-only, seuil + stop-list définis (SEC-01, SEC-02, SEC-04, TRA-01, TRA-02) (completed 2026-11-12)
-- [ ] **Phase 46: Fixes RLS majeurs** - Un commit atomique par constat majeur, migrations forward-only 0182+ testées (SEC-03)
+- [x] **Phase 46: Fixes RLS majeurs** - Clôture SEC-03 par preuve d'absence datée : zéro fiche majeure dans le rapport 45, zéro commit applicatif ; SEC-45-01 au backlog (SEC-03) (completed 2026-11-12)
 - [ ] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02)
 - [ ] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03)
 - [ ] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
@@ -107,10 +107,10 @@ Plans:
   3. La chaîne §2.7 complète est verte à l'état final de chaque plan porteur (typecheck, tests, build, e2e, contrôles SQL statiques)
   4. Les cas négatifs SQL (sans foyer, inter-foyer, escalade de privilèges) accompagnent chaque fix de politique et sont vus rouges avant verts
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans executed
 
 Plans:
-- [ ] 46-01-PLAN.md — clôture SEC-03 par preuve d'absence datée (lints + requêtes d'absence + chaîne §2.7) + addendum « Clôture SEC-03 » / « Consolidation phase 52 » dans 45-AUDIT.md + backlog SEC-45-01 dans ROADMAP-TODO.md
+- [x] 46-01-PLAN.md — clôture SEC-03 par preuve d'absence datée (lints + requêtes d'absence + chaîne §2.7) + addendum « Clôture SEC-03 » / « Consolidation phase 52 » dans 45-AUDIT.md + backlog SEC-45-01 dans ROADMAP-TODO.md
 
 ### Phase 47: Audit performance/requêtes
 
@@ -196,8 +196,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
-| 46. Fixes RLS majeurs | 0/? | Not started | - |
-| 47. Audit performance/requêtes | 0/? | Not started | - |
+| 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 0/? | Not started | - |
 | 49. Audit accessibilité WCAG 2.2 AA | 0/? | Not started | - |
 | 50. Fixes a11y majeurs | 0/? | Not started | - |

@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 46
-current_phase_name: fixes-rls-majeurs
-status: executing
-stopped_at: Phase 46 context gathered
-last_updated: "2026-11-12T16:42:06.822Z"
+current_phase_name: Fixes RLS majeurs
+status: verifying
+stopped_at: Completed 46-01-PLAN.md
+last_updated: "2026-11-12T17:01:40.937Z"
 last_activity: 2026-11-12
-last_activity_desc: Phase 45 complete, transitioned to Phase 46
-state_head: dadb511066f1e624227f15c069d3e923c7083aa5
+last_activity_desc: Phase 46 execution started
+state_head: 66934c7476d4356885499b199a8db6e7258e7d0f
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 13
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 45 — Audit sécurité/RLS
+**Current focus:** Phase 46 — Fixes RLS majeurs
 
 ## Current Position
 
-Phase: 46 (fixes-rls-majeurs) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
+Phase: 46 (Fixes RLS majeurs) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-11-12 — Phase 46 execution started
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
 | Phase 45 P01 | 6 min | 3 tasks | 12 files |
 | Phase 45 P02 | 13min | 3 tasks | 13 files |
 | Phase 45 P03 | 105min | 3 tasks | 3 files |
+| Phase 46 P01 | 15m | 4 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,9 +73,9 @@ Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T13:56:16.055Z
-**Stopped at:** Phase 46 context gathered
-**Resume file:** .planning/phases/46-fixes-rls-majeurs/46-CONTEXT.md
+**Last session:** 2026-11-12T17:01:40.892Z
+**Stopped at:** Completed 46-01-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -106,3 +107,9 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 45]: 45-04 : 16/16 Edge Functions cohérentes — aucun mismatch mode déclaré vs comportement, aucune fonction en mode none ; secrets HMAC dédiés par fonction de partage, jamais réutilisés
 - [Phase 45]: 45-04 : 3 buckets Storage tous privés — politiques portées par helpers private.* sur le chemin de foyer ; 212 helpers SECURITY DEFINER, 0 search_path mutable ; 1 seule fonction SD exécutable par anon (preview_household_invite_token, lecture seule)
 - [Phase 45]: 45-04 : rapport consolidé — 2 fiches mineures (SEC-45-01 backlog, SEC-45-02 verrouillé), aucune fiche majeure ; audit secrets par noms/canaux, aucune valeur suivie par git
+- [Phase 46]: SEC-03 clôturée par preuve d'absence datée du jour — zéro fiche majeure, zéro commit applicatif (D-01/D-04)
+- [Phase 46]: SEC-45-01 au backlog (lint 0006 = 10 lignes reconfirmé) — fix = fusion politiques permissives, migration forward-only 0182+, candidat phase 52 (D-02/D-03)
+- [Phase 46]: Régime git .planning/* gitigné (.gitignore:86) prévaut sur « commité » de D-06 — preuve par le contenu, jamais git add -f (A3 résolu)
+- [Phase 46]: SEC-03 clôturée par preuve d'absence datée du jour — zéro fiche majeure, zéro commit applicatif (D-01/D-04)
+- [Phase 46]: SEC-45-01 au backlog (lint 0006 = 10 lignes reconfirmé) — fix = fusion politiques permissives, migration forward-only 0182+, candidat phase 52 (D-02/D-03)
+- [Phase 46]: Régime git .planning/* gitigné (.gitignore:86) prévaut sur « commité » de D-06 — preuve par le contenu, jamais git add -f (A3 résolu)
