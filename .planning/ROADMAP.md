@@ -65,7 +65,7 @@
 
 **Goal :** Auditer l'intégralité du dépôt (qualité, sécurité/RLS, performance, accessibilité) et corriger uniquement les constats majeurs — sans nouvelle fonctionnalité, sans rupture. Structure : audit-first-per-axis, ordre imposé par les dépendances (RLS d'abord = risque dominant ; audit qualité en dernier = revue finale des fixes eux-mêmes). Les exigences transverses TRA-01/02 s'ancrent dans la phase 45 (première SPEC d'audit qui définit le seuil et introduit les premiers vérificateurs prouvés) ; TRA-03 se clôt en phase 52 (chaîne §2.7 verte à l'état final du jalon).
 
-- [ ] **Phase 45: Audit sécurité/RLS** - Rapport complet : matrice RLS 83 tables, 16 Edge Functions, secrets, Storage, tokens — read-only, seuil + stop-list définis (SEC-01, SEC-02, SEC-04, TRA-01, TRA-02)
+- [x] **Phase 45: Audit sécurité/RLS** - Rapport complet : matrice RLS 83 tables, 16 Edge Functions, secrets, Storage, tokens — read-only, seuil + stop-list définis (SEC-01, SEC-02, SEC-04, TRA-01, TRA-02) (completed 2026-11-12)
 - [ ] **Phase 46: Fixes RLS majeurs** - Un commit atomique par constat majeur, migrations forward-only 0182+ testées (SEC-03)
 - [ ] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02)
 - [ ] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03)
@@ -88,7 +88,7 @@
   4. Les lints SQL introduits (pg-meta versionnés dans `supabase/tests/lints/`) sont prouvés sur des cas qui doivent échouer avant de produire un constat retenu (TRA-02, §2.7-B)
   5. Aucun fichier applicatif n'est modifié — la phase est read-only, ses artefacts vivent dans `.planning/phases/45/` (gitignoré)
 
-**Plans**: 4/4 plans executed
+**Plans**: 4/4 plans complete
 
 Plans:
 - [x] 45-01-PLAN.md — SPEC seuil TRA-01 + stop-list SEC-04 + preuve Docker + récupération lints pg-meta (provenance D-09)
@@ -192,7 +192,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 45. Audit sécurité/RLS | 4/4 | Complete | 2026-11-12 |
+| 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
 | 46. Fixes RLS majeurs | 0/? | Not started | - |
 | 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 0/? | Not started | - |

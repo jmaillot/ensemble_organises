@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
-current_phase: 45
-current_phase_name: Audit sécurité/RLS
-status: executing
-stopped_at: Completed 45-04-PLAN.md
-last_updated: "2026-11-12T12:40:30.000Z"
+current_phase: 46
+current_phase_name: Fixes RLS majeurs
+status: planning
+stopped_at: Phase 45 complete, ready to plan Phase 46
+last_updated: "2026-11-12T12:56:02.820Z"
 last_activity: 2026-11-12
-last_activity_desc: Phase 45 execution started
-state_head: f72749b7ac012ba8c2337aa30eb81cb451c354fc
+last_activity_desc: Phase 45 complete, transitioned to Phase 46
+state_head: d6aa733ec3357a918b7e2d902f8b12dd2847df48
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
   completed_plans: 4
-  percent: 0
+  percent: 13
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 45 (Audit sécurité/RLS) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-11-12 — Phase 45 execution started
+Phase: 46 — Fixes RLS majeurs
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
 
 ## Performance Metrics
 
@@ -73,7 +73,7 @@ Last activity: 2026-11-12 — Phase 45 execution started
 ## Session Continuity
 
 **Last session:** 2026-11-12T12:40:30.000Z
-**Stopped at:** Completed 45-04-PLAN.md
+**Stopped at:** Phase 45 complete, ready to plan Phase 46
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
