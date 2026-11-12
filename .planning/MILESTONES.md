@@ -2,6 +2,8 @@
 
 ## v1.4 Preuve & décision (Shipped: 2026-11-12)
 
+**Known verification overrides : 69 items acquittés à la clôture (4 debug sessions, 10 uat_gaps, 5 verification_gaps, 50 différés), 0 reporté d'une clôture antérieure — voir STATE.md « Deferred Items ».**
+
 **Phases completed:** 2 phases, 3 plans, 6 tasks
 
 **Key accomplishments:**
