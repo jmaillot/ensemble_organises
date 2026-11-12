@@ -78,9 +78,9 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | QUA-02 | Phase 51 | Pending |
 | QUA-03 | Phase 52 | Pending |
 | QUA-04 | Phase 52 | Pending |
-| TRA-01 | Phases 45-52 | Pending |
-| TRA-02 | Phases 45-52 | Pending |
-| TRA-03 | Phases 45-52 | Pending |
+| TRA-01 | Phase 45 | Pending |
+| TRA-02 | Phase 45 | Pending |
+| TRA-03 | Phase 52 | Pending |
 
 **Coverage:**
 - v1 requirements: 17 total
