@@ -4,6 +4,10 @@ phase: 34-file-d-criture-rejeu
 source: [34-VERIFICATION.md]
 started: 2026-11-05T14:30:00Z
 updated: 2026-11-06T00:00:00Z
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "passed::scenarios=0"
 ---
 
 ## Current Test
@@ -21,6 +25,7 @@ awaiting: nothing
 > Tier 1 des écritures Courses, commit 0403e0b). Les 3 tests repartent de zéro.
 
 ### 1. Primauté Realtime réelle (D-16/WRQ-06)
+
 expected: Créer une écriture hors-ligne sur Courses, couper le réseau, revenir en ligne avec un second appareil connecté au même foyer, observer l'overlay se remplacer par les données serveur (id et client_key inchangés, pas de doublon ni flash d'ancien état).
 result: [pass]
 note: |
@@ -29,10 +34,12 @@ note: |
   rejeu vert après correctif.
 
 ### 2. Rendu visuel badge/toast (D-11/D-12/D-13)
+
 expected: Enfiler 2 écritures hors-ligne puis provoquer 1 échec terminal ; observer la bannière, le compteur, le toast. Badge visible online et offline, retombe à zéro après rejeu complet, « N bloquées » ouvre le panneau, un seul toast par passe d'échec.
 result: [pass]
 
 ### 3. Parcours e2e appareil réel
+
 expected: Mode avion → ajouter un article Courses + cocher une tâche → retour réseau → vérifier que le serveur contient exactement les 2 écritures et que le badge descend à 0. Exactement une écriture serveur par action, zéro doublon, zéro perte silencieuse.
 result: [pass]
 

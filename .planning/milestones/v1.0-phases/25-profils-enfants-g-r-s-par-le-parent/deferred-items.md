@@ -11,6 +11,7 @@
 - **Piste de correction (pour un plan futur) :** borner l'assertion — ex. `select count(*) from shopping_list_items where list_id like 'list_t139_%' and position is distinct from <rang attendu>` ou faire du backfill une fonction paramétrée par liste ; correction VERS L'AVANT dans une nouvelle migration/test uniquement.
 
 ---
+  status: acknowledged
 
 # 25-04 — Éléments différés (exécution du 2026-10-25/26)
 
@@ -18,6 +19,7 @@
 
 - **test 0139 (ci-dessus) : CORRIGÉ pendant 25-04** — l'assertion globale `v_count = 4` a été remplacée par un comptage borné `id like 'item_t139_%' and position is null = 0` (preuve comportementale, AGENTS.md §2.7 D). Vert.
 - **Régression D-07 de 0146 : CORRIGÉE** — 0146 avait réintroduit la branche `is_household_admin` sur `posts_delete_admin`, `post_comments_delete_admin` et `post_reactions_delete_admin` (recopie de la forme 0109 au lieu de 0117). 0149 rétablit la forme D-07 (auteur uniquement + branche D-12 enfant géré). 0047 et 0052 verts.
+  status: acknowledged
 
 ## Résolu le 2026-10-26 (suite) — familles A/B, D-01 storage, 0053 (barrière 83/83)
 
@@ -59,3 +61,4 @@ correction du 2026-10-26 (commits `3b34fbb`, `b354843`, `2211677`, `d6f4722`,
   `can_write_household`. La fonction reste correcte et inoffensive ; sa
   suppression (avec les négatifs de 0038 qui la documentent) est une piste
   de simplification pour un plan futur, jamais une correction en place.
+  status: acknowledged

@@ -4,9 +4,14 @@ phase: 27-suppression-de-compte-rgpd
 source: [27-01-SUMMARY.md, 27-02-SUMMARY.md, 27-03-SUMMARY.md, 27-04-SUMMARY.md, 27-05-SUMMARY.md]
 started: 2026-10-27T17:10:00Z
 updated: 2026-10-28T00:00:00Z
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "deferred_tests_to_phase_28::scenarios=0"
 ---
 
 ## Current Test
+
 <!-- OVERWRITE each test - shows where we are -->
 
 number: —
@@ -21,27 +26,29 @@ awaiting: phase closure
 ## Tests
 
 ### 1. Démarrage à froid après les migrations RGPD
+
 expected: La stack redémarre proprement avec la migration 0170 appliquée : l'app se charge, la connexion fonctionne, une requête basique (tableau de bord) renvoie des données vivantes.
 result: pass
 
 ### 2. Panneau « Mes données (RGPD) » dans Paramètres
+
 expected: Dans Paramètres, le panneau RGPD propose l'export des données et la suppression du compte ; la demande de suppression affiche un avertissement clair (délai J+30, sessions coupées, restauration nom/photo possible via le lien d'annulation).
 result: pass
 
 ### 3. Demande de suppression : déshumanisation + message honnête
+
 expected: Après confirmation de la demande, le nom/photo du membre disparaissent des espaces du foyer (affichés comme compte supprimé) ; le panneau n'affiche « sessions coupées » QUE si sessions_revoked est vrai, n'affiche jamais email_error brut, et ne promet jamais de « restauration des sessions ».
 result: pass
 
 ### 4. Sessions réellement révoquées (GoTrue)
+
 expected: Dans Studio (auth.sessions / table des sessions), les sessions de l'utilisateur qui a demandé la suppression sont réellement révoquées après la demande — pas seulement côté client.
 result: pass
 resolved: 2026-10-28 — retest humain après la chaîne de correctifs 8bdb858/efaed47/9b29689/9c8dddd : panneau succès, déconnexion immédiate, preuve SQL sessions_restantes = 0 (voir G-27-4).
 originally: "Session encore vivante dans auth.sessions (not_after NULL, updated_at 08:19) après la demande de suppression — le kill global GoTrue n'a pas touché cette session."
 
-
-
-
 ### 5. Relecture : commentaires véridiques (WR-01/WR-03)
+
 expected: Relecture des commentaires posés par 0170 et du doc-comment database.ts : le contrat best-effort du rappel J-7 (échec de livraison = alerte perdue) et l'absence de filtre account_deleted_at dans les sélecteurs sont énoncés honnêtement (jugement de relecture, disposition 27-REVIEW-DISPOSITION §WR-01/WR-03).
 result: pass
 source: human (agent relecture, 2026-10-28) — les trois affirmations vérifiées contre le dépôt :
@@ -56,24 +63,28 @@ source: human (agent relecture, 2026-10-28) — les trois affirmations vérifié
 **Coverage auto-passed (automated, #1602) :**
 
 ### A1. Purge J+30 100 % SQL (D1)
+
 expected: Données partagées intactes quand d'autres adultes restent, enfants transférés (D-08), demande purgée + compte supprimé.
 result: pass
 source: automated
 coverage_id: D1
 
 ### A2. Foyer orphelin supprimé avec manifest médias (D2)
+
 expected: Manifest construit AVANT suppression ; foyers conservés n'y génèrent aucune ligne ; objets Storage jamais touchés par le SQL.
 result: pass
 source: automated
 coverage_id: D2
 
 ### A3. Alerte J-7 idempotente (D3)
+
 expected: Le flag rappel_envoye n'est posé que derrière un POST partant ; seconde exécution sans nouveau POST.
 result: pass
 source: automated
 coverage_id: D3
 
 ### A4. Négatifs purge + privilèges (D4)
+
 expected: Demande annulée ou pas encore due jamais purgée ; execute réservé à service_role.
 result: pass
 source: automated

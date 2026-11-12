@@ -35,6 +35,7 @@ casse).
   de lignes.
 - **Découvert pendant :** Task 2 — le test déterministe a dû être rendu
   indépendant de cet état (membre dédié, sans widget semé).
+  status: acknowledged
 
 ## 2. Tests e2e périmés (échecs préexistants, sans rapport avec 18-01)
 
@@ -62,6 +63,7 @@ chromium/mobile).
   (`d36359c` : 123 passés / 5 ignorés) ; cette passe n'a **pas** relancé la suite :
   c'est la cause exacte des 4 échecs qui est démontrée corrigée, pas le résultat
   global qui a été re-mesuré ici.
+  status: acknowledged
 
 ## 3. Classe WR-02 hors périmètre : les autres corbeilles admin-seules (relevé pendant 18-03)
 
@@ -134,6 +136,7 @@ demande un plan dédié, pas un correctif d'urgence.
   était le dernier site de la classe (il l'était pour les dossiers, corrigé dans
   18-03 par `Rule 2`), le relevé des politiques a montré que la classe dépasse
   largement les trois modules traités.
+  status: acknowledged
 
 ## 4. La reprise d'amorçage rétablit la session mais pas le foyer (relevé pendant 18-04)
 
@@ -168,6 +171,7 @@ demande un plan dédié, pas un correctif d'urgence.
   au lieu de sortir sans le charger.
 - **Découvert pendant :** Task 2 — en cherchant quel état la reprise laissait
   derrière elle quand l'échec ne venait pas de `getSession`.
+  status: acknowledged
 
 ## 5. `placePhotoPathOf` ne normalise pas une valeur blanche (relevé pendant 18-05)
 
@@ -210,6 +214,7 @@ demande un plan dédié, pas un correctif d'urgence.
   `resolveHouseholdMediaUrl` (`:119-124` → `:216`) ; `deletePlacePhoto`
   (`:147-150`) en hérite, donc plus de `removeHouseholdFile('  ')` ni de
   `createSignedUrl('  ')`.
+  status: acknowledged
 
 ## 6. L'en-tête de `STATE.md` porte encore un pointeur global périmé (relevé pendant 18-06)
 
@@ -253,6 +258,7 @@ demande un plan dédié, pas un correctif d'urgence.
     `e2f76ed9…`, devenu **injoignable** après la réaccentuation des messages de la
     phase 23 (`code content` inchangé, SHA nouveaux). Corrigé vers `23c4fb9f…`
     dans le même mouvement.
+  status: acknowledged
 
 ## 7. Script de mesure Playwright non suivi à la racine de `app/` (relevé pendant 18-06)
 
@@ -272,6 +278,7 @@ demande un plan dédié, pas un correctif d'urgence.
   ignore nommément `app/shot-toggle-on.mjs` (vérifié par `git check-ignore -v`) et
   `git status --porcelain --untracked-files=all` est vide. Le fichier est conservé
   à dessein (39 lignes, travail de l'auteur), hors du champ d'un `git add -A`.
+  status: acknowledged
 
 ## Clôture des escalades §1 et §4 (plan 18-06)
 
@@ -301,3 +308,4 @@ ROADMAP, la phase que `phase.complete 23` et `stopped_at` désignent tous deux) 
 le constat d'origine est donc à lire en deux parties, comme le détaille §6. §3
 reste **assumé, non traité** (décision du 2026-10-16). §1 et §4 sont fermés par
 `68b5427` et `f79d553`, comme la clôture de 18-06 l'annonçait.
+  status: acknowledged

@@ -6,8 +6,11 @@ score: 3/4 Success Criteria vérifiées (la 4e est présente et câblée, compor
 behavior_unverified: 1
 overrides_applied: 0
 re_verification: null
+
 # `gsd_run query verification.fingerprint` indisponible dans cet environnement
+
 # (même situation que 33-VERIFICATION.md) — covered_digest non calculé.
+
 covered_files:
   - .planning/phases/32-install-raccourcis/32-01-PLAN.md
   - .planning/phases/32-install-raccourcis/32-01-SUMMARY.md
@@ -39,6 +42,7 @@ covered_files:
   - app/src/modules/parametres/components/offline-panel.tsx
   - app/src/main.tsx
   - app/src/app/app-shell.tsx
+
 behavior_unverified_items:
   - truth: "Quand une mise à jour du service worker est disponible, l'utilisateur la voit (bandeau) et le rechargement n'arrive jamais sans son action — sur un déploiement réel"
     test: "Au prochain déploiement naturel (release-build), ouvrir l'app installée avec une version antérieure, attendre le nouveau worker en attente"
@@ -48,6 +52,10 @@ human_verification:
   - test: "Re-jouer UAT test 7 au prochain déploiement réel (même véhicule que 35-UAT test 2) : ouvrir l'app installée sur la version N, déployer N+1, observer"
     expected: "Bandeau « Une mise à jour est disponible » apparaît (jamais de reload spontané) ; « Recharger » actif si file vide, sinon libellé « Mise à jour en préparation… » ; après rechargement, la version du worker dans le panneau offline change"
     why_human: "Dépend d'un vrai cycle de déploiement avec un onglet ouvert — non reproductible hors production ; jamais exercé depuis la livraison de la phase"
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  status: human_needed
 ---
 
 # Phase 32: Install & raccourcis Verification Report

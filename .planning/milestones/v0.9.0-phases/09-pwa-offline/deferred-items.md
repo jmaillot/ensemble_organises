@@ -40,3 +40,4 @@ et re-vérifiée telle quelle ») est **périmée** — la garantie n'est plus
 l'heure de la journée mais l'instant relatif, verrouillé par la garde.
 
 *Ce registre est désormais entièrement balayé : son unique constat est fermé.*
+  status: acknowledged

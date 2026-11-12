@@ -64,6 +64,7 @@ covered_files:
   - supabase/migrations/0123_dashboard_widget_width_zero.sql
   - supabase/tests/0122_dashboard_widget_width.sql
   - supabase/tests/0123_rls_delete_zero_rows.sql
+
 covered_digest: "v3:sha256:fb2b2bdb197677d157d555f0c42fec7fa11e1a94987751e3171496ca5a3a7068"
 behavior_unverified: 0
 overrides_applied: 0
@@ -74,6 +75,10 @@ human_verification:
   - test: "Amorçage d'auth : provoquer un échec de `loadHousehold` (réseau/5xx sur `household_members`), voir l'écran d'erreur, cliquer « Réessayer »."
     expected: "L'utilisateur atteint son tableau de bord (foyer rechargé)."
     why_human: "`retry` relance l'effet mais `signIn` pose `status='authenticated'` avant `await loadHousehold()` (session-store.ts:24-27), donc la seconde tentative prend la branche « session déjà établie » d'`applySession` et ne relit jamais le foyer (deferred-items.md §4, 0 appel à `household_members` mesuré) : l'utilisateur atterrit sur `/foyer` « Vous n'avez pas encore de foyer » alors que son foyer existe. Le test de `use-auth.test.ts` verrouille « l'échec rendu, la reprise, la non-fuite du détail » mais pas la restauration du foyer à la reprise. Décision in/out-of-scope à prendre."
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  status: human_needed
 ---
 
 # Phase 18: Durcissement frontend — correctifs de revue de code — Verification Report

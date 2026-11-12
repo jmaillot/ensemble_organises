@@ -7,6 +7,7 @@
   `findByText('Journée libre')` échoue. 243/244 fichiers verts, 1987/1988 tests verts.
   Le plan 39-01 ne touche aucun fichier `app/` (scripts + docs uniquement), le défaut
   est donc préexistant au plan. À traiter dans un chantier dédié.
+  status: acknowledged
 
 ## 2026-11-09 — plan 39-02
 
@@ -20,3 +21,4 @@
   avant /gsd-verify-work : `sh scripts/test-join-token-real.sh` depuis l'hôte de
   la stack — les 6 points JT-02 doivent être verts avec la ligne « comptes
   purgés, purge prouvée (re-delete → 404) » du trap.
+  status: acknowledged

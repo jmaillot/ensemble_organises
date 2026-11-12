@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "unknown::scenarios=0"
+---
+
 # UAT — Phase 21 : Photos dans les étapes de recette
 
 > UAT conversationnelle du 24/10/2026, exécutée par l'utilisateur **en production**

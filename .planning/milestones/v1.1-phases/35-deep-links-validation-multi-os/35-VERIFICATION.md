@@ -33,6 +33,7 @@ covered_files:
   - app/src/lib/query-policy.ts
   - app/src/components/banners/update-banner.tsx
   - app/src/modules/parametres/components/offline-panel.tsx
+
 covered_digest: "v2:78ba68152b9c1d3c332e8399d6ef899be7367d6bb7e1dc9d3ca4f480df3f4042"
 behavior_unverified: 0
 overrides_applied: 0
@@ -78,6 +79,10 @@ human_verification:
   - test: "Rejeu Android §1.4 après le diagnostic DLNK-02 Android : cold-start déconnecté avec session sur Android 16, deep link /taches/jour"
     expected: "/taches/jour rendue depuis le cache persisté (plus d'écran « Chargement de votre foyer ») — re-celler l'item deferred-items.md et lever le bloqueur STATE.md uniquement sur Passé consigné"
     why_human: "L'échec Android est observé uniquement on-device (le symptôme « encore chargement de votre foyer » suggère un contrôle SW ou une restauration persist divergents sur Android) ; aucun émulateur de ce régime n'est automatisable tel quel"
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  status: human_needed
 ---
 
 # Phase 35: Deep links & validation multi-OS Verification Report

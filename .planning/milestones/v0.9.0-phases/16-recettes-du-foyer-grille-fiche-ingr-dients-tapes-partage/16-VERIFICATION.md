@@ -12,6 +12,10 @@ human_verification:
   - test: "Dans la fiche, cliquer Exporter puis ouvrir l'apercu avant impression du navigateur"
     expected: "Nom + ingredients recalcules a l'echelle courante + etapes numerotees, sans photo, sans chrome applicatif"
     why_human: "Le rendu @media print ne peut pas etre verifie par grep ; l'e2e ne constate que l'existence du noeud .recipe-print masque a l'ecran"
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  status: human_needed
 ---
 
 # Phase 16 : Recettes du foyer Verification Report

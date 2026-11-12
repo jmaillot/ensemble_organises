@@ -8,6 +8,7 @@
   pg_cron `eo-routine-maintenance` et l'assertion d'occurrence du jour) ; la voie testée
   (`push_birthday_notifications` → `household_birthday_alerts`) n'a aucun lien avec cron.
   À traiter dans un plan de hygiène dédié ou à la revue de la phase 30.
+  status: acknowledged
 
 ## 30-02 (2026-10-30) — échec pré-existant hors périmètre : test calendrier « supprime un événement après confirmation »
 

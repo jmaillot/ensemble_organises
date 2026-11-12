@@ -4,6 +4,10 @@ phase: 37-filet-de-tests-fiable
 source: [37-01-SUMMARY.md, 37-02-SUMMARY.md]
 started: 2026-11-08T00:00:00Z
 updated: 2026-11-08T00:00:00Z
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "passed::scenarios=0"
 ---
 
 ## Current Test
@@ -13,12 +17,14 @@ updated: 2026-11-08T00:00:00Z
 ## Tests
 
 ### 1. Purge de la clé de session GoTrue à la déconnexion
+
 expected: |
   Connecté avec un compte A sur un appareil, déconnexion via l'app → le Local Storage
   ne contient plus AUCUNE clé `sb-*-auth-token*` (base ni chunks .0/.1/…).
 result: pass
 
 ### 2. Purge invité (chock point commun)
+
 expected: |
   Toute purge de session invité convergeant vers session-store.signOut élimine aussi
   la clé GoTrue — même vérification Local Storage après une purge invité.
@@ -42,6 +48,7 @@ complements: |
      avant l'incrément pour un membre). Note ajoutée au panneau (plan 37-03).
 
 ### 3. Robustesse du test D auth-bootstrap hors ligne
+
 expected: |
   La suite de tests ne présente plus de flocon sur le test D auth-bootstrap :
   `cd app && npx vitest run src/hooks/__tests__/auth-bootstrap-offline.test.tsx`
@@ -49,6 +56,7 @@ expected: |
 result: pass
 
 ### 4. E2E appareil partagé avec 2 comptes réels (TEST-03)
+
 expected: |
   `offline-shared-device` exécuté au vert avec deux comptes réels : A et B partagent
   l'appareil, B voit SES lignes hors ligne, et aucune clé GoTrue ne survit à la

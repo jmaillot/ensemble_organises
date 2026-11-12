@@ -29,7 +29,7 @@ casse).
   « Sélectionnez une image (JPEG, PNG ou HEIC). »
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `d36359c` (22-02 (a)) — `cercle/lib/media.ts:82` n'écarte plus qu'un type DÉCLARÉ non-image (`file.type !== '' && !file.type.startsWith('image/')`) ; le refus tombe au décodage (`:100-106`), avec le même message.
-
+  status: acknowledged
 
 ## 2. Deux consommateurs de `NoteAttachment.url` n'appartiennent à aucun plan de la phase
 
@@ -51,7 +51,7 @@ casse).
 ---
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `d6854f4` (Task 1 de 19-01) — `notes/types.ts:74` déclare `url: string | null`, et les deux consommateurs gardent : `notes-page.tsx:266,271` (`href={attachment.url ?? undefined}`) et `note-form-dialog.tsx:198`.
-
+  status: acknowledged
 
 # Phase 19 — éléments relevés hors périmètre (exécution du plan 19-04)
 
@@ -67,7 +67,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
 - **Découvert pendant :** Task 2 — l'inventaire `grep -n "openEdit\|setPendingDelete\|openCreate"` demandé par l'action a montré que `openCreate` a un appelant hors garde.
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `d36359c` (22-02 (b)) — `calendrier-page.tsx:467` passe `onLongPress={isChild ? undefined : openCreate}`, le texte d'aide devient conditionnel (`:254`, `calendar-grid.tsx:214`) et `calendar-grid.tsx:34,73` rend le geste facultatif. Assertion : `calendrier-page.test.tsx:298`.
-
+  status: acknowledged
 
 ## 4. Une ligne de `use-notifications.ts` porte deux instructions (défaut de forme préexistant)
 
@@ -78,7 +78,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
 - **Découvert pendant :** Task 3, lecture du corps du memo (l'inventaire des dépendances part de la ligne 233).
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `d36359c` (22-02 (c)) — `use-notifications.ts:146` et `:148` sont deux instructions distinctes (la ligne 147 est vide).
-
+  status: acknowledged
 
 ## 5. Le memo `items` se recalcule à chaque rendu quand la session n'est pas connectée (cause amont, préexistante)
 
@@ -100,7 +100,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
 > (`22-VERIFICATION.md:107`, `22-02-SUMMARY.md:71`) et **délibérément non
 > corrigé** : ce n'est pas un défaut de correction, seulement un effet qui se
 > rejoue à vide. Ne pas lire ce statut comme « plus aucune occurrence ».
-
+  status: acknowledged
 
 # Phase 19 — éléments relevés hors périmètre (exécution du plan 19-06)
 
@@ -128,7 +128,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
   vert à la 1ʳᵉ et à la 3ᵉ).
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** — la course nommée est retirée par `75850b1` (21-05) : `e2e/recettes.spec.ts:158` attend que le champ soit vidé (`await expect(input).toHaveValue('')`) avant le remplissage suivant, parce que `submitAdd` remet le brouillon à vide **après** son `await onAdd` ; `recipe-steps.tsx:168` porte en plus la garde `disabled={isSaving || draft.trim() === ''}`. Ce commit s'est vérifié lui-même par `--repeat-each=4` → 80 passés. **La condition d'apparition a été rejouée le 2026-10-17** : `cd app && npm run test:e2e` (suite entière, parallèle) rend **123 passés / 5 sautés, zéro échec**, deux exécutions consécutives, et le test cité — désormais `:186` — y passe (3,0 s puis 2,7 s). Deux verts consécutifs ne prouvent pas l'absence de toute instabilité, mais la course nommée a une cause écrite et cette cause est hors du code : la condition qui la révélait ne se reproduit plus.
-
+  status: acknowledged
 
 ## 7. La redirection de `RequireAuth` perd la requête, et rien ne lit `?token=`
 
@@ -153,7 +153,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
   a montré que personne ne le lit, et que le token d'URL n'a pas de lecteur.
 
 **Statut (passe de vérité du 2026-10-17) : CLOS**, les deux moitiés, par `1126bc4` (19-14) puis `79e0fbd` (19-16) — `router.tsx:38` porte `state={{ from: location.pathname + location.search }}`, `sign-in-page.tsx:83` honore `from`, et `join-household-page.tsx:26,36` lit `?token=`.
-
+  status: acknowledged
 
 ## 8. L'accroche de la landing annonce « Seize espaces » et en rend dix-sept
 
@@ -172,7 +172,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
   demandé de compter les liens de `main`, ce qui a fait apparaître l'écart.
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `d36359c` (22-02 (f)) — `landing-page.tsx:124` lit `{modules.length}` (17 entrées, `modules.ts:50-68`), verrouillé par `landing-page.test.tsx:49` : le nombre ne peut plus dériver.
-
+  status: acknowledged
 
 ## 9. Trois fichiers non suivis traînent à la racine du dépôt
 
@@ -194,7 +194,7 @@ Même règle que ci-dessus : ces constats ont été faits pendant l'exécution d
 ---
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `7437f51` (20-02) — `.gitignore:62` (`.claude/worktrees/`), `:66` (`.gsd/`) et `:71` (`app/shot-toggle-on.mjs`) ; `git status --short` est vide et `git check-ignore` nomme ces entrées.
-
+  status: acknowledged
 
 # Phase 19 — éléments relevés hors périmètre (exécution du plan 19-09)
 
@@ -249,6 +249,7 @@ Même règle que ci-dessus : ce constat a été fait pendant l'exécution de
 - **Découvert pendant :** Task 2 — la recherche des lecteurs restants de `cover_url`
   (`grep -rn "cover_url" app/src/modules/ardoise`) a montré que le troisième écran du
   module, l'invité, lit la même colonne depuis une autre provenance.
+  status: acknowledged
 
 ## 11. `use-notifications.test.tsx` échoue par expiration (4 cas) — préexistant, hors plan 19-11
 
@@ -274,7 +275,7 @@ Même règle que ci-dessus : ce constat a été fait pendant l'exécution de
 - **Découvert pendant :** la vérification finale de 19-11 (`npm test` complet).
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `1f6eb50` (19-15) — les cinq `created_at` de messages passent à `minutesAgo` (`seed.ts:75`, `:1281…1314`, plus aucun instant futur), `seed-instants.test.ts` interdit la récidive, et `use-notifications.test.tsx:35-43` fixe la bascule passé/futur (plus d'horloge).
-
+  status: acknowledged
 
 ## 12. Décompte de `npm test` : 4 échecs préexistants, à ne pas attribuer à 19-11
 
@@ -289,7 +290,7 @@ Même règle que ci-dessus : ce constat a été fait pendant l'exécution de
   régression de 19-11. Aucune correction ici.
 
 **Statut (passe de vérité du 2026-10-17) : PÉRIMÉ** — les « 4 échecs préexistants » sont fermés par `1f6eb50` (19-15) et le décompte (134 fichiers / 1145 cas) est dépassé (cf. `d36359c` : 148 fichiers / 1264 cas).
-
+  status: acknowledged
 
 ## 13. §11 : cause PROUVÉE (la piste « dépend de l'heure » est confirmée et localisée)
 
@@ -303,10 +304,8 @@ rien introduit ; elle a ajouté un cas (13 → 14) qui passe.
 
 **Il est horaire, dans le même arbre.** Même commit courant, deux fuseaux :
 
-| `TZ` | heure locale vue | `use-notifications.test.tsx` |
-|---|---|---|
-| `Europe/Paris` | 2026-10-16 00:27 | **4 échoués**, 10 passés |
-| `Pacific/Midway` | 2026-10-15 11:23 | **14 passés**, 4,4 s |
+- `TZ=Europe/Paris` : heure locale vue 2026-10-16 00:27 — `use-notifications.test.tsx` **4 échoués**, 10 passés
+- `TZ=Pacific/Midway` : heure locale vue 2026-10-15 11:23 — `use-notifications.test.tsx` **14 passés**, 4,4 s
 
 **Ce n'est pas de la lenteur.** Avec `--testTimeout=30000`, le fichier échoue
 toujours (4/4) : le `waitFor` ne retombe jamais. `vitest` annonce bien
@@ -358,7 +357,7 @@ La garde à poser est de classe : aucun instant ensemencé ne doit être postér
 ---
 
 **Statut (passe de vérité du 2026-10-17) : CAUSE LEVÉE** — cette analyse prouvait la cause de §11 ; `1f6eb50` (19-15) a changé les cinq `created_at` en instants relatifs et ajouté `seed-instants.test.ts`, donc la cause n'existe plus. Le « à corriger » ci-dessus est supersédé par 19-15.
-
+  status: acknowledged
 
 ## 14. `0004_cron.sql` échoue par frontière de date UTC/Paris — préexistant, hors plan 19-12
 
@@ -404,7 +403,6 @@ l'assertion (`(now() at time zone 'Europe/Paris')::date - 20`, et non
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `15458ef` (19-15) — `0004_cron.sql:55` mesure le temps en `Europe/Paris` (`v_today`), et la graine (`:64`) comme l'assertion (`:93`, `:124`) s'y accordent.
 
-
 ## 15. Le formulaire « Rejoindre un foyer » ne lit toujours pas `?token=` — reste de §7
 
 - **Fichiers :** `app/src/modules/landing/join-household-page.tsx` (formulaire à
@@ -432,7 +430,7 @@ l'assertion (`(now() at time zone 'Europe/Paris')::date - 20`, et non
   `modules/landing/`).
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** par `79e0fbd` (19-16) — `join-household-page.tsx:2,26,36,41` lit `?token=` et préremplit le champ.
-
+  status: acknowledged
 
 ## 16. `recettes.spec.ts:159` instable sous la charge de la suite e2e entière (classe de §6)
 
@@ -450,6 +448,4 @@ l'assertion (`(now() at time zone 'Europe/Paris')::date - 20`, et non
 - **Découvert pendant :** vérification finale de `19-14`.
 
 **Statut (passe de vérité du 2026-10-17) : CLOS** — même classe que §6, même remède : le helper `seedTwoSteps` attend le champ vide avant la saisie suivante (`e2e/recettes.spec.ts:158`) depuis `75850b1` (21-05), et la course qu'il retirait est la seule cause nommée de cette instabilité. **Condition d'apparition rejouée le 2026-10-17** : `cd app && npm run test:e2e` → **123 passés / 5 sautés, zéro échec**, deux exécutions consécutives, et le test cité — désormais `:164` — y passe (3,3 s puis 3,1 s). Il avait échoué le 2026-10-16 sous la même charge : la référence attendue est retrouvée et tenue deux fois de suite.
-
-
-
+  status: acknowledged

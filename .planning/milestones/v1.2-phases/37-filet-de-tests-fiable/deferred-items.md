@@ -7,3 +7,4 @@
 - **Nature :** flocon temporel sous charge parallèle (243 fichiers) — attente fixe de 1200 ms (l.330) pas toujours suffisante sous contention worker, même famille que le flocon test D corrigé en `b0c9c3d`.
 - **Périmètre :** test non modifié par la phase 37, aucune cause dans ses diffs (les seuls changements de la phase touchent auth-bootstrap-offline.test.tsx, session-cache/store, e2e spec et docs). Out-of-scope → non corrigé (§2.7, périmètre).
 - **Re-test proposé :** même traitement que TEST-01 (options explicites sur l'attente, bornées au test), ou investigation de `isolate: false` signalée par Vitest. Candidat naturel pour une future passe « filet de tests » si le jalon v1.3 contient de la dette test.
+  status: acknowledged

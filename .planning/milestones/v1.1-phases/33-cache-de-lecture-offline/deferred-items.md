@@ -14,3 +14,4 @@
   de correctifs dédié — probablement un sélecteur de modale modifié par
   d404ed0 (« UI : corrections de la critique Impeccable ») sans mise à jour
   du test.
+  status: acknowledged

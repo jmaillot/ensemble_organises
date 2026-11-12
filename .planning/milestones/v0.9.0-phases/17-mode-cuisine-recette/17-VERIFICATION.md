@@ -25,6 +25,7 @@ covered_files:
   - app/src/modules/recettes/recette-cuisine.test.tsx
   - app/src/modules/recettes/recette-detail-page.tsx
   - app/src/modules/recettes/use-screen-wake-lock.test.tsx
+
 covered_digest: "v2:sha256:7cf9640d5f506c41877d360c66cf155b86fc9afc78f9ff1aa0d280eafb2e4c96"
 behavior_unverified: 0
 overrides_applied: 0
@@ -60,6 +61,10 @@ human_verification:
   - test: "Ouvrir une fiche recette sur mobile 390px et 360px : le toggle Mode cuisine reste sur la ligne du titre Étapes en haut à droite, jamais sous la description, zéro scroll horizontal — re-test G-17-2"
     expected: "Toggle sur la ligne du titre, calé à droite du panneau ; description sous le titre ; scrollWidth <= innerWidth"
     why_human: "Mise en page mobile réelle (flex-wrap, breakpoint 650px, largeur tactile) — Vitest prouve les classes, e2e prouve en démo Chromium, l'œil confirme sur vrai petit écran"
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  status: human_needed
 ---
 
 # Phase 17: Mode cuisine recette Verification Report

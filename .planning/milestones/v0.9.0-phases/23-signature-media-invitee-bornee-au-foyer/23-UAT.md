@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "unknown::scenarios=0"
+---
+
 # UAT — Phase 23 : Signature média invitée bornée au foyer
 
 > UAT conversationnelle du 24/10/2026, en production (build `c92cb55`).

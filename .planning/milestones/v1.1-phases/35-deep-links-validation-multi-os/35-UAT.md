@@ -4,6 +4,10 @@ phase: 35-deep-links-validation-multi-os
 source: [35-VERIFICATION.md]
 started: 2026-11-06T18:30:00Z
 updated: 2026-11-06T20:10:00Z
+audit_acknowledged:
+  milestone: v1.4
+  at: 2026-11-12
+  gap_snapshot: "partial::scenarios=0"
 ---
 
 ## Current Test
@@ -15,17 +19,20 @@ awaiting: [none]
 ## Tests
 
 ### 1. Matrice iOS réelle (install, raccourcis, lecture offline avec bandeau, rejeu foreground, purge A→B, deep link cold-start, quirks ITP/éviction)
+
 expected: Chaque cellule iOS consigne un statut réel daté ; rien n'est coché à tort. Le critère roadmap « trois OS » ne peut être déclaré atteint qu'après ce passage.
 result: skipped
 reason: "Appareil iOS non disponible — archivé par l'utilisateur ; les cellules matrice restent « Non testé (appareil absent) », l'absence reste consignée honnêtement (jamais cochée à tort)"
 
 ### 2. Gate SW « file vide » déclenché on-device (à la prochaine mise en production)
+
 expected: |
   Avec une file d'écriture non vide et une proposition de mise à jour SW réelle : bouton désactivé + label « Mise à jour en préparation… » sur update-banner ET panneau Paramètres, zéro reload pendant le rejeu, puis file vidée → bouton actif.
 result: skipped
 reason: "Reporté au jour d'un rebuild réel — le gate exige une proposition de mise à jour SW réelle (aucun build publié pendant les passages) ; le code est vérifié (update-banner.tsx:29, offline-panel.tsx:142), rejeu consigné dans la matrice §2 à la prochaine mise en production"
 
 ### 3. Rejeu Android §1.4 après le diagnostic DLNK-02 Android
+
 expected: |
   Cold-start déconnecté avec session sur Android 16, deep link /taches/jour → la vue rend depuis le cache persisté (plus d'écran « Chargement de votre foyer »). Sur Passé consigné : celler l'item deferred-items.md et lever le bloqueur STATE.md.
 result: passed
