@@ -3,19 +3,18 @@ gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Preuve & décision
 current_phase: 44
-current_phase_name: Décision cache maxAge par famille (CACHE-01)
-status: executing
-stopped_at: Completed 44-01-PLAN.md
-last_updated: "2026-11-11T20:46:30.569Z"
-last_activity: 2026-11-11
-last_activity_desc: Phase 44 execution started
-state_head: 1f472afbe0c1be49d92dbd598b0d646ac9b0b0b6
+status: completed
+stopped_at: Phase 44 complete — all phases complete
+last_updated: "2026-11-12T08:14:21.252Z"
+last_activity: 2026-11-12
+last_activity_desc: Phase 44 complete
+state_head: 592fa18a9ed9dbe45e01941031c77fd25bf33e50
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -29,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-11-11)
 
 ## Current Position
 
-Phase: 44 (Décision cache maxAge par famille (CACHE-01)) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-11-11 — Phase 44 execution started
+Phase: 44
+Plan: Not started
+Status: All phases complete
+Last activity: 2026-11-12 — Phase 44 complete
 
 ## Performance Metrics
 
@@ -70,7 +69,7 @@ Last activity: 2026-11-11 — Phase 44 execution started
 ## Session Continuity
 
 **Last session:** 2026-11-11T20:46:30.531Z
-**Stopped at:** Completed 44-01-PLAN.md
+**Stopped at:** Phase 44 complete — all phases complete
 **Resume file:** None
 
 - Phase 43 close (run 11 vert, gates tous passés) — voir PROJECT.md « État courant ».
