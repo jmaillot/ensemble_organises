@@ -5,16 +5,16 @@ milestone_name: Audit complet & durcissement
 current_phase: 45
 current_phase_name: Audit sécurité/RLS
 status: executing
-stopped_at: Completed 45-02-PLAN.md
-last_updated: "2026-11-12T11:31:36.292Z"
+stopped_at: Completed 45-03-PLAN.md
+last_updated: "2026-11-12T12:29:20.180Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 45 execution started
-state_head: af2313c37acb0262271ce473e6fae3a1875c0e3e
+state_head: 3289d0c4c44f5d4b208e183fd996bab5cd8684ad
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 45 (Audit sécurité/RLS) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 45 execution started
 
@@ -48,6 +48,7 @@ Last activity: 2026-11-12 — Phase 45 execution started
 |------|----------|-------|-------|
 | Phase 45 P01 | 6 min | 3 tasks | 12 files |
 | Phase 45 P02 | 13min | 3 tasks | 13 files |
+| Phase 45 P03 | 105min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -71,8 +72,8 @@ Last activity: 2026-11-12 — Phase 45 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T11:31:29.404Z
-**Stopped at:** Completed 45-02-PLAN.md
+**Last session:** 2026-11-12T12:29:20.146Z
+**Stopped at:** Completed 45-03-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -99,3 +100,6 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 45]: Provenance officielle des lints : dépôt supabase/splinter tag 2026.09.1 — supabase/postgres-meta supposé par RESEARCH.md ne contient aucune règle de lint ; splinter est la source citée par la doc officielle du database linter — provenance D-09 satisfaite
 - [Phase 45]: auth.uid() lit request.jwt.claims — fixture JWT 0002 utilisable telle quelle — Preuve pg_get_functiondef datée 2026-11-12T11:09:12Z dans 45-AUDIT.md ; aucun changement requis dans le traversant du plan 03
 - [Phase 45]: Lints pg-meta versionnés avec périmètre public explicite (SPEC §3) et motif 0015 adapté au dé-parse jwt() non qualifié (§2.7-D.6)
+- [Phase 45]: 45-03 : racines households/members/profiles sondées par négatifs escalade + tests dédiés 0007 (sondes destructrices remplacées)
+- [Phase 45]: 45-03 : 6 tables zéro-grant classées couverture indirecte — preuve par refus systématique + information_schema (SEC-45-02 reclasse mineur, verrouillé)
+- [Phase 45]: 45-03 : birthdays.contact_id NULL dans le traversant — le déclencheur 0097 mirror_contact_birthday effaçait la fixture portant un contact_id
