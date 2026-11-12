@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 45
 current_phase_name: Audit sécurité/RLS
-status: planning
-stopped_at: Phase 45 context gathered
-last_updated: "2026-11-12T10:21:20.339Z"
+status: executing
+stopped_at: Completed 45-01-PLAN.md
+last_updated: "2026-11-12T11:15:19.749Z"
 last_activity: 2026-11-12
-last_activity_desc: Roadmap v1.5 créé (phases 45-52)
-state_head: f70ca2b11d5ea9a87499faa592413283247bce5b
+last_activity_desc: Phase 45 execution started
+state_head: 2fa82ef580cdd5476343cb2bd70bca3005405b44
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Jalon v1.5 « Audit complet & durcissement » — 8 phases (45-52), audit-first-per-axis, fixes majeurs uniquement, aucune nouvelle fonctionnalité.
+**Current focus:** Phase 45 — Audit sécurité/RLS
 
 ## Current Position
 
-Phase: 45 (Audit sécurité/RLS)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-11-12 — Roadmap v1.5 créé (phases 45-52)
+Phase: 45 (Audit sécurité/RLS) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-11-12 — Phase 45 execution started
 
 ## Performance Metrics
 
@@ -41,6 +41,12 @@ Last activity: 2026-11-12 — Roadmap v1.5 créé (phases 45-52)
 - v1.3 : 5 phases (38-42), 12 exigences, 13 plans — audit tech_debt 10/12 (2 deferred : COLD-02, CACHE-01)
 - v1.4 : 2 phases (43-44), 11 exigences — shipped 2026-11-12, CACHE-01 différée honnêtement
 - v1.5 : 8 phases (45-52), 17 exigences (SEC, PERF, A11Y, QUA, TRA) — en cours
+
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 45 P01 | 6 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -64,9 +70,9 @@ Last activity: 2026-11-12 — Roadmap v1.5 créé (phases 45-52)
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T10:21:20.314Z
-**Stopped at:** Phase 45 context gathered
-**Resume file:** .planning/phases/45-audit-s-curit-rls/45-CONTEXT.md
+**Last session:** 2026-11-12T11:15:19.717Z
+**Stopped at:** Completed 45-01-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -85,3 +91,9 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 | deferred | COLD-02 (corrections profilées cold start) | session dédiée avec appareil au jalon suivant | 2026-11-10 | v1.3 |
 | deferred | W2 (spec navigateur flux bridge ardoise) | conditionné à un seam client révélé | 2026-11-10 | v1.3 |
 | observatoire | GATE-01 (re-test gate SW) | à la première utilisation observée | 2026-11-08 | v1.2 |
+
+## Decisions
+
+- [Phase 45]: Périmètre de schémas de l'audit tranché (A2) — Matrice et lints sur public (exposé API) ; lint 0011 sur toutes les fonctions SECURITY DEFINER quel que soit le schéma ; private.* hors matrice avec couverture indirecte par ses helpers (colonne statut D-07) ; auth/storage/extensions exclus sauf politiques storage écrites par nos migrations
+- [Phase 45]: Provenance officielle des lints : dépôt supabase/splinter tag 2026.09.1 — supabase/postgres-meta supposé par RESEARCH.md ne contient aucune règle de lint ; splinter est la source citée par la doc officielle du database linter — provenance D-09 satisfaite
+- [Phase 45]: auth.uid() lit request.jwt.claims — fixture JWT 0002 utilisable telle quelle — Preuve pg_get_functiondef datée 2026-11-12T11:09:12Z dans 45-AUDIT.md ; aucun changement requis dans le traversant du plan 03

@@ -35,7 +35,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 ### Transverse (tous les axes)
 
-- [ ] **TRA-01** : Le seuil majeur-vs-moyen est défini dans la SPEC de chaque phase audit (majeur = violation de §2.6/§6 ou impact utilisateur prouvé ; « cohérence » ou « best practice » sans preuve = moyen/mineur) — la stop-list d'over-reach figure dans le brief de chaque phase
+- [x] **TRA-01** : Le seuil majeur-vs-moyen est défini dans la SPEC de chaque phase audit (majeur = violation de §2.6/§6 ou impact utilisateur prouvé ; « cohérence » ou « best practice » sans preuve = moyen/mineur) — la stop-list d'over-reach figure dans le brief de chaque phase
 - [ ] **TRA-02** : Tout nouveau vérificateur introduit est prouvé sur des cas qui doivent échouer (§2.7-B) avant de produire un constat retenu
 - [ ] **TRA-03** : La chaîne §2.7 complète est verte à l'état final du jalon et consignée — aucun constat sans preuve, aucun fix sans test
 
@@ -78,7 +78,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | QUA-02 | Phase 51 | Pending |
 | QUA-03 | Phase 52 | Pending |
 | QUA-04 | Phase 52 | Pending |
-| TRA-01 | Phase 45 | Pending |
+| TRA-01 | Phase 45 | Complete |
 | TRA-02 | Phase 45 | Pending |
 | TRA-03 | Phase 52 | Pending |
 

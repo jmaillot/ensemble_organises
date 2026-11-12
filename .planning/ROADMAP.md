@@ -77,6 +77,7 @@
 ### Phase Details
 
 ### Phase 45: Audit sécurité/RLS
+
 **Goal**: L'exposition de données de foyer est entièrement cartographiée et prouvée — tout constat porte une preuve fichier:ligne, les faux positifs sont exclus avec justification, et le seuil majeur-vs-moyen est posé pour tout le jalon.
 **Depends on**: Nothing (first phase of v1.5)
 **Requirements**: SEC-01, SEC-02, SEC-04, TRA-01, TRA-02
@@ -86,15 +87,17 @@
   3. La SPEC de la phase définit le seuil majeur-vs-moyen (TRA-01 : majeur = violation §2.6/§6 prouvée ou impact utilisateur ; « cohérence » sans preuve = moyen/mineur) et le brief porte la stop-list d'over-reach — les surfaces verrouillées (outbox, bandeau offline, SW, buster `v2`) sont verify-only avec mentions « verrouillé — hors périmètre » (SEC-04)
   4. Les lints SQL introduits (pg-meta versionnés dans `supabase/tests/lints/`) sont prouvés sur des cas qui doivent échouer avant de produire un constat retenu (TRA-02, §2.7-B)
   5. Aucun fichier applicatif n'est modifié — la phase est read-only, ses artefacts vivent dans `.planning/phases/45/` (gitignoré)
-**Plans**: 4 plans
+
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 45-01-PLAN.md — SPEC seuil TRA-01 + stop-list SEC-04 + preuve Docker + récupération lints pg-meta (provenance D-09)
+- [x] 45-01-PLAN.md — SPEC seuil TRA-01 + stop-list SEC-04 + preuve Docker + récupération lints pg-meta (provenance D-09)
 - [ ] 45-02-PLAN.md — Lints pg-meta portés, prouvés rouge-avant-vert (TRA-02), versionnés sous supabase/tests/lints/
 - [ ] 45-03-PLAN.md — Script traversant + matrice RLS 83×4 exécutée en authenticated (SEC-02)
 - [ ] 45-04-PLAN.md — Revue Edge Functions / Storage / helpers / secrets + consolidation du rapport unique (SEC-01, SEC-04)
 
 ### Phase 46: Fixes RLS majeurs
+
 **Goal**: Tout constat majeur de sécurité de la phase 45 est corrigé — un commit atomique par constat, sans que la chaîne §2.7 ne se dégrade jamais.
 **Depends on**: Phase 45
 **Requirements**: SEC-03
@@ -103,9 +106,11 @@ Plans:
   2. Tout fix SQL est une migration forward-only (0182+) testée — les migrations appliquées ne sont jamais réécrites ; `sh scripts/test-db.sh` est vert et obligatoire pour tout changement SQL
   3. La chaîne §2.7 complète est verte à l'état final de chaque plan porteur (typecheck, tests, build, e2e, contrôles SQL statiques)
   4. Les cas négatifs SQL (sans foyer, inter-foyer, escalade de privilèges) accompagnent chaque fix de politique et sont vus rouges avant verts
+
 **Plans**: TBD
 
 ### Phase 47: Audit performance/requêtes
+
 **Goal**: La performance des parcours clés est mesurée sur le schéma post-fixes RLS — bundle, requêtes et re-renders, chaque constat mesuré et jamais deviné.
 **Depends on**: Phase 46 (les politiques/vues changent les plans de requête à auditer)
 **Requirements**: PERF-01, PERF-02
@@ -115,9 +120,11 @@ Plans:
   3. Les re-renders React sont audités par revue humaine (DevTools Profiler / `<Profiler>` temporaire jamais commité) — aucun détecteur automatisé React 19 n'est ajouté (PERF-02)
   4. Chaque constat porte sa preuve (commande → résultat daté, §2.7-I) ; le seuil et la stop-list (query-policy.ts, différés CACHE-01/COLD-02, systèmes verrouillés) figurent dans la SPEC et le brief
   5. La phase est read-only — aucun fichier applicatif modifié
+
 **Plans**: TBD
 
 ### Phase 48: Fixes perf majeurs
+
 **Goal**: Tout constat majeur de performance est corrigé avec preuve avant/après mesurée — jamais d'optimisation préventive sans mesure.
 **Depends on**: Phase 47 (audit complet avant le premier fix — séparation audit/fix stricte)
 **Requirements**: PERF-03
@@ -126,9 +133,11 @@ Plans:
   2. Un commit atomique par fix ; toute lecture des conventions existantes (commentaires de raison des mémo) précède toute modification
   3. `test-db.sh` obligatoire pour tout changement SQL (index = migration non destructive 0182+) ; chaîne §2.7 verte à chaque plan
   4. Les moyens/mineurs vont au backlog — aucun mémo préventif, aucun index « entreprise » sans mesure
+
 **Plans**: TBD
 
 ### Phase 49: Audit accessibilité (WCAG 2.2 AA)
+
 **Goal**: L'accessibilité des parcours clés et des primitives est cartographiée par axe-core et revue humaine — sur les composants finaux après les fixes perf.
 **Depends on**: Phase 48 (les composants doivent être finaux avant le scan WCAG)
 **Requirements**: A11Y-01, A11Y-02
@@ -137,9 +146,11 @@ Plans:
   2. Les primitives `components/ui` sont revues d'abord (focus visible, navigation clavier, cibles ≥ 44 px, contrastes, ARIA), puis les pages des modules (A11Y-02)
   3. Le rapport classe chaque violation axe bloquant/informatif/design-verrouillé et consigne l'allowlist des violations acceptées ; les parcours clavier réels sont documentés, pas seulement les attributs
   4. La SPEC définit le seuil (critical/serious = majeur) et porte la stop-list (design photo-overlay intouché) ; la phase est read-only
+
 **Plans**: TBD
 
 ### Phase 50: Fixes a11y majeurs
+
 **Goal**: Tout constat majeur d'accessibilité est corrigé sans casser le design — les primitives d'abord pour propager aux 25 modules.
 **Depends on**: Phase 49
 **Requirements**: A11Y-03
@@ -148,9 +159,11 @@ Plans:
   2. Les primitives `components/ui` sont corrigées en premier (ratio effort/impact maximal) ; chaque fix comportemental porte son test vu rouge avant vert
   3. Un commit atomique par fix ; la chaîne §2.7 complète (e2e comprise) est verte à chaque plan
   4. Aucune violation axe bloquante des parcours clés ne subsiste au scan final (hormis l'allowlist consignée)
+
 **Plans**: TBD
 
 ### Phase 51: Audit qualité transverse
+
 **Goal**: La qualité du dépôt entier est revue — code mort, duplications, cohérence, zones jamais relues depuis v0.9 — et sert de revue finale des fichiers que les fixes précédents ont modifiés.
 **Depends on**: Phase 50 (audit en dernier = il relit ce qui vient de changer)
 **Requirements**: QUA-01, QUA-02
@@ -159,9 +172,11 @@ Plans:
   2. `knip` et `oxlint` tournent en one-shot jetables (rien de persisté, aucune directive) — la garde `no-eslint-directive.test.ts` reste verte (QUA-01)
   3. Avant de classer du code mort, les quatre câblages invisibles sont vérifiés (pg_cron, testkit SQL, deploy-functions.sh, mode démo Dexie) — l'absence affirmée porte sa preuve (§2.7-I)
   4. La SPEC définit le seuil et la stop-list (conventions intouchables §2.7 — un constat dont le fix toucherait §2.7 est reclassé moyen/mineur) ; la phase est read-only
+
 **Plans**: TBD
 
 ### Phase 52: Fixes qualité + closing du jalon
+
 **Goal**: Les constats majeurs de qualité sont corrigés et le jalon se clôt avec des rapports consolidés versionnés, un backlog durable, et la chaîne §2.7 verte consignée à l'état final.
 **Depends on**: Phase 51
 **Requirements**: QUA-03, QUA-04, TRA-03
@@ -170,13 +185,14 @@ Plans:
   2. Les rapports consolidés sont versionnés sous `docs/AUDIT-*.md` (un par axe : preuve par constat, verdict majeur/moyen/mineur, disposition fix/backlog/verrouillé) — rien d'audité ne vit uniquement dans `.planning/phases/` (QUA-04)
   3. Le backlog durable des moyens/mineurs existe ; AGENTS.md est mis à jour si une convention évolue (dont le module `documents` en §3)
   4. La chaîne §2.7 complète est verte à l'état final du jalon et consignée (TRA-03) — aucun constat sans preuve, aucun fix sans test
+
 **Plans**: TBD
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 45. Audit sécurité/RLS | 0/? | Not started | - |
+| 45. Audit sécurité/RLS | 1/4 | In Progress|  |
 | 46. Fixes RLS majeurs | 0/? | Not started | - |
 | 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 0/? | Not started | - |
