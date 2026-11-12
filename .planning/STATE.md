@@ -5,11 +5,11 @@ milestone_name: Audit complet & durcissement
 current_phase: 47
 current_phase_name: Audit performance/requêtes
 status: planning
-stopped_at: Phase 46 complete, ready to plan Phase 47
-last_updated: "2026-11-12T17:09:56.133Z"
+stopped_at: Phase 47 context gathered
+last_updated: "2026-11-12T17:50:40.536Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 46 complete, transitioned to Phase 47
-state_head: ee9af3738b78d1c1228f3ccc79a59d4fd935b36f
+state_head: d42e1ab4a225af3f01b6240d8fe8e3a34e2d0f01
 progress:
   total_phases: 8
   completed_phases: 2
@@ -73,9 +73,9 @@ Last activity: 2026-11-12 — Phase 46 complete, transitioned to Phase 47
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T17:01:40.892Z
-**Stopped at:** Phase 46 complete, ready to plan Phase 47
-**Resume file:** None
+**Last session:** 2026-11-12T17:50:40.487Z
+**Stopped at:** Phase 47 context gathered
+**Resume file:** .planning/phases/47-audit-performance-requ-tes/47-CONTEXT.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
