@@ -9,7 +9,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 ### Sécurité / RLS (axe P1)
 
-- [ ] **SEC-01** : Chaque constat de l'audit sécurité est consigné avec preuve fichier:ligne (politique RLS manquante/permissive, mismatch de mode auth d'Edge Function sous `FUNCTIONS_VERIFY_JWT=false`, helper SECURITY DEFINER à `search_path` mutable, politique Storage trop large, secret exposé) — l'audit couvre les 83 tables / 286 politiques / 16 Edge Functions / buckets Storage via les lints SQL officiels (pg-meta) exécutés par `psql.sh` + revue humaine
+- [x] **SEC-01** : Chaque constat de l'audit sécurité est consigné avec preuve fichier:ligne (politique RLS manquante/permissive, mismatch de mode auth d'Edge Function sous `FUNCTIONS_VERIFY_JWT=false`, helper SECURITY DEFINER à `search_path` mutable, politique Storage trop large, secret exposé) — l'audit couvre les 83 tables / 286 politiques / 16 Edge Functions / buckets Storage via les lints SQL officiels (pg-meta) exécutés par `psql.sh` + revue humaine
 - [ ] **SEC-02** : La matrice de couverture RLS par table (SELECT/INSERT/UPDATE/DELETE + cas négatifs) est remplie pour les 83 tables — les faux positifs connus (rôle postgres, helpers SECURITY DEFINER légitimes, couverture indirecte par foyer) sont exclus avec justification
 - [ ] **SEC-03** : Tout constat majeur de sécurité est corrigé — un commit atomique par constat, migration forward-only (0182+) testée si le fix est SQL, chaîne §2.7 verte au plan porteur
 - [ ] **SEC-04** : Les surfaces verrouillées (outbox, bandeau offline, SW, buster `v2`) sont verify-only — toute observation est consignée « verrouillé — hors périmètre », jamais traitée comme un constat
@@ -36,7 +36,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 ### Transverse (tous les axes)
 
 - [x] **TRA-01** : Le seuil majeur-vs-moyen est défini dans la SPEC de chaque phase audit (majeur = violation de §2.6/§6 ou impact utilisateur prouvé ; « cohérence » ou « best practice » sans preuve = moyen/mineur) — la stop-list d'over-reach figure dans le brief de chaque phase
-- [ ] **TRA-02** : Tout nouveau vérificateur introduit est prouvé sur des cas qui doivent échouer (§2.7-B) avant de produire un constat retenu
+- [x] **TRA-02** : Tout nouveau vérificateur introduit est prouvé sur des cas qui doivent échouer (§2.7-B) avant de produire un constat retenu
 - [ ] **TRA-03** : La chaîne §2.7 complète est verte à l'état final du jalon et consignée — aucun constat sans preuve, aucun fix sans test
 
 ## v2 Requirements
@@ -64,7 +64,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 45 | Pending |
+| SEC-01 | Phase 45 | Complete |
 | SEC-02 | Phase 45 | Pending |
 | SEC-03 | Phase 46 | Pending |
 | SEC-04 | Phase 45 | Pending |
@@ -79,7 +79,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | QUA-03 | Phase 52 | Pending |
 | QUA-04 | Phase 52 | Pending |
 | TRA-01 | Phase 45 | Complete |
-| TRA-02 | Phase 45 | Pending |
+| TRA-02 | Phase 45 | Complete |
 | TRA-03 | Phase 52 | Pending |
 
 **Coverage:**

@@ -5,16 +5,16 @@ milestone_name: Audit complet & durcissement
 current_phase: 45
 current_phase_name: Audit sécurité/RLS
 status: executing
-stopped_at: Completed 45-01-PLAN.md
-last_updated: "2026-11-12T11:15:19.749Z"
+stopped_at: Completed 45-02-PLAN.md
+last_updated: "2026-11-12T11:31:36.292Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 45 execution started
-state_head: 2fa82ef580cdd5476343cb2bd70bca3005405b44
+state_head: af2313c37acb0262271ce473e6fae3a1875c0e3e
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 45 (Audit sécurité/RLS) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 45 execution started
 
@@ -47,6 +47,7 @@ Last activity: 2026-11-12 — Phase 45 execution started
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 45 P01 | 6 min | 3 tasks | 12 files |
+| Phase 45 P02 | 13min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -70,8 +71,8 @@ Last activity: 2026-11-12 — Phase 45 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T11:15:19.717Z
-**Stopped at:** Completed 45-01-PLAN.md
+**Last session:** 2026-11-12T11:31:29.404Z
+**Stopped at:** Completed 45-02-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -97,3 +98,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 45]: Périmètre de schémas de l'audit tranché (A2) — Matrice et lints sur public (exposé API) ; lint 0011 sur toutes les fonctions SECURITY DEFINER quel que soit le schéma ; private.* hors matrice avec couverture indirecte par ses helpers (colonne statut D-07) ; auth/storage/extensions exclus sauf politiques storage écrites par nos migrations
 - [Phase 45]: Provenance officielle des lints : dépôt supabase/splinter tag 2026.09.1 — supabase/postgres-meta supposé par RESEARCH.md ne contient aucune règle de lint ; splinter est la source citée par la doc officielle du database linter — provenance D-09 satisfaite
 - [Phase 45]: auth.uid() lit request.jwt.claims — fixture JWT 0002 utilisable telle quelle — Preuve pg_get_functiondef datée 2026-11-12T11:09:12Z dans 45-AUDIT.md ; aucun changement requis dans le traversant du plan 03
+- [Phase 45]: Lints pg-meta versionnés avec périmètre public explicite (SPEC §3) et motif 0015 adapté au dé-parse jwt() non qualifié (§2.7-D.6)
