@@ -86,7 +86,13 @@
   3. La SPEC de la phase définit le seuil majeur-vs-moyen (TRA-01 : majeur = violation §2.6/§6 prouvée ou impact utilisateur ; « cohérence » sans preuve = moyen/mineur) et le brief porte la stop-list d'over-reach — les surfaces verrouillées (outbox, bandeau offline, SW, buster `v2`) sont verify-only avec mentions « verrouillé — hors périmètre » (SEC-04)
   4. Les lints SQL introduits (pg-meta versionnés dans `supabase/tests/lints/`) sont prouvés sur des cas qui doivent échouer avant de produire un constat retenu (TRA-02, §2.7-B)
   5. Aucun fichier applicatif n'est modifié — la phase est read-only, ses artefacts vivent dans `.planning/phases/45/` (gitignoré)
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 45-01-PLAN.md — SPEC seuil TRA-01 + stop-list SEC-04 + preuve Docker + récupération lints pg-meta (provenance D-09)
+- [ ] 45-02-PLAN.md — Lints pg-meta portés, prouvés rouge-avant-vert (TRA-02), versionnés sous supabase/tests/lints/
+- [ ] 45-03-PLAN.md — Script traversant + matrice RLS 83×4 exécutée en authenticated (SEC-02)
+- [ ] 45-04-PLAN.md — Revue Edge Functions / Storage / helpers / secrets + consolidation du rapport unique (SEC-01, SEC-04)
 
 ### Phase 46: Fixes RLS majeurs
 **Goal**: Tout constat majeur de sécurité de la phase 45 est corrigé — un commit atomique par constat, sans que la chaîne §2.7 ne se dégrade jamais.
