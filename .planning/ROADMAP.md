@@ -127,8 +127,13 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
+**Wave 1**
 - [ ] 47-01-PLAN.md — Tracer : parcours courses audité de bout en bout (seed rollbacké → EXPLAIN sous RLS → fiche PERF-47-01 → 47-AUDIT.md) + baseline bundle one-shot
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 47-02-PLAN.md — Axe requêtes étendu : revue statique N+1/colonnes + EXPLAIN datés (dashboard, tâches, ardoise + SQL serveur D-04) des 6 parcours
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 47-03-PLAN.md — Axe re-renders React : Profiler humain, montage + interaction par parcours, fiches texte D-10, instrumentation jamais commitée
 
 ### Phase 48: Fixes perf majeurs
