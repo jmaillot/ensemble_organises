@@ -82,27 +82,24 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
-## État courant — phase 43 close le 2026-11-11 (W1 du jalon v1.4)
+## État courant — phase 44 close le 2026-11-12 (CACHE-01 du jalon v1.4, jalon soldé)
 
-**La surface bridge ardoise est désormais prouvée en prod** : la dette W1 de
-v1.3 est soldée par `scripts/test-ardoise-bridge-real.sh` (convention du
-dépôt : un script par preuve à ressource réelle). Trois runs complets verts
-(9, 10 idempotence, 11 post-review) : 18 étapes HTTP attribuables (Edge
-`ardoise-invite household-token` → Edge `household-invite redeem` →
-réconciliation), 4 négatifs red-team vus rouges sur le vrai fil (replay 410
-« révoqué », token muté 404, expiration 410 après attente réelle de 1020 s
-sans falsification SQL, borne cross-household), 9 asserts SQL exacts bornés
-par foyer, purge prouvée (foyers en cascade → 0 ligne, re-delete → 404).
-Gates : security SECURED (4/4 menaces T-43-* fermées), review 0 critique
-(WR-01 corrigé à la cause réelle : GoTrue duplique l'email dans
-`user_metadata.email` — extraction jq du champ racine, 4027d2c), nyquist
-7/7 COVERED, verification passed 6/6, UAT-1 PASS (0 signal D-10 : aucun seam
-client ne requiert d'e2e navigateur pour la W1 — verdict humain du 2026-11-11).
-Consignation : `docs/BRIDGE-ARDOISE-PREUVE.md` (réécrite à chaque run).
+**CACHE-01 n'est pas tranchée — différé consigné honnêtement** (critère de
+succès 1 du plan : campagne OU différé tracé). La campagne on-device §6
+n'a pas pu tourner : pas d'accès à l'environnement de mesure en session
+(confirmé par l'utilisateur le 2026-11-12). Le plan prévoyait ce repli :
+aucune valeur inventée, aucun émulateur, `query-policy.ts` inchangé (statu
+quo de fait, 9 familles vivantes à 24 h, 2 annexes à 7 j en expressions de
+ms), buster `v2` inchangé, PROJECT.md sans section « Décision CACHE-01 »
+(D-11 respecté). `docs/MESURES-COLD-START-42.md` porte les mentions
+« Différé consigné (2026-11-12) » datées en §7.1–7.5 et la chaîne §2.7
+complète verte en §7.6 (typecheck, 2006 tests, build, e2e 163 passed,
+contrôles SQL — bannière CHAINE-44-VERTE). L'outillage est prêt : la reprise
+se fait au même protocole (N=5, purge §2.1, dictée des panneaux) dès l'accès
+à l'appareil de référence — les squelettes attendent les dictées.
 Résiduels connus, hors-run, à traiter à la main : 3 comptes e2e antérieurs
-(e2e+179422391*). Reste au jalon : CACHE-01 (phase 44, décision maxAge par
-famille) ; W2 (spec navigateur Playwright) reste conditionné à un seam client
-révélé — aucun à ce jour.
+(e2e+179422391*). W2 (spec navigateur Playwright) reste conditionné à un seam
+client révélé — aucun à ce jour.
 
 ## Current Milestone: v1.4 Preuve & décision
 
@@ -127,7 +124,7 @@ Jalon dette soldé : 5 phases, 13 plans, 12 tâches. 10/12 exigences satisfaites
 
 **Dette reportée hors jalon (décision produit) :**
 - COLD-02 : corrections profilées du cold start — campagne on-device interrompue après 2 runs (protocole `docs/MESURES-COLD-START-42.md`, reprise avec purge « Vider le cache » seule)
-- CACHE-01 : décision maxAge par famille — critères §5 contraignants, `query-policy.ts` inchangé (statu quo de fait)
+- CACHE-01 : décision maxAge par famille — critères §5 contraignants, campagne on-device différée honnêtement le 2026-11-12 (phase 44), `query-policy.ts` inchangé, protocole prêt pour reprise
 - W1 : surface bridge ardoise sans preuve niveau prod (tests SQL + RTL uniquement) — étendre `test-join-token-real.sh` ou spec navigateur réel
 
 ## État v0.9.0 (historique)
@@ -153,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-11 after Phase 43 (W1 preuve prod bridge ardoise)*
+*Last updated: 2026-11-12 after Phase 44 (CACHE-01 différée honnêtement, jalon v1.4 soldé)*

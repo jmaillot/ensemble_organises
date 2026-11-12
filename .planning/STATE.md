@@ -21,10 +21,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-11)
+See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 44 — Décision cache maxAge par famille (CACHE-01)
+**Current focus:** Jalon v1.4 complet — CACHE-01 différée honnêtement, reprise de campagne quand l'appareil de référence est accessible
 
 ## Current Position
 
@@ -46,6 +46,7 @@ Last activity: 2026-11-12 — Phase 44 complete
 |------|----------|-------|-------|
 | Phase 43 P01 | 5h | 3 tasks | 2 files |
 | Phase 44 P01 | 11 min | 3 tasks | 1 files |
+| Phase 44 P02 | 1h55 | 3 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -56,6 +57,8 @@ Last activity: 2026-11-12 — Phase 44 complete
 - Zéro nouveau paquet, zéro nouveau service : W1 = sh + curl -K + psql.sh stdin + lib-smoke-accounts.sh ; CACHE-01 = édition déclarative d'`OFFLINE_FAMILIES` dans `query-policy.ts`. `experimental_createQueryPersister` refusé (casserait outbox, namespacing D-03, throttle muté).
 - Statu quo justifié = décision CACHE-01 valide (CA-03) ; les critères §5 (b)(c) tranchent, jamais la lecture du panneau seule (biais d'ordre — le maxAge en vigueur détermine le volume observé).
 - Déféré au backlog : W2 (spec navigateur du flux bridge, si PROOF-07 révèle un seam au-delà du scénario déclenché), GATE-01 (observatoire), COLD-02 (périmètre distinct).
+- [Phase 44] Différé de campagne consigné honnêtement (2026-11-12) : accès à l'environnement de mesure absent en session — aucune valeur inventée, aucun émulateur, code inchangé ; la reprise se fait au même protocole (N=5, purge §2.1, dictée des panneaux), squelettes prêts dans `docs/MESURES-COLD-START-42.md`.
+- [Phase 44] Repli checkpoint = repli produit : la clause « Si NON » du plan (différé tracé, PROJECT.md intouché) est le critère de succès 1, pas un échec — verdict du vérificateur 10/10.
 
 ### Todos
 
@@ -64,21 +67,21 @@ Last activity: 2026-11-12 — Phase 44 complete
 
 ### Blockers
 
-- Phase 44 : machine on-device (appareil de référence) requise pour la campagne N=5 et toute décision maxAge — tant qu'elle manque, travail préparatoire seul (relecture des tolérances §5, vérification `inspectPersistedCache`), différé consigné honnêtement si report, jamais de valeur inventée.
+- Phase 44 : machine on-device (appareil de référence) requise pour la campagne N=5 et toute décision maxAge — toujours bloquant : la campagne 44-02 a été différée faute d'accès à l'environnement de mesure (2026-11-12). L'outillage est prêt, la reprise ne demande que l'appareil.
 
 ## Session Continuity
 
-**Last session:** 2026-11-11T20:46:30.531Z
-**Stopped at:** Phase 44 complete — all phases complete
+**Last session:** 2026-11-12T08:20:00Z
+**Stopped at:** Jalon v1.4 complet — phases 43-44 closes, CACHE-01 différée honnêtement, reprise de campagne quand l'appareil est accessible
 **Resume file:** None
 
-- Phase 43 close (run 11 vert, gates tous passés) — voir PROJECT.md « État courant ».
-- Prochain pas : `/gsd-plan-phase 44` (CACHE-01, requiert l'appareil de référence pour la campagne).
-- Exigences : PROOF-01..07 ✓ Complete (Phase 43) ; CACHE-01..04 → Phase 44.
+- Phase 44 close (44-01 préparatoire + 44-02 différé consigné, chaîne §2.7 verte CHAINE-44-VERTE, verification passed 10/10, UAT 3/3) — voir PROJECT.md « État courant ».
+- Exigences : PROOF-01..07 ✓ (Phase 43) ; CACHE-02..04 ✓ (44-01) ; CACHE-01 → différée honnêtement (critère de succès 1), reprise au protocole §6.
+- Prochain pas : `/gsd-complete-milestone` pour archiver v1.4, ou reprise de campagne quand l'appareil de référence sera disponible.
 
 ## Operator Next Steps
 
-- `/gsd-plan-phase 44` — prévoir la disponibilité de l'appareil de référence (blocker consigné).
+- `/gsd-complete-milestone` — archiver v1.4 et préparer le jalon suivant (la décision CACHE-01 reste ouverte, à porter au jalon suivant ou en reprise de campagne).
 
 ## Decisions
 
