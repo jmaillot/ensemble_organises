@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 46 — Fixes RLS majeurs
+**Current focus:** Phase 47 — Audit performance/requêtes
 
 ## Current Position
 

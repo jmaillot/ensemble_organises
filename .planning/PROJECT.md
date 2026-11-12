@@ -82,6 +82,25 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
+## État courant — phases 45-46 closes le 2026-11-12 (audit sécurité/RLS + clôture SEC-03)
+
+**Phase 45 (audit sécurité/RLS)** : rapport `45-AUDIT.md` — zéro constat majeur
+bloquant ; 1 fiche mineure SEC-45-01 (politiques permissives multiples sur
+`ardoise_guests`/`ardoise_members`, lint 0006) et 1 fiche SEC-45-02 (lint 0008
+faux positifs confirmés), toutes deux à disposition backlog.
+
+**Phase 46 (clôture SEC-03)** : SEC-03 clôturée par **preuve d'absence datée**
+(§2.7-I) — zéro fiche majeure = zéro commit applicatif. Preuves du jour :
+lints 0006 (10 rows, disposition backlog D-02) / 0008 (10 tables, faux
+positifs) / 0011+0013 (0), requêtes d'absence (buckets 3×f, search_path
+mutable 0, grants authenticated 0, testkit 0), chaîne §2.7 complète verte
+(2006 tests, 163 e2e, 105 fichiers SQL). Addendum « Clôture SEC-03 » +
+« Consolidation phase 52 » en tête de `45-AUDIT.md` ; SEC-45-01 consignée au
+backlog `ROADMAP-TODO.md` (fix candidat phase 52 : fusion des politiques
+permissives, migration forward-only 0182+). Régime git observé : artefacts
+`.planning/*` gitignés (`.gitignore:86`), preuve par le contenu — jamais
+`git add -f` (A3 résolu).
+
 ## Current Milestone: v1.5 Audit complet & durcissement
 
 **Goal:** Auditer l'intégralité du dépôt (qualité, sécurité/RLS, performance/requêtes, accessibilité) et corriger uniquement les constats majeurs — sans nouvelle fonctionnalité, sans rupture, sans campagne on-device.
@@ -163,4 +182,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-12 after v1.5 milestone start (audit complet & durcissement)*
+*Last updated: 2026-11-12 after Phase 46 (SEC-03 clôturée par preuve d'absence datée)*
