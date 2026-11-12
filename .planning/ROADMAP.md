@@ -124,7 +124,12 @@ Plans:
   4. Chaque constat porte sa preuve (commande → résultat daté, §2.7-I) ; le seuil et la stop-list (query-policy.ts, différés CACHE-01/COLD-02, systèmes verrouillés) figurent dans la SPEC et le brief
   5. La phase est read-only — aucun fichier applicatif modifié
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 47-01-PLAN.md — Tracer : parcours courses audité de bout en bout (seed rollbacké → EXPLAIN sous RLS → fiche PERF-47-01 → 47-AUDIT.md) + baseline bundle one-shot
+- [ ] 47-02-PLAN.md — Axe requêtes étendu : revue statique N+1/colonnes + EXPLAIN datés (dashboard, tâches, ardoise + SQL serveur D-04) des 6 parcours
+- [ ] 47-03-PLAN.md — Axe re-renders React : Profiler humain, montage + interaction par parcours, fiches texte D-10, instrumentation jamais commitée
 
 ### Phase 48: Fixes perf majeurs
 
