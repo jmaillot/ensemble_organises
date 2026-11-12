@@ -5,11 +5,11 @@ milestone_name: Audit complet & durcissement
 current_phase: 46
 current_phase_name: Fixes RLS majeurs
 status: planning
-stopped_at: Phase 45 complete, ready to plan Phase 46
-last_updated: "2026-11-12T12:56:02.820Z"
+stopped_at: Phase 46 context gathered
+last_updated: "2026-11-12T13:56:16.103Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 45 complete, transitioned to Phase 46
-state_head: d6aa733ec3357a918b7e2d902f8b12dd2847df48
+state_head: 8b7c1d2dd9c21210100d8a76e600dabdce5593a4
 progress:
   total_phases: 8
   completed_phases: 1
@@ -72,9 +72,9 @@ Last activity: 2026-11-12 — Phase 45 complete, transitioned to Phase 46
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T12:40:30.000Z
-**Stopped at:** Phase 45 complete, ready to plan Phase 46
-**Resume file:** None
+**Last session:** 2026-11-12T13:56:16.055Z
+**Stopped at:** Phase 46 context gathered
+**Resume file:** .planning/phases/46-fixes-rls-majeurs/46-CONTEXT.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
