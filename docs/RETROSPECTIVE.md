@@ -905,3 +905,25 @@ seul code de test. Deux leçons nouvelles pour la campagne :
 ### Leçons
 - **Une exigence de mesure exige l'appareil avant la planification** : le protocole le plus rigoureux ne produit rien sans le geste physique validé (purge, mode avion). Tester la séquence de purge en discuss-phase, pas en exécution.
 - **« Effacer le stockage » n'est pas « Vider le cache »** : la première est la purge froide sûre pour le SW mais tue la session hors ligne ; la seconde préserve la session au prix d'un run potentiellement pas froid. Les critères de froid à deux faits (panneau vide + section Amorçage) restent le juge.
+
+## 17. Campagne v1.4 — clôture du jalon « Preuve & décision »
+
+**Shipped :** 2026-11-12 · 2 phases (43-44), 3 plans · 62 commits · audit non dédié (11/11 exigences cochées, 2 phases vérifiées « passed », clôture override avec 69 items acquittés)
+
+### Ce que le jalon a construit
+- **W1 soldée** : la surface bridge ardoise est prouvée en prod par `scripts/test-ardoise-bridge-real.sh` (convention « un script par preuve à ressource réelle ») — 18 étapes HTTP attribuables, 4 négatifs red-team vus rouges sur le vrai fil (dont une expiration prouvée après attente réelle de 1020 s sans falsification SQL), purge prouvée par re-delete → 404.
+- **CACHE-01 non tranchée — différé consigné honnêtement** : la campagne on-device n'a pas pu tourner (pas d'accès à l'environnement de mesure en session). Le repli prévu par le plan a été appliqué sans maquillage : aucune valeur inventée, aucun émulateur, code inchangé, squelettes §7 prêts pour la reprise. Le vérificateur a jugé le critère de succès 1 (campagne OU différé tracé) à 10/10.
+- **D-15** : le panneau offline existant suffit pour les critères (a) et (c) — l'observabilité conditionnelle D-14 n'est pas déclenchée, jamais préventive.
+
+### Ce qui a marché
+- Le repli du checkpoint comme critère de succès, pas comme échec : le plan 44-02 avait écrit la clause « Si NON » à l'avance, et l'exécution l'a suivie sans improvisation. Aucune pression pour fabriquer une décision sans données.
+- La chaîne §2.7 complète a tourné à l'état final du repli (D-08) : le différé est documenté avec la preuve que le dépôt reste vert.
+- Le re-vérificateur post-commit avec digest v2 explicite a évité le blocage fail-closed vu en v1.3.
+
+### Ce qui a été inefficace
+- La campagne CACHE-01 a été différée deux fois en v1.3 puis une fois en v1.4 — même cause racine (l'appareil n'est pas sous la main au moment de la session). La leçon de v1.3 (« l'appareil avant la planification ») n'a pas pu être appliquée : le blocker n'est pas process mais logistique.
+- L'acquittement des items différés de jalon antérieurs a buté sur deux formes non ancrables (entrées en tableau GFM, entrée heading-shaped mixte) — deux fichiers reformés en puces pour que le CLI puisse poser le marqueur lui-même.
+
+### Leçons
+- **Un différé tracé est un livrable** : le succès d'un jalon de preuve se mesure à ce qui est prouvé OU honnêtement consigné, jamais à des valeurs fabriquées pour boucler.
+- **Le même blocker qui revient trois jalons de suite mérite une décision de planification** : la reprise de campagne CACHE-01 doit être planifiée comme une session dédiée avec l'appareil réservé, pas comme une tâche opportuniste.
