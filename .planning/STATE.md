@@ -2,19 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Preuve & décision
-current_phase: 44
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 44 complete — all phases complete
-last_updated: "2026-11-12T08:14:21.252Z"
+last_updated: "2026-11-12T08:41:30.819Z"
 last_activity: 2026-11-12
-last_activity_desc: Phase 44 complete
-state_head: 592fa18a9ed9dbe45e01941031c77fd25bf33e50
+last_activity_desc: Milestone v1.4 completed and archived
+state_head: c0e8b7935441861fd387a460e956781875935bf1
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 3
   completed_plans: 3
   percent: 100
+closeout_type: override_closeout
+current_phase: 44
 ---
 
 # Project State
@@ -28,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 44
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-11-12 — Phase 44 complete
+Phase: Milestone v1.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-12 — Milestone v1.4 completed and archived
 
 ## Performance Metrics
 
@@ -81,7 +82,7 @@ Last activity: 2026-11-12 — Phase 44 complete
 
 ## Operator Next Steps
 
-- `/gsd-complete-milestone` — archiver v1.4 et préparer le jalon suivant (la décision CACHE-01 reste ouverte, à porter au jalon suivant ou en reprise de campagne).
+- Start the next milestone with /gsd-new-milestone
 
 ## Decisions
 
@@ -89,3 +90,79 @@ Last activity: 2026-11-12 — Phase 44 complete
 - [Phase 43]: config_session à étiquette unique — aucun compteur global en substitution de commande (sous-shell)
 - [Phase 43]: householdId explicite sur create-ardoise du foyer B (households[0] sinon)
 - [Phase 44]: Verdict D-15 : le panneau offline existant suffit pour les critères (a) et (c) par famille — observabilité conditionnelle D-14 non déclenchée, jamais préventive
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close, most recent first:
+
+| Category | Item | Status | Deferred At | Milestone |
+|----------|------|--------|-------------|-----------|
+| debug_sessions | 35-07-probe-offline-not-flipping | diagnosed | 2026-11-12 | v1.4 |
+| debug_sessions | courses-offline-create-bypasses-outbox | diagnosed | 2026-11-12 | v1.4 |
+| debug_sessions | dispatch-push-401 | diagnosed | 2026-11-12 | v1.4 |
+| debug_sessions | dlnk02-android-cold-start-offline | investigating | 2026-11-12 | v1.4 |
+| uat_gaps | 43/43-UAT.md | unknown | 2026-11-12 | v1.4 |
+| uat_gaps | 39/39-UAT.md | testing | 2026-11-12 | v1.4 |
+| uat_gaps | 37/37-UAT.md | passed | 2026-11-12 | v1.4 |
+| uat_gaps | 34/34-UAT.md | passed | 2026-11-12 | v1.4 |
+| uat_gaps | 35/35-UAT.md | partial | 2026-11-12 | v1.4 |
+| uat_gaps | 27/27-UAT.md | deferred_tests_to_phase_28 | 2026-11-12 | v1.4 |
+| uat_gaps | 21/21-UAT.md | unknown | 2026-11-12 | v1.4 |
+| uat_gaps | 22/22-UAT.md | unknown | 2026-11-12 | v1.4 |
+| uat_gaps | 23/23-UAT.md | unknown | 2026-11-12 | v1.4 |
+| uat_gaps | 24/24-UAT.md | unknown | 2026-11-12 | v1.4 |
+| verification_gaps | 32/32-VERIFICATION.md | human_needed | 2026-11-12 | v1.4 |
+| verification_gaps | 35/35-VERIFICATION.md | human_needed | 2026-11-12 | v1.4 |
+| verification_gaps | 16/16-VERIFICATION.md | human_needed | 2026-11-12 | v1.4 |
+| verification_gaps | 17/17-VERIFICATION.md | human_needed | 2026-11-12 | v1.4 |
+| verification_gaps | 18/18-VERIFICATION.md | human_needed | 2026-11-12 | v1.4 |
+| deferred_items | 39/deferred-items.md: 2026-11-09 — plan 39-01  - **Échec unitaire préexistant** (hors périmètre, non corrigé) : `app/src/modules/calendrier/calendrier-page.test… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 39/deferred-items.md: 2026-11-09 — plan 39-02  - **Échec unitaire préexistant, inchangé** (hors périmètre, non corrigé) : `app/src/modules/calendrier/calendrier… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 40/deferred-items.md: 1. Test calendrier préexistant en échec (hors périmètre 40-01)  - **Fichier :** `app/src/modules/calendrier/calendrier-page.test.tsx` - **… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 36/deferred-items.md: [préexistant, hors périmètre 36] e2e `rejoindre un foyer valide le format du token` rouge avant la phase  - **Constaté pendant :** 36-02, … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 37/deferred-items.md: 1. Flocon sibling découvert en clôture — household-store.test.ts WR-03 (hors périmètre TEST-01)  - **Découvert pendant :** plan 37-02, re-… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 32/deferred-items.md: Hors périmètre (pré-existants, non touchés par 32-01)  - **2 tests rouges dans `app/src/modules/anniversaires/anniversaires-page.test.tsx`… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 33/deferred-items.md: 33-01 — Échecs de test préexistant (hors périmètre, Rule SCOPE BOUNDARY)  **Découvert pendant :** Task 3 (tracer offline) — `npm test` com… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 34/deferred-items.md: 2026-11-05 (plan 34-02)  - **2 tests préexistants en échec sur `app/src/modules/anniversaires/anniversaires-page.test.tsx`** (« bascule en… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 34/deferred-items.md: 34-03 (2026-11-05)  - `app/src/components/ui/route-error.tsx:128` garde un `window.addEventListener('online', …)` préexistant (retry d'Err… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 35/deferred-items.md: 2026-11-06 — 35-01 (hors périmètre, constaté, non corrigé)  - **e2e `critical-paths.spec.ts` « rejoindre un foyer valide le format du toke… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 35/deferred-items.md: 2026-11-06 — 35-02 (résultats Échoué de la matrice multi-OS, travaux correctifs ouverts)  Constats issus de la consignation `35-VALIDATION… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 35/deferred-items.md: 2026-11-07 — 35-09 (hors périmètre, constaté, non corrigé)  - **`auth-bootstrap-offline.test.tsx` test D (« monte l'application hors-ligne… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 25/deferred-items.md: test 0139 : assertion de backfill non bornée (préexistant, hors périmètre 25-01)  - **Découvert pendant :** plan 25-01, exécution de la su… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 25/deferred-items.md: Résolu pendant 25-04 (pour mémoire)  - **test 0139 (ci-dessus) : CORRIGÉ pendant 25-04** — l'assertion globale `v_count = 4` a été remplac… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 25/deferred-items.md: Résolu le 2026-10-26 (suite) — familles A/B, D-01 storage, 0053 (barrière 83/83)  Les sections « Ouvert » ci-dessous sont **toutes résolue… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 29/deferred-items.md: 2026-10-29 (29-01)  - **test 0147_child_push_adults.sql en échec préexistant** — « anniversaire enfant : annonce a chaque adulte du foyer … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 29/deferred-items.md: 2026-10-29 (29-02)  - **0147 toujours en échec** (même signature qu'en 29-01) — seul échec restant de `test-db.sh` (1/101) ; inchangé par … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 29/deferred-items.md: 2026-10-29 (29-03, exécution) - Hors périmètre, observation : `scripts/test-dispatch-push.sh` (et d'autres scripts du dépôt ?) portent des… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 30/deferred-items.md: 30-01  - **[Pré-existant, hors périmètre] `supabase/tests/0147_child_push_adults.sql` échoue** : assertion « anniversaire enfant : annonce… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 31/deferred-items.md: `app/src/modules/anniversaires/anniversaires-page.test.tsx` — bascule liste/calendrier ; point d'un anniversaire d'origine anniversaire co… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 31/deferred-items.md: `app/src/modules/anniversaires/components/birthday-confetti.test.tsx` — accueille le jour J par la pluie | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 31/deferred-items.md: `app/src/modules/calendrier/calendrier-page.test.tsx` — ajout via dialogue ; appui long sur une date ; sélection met à jour l'agenda | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 31/deferred-items.md: `app/src/modules/courses/off-client.test.ts` — retourne null après timeout (repli manuel) | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 09/deferred-items.md: 1. Time-of-day flake: `use-notifications.test.tsx` (3 tests)  - **Found during:** 09-07 Task 3 full-suite gate (2026-10-12, ~08:25 Paris).… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 1. `setWidgetOrder` insère une seconde série de widgets quand la lecture n'est pas chargée  - **Fichier :** `app/src/modules/dashboard/hoo… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 2. Tests e2e périmés (échecs préexistants, sans rapport avec 18-01)  Mesuré sur la chaîne complète : **4 échecs, 117 passés, 5 ignorés** (… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 3. Classe WR-02 hors périmètre : les autres corbeilles admin-seules (relevé pendant 18-03)  Le plan 18-03 ferme la classe pour les politiq… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 4. La reprise d'amorçage rétablit la session mais pas le foyer (relevé pendant 18-04)  - **Fichiers :** `app/src/stores/session-store.ts:2… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 5. `placePhotoPathOf` ne normalise pas une valeur blanche (relevé pendant 18-05)  - **Fichiers :** `app/src/modules/adresses/api.ts` (`pla… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 6. L'en-tête de `STATE.md` porte encore un pointeur global périmé (relevé pendant 18-06)  - **Fichier :** `.planning/STATE.md`, frontmatte… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: 7. Script de mesure Playwright non suivi à la racine de `app/` (relevé pendant 18-06)  - **Fichier :** `app/shot-toggle-on.mjs` (39 lignes… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 18/deferred-items.md: Clôture des escalades §1 et §4 (plan 18-06)  Les deux escalades qui motivaient ce registre sont **fermées** par le plan 18-06, et par lui … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 1. `compressImage` refuse un fichier dont le `type` est vide, même quand sa seule extension l'identifie  - **Fichier :** `app/src/modules/… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 2. Deux consommateurs de `NoteAttachment.url` n'appartiennent à aucun plan de la phase  - **Fichiers :** `app/src/modules/notes/notes-page… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 3. Un `enfant` peut encore ouvrir le dialogue de création par un appui long sur la grille  - **Fichiers :** `app/src/modules/calendrier/ca… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 4. Une ligne de `use-notifications.ts` porte deux instructions (défaut de forme préexistant)  - **Fichier :** `app/src/hooks/use-notificat… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 5. Le memo `items` se recalcule à chaque rendu quand la session n'est pas connectée (cause amont, préexistante)  - **Fichiers :** `app/src… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 6. `recettes.spec.ts:181` est instable sous la charge de la suite entière  - **Fichier :** `app/e2e/recettes.spec.ts:181` (« enfant : togg… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 7. La redirection de `RequireAuth` perd la requête, et rien ne lit `?token=`  - **Fichiers :** `app/src/app/router.tsx:34` (`state={{ from… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 8. L'accroche de la landing annonce « Seize espaces » et en rend dix-sept  - **Fichier :** `app/src/modules/landing/landing-page.tsx:124` … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 9. Trois fichiers non suivis traînent à la racine du dépôt  - **Fichiers :** `.claude/`, `.gsd/`, `app/shot-toggle-on.mjs`. - **Constat :*… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 10. Le parcours invité de l'Ardoise servait `cover_url` brut — **CLOS par 19-14** (2026-10-16)  > **CLOS le 2026-10-16 (plan 19-14, `39b0c… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 11. `use-notifications.test.tsx` échoue par expiration (4 cas) — préexistant, hors plan 19-11  - **Fichier :** `app/src/hooks/use-notifica… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 12. Décompte de `npm test` : 4 échecs préexistants, à ne pas attribuer à 19-11  - **Base au commit 86944da :** conforme au plan, **132 fic… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 15. Le formulaire « Rejoindre un foyer » ne lit toujours pas `?token=` — reste de §7  - **Fichiers :** `app/src/modules/landing/join-house… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: 16. `recettes.spec.ts:159` instable sous la charge de la suite e2e entière (classe de §6)  - **Fichier :** `app/e2e/recettes.spec.ts:159` … | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: `Europe/Paris` — 2026-10-16 00:27 — **4 échoués**, 10 passés | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 19/deferred-items.md: `Pacific/Midway` — 2026-10-15 11:23 — **14 passés**, 4,4 s | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 21/deferred-items.md: `supabase/tests/0001_schema_contract.sql:52` — le contrat de schéma déclare les colonnes de `recipe_steps` comme `['id','recipe_id','house… | acknowledged | 2026-11-12 | v1.4 |
+| deferred_items | 21/deferred-items.md: `app/e2e/recettes.spec.ts:270` — le test « dépôt, image sur les trois surfaces, puis aperçu mort masqué après rechargement » est **instabl… | acknowledged | 2026-11-12 | v1.4 |

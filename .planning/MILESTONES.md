@@ -1,5 +1,15 @@
 # Milestones
 
+## v1.4 Preuve & décision (Shipped: 2026-11-12)
+
+**Phases completed:** 2 phases, 3 plans, 6 tasks
+
+**Key accomplishments:**
+- Squelettes de consignation §7.1–7.6 prêts à remplir dans docs/MESURES-COLD-START-42.md + verdict D-15 consigné : le panneau offline existant suffit pour les critères (a) et (c) par famille, l'observabilité conditionnelle n'est pas déclenchée
+- Différé consigné honnêtement (§7.1–7.5) — la campagne on-device n'a pas pu tourner, aucune valeur inventée, CACHE-01 NON tranchée, PROJECT.md intouché ; chaîne §2.7 complète verte à l'état final (§7.6, CHAINE-44-VERTE)
+
+---
+
 ## v1.3 Solde de la dette (Shipped: 2026-11-10)
 
 **Phases completed:** 5 phases, 13 plans, 12 tasks
@@ -10,6 +20,7 @@
 **Delivered:** jalon dette soldé — le filet de tests est un instrument de confiance, la surface produit unique (adhésion ardoise via le lien de partage) est livrée et câblée au flux d'invitation existant, la gate SW est devenue planifiable, et le cold start est instrumenté avec un protocole de mesure versionné.
 
 ### Known Gaps (exigences décochées, décision produit)
+
 - COLD-02 : corrections profilées du cold start — campagne on-device interrompue après 2 runs ; instrumentation + protocole livrés
 - CACHE-01 : décision maxAge par famille — critères §5 du doc mesures contraignants pour la campagne future ; query-policy.ts inchangé (statu quo de fait)
 - W1 : surface bridge ardoise (Edge household-token, RPC, réconciliation) sans preuve niveau prod ni navigateur réel — tests SQL + RTL uniquement
