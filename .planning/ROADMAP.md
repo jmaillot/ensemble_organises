@@ -107,7 +107,7 @@ Plans:
   3. La chaîne §2.7 complète est verte à l'état final de chaque plan porteur (typecheck, tests, build, e2e, contrôles SQL statiques)
   4. Les cas négatifs SQL (sans foyer, inter-foyer, escalade de privilèges) accompagnent chaque fix de politique et sont vus rouges avant verts
 
-**Plans:** 1/1 plans executed
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 46-01-PLAN.md — clôture SEC-03 par preuve d'absence datée (lints + requêtes d'absence + chaîne §2.7) + addendum « Clôture SEC-03 » / « Consolidation phase 52 » dans 45-AUDIT.md + backlog SEC-45-01 dans ROADMAP-TODO.md
