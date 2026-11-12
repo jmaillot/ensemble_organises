@@ -11,7 +11,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 - [x] **SEC-01** : Chaque constat de l'audit sécurité est consigné avec preuve fichier:ligne (politique RLS manquante/permissive, mismatch de mode auth d'Edge Function sous `FUNCTIONS_VERIFY_JWT=false`, helper SECURITY DEFINER à `search_path` mutable, politique Storage trop large, secret exposé) — l'audit couvre les 83 tables / 286 politiques / 16 Edge Functions / buckets Storage via les lints SQL officiels (pg-meta) exécutés par `psql.sh` + revue humaine
 - [x] **SEC-02** : La matrice de couverture RLS par table (SELECT/INSERT/UPDATE/DELETE + cas négatifs) est remplie pour les 83 tables — les faux positifs connus (rôle postgres, helpers SECURITY DEFINER légitimes, couverture indirecte par foyer) sont exclus avec justification
-- [ ] **SEC-03** : Tout constat majeur de sécurité est corrigé — un commit atomique par constat, migration forward-only (0182+) testée si le fix est SQL, chaîne §2.7 verte au plan porteur
+- [x] **SEC-03** : Tout constat majeur de sécurité est corrigé — un commit atomique par constat, migration forward-only (0182+) testée si le fix est SQL, chaîne §2.7 verte au plan porteur
 - [x] **SEC-04** : Les surfaces verrouillées (outbox, bandeau offline, SW, buster `v2`) sont verify-only — toute observation est consignée « verrouillé — hors périmètre », jamais traitée comme un constat
 
 ### Performance / requêtes
@@ -66,7 +66,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 |-------------|-------|--------|
 | SEC-01 | Phase 45 | Complete |
 | SEC-02 | Phase 45 | Complete |
-| SEC-03 | Phase 46 | Pending |
+| SEC-03 | Phase 46 | Complete |
 | SEC-04 | Phase 45 | Complete |
 | PERF-01 | Phase 47 | Pending |
 | PERF-02 | Phase 47 | Pending |
