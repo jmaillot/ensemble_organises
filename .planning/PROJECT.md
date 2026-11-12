@@ -82,6 +82,19 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
+## Current Milestone: v1.5 Audit complet & durcissement
+
+**Goal:** Auditer l'intégralité du dépôt (qualité, sécurité/RLS, performance/requêtes, accessibilité) et corriger uniquement les constats majeurs — sans nouvelle fonctionnalité, sans rupture, sans campagne on-device.
+
+**Target features:**
+- Audit qualité code : cohérence, mort, duplications, zones jamais relues depuis v0.9 (~22 espaces + lib/hooks/components partagés + supabase/)
+- Audit sécurité/RLS : politiques par table, Edge Functions (modes auth), secrets, Storage, tokens d'invitation
+- Audit performance/requêtes : re-renders, mémo, bundles, N+1, index manquants
+- Audit accessibilité WCAG AA : focus clavier, contrastes, lecteur d'écran sur les parcours clés
+- Correctifs majeurs/critiques uniquement (commit atomique par fix, tests verts) ; moyen/mineur → rapport + backlog
+
+**Contraintes :** anti-features verrouillées intouchables (outbox, bandeau offline, SW, buster `v2`) ; migrations de fix permises mais testées et non destructives ; chaîne §2.7 verte à chaque plan ; CACHE-01/COLD-02 restent différés.
+
 ## État courant — phase 44 close le 2026-11-12 (CACHE-01 du jalon v1.4, jalon soldé)
 
 **CACHE-01 n'est pas tranchée — différé consigné honnêtement** (critère de
@@ -150,4 +163,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-12 after Phase 44 (CACHE-01 différée honnêtement, jalon v1.4 soldé)*
+*Last updated: 2026-11-12 after v1.5 milestone start (audit complet & durcissement)*
