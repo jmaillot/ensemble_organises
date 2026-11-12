@@ -5,16 +5,16 @@ milestone_name: Audit complet & durcissement
 current_phase: 45
 current_phase_name: Audit sécurité/RLS
 status: executing
-stopped_at: Completed 45-03-PLAN.md
-last_updated: "2026-11-12T12:29:20.180Z"
+stopped_at: Completed 45-04-PLAN.md
+last_updated: "2026-11-12T12:40:30.000Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 45 execution started
-state_head: 3289d0c4c44f5d4b208e183fd996bab5cd8684ad
+state_head: f72749b7ac012ba8c2337aa30eb81cb451c354fc
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -72,8 +72,8 @@ Last activity: 2026-11-12 — Phase 45 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T12:29:20.146Z
-**Stopped at:** Completed 45-03-PLAN.md
+**Last session:** 2026-11-12T12:40:30.000Z
+**Stopped at:** Completed 45-04-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -103,3 +103,6 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 45]: 45-03 : racines households/members/profiles sondées par négatifs escalade + tests dédiés 0007 (sondes destructrices remplacées)
 - [Phase 45]: 45-03 : 6 tables zéro-grant classées couverture indirecte — preuve par refus systématique + information_schema (SEC-45-02 reclasse mineur, verrouillé)
 - [Phase 45]: 45-03 : birthdays.contact_id NULL dans le traversant — le déclencheur 0097 mirror_contact_birthday effaçait la fixture portant un contact_id
+- [Phase 45]: 45-04 : 16/16 Edge Functions cohérentes — aucun mismatch mode déclaré vs comportement, aucune fonction en mode none ; secrets HMAC dédiés par fonction de partage, jamais réutilisés
+- [Phase 45]: 45-04 : 3 buckets Storage tous privés — politiques portées par helpers private.* sur le chemin de foyer ; 212 helpers SECURITY DEFINER, 0 search_path mutable ; 1 seule fonction SD exécutable par anon (preview_household_invite_token, lecture seule)
+- [Phase 45]: 45-04 : rapport consolidé — 2 fiches mineures (SEC-45-01 backlog, SEC-45-02 verrouillé), aucune fiche majeure ; audit secrets par noms/canaux, aucune valeur suivie par git
