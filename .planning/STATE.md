@@ -2,37 +2,37 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
-current_phase: 47
-current_phase_name: Audit performance/requêtes
-status: executing
-stopped_at: Phase 47 context gathered
-last_updated: "2026-11-12T21:35:05.852Z"
-last_activity: 2026-11-12
-last_activity_desc: Phase 47 execution complete except PERF-02 human measurements — UAT persisted
-state_head: fed77dacc355ce7c20c09584d7d72a96e2dda2fd
+current_phase: 48
+current_phase_name: Fixes perf majeurs
+status: planning
+stopped_at: Phase 47 complete, ready to plan Phase 48
+last_updated: "2026-11-13T07:07:45.590Z"
+last_activity: 2026-11-13
+last_activity_desc: Phase 47 complete, transitioned to Phase 48
+state_head: 32a3e550bc5f7e5142f232892c8f671f090c6836
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 5
-  percent: 25
+  completed_plans: 8
+  percent: 38
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-12)
+See: .planning/PROJECT.md (updated 2026-11-13)
 
-**Core value:** PWA foyers — l'app de poche du quotidien familial, fiable hors-ligne, joignable en un tap, sans store.
-**Current focus:** Phase 47 — Audit performance/requêtes
+**Core value:** PWA foyers
+**Current focus:** Phase 48 — Fixes perf majeurs
 
 ## Current Position
 
-Phase: 47 (Audit performance/requêtes) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 47
-Last activity: 2026-11-12 — Phase 47 execution started
+Phase: 48 — Fixes perf majeurs
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-13 — Phase 47 complete, transitioned to Phase 48
 
 ## Performance Metrics
 
@@ -73,9 +73,9 @@ Last activity: 2026-11-12 — Phase 47 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-12T17:50:40.487Z
-**Stopped at:** Phase 47 context gathered
-**Resume file:** .planning/phases/47-audit-performance-requ-tes/47-CONTEXT.md
+**Last session:** 2026-11-13T00:00:00Z
+**Stopped at:** Phase 47 complete (UAT 2/2 pass, vérification canonisée passed), ready to plan Phase 48
+**Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).

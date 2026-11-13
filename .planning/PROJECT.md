@@ -101,7 +101,21 @@ permissives, migration forward-only 0182+). Régime git observé : artefacts
 `.planning/*` gitignés (`.gitignore:86`), preuve par le contenu — jamais
 `git add -f` (A3 résolu).
 
-## Current Milestone: v1.5 Audit complet & durcissement
+ ## État courant — phase 47 close le 2026-11-13 (audit performance/requêtes)
+
+**Phase 47 (audit performance/requêtes)** : rapport `47-AUDIT.md` (3 axes :
+EXPLAIN sous RLS avec seed rollbacké 300-800 lignes, baseline bundle
+source-map-explorer 122 chunks / 2 624 KiB, revue humaine Profiler
+PERF-47-11..16). Bilan : 1 feeder majeur phase 48 — PERF-47-09 (calcul des
+soldes Ardoise, 527 ms ×3 par settlement, ≈ 1,6 s redondants) ; 1 hypothèse
+réfutée par preuve d'exécution — PERF-47-06 (index task_assignees(task_id)
+inutile : la PK couvre la lecture par task_id) ; N+1 connexion sous seuil
+(volumétrie réelle) → backlog ; hypothèse PERF-47-15 validée en mesure
+Profiler. UAT humaine passée (2/2) le 2026-11-13, vérification canonisée
+`passed`. Régime inchangé : artefacts `.planning/*` gitignés, zéro fichier
+applicatif modifié.
+
+ ## Current Milestone: v1.5 Audit complet & durcissement
 
 **Goal:** Auditer l'intégralité du dépôt (qualité, sécurité/RLS, performance/requêtes, accessibilité) et corriger uniquement les constats majeurs — sans nouvelle fonctionnalité, sans rupture, sans campagne on-device.
 
@@ -182,4 +196,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-12 after Phase 46 (SEC-03 clôturée par preuve d'absence datée)*
+*Last updated: 2026-11-13 after Phase 47 (audit performance/requêtes, UAT 2/2 pass)*
