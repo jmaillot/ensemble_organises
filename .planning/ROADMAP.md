@@ -67,7 +67,7 @@
 
 - [x] **Phase 45: Audit sécurité/RLS** - Rapport complet : matrice RLS 83 tables, 16 Edge Functions, secrets, Storage, tokens — read-only, seuil + stop-list définis (SEC-01, SEC-02, SEC-04, TRA-01, TRA-02) (completed 2026-11-12)
 - [x] **Phase 46: Fixes RLS majeurs** - Clôture SEC-03 par preuve d'absence datée : zéro fiche majeure dans le rapport 45, zéro commit applicatif ; SEC-45-01 au backlog (SEC-03) (completed 2026-11-12)
-- [ ] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02)
+- [x] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02) (completed 2026-11-13)
 - [ ] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03)
 - [ ] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
 - [ ] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03)
@@ -124,17 +124,17 @@ Plans:
   4. Chaque constat porte sa preuve (commande → résultat daté, §2.7-I) ; le seuil et la stop-list (query-policy.ts, différés CACHE-01/COLD-02, systèmes verrouillés) figurent dans la SPEC et le brief
   5. La phase est read-only — aucun fichier applicatif modifié
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
-- [ ] 47-01-PLAN.md — Tracer : parcours courses audité de bout en bout (seed rollbacké → EXPLAIN sous RLS → fiche PERF-47-01 → 47-AUDIT.md) + baseline bundle one-shot
+- [x] 47-01-PLAN.md — Tracer : parcours courses audité de bout en bout (seed rollbacké → EXPLAIN sous RLS → fiche PERF-47-01 → 47-AUDIT.md) + baseline bundle one-shot
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 47-02-PLAN.md — Axe requêtes étendu : revue statique N+1/colonnes + EXPLAIN datés (dashboard, tâches, ardoise + SQL serveur D-04) des 6 parcours
+- [x] 47-02-PLAN.md — Axe requêtes étendu : revue statique N+1/colonnes + EXPLAIN datés (dashboard, tâches, ardoise + SQL serveur D-04) des 6 parcours
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 47-03-PLAN.md — Axe re-renders React : Profiler humain, montage + interaction par parcours, fiches texte D-10, instrumentation jamais commitée
+- [x] 47-03-PLAN.md — Axe re-renders React : Profiler humain, montage + interaction par parcours, fiches texte D-10, instrumentation jamais commitée
 
 ### Phase 48: Fixes perf majeurs
 
@@ -147,7 +147,11 @@ Plans:
   3. `test-db.sh` obligatoire pour tout changement SQL (index = migration non destructive 0182+) ; chaîne §2.7 verte à chaque plan
   4. Les moyens/mineurs vont au backlog — aucun mémo préventif, aucun index « entreprise » sans mesure
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
+- [ ] 48-02-PLAN.md — Fix SQL PERF-47-09 : migration 0182 create or replace sur les définitions effectives (fusion CTE, une seule exécution d'ardoise_balances par appel settlement) + preuve avant/après protocole 47 + test-db.sh (D-05…D-07)
+- [ ] 48-03-PLAN.md — Fixes re-renders majeurs conditionnels : React.memo de ligne (pattern post-card) un commit par fix avec preuve Profiler avant/après ; absence de majeur = résultat consigné (D-12…D-14)
 
 ### Phase 49: Audit accessibilité (WCAG 2.2 AA)
 
