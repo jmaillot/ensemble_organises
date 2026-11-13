@@ -149,8 +149,13 @@ Plans:
 
 **Plans**: 3 plans
 Plans:
+**Wave 1**
 - [ ] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 48-02-PLAN.md — Fix SQL PERF-47-09 : migration 0182 create or replace sur les définitions effectives (fusion CTE, une seule exécution d'ardoise_balances par appel settlement) + preuve avant/après protocole 47 + test-db.sh (D-05…D-07)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 48-03-PLAN.md — Fixes re-renders majeurs conditionnels : React.memo de ligne (pattern post-card) un commit par fix avec preuve Profiler avant/après ; absence de majeur = résultat consigné (D-12…D-14)
 
 ### Phase 49: Audit accessibilité (WCAG 2.2 AA)
