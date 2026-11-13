@@ -213,7 +213,14 @@ Plans:
   3. Avant de classer du code mort, les quatre câblages invisibles sont vérifiés (pg_cron, testkit SQL, deploy-functions.sh, mode démo Dexie) — l'absence affirmée porte sa preuve (§2.7-I)
   4. La SPEC définit le seuil et la stop-list (conventions intouchables §2.7 — un constat dont le fix toucherait §2.7 est reclassé moyen/mineur) ; la phase est read-only
 
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 51-01-PLAN.md — 51-SPEC (seuil, stop-list D-11, versions épinglées) + instruments one-shot knip/oxlint + fiches CABL-51-01..04 des quatre câblages (D-09/D-10)
+- [ ] 51-02-PLAN.md — Relecture des fichiers des fixes 46/48/50 (D-06) + triage D-03 des pistes knip/oxlint
+- [ ] 51-03-PLAN.md — Revue transverse D-05 : lib/, hooks/, stores/, components/ui + shared (119 fichiers)
+- [ ] 51-04-PLAN.md — Revue des 24 modules (D-05, documents verrouillé D-11)
+- [ ] 51-05-PLAN.md — Dérive docs/code QUA-51-DD-* (QUA-02, D-04) + clôture de 51-AUDIT (chaîne §2.7, anti-fuite, synthèse, consolidation 52)
 
 ### Phase 52: Fixes qualité + closing du jalon
 
