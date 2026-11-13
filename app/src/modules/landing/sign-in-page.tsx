@@ -165,7 +165,7 @@ export default function SignInPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <section className="flex flex-col justify-between bg-fg px-6 py-8 text-surface max-[1024px]:hidden">
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/" className="flex min-h-11 items-center gap-2.5">
           <div className="relative grid size-[38px] place-items-center overflow-hidden rounded-[13px] bg-surface text-fg">
             <Icon name="home" />
             <span aria-hidden="true" className="absolute right-[5px] bottom-[5px] size-[17px] rounded-full border-2 border-accent" />
@@ -190,7 +190,7 @@ export default function SignInPage() {
             <ConnexionRequise vue={requestedPath} onReconnect={() => setFormRevealed(true)} />
           ) : (
             <>
-            <Link to="/" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg lg:hidden">
+            <Link to="/" className="mb-6 inline-flex min-h-11 items-center gap-2 px-1 text-xs text-muted hover:text-fg lg:hidden">
               <Icon name="arrowLeft" size="sm" />
               Retour à l’accueil
             </Link>
@@ -236,7 +236,7 @@ export default function SignInPage() {
               {mode === 'connexion' ? 'Pas encore de compte ?' : 'Vous avez déjà un compte ?'}{' '}
               <button
                 type="button"
-                className="font-bold text-accent-strong"
+                className="inline-block -my-3.5 py-3.5 font-bold text-accent-strong"
                 onClick={() => setMode(mode === 'connexion' ? 'inscription' : 'connexion')}
               >
                 {mode === 'connexion' ? 'Créer un compte' : 'Se connecter'}
@@ -244,11 +244,11 @@ export default function SignInPage() {
             </p>
             <p className="mt-3 mb-0 text-[11px] text-muted">
               En continuant, vous acceptez les{' '}
-              <Link to="/conditions-utilisation" className="font-bold text-accent-strong">
+              <Link to="/conditions-utilisation" className="inline-block -mx-2.5 -my-3.75 px-2.5 py-3.75 font-bold text-accent-strong">
                 CGU
               </Link>{' '}
               et la{' '}
-              <Link to="/confidentialite" className="font-bold text-accent-strong">
+              <Link to="/confidentialite" className="inline-block -mx-2.5 -my-3.75 px-2.5 py-3.75 font-bold text-accent-strong">
                 politique de confidentialité
               </Link>
               .

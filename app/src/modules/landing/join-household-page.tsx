@@ -179,7 +179,7 @@ export default function JoinHouseholdPage() {
     <div className="mx-auto grid min-h-screen max-w-[620px] place-items-center px-5 py-12 max-[650px]:items-start max-[650px]:px-[15px]">
       <div className="w-full">
         {!isAuthenticated ? (
-          <Link to="/connexion" className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-fg">
+          <Link to="/connexion" className="mb-6 inline-flex min-h-11 items-center gap-2 px-1 text-xs text-muted hover:text-fg">
             <Icon name="arrowLeft" size="sm" />
             Retour à la connexion
           </Link>
@@ -237,7 +237,7 @@ export default function JoinHouseholdPage() {
         </div>
         <p className="mt-4 mb-0 text-xs text-muted">
           Vous n’avez pas encore de foyer ?{' '}
-          <Link to="/foyer/nouveau" className="font-bold text-accent-strong">
+          <Link to="/foyer/nouveau" className="inline-block -my-3.5 py-3.5 font-bold text-accent-strong">
             Créer le vôtre
           </Link>
         </p>
