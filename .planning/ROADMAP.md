@@ -68,7 +68,7 @@
 - [x] **Phase 45: Audit sécurité/RLS** - Rapport complet : matrice RLS 83 tables, 16 Edge Functions, secrets, Storage, tokens — read-only, seuil + stop-list définis (SEC-01, SEC-02, SEC-04, TRA-01, TRA-02) (completed 2026-11-12)
 - [x] **Phase 46: Fixes RLS majeurs** - Clôture SEC-03 par preuve d'absence datée : zéro fiche majeure dans le rapport 45, zéro commit applicatif ; SEC-45-01 au backlog (SEC-03) (completed 2026-11-12)
 - [x] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02) (completed 2026-11-13)
-- [ ] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03)
+- [x] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03) (completed 2026-11-13)
 - [ ] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
 - [ ] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03)
 - [ ] **Phase 51: Audit qualité transverse** - Code mort, duplications, cohérence, zones jamais relues depuis v0.9 — revue finale des fichiers que les fixes ont modifiés (QUA-01, QUA-02)
@@ -147,7 +147,7 @@ Plans:
   3. `test-db.sh` obligatoire pour tout changement SQL (index = migration non destructive 0182+) ; chaîne §2.7 verte à chaque plan
   4. Les moyens/mineurs vont au backlog — aucun mémo préventif, aucun index « entreprise » sans mesure
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 Plans:
 **Wave 1**
 - [x] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
@@ -156,7 +156,7 @@ Plans:
 - [x] 48-02-PLAN.md — Fix SQL PERF-47-09 : migration 0182 create or replace sur les définitions effectives (fusion CTE, une seule exécution d'ardoise_balances par appel settlement) + preuve avant/après protocole 47 + test-db.sh (D-05…D-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 48-03-PLAN.md — Fixes re-renders majeurs conditionnels : React.memo de ligne (pattern post-card) un commit par fix avec preuve Profiler avant/après ; absence de majeur = résultat consigné (D-12…D-14)
+- [x] 48-03-PLAN.md — Fixes re-renders majeurs conditionnels : React.memo de ligne (pattern post-card) un commit par fix avec preuve Profiler avant/après ; absence de majeur = résultat consigné (D-12…D-14)
 
 ### Phase 49: Audit accessibilité (WCAG 2.2 AA)
 
@@ -169,7 +169,15 @@ Plans:
   3. Le rapport classe chaque violation axe bloquant/informatif/design-verrouillé et consigne l'allowlist des violations acceptées ; les parcours clavier réels sont documentés, pas seulement les attributs
   4. La SPEC définit le seuil (critical/serious = majeur) et porte la stop-list (design photo-overlay intouché) ; la phase est read-only
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+- [ ] 49-01-PLAN.md — 49-SPEC : seuil hérité 45-SPEC §1 + stop-list étendue (photo-overlay + exceptions D-06) + classification + périmètre axe (D-14)
+**Wave 2** *(blocked on Wave 1)*
+- [ ] 49-02-PLAN.md — Tracer + harnais axe : devDependency @axe-core/playwright, spec e2e des 6 parcours × 2 projets, collecte sans échec, exports brut/ (A11Y-01)
+**Wave 3** *(blocked on Wave 2)*
+- [ ] 49-03-PLAN.md — Revue clavier réelle desktop + primitives puis modules + classification/allowlist/consolidation 49-AUDIT.md (A11Y-01, A11Y-02)
 
 ### Phase 50: Fixes a11y majeurs
 
@@ -216,7 +224,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
-| 48. Fixes perf majeurs | 2/3 | In Progress|  |
+| 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 0/? | Not started | - |
 | 50. Fixes a11y majeurs | 0/? | Not started | - |
 | 51. Audit qualité transverse | 0/? | Not started | - |

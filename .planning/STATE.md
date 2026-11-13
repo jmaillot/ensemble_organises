@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
-current_phase: 48
-current_phase_name: Fixes perf majeurs
+current_phase: 49
+current_phase_name: audit-accessibilit-wcag-2-2-aa
 status: executing
-stopped_at: Completed 48-02-PLAN.md
-last_updated: "2026-11-13T09:42:31.613Z"
+stopped_at: Phase 49 context gathered
+last_updated: "2026-11-13T12:17:50.774Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 48 execution started
-state_head: d41376993ab8bdb02ba91660edc19159e2fb8775
+last_activity_desc: Phase 48 complete, transitioned to Phase 49
+state_head: c1f11459eed060461a94d856d94bd3c21e9e5ad6
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 10
-  percent: 38
+  completed_phases: 4
+  total_plans: 14
+  completed_plans: 11
+  percent: 50
 ---
 
 # Project State
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-13)
 
 **Core value:** PWA foyers
-**Current focus:** Phase 48 — Fixes perf majeurs
+**Current focus:** Phase 49 — Audit accessibilité (WCAG 2.2 AA)
 
 ## Current Position
 
-Phase: 48 (Fixes perf majeurs) — EXECUTING
-Plan: 3 of 3
+Phase: 49 (audit-accessibilit-wcag-2-2-aa) — READY TO EXECUTE
+Plan: Not started
 Status: Ready to execute
-Last activity: 2026-11-13 — Phase 48 execution started
+Last activity: 2026-11-13 — Phase 48 complete, transitioned to Phase 49
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Last activity: 2026-11-13 — Phase 48 execution started
 | Phase 46 P01 | 15m | 4 tasks | 3 files |
 | Phase 48 P01 | 35 min | 3 tasks | 1 files |
 | Phase 48 P02 | 75 min | 3 tasks | 4 files |
+| Phase 48 P03 | 25 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,9 +76,9 @@ Last activity: 2026-11-13 — Phase 48 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T09:42:31.552Z
-**Stopped at:** Completed 48-02-PLAN.md
-**Resume file:** None
+**Last session:** 2026-11-13T11:40:14.936Z
+**Stopped at:** Phase 49 context gathered
+**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-CONTEXT.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -116,3 +117,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 46]: SEC-45-01 au backlog (lint 0006 = 10 lignes reconfirmé) — fix = fusion politiques permissives, migration forward-only 0182+, candidat phase 52 (D-02/D-03)
 - [Phase 46]: Régime git .planning/* gitigné (.gitignore:86) prévaut sur « commité » de D-06 — preuve par le contenu, jamais git add -f (A3 résolu)
 - [Phase 48]: Fix PERF-47-09 : helper privé ardoise_settlement_data lit les soldes UNE fois (boucle recopiée — simplify garde sa signature (text) pour 0018)
+- [Phase 48]: 48-03 : aucun memo posé — aucun majeur re-renders au seuil TRA-01 (ligne « Alimente le plan 48-03 : aucune ») ; PERF-03 clôturée par le fix SQL 48-02 ; éligibilité de démonstration courses : props instables (handlers inline non useCallback, Pitfall 6)
