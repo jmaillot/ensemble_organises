@@ -24,7 +24,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 - [x] **A11Y-01** : Les parcours clés (connexion, rejoindre un foyer, dashboard, courses, tâches, ardoise) sont scannés par axe-core (`@axe-core/playwright` dans le harnais e2e existant) avec allowlist des violations acceptées consignée dans le rapport — une seule devDependency ajoutée
 - [x] **A11Y-02** : Les primitives `components/ui` sont revues d'abord (focus visible, navigation clavier, cibles tactiles ≥ 44 px, contrastes, attributs ARIA), puis les pages des modules
-- [ ] **A11Y-03** : Tout constat majeur d'accessibilité est corrigé sans casser le design photo-overlay — les contrastes sur photos passent par l'overlay, jamais par la photo
+- [x] **A11Y-03** : Tout constat majeur d'accessibilité est corrigé sans casser le design photo-overlay — les contrastes sur photos passent par l'overlay, jamais par la photo
 
 ### Qualité / transverse (en dernier — revue finale des fixes précédents)
 
@@ -73,7 +73,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | PERF-03 | Phase 48 | Complete |
 | A11Y-01 | Phase 49 | Complete |
 | A11Y-02 | Phase 49 | Complete |
-| A11Y-03 | Phase 50 | Pending |
+| A11Y-03 | Phase 50 | Complete |
 | QUA-01 | Phase 51 | Pending |
 | QUA-02 | Phase 51 | Pending |
 | QUA-03 | Phase 52 | Pending |
