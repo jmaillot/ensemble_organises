@@ -147,7 +147,7 @@ Plans:
   3. `test-db.sh` obligatoire pour tout changement SQL (index = migration non destructive 0182+) ; chaîne §2.7 verte à chaque plan
   4. Les moyens/mineurs vont au backlog — aucun mémo préventif, aucun index « entreprise » sans mesure
 
-**Plans**: 3 plans
+**Plans**: 0/3 plans executed
 Plans:
 **Wave 1**
 - [ ] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
@@ -216,7 +216,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
-| 48. Fixes perf majeurs | 0/? | Not started | - |
+| 48. Fixes perf majeurs | 0/3 | Planned    |  |
 | 49. Audit accessibilité WCAG 2.2 AA | 0/? | Not started | - |
 | 50. Fixes a11y majeurs | 0/? | Not started | - |
 | 51. Audit qualité transverse | 0/? | Not started | - |
