@@ -39,14 +39,20 @@ async function openDemoSession(page: Page) {
  * les specs existantes intactes (D-02).
  */
 async function attendreMiseEnPageStable(page: Page) {
+  // `/connexion` et `/foyer/rejoindre` sont des pages autonomes sans `<main>`
+  // (flux public, hors app-shell) : la mesure porte sur `main` quand il
+  // existe, sinon sur `body`.
   await expect
     .poll(async () => {
-      const a = await page.locator('main').boundingBox();
+      const mesurer = async () => {
+        const cible = (await page.locator('main').count()) !== 0 ? 'main' : 'body';
+        const boite = await page.locator(cible).boundingBox();
+        return boite === null ? null : { y: boite.y, h: boite.height };
+      };
+      const a = await mesurer();
       await page.waitForTimeout(250);
-      const b = await page.locator('main').boundingBox();
-      return (
-        a !== null && b !== null && Math.abs(a.y - b.y) < 1 && Math.abs(a.height - b.height) < 1
-      );
+      const b = await mesurer();
+      return a !== null && b !== null && Math.abs(a.y - b.y) < 1 && Math.abs(a.h - b.h) < 1;
     }, { timeout: 15_000, message: 'la mise en page n’a jamais cessé de bouger' })
     .toBe(true);
 }
@@ -102,9 +108,66 @@ async function scanAxe(page: Page, parcours: string, infos: { project: string })
 }
 
 test.describe('Audit axe — collecte brute', () => {
-  test('dashboard', async ({ page }, testInfo) => {
+  /**
+   * Les 6 parcours clés (49-SPEC §4, D-11) scannés en page-base sur les deux
+   * projets (D-03). Slugs FIGÉS : le plan 03 et le verify attendent les 12
+   * fichiers brut/{chromium,mobile}-{connexion,rejoindre,dashboard,courses,
+   * taches,ardoise}.json.
+   *
+   * Chaque scan part de la page-base ; les surfaces interactives connues
+   * (tiroir mobile, dialog de confirmation de suppression) sont ouvertes,
+   * scannées puis refermées avant le scan suivant — axe ne voit que l'état
+   * DOM courant (Pattern 2 du RESEARCH : un dialog Radix fermé est invisible
+   * d'axe).
+   */
+  for (const [parcours, chemin, avecDemoSession] of [
+    ['connexion', '/connexion', false],
+    ['rejoindre', '/foyer/rejoindre', true],
+    ['dashboard', '/accueil', true],
+    ['courses', '/courses', true],
+    ['taches', '/taches', true],
+    ['ardoise', '/ardoise', true],
+  ] as const) {
+    test(parcours, async ({ page }, testInfo) => {
+      if (avecDemoSession) await openDemoSession(page);
+      await page.goto(chemin);
+      await attendreMiseEnPageStable(page);
+      await scanAxe(page, parcours, { project: testInfo.project.name });
+
+      // Surface interactive : le tiroir mobile « Plus » n'existe que sous
+      // 650 px ET dans l'app-shell — `/connexion` et `/foyer/rejoindre`
+      // (pré-écran public, hors shell) n'ont ni barre basse ni tiroir.
+      // Ouvert, scanné, refermé avant tout autre scan.
+      if (
+        avecDemoSession
+        && viewportIsMobile(page)
+        && parcours !== 'connexion'
+        && parcours !== 'rejoindre'
+      ) {
+        // `exact: true` : la barre basse porte le seul « Plus » exact — les
+        // pages de module ont aussi un « Plus d’actions » (strict mode).
+        await page.getByRole('button', { name: 'Plus', exact: true }).click();
+        const tiroir = page.getByRole('dialog', { name: 'Menu des espaces du foyer' });
+        await expect(tiroir).toBeVisible();
+        await scanAxe(page, `${parcours}-tiroir`, { project: testInfo.project.name });
+        await page.keyboard.press('Escape');
+        await expect(tiroir).toBeHidden();
+      }
+    });
+  }
+
+  test('taches-dialog-suppression', async ({ page }, testInfo) => {
+    // La confirmation de suppression de tâche existe sur les deux projets :
+    // le dialog de confirmation ouvre une couche Radix que la page-base ne
+    // montre pas (Pattern 2 du RESEARCH).
     await openDemoSession(page);
+    await page.goto('/taches');
     await attendreMiseEnPageStable(page);
-    await scanAxe(page, 'dashboard', { project: testInfo.project.name });
+    await page.getByRole('button', { name: /^Supprimer Valider les rendez-vous/ }).click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toBeVisible();
+    await scanAxe(page, 'taches-dialog-suppression', { project: testInfo.project.name });
+    await page.getByRole('button', { name: 'Annuler' }).click();
+    await expect(dialog).toBeHidden();
   });
 });
