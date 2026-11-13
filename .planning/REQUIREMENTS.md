@@ -16,9 +16,9 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 
 ### Performance / requêtes
 
-- [ ] **PERF-01** : La baseline du bundle est mesurée et consignée (source-map-explorer one-shot) ; les requêtes Supabase sont auditées (N+1, colonnes inutiles, index manquants via EXPLAIN) sur les parcours clés
-- [ ] **PERF-02** : Les re-renders React sont audités par revue humaine (DevTools Profiler / instrumentation temporaire `<Profiler>`) — aucun détecteur automatisé React 19 n'est ajouté
-- [ ] **PERF-03** : Tout constat majeur de performance est corrigé avec preuve avant/après mesurée (index manquant = migration testée ; re-render = mesure avant/après) — jamais de mémo préventif sans mesure
+- [x] **PERF-01** : La baseline du bundle est mesurée et consignée (source-map-explorer one-shot) ; les requêtes Supabase sont auditées (N+1, colonnes inutiles, index manquants via EXPLAIN) sur les parcours clés
+- [x] **PERF-02** : Les re-renders React sont audités par revue humaine (DevTools Profiler / instrumentation temporaire `<Profiler>`) — aucun détecteur automatisé React 19 n'est ajouté
+- [x] **PERF-03** : Tout constat majeur de performance est corrigé avec preuve avant/après mesurée (index manquant = migration testée ; re-render = mesure avant/après) — jamais de mémo préventif sans mesure
 
 ### Accessibilité (WCAG 2.2 AA)
 
@@ -68,9 +68,9 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | SEC-02 | Phase 45 | Complete |
 | SEC-03 | Phase 46 | Complete |
 | SEC-04 | Phase 45 | Complete |
-| PERF-01 | Phase 47 | Pending |
-| PERF-02 | Phase 47 | Pending |
-| PERF-03 | Phase 48 | Pending |
+| PERF-01 | Phase 47 | Complete |
+| PERF-02 | Phase 47 | Complete |
+| PERF-03 | Phase 48 | Complete |
 | A11Y-01 | Phase 49 | Pending |
 | A11Y-02 | Phase 49 | Pending |
 | A11Y-03 | Phase 50 | Pending |

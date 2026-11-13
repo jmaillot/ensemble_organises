@@ -147,13 +147,13 @@ Plans:
   3. `test-db.sh` obligatoire pour tout changement SQL (index = migration non destructive 0182+) ; chaîne §2.7 verte à chaque plan
   4. Les moyens/mineurs vont au backlog — aucun mémo préventif, aucun index « entreprise » sans mesure
 
-**Plans**: 0/3 plans executed
+**Plans**: 2/3 plans executed
 Plans:
 **Wave 1**
-- [ ] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
+- [x] 48-01-PLAN.md — Mesures Profiler des 6 fiches re-renders (PERF-47-11→16) + sous-rapport 48 avec dispositions TRA-01 et constat croisé consigné (D-01…D-04, D-10)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 48-02-PLAN.md — Fix SQL PERF-47-09 : migration 0182 create or replace sur les définitions effectives (fusion CTE, une seule exécution d'ardoise_balances par appel settlement) + preuve avant/après protocole 47 + test-db.sh (D-05…D-07)
+- [x] 48-02-PLAN.md — Fix SQL PERF-47-09 : migration 0182 create or replace sur les définitions effectives (fusion CTE, une seule exécution d'ardoise_balances par appel settlement) + preuve avant/après protocole 47 + test-db.sh (D-05…D-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 48-03-PLAN.md — Fixes re-renders majeurs conditionnels : React.memo de ligne (pattern post-card) un commit par fix avec preuve Profiler avant/après ; absence de majeur = résultat consigné (D-12…D-14)
@@ -216,7 +216,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
-| 48. Fixes perf majeurs | 0/3 | Planned    |  |
+| 48. Fixes perf majeurs | 2/3 | In Progress|  |
 | 49. Audit accessibilité WCAG 2.2 AA | 0/? | Not started | - |
 | 50. Fixes a11y majeurs | 0/? | Not started | - |
 | 51. Audit qualité transverse | 0/? | Not started | - |

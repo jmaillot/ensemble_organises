@@ -5,16 +5,16 @@ milestone_name: Audit complet & durcissement
 current_phase: 48
 current_phase_name: Fixes perf majeurs
 status: executing
-stopped_at: Completed 48-01-PLAN.md
-last_updated: "2026-11-13T09:20:04.258Z"
+stopped_at: Completed 48-02-PLAN.md
+last_updated: "2026-11-13T09:42:31.613Z"
 last_activity: 2026-11-13
 last_activity_desc: Phase 48 execution started
-state_head: f1d6647edca74b4537bc34ed517b5811c087b283
+state_head: d41376993ab8bdb02ba91660edc19159e2fb8775
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 10
   percent: 38
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 ## Current Position
 
 Phase: 48 (Fixes perf majeurs) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-13 — Phase 48 execution started
 
@@ -51,6 +51,7 @@ Last activity: 2026-11-13 — Phase 48 execution started
 | Phase 45 P03 | 105min | 3 tasks | 3 files |
 | Phase 46 P01 | 15m | 4 tasks | 3 files |
 | Phase 48 P01 | 35 min | 3 tasks | 1 files |
+| Phase 48 P02 | 75 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -74,8 +75,8 @@ Last activity: 2026-11-13 — Phase 48 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T09:20:04.198Z
-**Stopped at:** Completed 48-01-PLAN.md
+**Last session:** 2026-11-13T09:42:31.552Z
+**Stopped at:** Completed 48-02-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -114,3 +115,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 46]: SEC-03 clôturée par preuve d'absence datée du jour — zéro fiche majeure, zéro commit applicatif (D-01/D-04)
 - [Phase 46]: SEC-45-01 au backlog (lint 0006 = 10 lignes reconfirmé) — fix = fusion politiques permissives, migration forward-only 0182+, candidat phase 52 (D-02/D-03)
 - [Phase 46]: Régime git .planning/* gitigné (.gitignore:86) prévaut sur « commité » de D-06 — preuve par le contenu, jamais git add -f (A3 résolu)
+- [Phase 48]: Fix PERF-47-09 : helper privé ardoise_settlement_data lit les soldes UNE fois (boucle recopiée — simplify garde sa signature (text) pour 0018)
