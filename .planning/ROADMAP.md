@@ -169,13 +169,15 @@ Plans:
   3. Le rapport classe chaque violation axe bloquant/informatif/design-verrouillé et consigne l'allowlist des violations acceptées ; les parcours clavier réels sont documentés, pas seulement les attributs
   4. La SPEC définit le seuil (critical/serious = majeur) et porte la stop-list (design photo-overlay intouché) ; la phase est read-only
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 49-01-PLAN.md — 49-SPEC : seuil hérité 45-SPEC §1 + stop-list étendue (photo-overlay + exceptions D-06) + classification + périmètre axe (D-14)
+- [x] 49-01-PLAN.md — 49-SPEC : seuil hérité 45-SPEC §1 + stop-list étendue (photo-overlay + exceptions D-06) + classification + périmètre axe (D-14)
+
 **Wave 2** *(blocked on Wave 1)*
 - [ ] 49-02-PLAN.md — Tracer + harnais axe : devDependency @axe-core/playwright, spec e2e des 6 parcours × 2 projets, collecte sans échec, exports brut/ (A11Y-01)
+
 **Wave 3** *(blocked on Wave 2)*
 - [ ] 49-03-PLAN.md — Revue clavier réelle desktop + primitives puis modules + classification/allowlist/consolidation 49-AUDIT.md (A11Y-01, A11Y-02)
 
@@ -225,7 +227,7 @@ Plans:
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
-| 49. Audit accessibilité WCAG 2.2 AA | 0/? | Not started | - |
+| 49. Audit accessibilité WCAG 2.2 AA | 1/3 | In Progress|  |
 | 50. Fixes a11y majeurs | 0/? | Not started | - |
 | 51. Audit qualité transverse | 0/? | Not started | - |
 | 52. Fixes qualité + closing | 0/? | Not started | - |

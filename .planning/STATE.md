@@ -3,19 +3,19 @@ gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 49
-current_phase_name: audit-accessibilit-wcag-2-2-aa
+current_phase_name: Audit accessibilité (WCAG 2.2 AA)
 status: executing
 stopped_at: Phase 49 context gathered
-last_updated: "2026-11-13T12:17:50.774Z"
+last_updated: "2026-11-13T12:23:14.725Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 48 complete, transitioned to Phase 49
-state_head: c1f11459eed060461a94d856d94bd3c21e9e5ad6
+last_activity_desc: Phase 49 execution started
+state_head: 6543d27c78bcbe728695632e19eb587ffdfc7c90
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 14
-  completed_plans: 11
-  percent: 50
+  completed_plans: 12
+  percent: 54
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 
 ## Current Position
 
-Phase: 49 (audit-accessibilit-wcag-2-2-aa) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-13 — Phase 48 complete, transitioned to Phase 49
+Phase: 49 (Audit accessibilité (WCAG 2.2 AA)) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 49
+Last activity: 2026-11-13 — 49-01-PLAN.md exécuté (49-SPEC verrouillée, VALIDATION sans TBD)
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Last activity: 2026-11-13 — Phase 48 complete, transitioned to Phase 49
 | Phase 48 P01 | 35 min | 3 tasks | 1 files |
 | Phase 48 P02 | 75 min | 3 tasks | 4 files |
 | Phase 48 P03 | 25 min | 3 tasks | 2 files |
+| Phase 49 P01 | 6 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -76,9 +77,9 @@ Last activity: 2026-11-13 — Phase 48 complete, transitioned to Phase 49
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T11:40:14.936Z
-**Stopped at:** Phase 49 context gathered
-**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-CONTEXT.md
+**Last session:** 2026-11-13T12:30:00Z
+**Stopped at:** Completed 49-01-PLAN.md
+**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-01-SUMMARY.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -99,6 +100,8 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 | observatoire | GATE-01 (re-test gate SW) | à la première utilisation observée | 2026-11-08 | v1.2 |
 
 ## Decisions
+
+- [Phase 49]: 49-SPEC verrouillée (49-01) — seuil hérité par citation de 45-SPEC §1 avec transposition §2.6→§6 (D-12) ; stop-list fermée 7 entrées (4 surfaces 45-SPEC §2 + photo-overlay D-07 + démo + rôle enfant D-06) ; classification bloquant/informatif/design-verrouillé (phase 50 / QUA-04 / verify-only) ; `withRules(['target-size'])` obligatoire sur chaque scan + 2 hypothèses flaggées énoncées (D-13/D-14)
 
 - [Phase 45]: Périmètre de schémas de l'audit tranché (A2) — Matrice et lints sur public (exposé API) ; lint 0011 sur toutes les fonctions SECURITY DEFINER quel que soit le schéma ; private.* hors matrice avec couverture indirecte par ses helpers (colonne statut D-07) ; auth/storage/extensions exclus sauf politiques storage écrites par nos migrations
 - [Phase 45]: Provenance officielle des lints : dépôt supabase/splinter tag 2026.09.1 — supabase/postgres-meta supposé par RESEARCH.md ne contient aucune règle de lint ; splinter est la source citée par la doc officielle du database linter — provenance D-09 satisfaite
