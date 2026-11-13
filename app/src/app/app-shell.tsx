@@ -95,6 +95,34 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Voile modal (A11Y-49-07) : Radix (react-remove-scroll `hideOthers`)
+  // pose aria-hidden="true" sur la page tant qu'une couche modale est
+  // ouverte — constaté au sondage DOM, l'attribut est posé sur les
+  // DESCENDANTS individuels du shell (nav rail, header, skip-link
+  // lui-même), pas sur sa racine. On MIROIR cet état sur le skip-link :
+  // sous voile il devient tabIndex=-1 (non focusable au parcours de
+  // tabulation, il ne doit pas alimenter aria-hidden-focus), hors voile il
+  // reste la première tabulation. Observer le sous-arbre body plutôt que
+  // les états d'ouverture du shell couvre TOUTES les couches modales, y
+  // compris celles ouvertes par une page (le dialog de suppression de
+  // /taches) et les futures — piste (b) du RESEARCH 50, plus robuste que la (a).
+  const [voileModal, setVoileModal] = useState(false);
+  useEffect(() => {
+    const miroir = () => {
+      // Le skip-link est la référence : `closest` inclut l'élément lui-même
+      // (hideOthers le marque en propre) et ses ancêtres selon la version.
+      const skip = document.querySelector('a[href="#contenu-principal"]');
+      setVoileModal(skip?.closest('[aria-hidden="true"]') != null);
+    };
+    const observer = new MutationObserver(miroir);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['aria-hidden', 'data-aria-hidden'],
+      subtree: true,
+    });
+    miroir();
+    return () => observer.disconnect();
+  }, []);
   const notifications = useNotifications();
   const unread = notifications.total;
   const { rows: openTasks } = useResource<TaskRow>('tasks', {
@@ -206,6 +234,7 @@ export function AppShell() {
     <div className="flex min-h-screen">
       <a
         href="#contenu-principal"
+        tabIndex={voileModal ? -1 : undefined}
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:rounded-[10px] focus:bg-fg focus:px-4 focus:py-2 focus:text-surface"
       >
         Aller au contenu principal
