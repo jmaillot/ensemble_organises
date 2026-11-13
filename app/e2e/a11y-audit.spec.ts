@@ -10,7 +10,7 @@ import AxeBuilder from '@axe-core/playwright';
  */
 
 const DOSSIER_BRUT =
-  '../.planning/phases/49-audit-accessibilit-wcag-2-2-aa/brut';
+  '../.planning/phases/50-fixes-a11y-majeurs/brut';
 
 /** Le projet Playwright « mobile » (Pixel 7, 412 px) vs bureau. */
 function viewportIsMobile(page: Page) {
@@ -66,20 +66,23 @@ async function attendreMiseEnPageStable(page: Page) {
  */
 async function scanAxe(page: Page, parcours: string, infos: { project: string }) {
   const analyse = await new AxeBuilder({ page })
-    // Pitfall 1 du RESEARCH : les règles WCAG 2.2 sont désactivées par défaut
-    // dans axe-core ; sans activation explicite, `target-size` ne tourne pas.
-    .withRules(['target-size'])
+    // Correction de la limite L1 de 49-AUDIT : withRules LIMITE axe à une
+    // règle au lieu d'ajouter. `target-size` est désactivée par défaut dans
+    // axe-core (règle WCAG 2.2) : `options.rules` la réactive SANS toucher
+    // au jeu de règles par défaut (89–90 règles), contrairement à
+    // withRules/withTags qui restreignent l'analyse à leur liste.
+    .options({ rules: { 'target-size': { enabled: true } } })
     .analyze();
 
   const reduction = {
     projet: infos.project,
     parcours,
     viewport: page.viewportSize(),
-    regles: ['target-size'] as string[],
-    // Preuve d'exécution effective (Pitfall 1 : un « 0 violation » sur des
+    // Preuve d'exécution effective (§2.7-F : un « 0 violation » sur des
     // règles jamais lancées est un succès muet) : axe renvoie chaque règle
     // dans `passes` (exécutée, aucun nœud fautif) ou `inapplicable` (exécutée,
     // aucun nœud éligible). Les règles présentes nulle part n'ont PAS tourné.
+    // La présence de `target-size` ici prouve son exécution réelle.
     reglesExecutees: [...analyse.passes, ...analyse.inapplicable].map((r) => r.id),
     violations: analyse.violations.map((v) => ({
       id: v.id,
