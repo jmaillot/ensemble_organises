@@ -5,17 +5,17 @@ milestone_name: Audit complet & durcissement
 current_phase: 50
 current_phase_name: Fixes a11y majeurs
 status: executing
-stopped_at: Completed 50-03-PLAN.md
-last_updated: "2026-11-13T14:52:00.000Z"
+stopped_at: Completed 50-04-PLAN.md
+last_updated: "2026-11-13T15:20:00.000Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 50 plan 03 exécuté (cibles tactiles ≥ 44 px)
+last_activity_desc: Phase 50 plan 04 exécuté (skip-link non focusable sous voile modal)
 state_head: f6316d8b52eadce2fb5ab5a6418dceee0cc4d059
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 ## Current Position
 
 Phase: 50 (Fixes a11y majeurs) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
-Last activity: 2026-11-13 — Phase 50 execution started
+Last activity: 2026-11-13 — Phase 50 plan 04 exécuté
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Last activity: 2026-11-13 — Phase 50 execution started
 | Phase 50 P01 | 6 min | 2 tasks | 1 files |
 | Phase 50 P02 | 4 min | 3 tasks | 1 files |
 | Phase 50 P03 | ~20 min (session interrompue, reprise) | 3 tasks | 3 files |
+| Phase 50 P04 | 20 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -83,8 +84,8 @@ Last activity: 2026-11-13 — Phase 50 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T14:52:00.000Z
-**Stopped at:** Completed 50-03-PLAN.md
+**Last session:** 2026-11-13T15:20:00.000Z
+**Stopped at:** Completed 50-04-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -131,3 +132,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 49]: 49-03 — découverte : `withRules(['target-size'])` LIMITE axe à cette règle (les 18 exports du plan 02 n'ont pas fait tourner les règles par défaut) ; scans complémentaires à règles par défaut exécutés par 49-03 (20 scans, 89–90 règles chacun) — correction du harnais reportée phase 50 (read-only)
 - [Phase 50]: Correction du harnais axe par options.rules (règles WCAG 2.2 réactivées sans limiter les règles par défaut) — withRules/withTags LIMITENT l'analyse — Doc officielle axe-core-npm : withRules comme withTags restreignent l'analyse ; seule options({rules:{...enabled:true}}) réactive target-size en conservant les 89–90 règles par défaut. Limite L1 de 49-AUDIT corrigée sans nouveau withRules.
 - [Phase 50]: Fix A11Y-49-02 par focus-visible:outline-solid ajouté à outline-none dans la classe de base partagée input.tsx — une seule classe réparant tous les formulaires (§2.7-E), preuve rouge→vert par getComputedStyle
+- [Phase 50]: Fix A11Y-49-07 par piste (b) — miroir aria-hidden Radix sur le skip-link (MutationObserver sous-arbre body, closest depuis le skip-link : Radix marque les descendants individuels, pas la racine du shell) ; le piège de focus Radix intercepte Tab donc la preuve rouge exige axe sous voile, la navigation seule est verte avant fix
