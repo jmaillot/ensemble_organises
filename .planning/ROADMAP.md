@@ -196,8 +196,8 @@ Plans:
 
 Plans:
 - [x] 50-01-PLAN.md — Tracer : correction du harnais axe (withRules → règles par défaut, DOSSIER_BRUT → phase 50) + preuve des 89–90 règles (D-05)
-- [ ] 50-02-PLAN.md — A11Y-49-02 : outline de focus des champs rétabli dans le contrôle partagé input.tsx, rouge-avant-vert (§2.7-E)
-- [ ] 50-03-PLAN.md — A11Y-49-01 (bloquant) : cibles ≥ 44 px sur /connexion et /foyer/rejoindre par classes des pages, primitives intactes (D-02, D-03)
+- [x] 50-02-PLAN.md — A11Y-49-02 : outline de focus des champs rétabli dans le contrôle partagé input.tsx, rouge-avant-vert (§2.7-E)
+- [x] 50-03-PLAN.md — A11Y-49-01 (bloquant) : cibles ≥ 44 px sur /connexion et /foyer/rejoindre par classes des pages, primitives intactes (D-02, D-03)
 - [ ] 50-04-PLAN.md — A11Y-49-07 : skip-link tabindex="-1" dynamique sous voile, e2e rouge-avant-vert
 - [ ] 50-05-PLAN.md — A11Y-49-04 : label-content-name-mismatch sur tuiles + boutons shell, résolution empirique contre axe (Q1)
 - [ ] 50-06-PLAN.md — Scans finaux 6 parcours × 2 projets + classement D-06 des violations restantes (critère 4)
@@ -236,6 +236,6 @@ Plans:
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
-| 50. Fixes a11y majeurs | 1/6 | In Progress|  |
+| 50. Fixes a11y majeurs | 3/6 | In Progress|  |
 | 51. Audit qualité transverse | 0/? | Not started | - |
 | 52. Fixes qualité + closing | 0/? | Not started | - |
