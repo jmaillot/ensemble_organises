@@ -5,7 +5,7 @@ milestone_name: Audit complet & durcissement
 current_phase: 49
 current_phase_name: Audit accessibilité (WCAG 2.2 AA)
 status: executing
-stopped_at: Phase 49 context gathered
+stopped_at: Phase 49 — plan 02 exécuté, plan 03 prêt (revue clavier + classification)
 last_updated: "2026-11-13T12:23:14.725Z"
 last_activity: 2026-11-13
 last_activity_desc: Phase 49 execution started
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 ## Current Position
 
 Phase: 49 (Audit accessibilité (WCAG 2.2 AA)) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 49
-Last activity: 2026-11-13 — 49-01-PLAN.md exécuté (49-SPEC verrouillée, VALIDATION sans TBD)
+Plan: 3 of 3
+Status: Phase 49 — plan 03 (revue clavier + classification) prêt à démarrer
+Last activity: 2026-11-13 — 49-02-PLAN.md exécuté (harnais axe vert, 18 exports bruts)
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Last activity: 2026-11-13 — 49-01-PLAN.md exécuté (49-SPEC verrouillée, VAL
 | Phase 48 P02 | 75 min | 3 tasks | 4 files |
 | Phase 48 P03 | 25 min | 3 tasks | 2 files |
 | Phase 49 P01 | 6 min | 2 tasks | 2 files |
+| Phase 49 P02 | 35 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ Last activity: 2026-11-13 — 49-01-PLAN.md exécuté (49-SPEC verrouillée, VAL
 - Séparation audit/fix stricte : les phases audit sont read-only (artefacts dans `.planning/phases/`, gitignoré), les fixes sont atomiques par constat.
 - Anti-features verrouillées (outbox, bandeau offline, SW, buster `v2`) verify-only : toute observation est consignée « verrouillé — hors périmètre », jamais traitée comme un constat (SEC-04).
 - Outillage : lints pg-meta SQL purs via `psql.sh` stdin ; une seule devDependency (`@axe-core/playwright@4.14.0`) ; knip/oxlint/source-map-explorer one-shot jetables ; no-linter inchangé (recommandation écrite au pire) ; re-renders et duplications = revue humaine.
+- Harnais axe (49-02) : collecte sans échec (D-04), aucune assertion sur les violations ; exports étiquetés avec les règles exécutées (passes+inapplicable) pour prouver que `target-size` a tourné ; tiroir mobile scanné sur l'app-shell seul (le pré-écran /foyer/rejoindre n'a ni barre basse ni tiroir) ; 3 échecs vitest pré-existants en calendrier-page.test.tsx (vérifiés sur HEAD~1), hors périmètre read-only.
 - Fixes SQL = migrations forward-only 0182+ uniquement ; `test-db.sh` obligatoire pour tout changement SQL ; les migrations appliquées ne sont jamais réécrites.
 
 ### Todos

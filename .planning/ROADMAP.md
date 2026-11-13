@@ -169,14 +169,14 @@ Plans:
   3. Le rapport classe chaque violation axe bloquant/informatif/design-verrouillé et consigne l'allowlist des violations acceptées ; les parcours clavier réels sont documentés, pas seulement les attributs
   4. La SPEC définit le seuil (critical/serious = majeur) et porte la stop-list (design photo-overlay intouché) ; la phase est read-only
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
 - [x] 49-01-PLAN.md — 49-SPEC : seuil hérité 45-SPEC §1 + stop-list étendue (photo-overlay + exceptions D-06) + classification + périmètre axe (D-14)
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 49-02-PLAN.md — Tracer + harnais axe : devDependency @axe-core/playwright, spec e2e des 6 parcours × 2 projets, collecte sans échec, exports brut/ (A11Y-01)
+- [x] 49-02-PLAN.md — Tracer + harnais axe : devDependency @axe-core/playwright, spec e2e des 6 parcours × 2 projets, collecte sans échec, exports brut/ (A11Y-01)
 
 **Wave 3** *(blocked on Wave 2)*
 - [ ] 49-03-PLAN.md — Revue clavier réelle desktop + primitives puis modules + classification/allowlist/consolidation 49-AUDIT.md (A11Y-01, A11Y-02)
