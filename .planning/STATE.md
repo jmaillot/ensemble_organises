@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 50
 current_phase_name: Fixes a11y majeurs
-status: planning
-stopped_at: Phase 50 context gathered
-last_updated: "2026-11-13T13:50:45.159Z"
+status: executing
+stopped_at: Completed 50-01-PLAN.md
+last_updated: "2026-11-13T14:31:57.681Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 49 complete, transitioned to Phase 50
-state_head: 40de3dfb79ac3c94a639503a90e711f05c6a0082
+last_activity_desc: Phase 50 execution started
+state_head: 8a768f9e462a05c5c03371af7dafb8c17e35c49f
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 20
+  completed_plans: 15
   percent: 63
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-13)
 
 **Core value:** PWA foyers
-**Current focus:** Phase 49 — Audit accessibilité (WCAG 2.2 AA)
+**Current focus:** Phase 50 — Fixes a11y majeurs
 
 ## Current Position
 
-Phase: 50 — Fixes a11y majeurs
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-13 — Phase 49 complete, transitioned to Phase 50
+Phase: 50 (Fixes a11y majeurs) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-11-13 — Phase 50 execution started
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Last activity: 2026-11-13 — Phase 49 complete, transitioned to Phase 50
 | Phase 49 P01 | 6 min | 2 tasks | 2 files |
 | Phase 49 P02 | 35 min | 2 tasks | 3 files |
 | Phase 49 P03 | 60 min | 3 tasks | 1 files (+6 preuves brut/) |
+| Phase 50 P01 | 6 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,9 +81,9 @@ Last activity: 2026-11-13 — Phase 49 complete, transitioned to Phase 50
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T13:50:45.086Z
-**Stopped at:** Phase 50 context gathered
-**Resume file:** .planning/phases/50-fixes-a11y-majeurs/50-CONTEXT.md
+**Last session:** 2026-11-13T14:31:50.853Z
+**Stopped at:** Completed 50-01-PLAN.md
+**Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -126,3 +127,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 48]: 48-03 : aucun memo posé — aucun majeur re-renders au seuil TRA-01 (ligne « Alimente le plan 48-03 : aucune ») ; PERF-03 clôturée par le fix SQL 48-02 ; éligibilité de démonstration courses : props instables (handlers inline non useCallback, Pitfall 6)
 - [Phase 49]: 49-03 — une seule fiche bloquant (A11Y-49-01 : cibles < 44 px des pages publiques /connexion et /foyer/rejoindre, règle AGENTS.md §6, preuve de mesure datée) ; 7 fiches informatif → backlog QUA-04 ; 1 design-verrouillé (faux positif d'animation prouvé par re-mesure + D-07)
 - [Phase 49]: 49-03 — découverte : `withRules(['target-size'])` LIMITE axe à cette règle (les 18 exports du plan 02 n'ont pas fait tourner les règles par défaut) ; scans complémentaires à règles par défaut exécutés par 49-03 (20 scans, 89–90 règles chacun) — correction du harnais reportée phase 50 (read-only)
+- [Phase 50]: Correction du harnais axe par options.rules (règles WCAG 2.2 réactivées sans limiter les règles par défaut) — withRules/withTags LIMITENT l'analyse — Doc officielle axe-core-npm : withRules comme withTags restreignent l'analyse ; seule options({rules:{...enabled:true}}) réactive target-size en conservant les 89–90 règles par défaut. Limite L1 de 49-AUDIT corrigée sans nouveau withRules.
