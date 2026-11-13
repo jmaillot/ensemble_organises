@@ -5,11 +5,11 @@ milestone_name: Audit complet & durcissement
 current_phase: 50
 current_phase_name: Fixes a11y majeurs
 status: planning
-stopped_at: Phase 49 complete, ready to plan Phase 50
-last_updated: "2026-11-13T13:29:43.084Z"
+stopped_at: Phase 50 context gathered
+last_updated: "2026-11-13T13:50:45.159Z"
 last_activity: 2026-11-13
 last_activity_desc: Phase 49 complete, transitioned to Phase 50
-state_head: 593e705bc7f203d2e3da6314629ed8d74d1ce181
+state_head: 40de3dfb79ac3c94a639503a90e711f05c6a0082
 progress:
   total_phases: 8
   completed_phases: 5
@@ -80,9 +80,9 @@ Last activity: 2026-11-13 — Phase 49 complete, transitioned to Phase 50
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T13:45:00Z
-**Stopped at:** Phase 49 complete, ready to plan Phase 50
-**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-03-SUMMARY.md
+**Last session:** 2026-11-13T13:50:45.086Z
+**Stopped at:** Phase 50 context gathered
+**Resume file:** .planning/phases/50-fixes-a11y-majeurs/50-CONTEXT.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
