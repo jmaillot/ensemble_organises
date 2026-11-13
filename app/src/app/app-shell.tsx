@@ -125,6 +125,12 @@ export function AppShell() {
   }, []);
   const notifications = useNotifications();
   const unread = notifications.total;
+  // Bouton préférences : le nom accessible doit contenir les jetons du
+  // texte rendu (axe 4.14 Label in Name) — le libellé ET les initiales du
+  // cercle, dont le span aria-hidden reste visible on-screen (axe ignore
+  // aria-hidden pour le texte visible). Un seul const : libellé et
+  // initiales dérivent du même état.
+  const preferencesLabel = user?.displayName?.trim() ? user.displayName : 'Profil';
   const { rows: openTasks } = useResource<TaskRow>('tasks', {
     filter: { status: 'a_faire' },
     // Régime 15-01 : le badge « tâches ouvertes » ne compte que le module
@@ -361,12 +367,21 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              aria-label={`Rechercher (${searchShortcutLabel})`}
+              aria-label={`Rechercher ${searchShortcutLabel}`}
               aria-keyshortcuts="Control+K Meta+K"
               className="flex min-h-11 items-center gap-2 rounded-full border border-border/70 bg-surface px-3 text-muted transition-colors duration-[var(--duration-quick)] hover:border-accent hover:bg-accent-faint hover:text-fg max-[650px]:w-11 max-[650px]:justify-center max-[650px]:px-0"
             >
               <Icon name="search" size="sm" />
               <span className="text-[12.5px] font-[650] max-[650px]:sr-only">Rechercher</span>
+              {/* Espace sécateur : axe 4.14 concatène les nœuds texte visibles
+                  sans séparateur (« Rechercher » + « Ctrl K » fusionnaient en
+                  « rechercherctrl », absent du nom) ; l'espace texte nu,
+                  ignoré par flex, rétablit la frontière de jeton. Le nom
+                  aligné sur le rendu reprend les jetons du libellé ET du
+                  raccourci — « Rechercher (Ctrl K) » perdait ses
+                  parenthèses dans la tokenisation axe et ne contenait plus
+                  « ctrl » ni « k ». */}
+              {' '}
               <kbd className="hidden rounded-[5px] border border-border bg-surface-2 px-1 py-px text-[11px] font-[650] min-[1180px]:inline">
                 {searchShortcutLabel}
               </kbd>
@@ -405,14 +420,26 @@ export function AppShell() {
               type="button"
               onClick={() => navigate('/parametres')}
               className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 max-[650px]:pl-1"
-              aria-label="Ouvrir les préférences du foyer"
+              aria-label={`Ouvrir les préférences du foyer — ${preferencesLabel} ${initials(preferencesLabel)}`}
             >
-              <span className="text-xs text-muted max-[650px]:hidden">{user?.displayName?.trim() ? user.displayName : 'Profil'}</span>
+              {/* Espace sécateur entre libellé et initiales : axe 4.14
+                  concatène les nœuds texte visibles sans séparateur —
+                  « Profil » + « PM » fusionnaient en « profilpm », absent
+                  du nom. L'espace texte nu, ignoré par flex, rétablit la
+                  frontière de jeton. */}
+              {' '}
+              <span className="text-xs text-muted max-[650px]:hidden">{preferencesLabel}</span>
+              {/* Espace sécateur entre libellé et initiales : axe 4.14
+                  concatène les nœuds texte visibles sans séparateur —
+                  « Camille Martin » + « CM » fusionnaient en « martincm »,
+                  absent du nom. L'espace texte nu, ignoré par flex,
+                  rétablit la frontière de jeton. */}
+              {' '}
               <span
                 aria-hidden="true"
                 className="grid size-8 place-items-center rounded-full bg-fg text-[11px] font-extrabold text-surface"
               >
-                {initials(user?.displayName?.trim() ? user.displayName : 'Profil')}
+                {initials(preferencesLabel)}
               </span>
             </button>
           </div>

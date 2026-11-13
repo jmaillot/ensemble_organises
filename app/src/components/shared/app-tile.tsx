@@ -79,11 +79,21 @@ function TileContent({ label, module, counter }: { label: string; module: Module
           « 21 » de melimelo pose sur son caddie, et grandit avec lui.
           `select-none` : un double-tap ne doit jamais sélectionner le
           dessin. */}
+      {/* Espace sécateur entre chaque enfant visible : axe 4.14
+          (label-content-name-mismatch) concatène les nœuds texte on-screen
+          SANS séparateur — « Courses » + pastille « 5 » fusionnaient en
+          « courses5 », qui n'est plus une sous-séquence contiguë de jetons
+          du nom « Ouvrir Courses, 5 articles à acheter ». Un espace texte
+          nu (invisible, ignoré par flex : texte purement blanc, aucun item
+          anonyme) rétablit la frontière de jeton sans toucher au dessin ni
+          à la pastille (D-07). */}
+      {' '}
       <span aria-hidden="true" className="pointer-events-none absolute right-0 bottom-0 block w-[58px] select-none pr-1.5 pb-1 leading-none min-[651px]:w-[112px]">
         <ModuleObject module={module} className="h-auto w-full text-fg" />
       </span>
       {/* Jamais un zéro décoratif : la pastille ne paraît que si la valeur
           est informative. */}
+      {' '}
       {counter ? (
         <span
           aria-hidden="true"
