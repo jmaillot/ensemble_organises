@@ -192,7 +192,7 @@ Plans:
   3. Un commit atomique par fix ; la chaîne §2.7 complète (e2e comprise) est verte à chaque plan
   4. Aucune violation axe bloquante des parcours clés ne subsiste au scan final (hormis l'allowlist consignée)
 
-**Plans**: 6/6 plans executed
+**Plans**: 6/6 plans complete
 
 Plans:
 - [x] 50-01-PLAN.md — Tracer : correction du harnais axe (withRules → règles par défaut, DOSSIER_BRUT → phase 50) + preuve des 89–90 règles (D-05)
@@ -236,6 +236,6 @@ Plans:
 | 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
-| 50. Fixes a11y majeurs | 5/6 | In Progress|  |
+| 50. Fixes a11y majeurs | 6/6 | Complete    | 2026-11-13 |
 | 51. Audit qualité transverse | 0/? | Not started | - |
 | 52. Fixes qualité + closing | 0/? | Not started | - |
