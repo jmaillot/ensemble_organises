@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Audit complet & durcissement
-current_phase: 49
-current_phase_name: Audit accessibilité (WCAG 2.2 AA)
-status: executing
-stopped_at: Phase 49 — plan 02 exécuté, plan 03 prêt (revue clavier + classification)
-last_updated: "2026-11-13T12:23:14.725Z"
+current_phase: 50
+current_phase_name: Fixes a11y majeurs
+status: planning
+stopped_at: Phase 49 complete, ready to plan Phase 50
+last_updated: "2026-11-13T13:29:43.084Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 49 execution started
-state_head: 6543d27c78bcbe728695632e19eb587ffdfc7c90
+last_activity_desc: Phase 49 complete, transitioned to Phase 50
+state_head: 593e705bc7f203d2e3da6314629ed8d74d1ce181
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 12
-  percent: 54
+  completed_plans: 14
+  percent: 63
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 
 ## Current Position
 
-Phase: 49 (Audit accessibilité (WCAG 2.2 AA)) — EXECUTING
-Plan: 3 of 3
-Status: Phase 49 — plan 03 (revue clavier + classification) prêt à démarrer
-Last activity: 2026-11-13 — 49-02-PLAN.md exécuté (harnais axe vert, 18 exports bruts)
+Phase: 50 — Fixes a11y majeurs
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-13 — Phase 49 complete, transitioned to Phase 50
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Last activity: 2026-11-13 — 49-02-PLAN.md exécuté (harnais axe vert, 18 expo
 | Phase 48 P03 | 25 min | 3 tasks | 2 files |
 | Phase 49 P01 | 6 min | 2 tasks | 2 files |
 | Phase 49 P02 | 35 min | 2 tasks | 3 files |
+| Phase 49 P03 | 60 min | 3 tasks | 1 files (+6 preuves brut/) |
 
 ## Accumulated Context
 
@@ -79,9 +80,9 @@ Last activity: 2026-11-13 — 49-02-PLAN.md exécuté (harnais axe vert, 18 expo
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T12:30:00Z
-**Stopped at:** Completed 49-01-PLAN.md
-**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-01-SUMMARY.md
+**Last session:** 2026-11-13T13:45:00Z
+**Stopped at:** Phase 49 complete, ready to plan Phase 50
+**Resume file:** .planning/phases/49-audit-accessibilit-wcag-2-2-aa/49-03-SUMMARY.md
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -123,3 +124,5 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 46]: Régime git .planning/* gitigné (.gitignore:86) prévaut sur « commité » de D-06 — preuve par le contenu, jamais git add -f (A3 résolu)
 - [Phase 48]: Fix PERF-47-09 : helper privé ardoise_settlement_data lit les soldes UNE fois (boucle recopiée — simplify garde sa signature (text) pour 0018)
 - [Phase 48]: 48-03 : aucun memo posé — aucun majeur re-renders au seuil TRA-01 (ligne « Alimente le plan 48-03 : aucune ») ; PERF-03 clôturée par le fix SQL 48-02 ; éligibilité de démonstration courses : props instables (handlers inline non useCallback, Pitfall 6)
+- [Phase 49]: 49-03 — une seule fiche bloquant (A11Y-49-01 : cibles < 44 px des pages publiques /connexion et /foyer/rejoindre, règle AGENTS.md §6, preuve de mesure datée) ; 7 fiches informatif → backlog QUA-04 ; 1 design-verrouillé (faux positif d'animation prouvé par re-mesure + D-07)
+- [Phase 49]: 49-03 — découverte : `withRules(['target-size'])` LIMITE axe à cette règle (les 18 exports du plan 02 n'ont pas fait tourner les règles par défaut) ; scans complémentaires à règles par défaut exécutés par 49-03 (20 scans, 89–90 règles chacun) — correction du harnais reportée phase 50 (read-only)
