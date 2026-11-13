@@ -70,7 +70,7 @@
 - [x] **Phase 47: Audit performance/requêtes** - Bundle, N+1, index, re-renders — sur le schéma post-fixes RLS (PERF-01, PERF-02) (completed 2026-11-13)
 - [x] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03) (completed 2026-11-13)
 - [x] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
-- [ ] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03)
+- [x] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03) — 6/6 plans, 2026-11-13
 - [ ] **Phase 51: Audit qualité transverse** - Code mort, duplications, cohérence, zones jamais relues depuis v0.9 — revue finale des fichiers que les fixes ont modifiés (QUA-01, QUA-02)
 - [ ] **Phase 52: Fixes qualité + closing du jalon** - Fixes majeurs, consolidation docs/AUDIT-*.md, backlog durable, chaîne §2.7 verte consignée (QUA-03, QUA-04, TRA-03)
 
@@ -192,7 +192,7 @@ Plans:
   3. Un commit atomique par fix ; la chaîne §2.7 complète (e2e comprise) est verte à chaque plan
   4. Aucune violation axe bloquante des parcours clés ne subsiste au scan final (hormis l'allowlist consignée)
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 - [x] 50-01-PLAN.md — Tracer : correction du harnais axe (withRules → règles par défaut, DOSSIER_BRUT → phase 50) + preuve des 89–90 règles (D-05)
@@ -200,7 +200,7 @@ Plans:
 - [x] 50-03-PLAN.md — A11Y-49-01 (bloquant) : cibles ≥ 44 px sur /connexion et /foyer/rejoindre par classes des pages, primitives intactes (D-02, D-03)
 - [x] 50-04-PLAN.md — A11Y-49-07 : skip-link tabindex="-1" dynamique sous voile, e2e rouge-avant-vert
 - [x] 50-05-PLAN.md — A11Y-49-04 : label-content-name-mismatch sur tuiles + boutons shell, résolution empirique contre axe (Q1)
-- [ ] 50-06-PLAN.md — Scans finaux 6 parcours × 2 projets + classement D-06 des violations restantes (critère 4)
+- [x] 50-06-PLAN.md — Scans finaux 6 parcours × 2 projets + classement D-06 des violations restantes (critère 4)
 
 ### Phase 51: Audit qualité transverse
 

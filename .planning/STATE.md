@@ -8,14 +8,14 @@ status: executing
 stopped_at: Completed 50-06-PLAN.md
 last_updated: "2026-11-13T15:44:08.523Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 50 plan 04 exécuté (skip-link non focusable sous voile modal)
+last_activity_desc: Phase 50 complète (plan 06 — scans finaux axe, critère 4 VRAI, zéro bloquant nouveau)
 state_head: 2c8682a1750ec4eaf89d1f7ccaba8adbf04438a9
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 20
-  completed_plans: 19
-  percent: 63
+  completed_plans: 20
+  percent: 75
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 
 ## Current Position
 
-Phase: 50 (Fixes a11y majeurs) — EXECUTING
+Phase: 50 (Fixes a11y majeurs) — COMPLETE
 Plan: 6 of 6
-Status: Ready to execute
-Last activity: 2026-11-13 — Phase 50 plan 04 exécuté
+Status: Complete
+Last activity: 2026-11-13 — Phase 50 complète (scans finaux axe : critère 4 VRAI, zéro bloquant nouveau)
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Last activity: 2026-11-13 — Phase 50 plan 04 exécuté
 - Outillage : lints pg-meta SQL purs via `psql.sh` stdin ; une seule devDependency (`@axe-core/playwright@4.14.0`) ; knip/oxlint/source-map-explorer one-shot jetables ; no-linter inchangé (recommandation écrite au pire) ; re-renders et duplications = revue humaine.
 - Harnais axe (49-02) : collecte sans échec (D-04), aucune assertion sur les violations ; exports étiquetés avec les règles exécutées (passes+inapplicable) pour prouver que `target-size` a tourné ; tiroir mobile scanné sur l'app-shell seul (le pré-écran /foyer/rejoindre n'a ni barre basse ni tiroir) ; 3 échecs vitest pré-existants en calendrier-page.test.tsx (vérifiés sur HEAD~1), hors périmètre read-only.
 - Fixes SQL = migrations forward-only 0182+ uniquement ; `test-db.sh` obligatoire pour tout changement SQL ; les migrations appliquées ne sont jamais réécrites.
+- Phase 50 P06 (classement D-06) : zéro bloquant nouveau — critère 4 VRAI, prouvé par 18 scans finaux à règles par défaut (≥ 89 règles incl. target-size) ; 47 nœuds restants = 8 allowlistés A11Y-49-10 (faux positif d'animation) + 39 informatifs A11Y-49-05 hérités vers QUA-04, aucun fix opportuniste.
 
 ### Todos
 
