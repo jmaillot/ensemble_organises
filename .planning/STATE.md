@@ -5,11 +5,11 @@ milestone_name: Audit complet & durcissement
 current_phase: 50
 current_phase_name: Fixes a11y majeurs
 status: executing
-stopped_at: Completed 50-05-PLAN.md
-last_updated: "2026-11-13T15:38:45.146Z"
+stopped_at: Completed 50-06-PLAN.md
+last_updated: "2026-11-13T15:44:08.523Z"
 last_activity: 2026-11-13
 last_activity_desc: Phase 50 plan 04 exécuté (skip-link non focusable sous voile modal)
-state_head: dc3366612ce4db553a52f9f4761fbf93449072ac
+state_head: 2c8682a1750ec4eaf89d1f7ccaba8adbf04438a9
 progress:
   total_phases: 8
   completed_phases: 5
@@ -61,6 +61,7 @@ Last activity: 2026-11-13 — Phase 50 plan 04 exécuté
 | Phase 50 P03 | ~20 min (session interrompue, reprise) | 3 tasks | 3 files |
 | Phase 50 P04 | 20 min | 3 tasks | 2 files |
 | Phase 50 P05 | 85 min | 3 tasks | 2 files |
+| Phase 50 P06 | 10 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,8 +86,8 @@ Last activity: 2026-11-13 — Phase 50 plan 04 exécuté
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T15:38:45.072Z
-**Stopped at:** Completed 50-05-PLAN.md
+**Last session:** 2026-11-13T15:44:08.448Z
+**Stopped at:** Completed 50-06-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -134,3 +135,4 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 50]: Correction du harnais axe par options.rules (règles WCAG 2.2 réactivées sans limiter les règles par défaut) — withRules/withTags LIMITENT l'analyse — Doc officielle axe-core-npm : withRules comme withTags restreignent l'analyse ; seule options({rules:{...enabled:true}}) réactive target-size en conservant les 89–90 règles par défaut. Limite L1 de 49-AUDIT corrigée sans nouveau withRules.
 - [Phase 50]: Fix A11Y-49-02 par focus-visible:outline-solid ajouté à outline-none dans la classe de base partagée input.tsx — une seule classe réparant tous les formulaires (§2.7-E), preuve rouge→vert par getComputedStyle
 - [Phase 50]: Fix A11Y-49-07 par piste (b) — miroir aria-hidden Radix sur le skip-link (MutationObserver sous-arbre body, closest depuis le skip-link : Radix marque les descendants individuels, pas la racine du shell) ; le piège de focus Radix intercepte Tab donc la preuve rouge exige axe sous voile, la navigation seule est verte avant fix
+- [Phase 50]: Classement D-06 scans finaux : zero bloquant nouveau, critere 4 VRAI (47 noeuds restants : 8 allowlistes A11Y-49-10 faux positif animation, 39 informatifs A11Y-49-05 herites vers QUA-04) — 18 exports a regles par defaut (>=89 incl. target-size) prouvent le critere 4 ; aucun fix opportuniste (D-06)
