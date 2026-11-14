@@ -5,17 +5,17 @@ milestone_name: Audit complet & durcissement
 current_phase: 51
 current_phase_name: Audit qualité transverse
 status: executing
-stopped_at: Completed 51-01-PLAN.md (plan 1/5)
-last_updated: "2026-11-14T07:16:26.894Z"
+stopped_at: Completed 51-04-PLAN.md (plan 4/5)
+last_updated: "2026-11-14T08:52:00Z"
 last_activity: 2026-11-14
-last_activity_desc: Phase 51 execution started
+last_activity_desc: Plan 51-04 (revue modules) terminé
 state_head: 5a3295ee532fec84ca661722ebeb0a3a87338683
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 25
-  completed_plans: 20
-  percent: 75
+  completed_plans: 24
+  percent: 96
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-13)
 ## Current Position
 
 Phase: 51 (Audit qualité transverse) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
-Last activity: 2026-11-14 — Phase 51 execution started
+Plan: 5 of 5
+Status: Ready to execute (plan 51-05 restant)
+Last activity: 2026-11-14 — Plan 51-04 (revue modules) terminé — couverture roadmap critère 1 atteinte côté modules
 
 ## Performance Metrics
 
@@ -63,6 +63,9 @@ Last activity: 2026-11-14 — Phase 51 execution started
 | Phase 50 P05 | 85 min | 3 tasks | 2 files |
 | Phase 50 P06 | 10 min | 2 tasks | 2 files |
 | Phase 51 P01 | 5 min | 3 tasks | 5 files |
+| Phase 51 P02 | 60 min | 3 tasks | 1 file (+journal brut/) |
+| Phase 51 P03 | ~2h | 4 tasks | 1 file |
+| Phase 51 P04 | ~4h | 3 tasks | 1 file (51-AUDIT.md, 412 l.) |
 
 ## Accumulated Context
 
@@ -88,8 +91,8 @@ Last activity: 2026-11-14 — Phase 51 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-14T07:16:25.841Z
-**Stopped at:** Completed 51-01-PLAN.md (plan 1/5)
+**Last session:** 2026-11-14T08:52:00Z
+**Stopped at:** Completed 51-04-PLAN.md (plan 4/5)
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -141,3 +144,5 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 51]: 51-01 : SPEC verrouillée (seuil cité 45-SPEC §1, stop-list D-11 à 9 entrées, versions épinglées knip@6.45.1 / oxlint@1.93.0, listes fermées datées — 23 répertoires modules ≠ 24 de RESEARCH, 21 fichiers data/ ≠ 20) — Les compteurs de prose divergent du disque (Pitfall 4) ; le ls daté fait foi pour les plans 02-05
 - [Phase 51]: 51-01 : quatre câblages invisibles prouvés à l'exécution (CABL-51-01..04) — test-db.sh 105 fichiers tous verts le 2026-11-14, cron.job 14 jobs sans secret + 50548 runs réussis, deploy-functions --list 16 fonctions, Dexie câblé au barrel data/index.ts avec 10 suites contrat — Docker disponible → preuve réelle (D-10), jamais grep seul ; toute fiche de code mort des plans 02-04 citera ces fiches (D-03)
 - [Phase 51]: 51-01 : instruments one-shot tournés sans rien persister — knip 306 lignes de pistes en brut/, oxlint 0 erreur / warnings seulement, garde no-eslint-directive verte (3 passed) ; pistes NON classées (triage D-03 au plan 02) — D-07/D-08 : npx épinglé jetable, aucune devDependency ; knip jamais preuve primaire
+- [Phase 51]: 51-04 : aucune nouvelle fiche QUA-51-07+ — code mort voyages `useVoyages().remove` rattaché à la surface QUA-51-06 existante (grep daté 08:37Z, câblages D-09 cités) ; observations sous le seuil consignées au journal sans fiche (messages media_url TTL 30 j, prestataires prose guide, notes color-column, recettes anglicismes/label invité, routines/taches libellés, voyages typo+nuance guide)
+- [Phase 51]: 51-04 : couverture modules complète (22 relus + documents verrouillé D-11 + racines) — journal Axe 4 en 3 sections, écriture incrémentale, `git status --porcelain app/` vide après chaque tâche ; critère de réussite 1 roadmap (transverse + modules) atteint
