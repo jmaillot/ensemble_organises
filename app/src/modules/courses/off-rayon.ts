@@ -109,5 +109,3 @@ export function offProductRayon(product: { categoriesTags: string[] } | null | u
   if (!product) return DEFAULT_RAYON;
   return offCategoriesToRayon(product.categoriesTags);
 }
-
-export { normalizeRayon };

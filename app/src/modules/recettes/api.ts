@@ -13,7 +13,6 @@ import type {
   RecipeCategoryRow,
   RecipeFavoriteRow,
   RecipeIngredientRow,
-  RecipeRow,
   RecipeStepRow,
   RecipeTagLinkRow,
   RecipeTagRow,
@@ -304,9 +303,6 @@ export async function resolveRecipeCoverUrls(
   }
   return resolved;
 }
-
-export type { RecipeRow };
-
 /* ------------------------------------------------------------------ */
 /* Photo d'étape (R1, D-02/D-03) : même régime que la couverture —      */
 /* chemin de bucket signé à la lecture, valeur produite par `storedValueOf`. */
