@@ -8,7 +8,7 @@ Chaque entrée porte ce qu'il faut pour la reprendre à froid : ce qui est à
 faire, pourquoi, et **comment vérifier que c'est fini**. Un travail sans
 critère de fin n'est pas terminé, il est en cours.
 
-Dernière mise à jour : 22 octobre 2026.
+Dernière mise à jour : 14 novembre 2026.
 
 ---
 
@@ -941,3 +941,133 @@ encore :
 - le parcours « archiver pour vous / quitter / supprimer pour vous » a été
   validé en production le 2026-10-19 sur le protocole en trois gestes (retour
   utilisateur), après `0131` et `0132`.
+
+---
+
+## Backlog des audits du jalon v1.5 (phase 52, QUA-04)
+
+Items moyens/mineurs issus des audits du jalon (phases 45, 47, 48, 49, 51),
+consolidés au closing par recopie par référence — chaque entrée cite sa fiche
+source (`ID + rapport`), les fiches complètes vivent dans les rapports sous
+`.planning/phases/` et les synthèses versionnées dans `docs/AUDIT-*.md`.
+Aucun de ces items n'atteint le seuil majeur TRA-01 (45-SPEC §1).
+
+### Performance SQL / requêtes (47-AUDIT, 48-SOUS-RAPPORT)
+
+- [ ] **PERF-47-02 — Baseline bundle : chunk `notes-page` atypique** —
+  **Quoi** : examiner pourquoi `notes-page` pèse 179,6 KiB (× 3,5 la médiane
+  des pages métier) — réutilisation de `seed-glsrugWQ.js` ? duplications ?
+  **Pourquoi** : observation de baseline sans impact démontré (lazy-loading
+  par route), mais l'écart est grand. **Comment vérifier** : après
+  investigation, soit le chunk est réduit (mesure avant/après du build), soit
+  l'absence de gain démontrée est consignée. Source : 47-AUDIT §« PERF-47-02 ».
+
+- [ ] **PERF-47-03 — parcours connexion : une requête `households` PAR foyer
+  (N+1 borné)** — **Quoi** : remplacer la boucle `session-store.ts:218-224`
+  (N = foyers de l'appelant, ≤ 4 mesuré) par une lecture unique.
+  **Pourquoi** : mineur à la volumétrie actuelle, mais la forme N+1 se
+  dégrade avec le nombre de foyers. **Comment vérifier** : une seule requête
+  dans le bootstrap multi-foyers, tests de session verts. Source :
+  47-AUDIT §« PERF-47-03 ».
+
+- [ ] **PERF-47-05 — parcours dashboard : double lecture `expenses` + upserts
+  widgets en boucle** — **Quoi** : supprimer la relecture `expenses` du
+  `queryFn` des participants (use-dashboard.ts:119-128) ; grouper les ~7
+  upserts `dashboard_widgets` de `setWidgetOrder` (l.142-170).
+  **Pourquoi** : EXPLAIN daté (2026-11-12T20:07Z) : ~15 ms redondantes par
+  montage ; le facteur 2, pas le plan d'accès, est le problème.
+  **Comment vérifier** : une seule lecture `expenses` par montage du
+  dashboard ; un upsert groupé au réordonnancement. Source :
+  47-AUDIT §« PERF-47-05 ».
+
+- [ ] **PERF-47-07 — parcours tâches : `updateTaskOrders`, une requête par
+  tâche** — **Quoi** : batcher les updates de réordonnancement
+  (app/src/modules/taches/api.ts:64-69, 1 update HTTP/tâche dans un
+  `Promise.all`). **Pourquoi** : mineur (N = 1-3 mesuré), la forme se
+  dégrade avec de longues listes. **Comment vérifier** : un appel HTTP par
+  réordonnancement (RPC ou upsert batch), tests tâches verts. Source :
+  47-AUDIT §« PERF-47-07 ».
+
+- [ ] **PERF-47-08 — parcours ardoise (client) : participants non filtrés +
+  jointure client O(n×m)** — **Quoi** : filtrer `expense_participants` côté
+  serveur (`expense_id in (…)`), `fetchArdoiseDetail` (api.ts:115-126).
+  **Pourquoi** : mineur ; le payload croît avec le nombre de dépenses du
+  foyer. **Comment vérifier** : la requête porte le filtre et le calcul
+  client ne fait plus de `some()` croisé. Source :
+  47-AUDIT §« PERF-47-08 ».
+
+- [ ] **PERF-47-10 — transverse : `select *` systématique sur le
+  supabase-adapter** — **Quoi** : projeter les colonnes utiles au lieu de
+  `select *` (supabase-adapter.ts:137). **Pourquoi** : mineur (aucune preuve
+  d'impact, coût de désérialisation PostgREST théorique) ; économie de
+  payload générale. **Comment vérifier** : les lectures portent une liste de
+  colonnes, la suite entière reste verte. Source :
+  47-AUDIT §« PERF-47-10 ».
+
+### Performance re-renders / arbitrage useResource (48-SOUS-RAPPORT)
+
+- [ ] **PERF-47-13 / PERF-47-15 (+ 11/12/14/16) — chemin transverse
+  `useResource` : chaque arrivée de données re-rend toute la page** —
+  **Quoi** : arbitrage D-14 rendu en phase 52 (D-04) : **aucun fix** — les
+  re-renders mesurés sont tous mineurs/moyens (≤ ~55 ms par commit, réponse
+  optimiste < 1 ms, aucun impact au seuil TRA-01) ; un `React.memo` sur les
+  widgets n'éliderait pas les arrivées séquentielles (les données changent à
+  chaque commit). **Pourquoi** : la cause est transverse (7 `useResource`
+  parallèles au dashboard) et sans preuve d'impact ; consigné pour ne pas le
+  ré-ouvrir sans nouveau majeur. **Comment vérifier** : ne réouvrir qu'avec
+  une mesure démontrant un impact utilisateur au seuil TRA-01. Source :
+  48-SOUS-RAPPORT récap final (fiches PERF-47-11..16) + décision D-04 de
+  52-CONTEXT.
+
+- [ ] **PERF-47-16 — `computeBalances` client (use-ardoise.ts:279)**
+  — **Quoi** : mémoïser ou déplacer le recalcul client des soldes.
+  **Pourquoi** : mineur (≤ 25,4 ms au commit le plus coûteux du parcours,
+  48-05) ; c'est le recalcul client complet à chaque invalidation ardoise.
+  **Comment vérifier** : mesure avant/après du commit « saisie dépense » et
+  suites ardoise vertes. Source : 48-SOUS-RAPPORT fiche PERF-47-16 (D-08 :
+  explicitement au backlog).
+
+- [ ] **PERF-48-CROISE-01 — famille SQL household (`household_balances` /
+  `simplify_household_debts` / `expense_settlement`, 0006:488-597,
+  0013:148-163)** — **Quoi** : EXPLAINer cette famille et la fusionner si un
+  recalcul redondant est démontré (gabarit réutilisable : fix ardoise 0182).
+  **Pourquoi** : mineur — jamais EXPLAINée en 47, non mesurée ; tout fix
+  exige d'abord sa preuve avant/après (protocole 47, D-06 de la phase 48).
+  **Comment vérifier** : EXPLAIN daté de chaque fonction à volumétrie cible ;
+  fix uniquement si impact démontré. Source : 48-SOUS-RAPPORT récap final
+  (D-10 : hors périmètre 48).
+
+### Accessibilité (49-AUDIT §6 + 50-SCANS-FINAUX)
+
+- [ ] **A11Y-49-03 / A11Y-49-05 / A11Y-49-06 / A11Y-49-08 / A11Y-49-09 —
+  fiches informatives WCAG 2.2 AA au backlog** — **Quoi** : corriger les
+  violations best-practice axe restantes (notamment `landmark-one-main` +
+  `region` sur /connexion et /foyer/rejoindre — 39 nœuds confirmés par les
+  scans finaux 50 du 2026-11-13T16:41Z — et les autres fiches 49 §6).
+  **Pourquoi** : informatif — best-practice axe, pas de critère WCAG 2.2 AA
+  direct. **Comment vérifier** : scans axe (règles par défaut + target-size,
+  ≥ 89 règles exécutées) à 0 violation sur les surfaces concernées. Source :
+  49-AUDIT §6 (A11Y-49-02/04/07 corrigées en 50 ; A11Y-49-01 fixée ;
+  A11Y-49-10 design-verrouillé — verify-only) + 50-SCANS-FINAUX §(c).
+
+### Qualité transverse (51-AUDIT §5)
+
+- [ ] **QUA-51-01 — 170 exports sans consommateur (classe transverse)** —
+  **Quoi** : suppression symbole par symbole après re-vérification
+  individuelle (le volume impose un plan dédié). **Pourquoi** : mineur —
+  code mort sans impact utilisateur démontré ; la preuve existe déjà :
+  liste complète symbol par symbole dans
+  `.planning/phases/51-audit-qualit-transverse/brut/triage-plan02-exports-2026-11-14.log`,
+  section « Balayage 3 » (journal daté 2026-11-14T07:24:41Z, grep = preuve).
+  **Comment vérifier** : `grep -rwF` à 0 consommateur confirmé juste avant
+  chaque suppression ; typecheck + suite verte. Source :
+  51-AUDIT §« QUA-51-01 ».
+
+- [ ] **QUA-51-03 — duplications de helpers/formatteurs entre modules
+  (classe)** — **Quoi** : un unique chantier « mutualiser dans `@/lib` »
+  pour `formatBytes`, `formatClockTime` (3 copies), `toReminderIso`,
+  `ReadMap`, `GridDay`, `daysUntil`, `displayablePhoto`. **Pourquoi** :
+  mineur — chaque copie est correcte individuellement ; identifier les
+  copies mortes est déjà couvert par QUA-51-01. **Comment vérifier** : une
+  seule définition par helper, importée partout ; suites des modules
+  concernés vertes. Source : 51-AUDIT §« QUA-51-03 ».
