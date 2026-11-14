@@ -386,6 +386,7 @@ second demande une preuve d'absence, ce qui est plus dur que l'inverse.
       /contacts
       /frigo
       /menu
+      /documents                  # papiers du foyer (factures, contrats, ordonnances)
       /dashboard                  # tableau de bord personnalisé (ex-/widgets)
       /parametres
       /landing
@@ -532,6 +533,10 @@ Chaque module suit la même structure interne : `components/`, `hooks/`, `api.ts
 ### Menu de la semaine (vague 3.1)
 - `meal_entries` (id, household_id, entry_date, slot [matin/midi/soir], recipe_id nullable, free_text nullable, servings, member_ids text[], created_by) — une table, pas deux : une ligne = un repas ; soit recette, soit texte libre (0142) ; la génération des Courses collecte les
   ingrédients des repas déjà placés (menu → liste, 77998a1)
+
+### Documents (vague 3.2)
+- `document_folders` (id, household_id, name, color [sage/blush/butter/sky/lilac/sand], created_by, created_at) — dossiers colorés de classement, nom unique par foyer (0143)
+- `documents` (id, household_id, folder_id nullable, name, mime [images/application/pdf], size, storage_path, expires_on nullable, notes ≤1000, created_by, created_at) — toujours un fichier photo ou PDF du bucket privé `household-media`, jamais un texte nu ; la suppression d'un dossier ne détruit pas ses documents (`on delete set null`, retombent à la racine) et un déclencheur aligne le foyer du document sur celui de son dossier (0143)
 
 ### Widgets (tableau de bord personnalisé)
 - `dashboard_widgets` (id, member_id, widget_type [calendrier/tâches/météo/anniversaires/routines], position_x, position_y, width, height, settings jsonb) — préférences personnelles; le foyer est dérivé du membre
