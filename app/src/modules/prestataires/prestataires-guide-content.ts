@@ -48,7 +48,7 @@ export const PRESTATAIRES_GUIDE_QUESTIONS: GuideQuestion[] = [
   {
     question: 'Comment ajouter un contact ?',
     answer:
-      "Le bouton Ajouter un prestataire ouvre une fiche vierge. Seuls le nom et le type sont dérangeants : tout le reste peut attendre, et se compléter plus tard.",
+      "Le bouton Ajouter un prestataire ouvre une fiche vierge. Seul le nom est requis : tout le reste, le type compris, peut attendre et se compléter plus tard.",
   },
   {
     question: 'Que puis-je mettre dans les pièces jointes ?',
