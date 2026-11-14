@@ -19,13 +19,9 @@
 #     secrets d'environnement à la création du service, l'intégrer transformerait
 #     une copie de fichiers en redémarrage d'infrastructure.
 #
-# Fonctions métier attendues à ce jour :
-#   household-invite, expense-settlement, generate-routine-occurrences,
-#   push-subscribe, push-notify.
-#
 # La liste n'est PAS figée ici : le script balaie `supabase/functions` et
-# n'exige que la présence d'un `index.ts` par répertoire. Cette liste est donc
-# documentaire — `sh scripts/deploy-functions.sh --list` fait foi.
+# n'exige que la présence d'un `index.ts` par répertoire —
+# `sh scripts/deploy-functions.sh --list` fait foi.
 #
 #   sh scripts/deploy-functions.sh
 #   sh scripts/deploy-functions.sh --list
