@@ -24,7 +24,7 @@ current_phase: 52
 See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** PWA foyers
-**Current focus:** Phase 52 — Fixes qualité + closing du jalon
+**Current focus:** Awaiting next milestone
 
 ## Current Position
 
@@ -39,7 +39,7 @@ Last activity: 2026-11-14 — Milestone v1.5 completed and archived
 - v1.2 : 2 phases, 5 plans, 6 exigences, audit tech_debt 6/6
 - v1.3 : 5 phases (38-42), 12 exigences, 13 plans — audit tech_debt 10/12 (2 deferred : COLD-02, CACHE-01)
 - v1.4 : 2 phases (43-44), 11 exigences — shipped 2026-11-12, CACHE-01 différée honnêtement
-- v1.5 : 8 phases (45-52), 17 exigences (SEC, PERF, A11Y, QUA, TRA) — en cours
+- v1.5 : 8 phases (45-52), 17 exigences (SEC, PERF, A11Y, QUA, TRA) — shipped 2026-11-14, audit tech_debt 17/17 (dette déclarée, backlog docs/TODO.md)
 
 **Per-Plan Metrics:**
 
