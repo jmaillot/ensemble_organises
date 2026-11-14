@@ -82,6 +82,34 @@ UX), smoke-test sans mode prod (exige l'autoconfirm), 2 infos de review
 phase 37 (gardes morts), extension du modèle de partage ardoise (observation
 produit UAT test 2).
 
+## État courant — jalon v1.5 « Audit complet & durcissement » clôturé le 2026-11-14
+
+Le jalon v1.5 (phases 45-52, audit-first-per-axis) est clos : **sécurité** —
+audit RLS complet matrice 83 tables + lints pg-meta (45), zéro fiche majeure,
+SEC-45-01 fixée par migration 0183 avec lint 0006 → 0 rows (preuve :
+[docs/AUDIT-SECURITE.md](docs/AUDIT-SECURITE.md)) ; **performance** — audit
+requêtes + re-renders (47/48), PERF-47-09 fixé (0182), arbitrage useResource
+consigné sans fix (D-04, impact mesuré ≤ ~55 ms, aucun au seuil TRA-01)
+(preuve : [docs/AUDIT-PERFORMANCE.md](docs/AUDIT-PERFORMANCE.md)) ;
+**accessibilité** — audit WCAG 2.2 AA avec harnais axe durable (49/50),
+A11Y-49-01/02/07 fixées, scans finaux à règles par défaut : zéro bloquant
+nouveau (preuve : [docs/AUDIT-ACCESSIBILITE.md](docs/AUDIT-ACCESSIBILITE.md)) ;
+**qualité** — audit transverse code mort/duplications/dérive docs (51), 9
+fiches mineures fixées par commit atomique, 4 consolidations versionnées sous
+`docs/AUDIT-*.md` + backlog durable (preuve :
+[docs/AUDIT-QUALITE.md](docs/AUDIT-QUALITE.md)). Chaîne §2.7 complète rejouée
+et consignée datée à l'état final (typecheck 0, 2006 tests, build PWA,
+e2e 179 passed/11 skipped, check-sql-statique 232 fonctions aucun défaut,
+test-db.sh 106/106 verts dont 0183) ; le push réel non prouvé faute
+d'appareil abonné est mentionné explicitement (§2.7-F).
+
+**Dettes restantes au backlog durable** (voir
+[docs/TODO.md](docs/TODO.md) — section « Backlog des audits du jalon v1.5 ») :
+QUA-51-01 (170 exports), QUA-51-03 (mutualiser dans `@/lib`), famille
+PERF-47 (02/03/05/07/08/10), PERF-48-CROISE-01, famille A11Y-49
+(03/05/06/08/09), computeBalances. Observatoires hors jalon inchangés :
+GATE-01 (re-test gate SW), CACHE-01 (differée v1.4), COLD-02.
+
 ## État courant — phases 45-46 closes le 2026-11-12 (audit sécurité/RLS + clôture SEC-03)
 
 **Phase 45 (audit sécurité/RLS)** : rapport `45-AUDIT.md` — zéro constat majeur

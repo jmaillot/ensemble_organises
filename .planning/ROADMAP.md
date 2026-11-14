@@ -72,7 +72,7 @@
 - [x] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
 - [x] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03) — 6/6 plans, 2026-11-13
 - [x] **Phase 51: Audit qualité transverse** - Code mort, duplications, cohérence, zones jamais relues depuis v0.9 — revue finale des fichiers que les fixes ont modifiés (QUA-01, QUA-02) (completed 2026-11-14)
-- [ ] **Phase 52: Fixes qualité + closing du jalon** - Fixes majeurs, consolidation docs/AUDIT-*.md, backlog durable, chaîne §2.7 verte consignée (QUA-03, QUA-04, TRA-03)
+- [x] **Phase 52: Fixes qualité + closing du jalon** - Fixes majeurs, consolidation docs/AUDIT-*.md, backlog durable, chaîne §2.7 verte consignée (QUA-03, QUA-04, TRA-03) (completed 2026-11-14)
 
 ### Phase Details
 
@@ -242,7 +242,7 @@ Plans:
   3. Le backlog durable des moyens/mineurs existe ; AGENTS.md est mis à jour si une convention évolue (dont le module `documents` en §3)
   4. La chaîne §2.7 complète est verte à l'état final du jalon et consignée (TRA-03) — aucun constat sans preuve, aucun fix sans test
 
-**Plans**: 3/6 plans executed
+**Plans**: 6/6 plans complete
 
 Plans:
 - [x] 52-01-PLAN.md — Fix SEC-45-01 : migration 0183 fusion des politiques permissives + testkit non-escalade, lint 0006 → 0 rows (QUA-03)
@@ -250,7 +250,7 @@ Plans:
 - [x] 52-03-PLAN.md — Retrait des 13 dépendances mortes + lockfile §2.1 (QUA-51-05) (QUA-03)
 - [x] 52-04-PLAN.md — Fixes documentaires : AGENTS.md documents (DD-01), deploy-functions.sh (DD-02), prose prestataires (DD-03) (QUA-03, QUA-04)
 - [x] 52-05-PLAN.md — Consolidations docs/AUDIT-{SECURITE,PERFORMANCE,ACCESSIBILITE}.md + backlog docs/TODO.md + ROADMAP-TODO (QUA-04)
-- [ ] 52-06-PLAN.md — Chaîne §2.7 complète datée + docs/AUDIT-QUALITE.md + récap jalon PROJECT.md + clôture planning (QUA-04, TRA-03)
+- [x] 52-06-PLAN.md — Chaîne §2.7 complète datée + docs/AUDIT-QUALITE.md + récap jalon PROJECT.md + clôture planning (QUA-04, TRA-03)
 
 ## Progress
 
@@ -262,4 +262,4 @@ Plans:
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
 | 50. Fixes a11y majeurs | 6/6 | Complete    | 2026-11-13 |
 | 51. Audit qualité transverse | 5/5 | Complete    | 2026-11-14 |
-| 52. Fixes qualité + closing | 3/6 | In Progress|  |
+| 52. Fixes qualité + closing | 6/6 | Complete    | 2026-11-14 |
