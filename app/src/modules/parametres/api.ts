@@ -91,7 +91,7 @@ export async function saveProfile(target: ProfileTarget, values: { displayName: 
   const meteo = widgets.find((widget) => widget.widget_type === 'meteo' && widget.member_id === target.memberId);
   if (meteo) {
     await data.update<DashboardWidgetRow>('dashboard_widgets', meteo.id, {
-      settings: { ...(meteo.settings ?? {}), city: values.city },
+      settings: { ...meteo.settings, city: values.city },
     });
     return;
   }

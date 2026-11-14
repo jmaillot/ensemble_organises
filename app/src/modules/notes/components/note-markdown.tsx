@@ -61,7 +61,7 @@ export function NoteMarkdown({ content, className }: { content: string; classNam
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ node, ...props }) => {
+          a: ({ node: _node, ...props }) => {
             // Un lien absolu quitte l'application : il s'ouvre dans un onglet
             // et ne transmet pas la page d'origine. Un lien interne (route de
             // l'application) garde la navigation normale, sans nouvel onglet.
@@ -73,7 +73,7 @@ export function NoteMarkdown({ content, className }: { content: string; classNam
               />
             );
           },
-          table: ({ node, ...props }) => (
+          table: ({ node: _node, ...props }) => (
             <div className="my-2.5 overflow-x-auto">
               <table {...props} className="my-0" />
             </div>

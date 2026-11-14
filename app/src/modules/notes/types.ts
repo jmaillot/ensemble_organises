@@ -372,7 +372,7 @@ export interface MentionCandidate {
 /** Le texte d'une mention de note : un lien Markdown vers son lien profond. */
 export function noteMentionText(id: string, title: string): string {
   // Un titre qui contient un crochet casserait le lien : on l'enlève.
-  const label = title.replace(/[\[\]]/g, '').trim();
+  const label = title.replace(/[[\]]/g, '').trim();
   return `[${label}](/notes?ouvrir=${encodeURIComponent(id)})`;
 }
 

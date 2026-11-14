@@ -727,7 +727,7 @@ export function filterRoutinesByAssignee(routines: Routine[], assignee: RoutineA
 
 /** Routines avec au moins une occurrence à rattraper, les plus en retard d'abord. */
 export function lateRoutines(routines: Routine[]): Routine[] {
-  return [...routines.filter((routine) => routine.isLate)].sort(
+  return routines.filter((routine) => routine.isLate).sort(
     (a, b) => b.lateCount - a.lateCount || a.name.localeCompare(b.name, 'fr'),
   );
 }
