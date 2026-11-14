@@ -5,16 +5,16 @@ milestone_name: Audit complet & durcissement
 current_phase: 52
 current_phase_name: Fixes qualité + closing du jalon
 status: executing
-stopped_at: Completed 52-01-PLAN.md
-last_updated: "2026-11-14T11:00:44.100Z"
+stopped_at: Completed 52-03-PLAN.md
+last_updated: "2026-11-14T11:46:49.203Z"
 last_activity: 2026-11-14
 last_activity_desc: Phase 52 execution started
-state_head: ba4b30da9890d8131f35bf89e1a01f10f0390014
+state_head: 619bd04c10fad7b04661270a77d78c174be60f09
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 31
-  completed_plans: 26
+  completed_plans: 28
   percent: 75
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-14)
 ## Current Position
 
 Phase: 52 (Fixes qualité + closing du jalon) — EXECUTING
-Plan: 2 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-11-14 — Phase 52 execution started
 
@@ -67,6 +67,8 @@ Last activity: 2026-11-14 — Phase 52 execution started
 | Phase 51 P03 | ~2h | 4 tasks | 1 file |
 | Phase 51 P04 | ~4h | 3 tasks | 1 file (51-AUDIT.md, 412 l.) |
 | Phase 52 P01 | 19 min | 2 tasks | 2 files |
+| Phase 52 P02 | 11 min | 3 tasks | 8 files |
+| Phase 52 P03 | 25 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -93,8 +95,8 @@ Last activity: 2026-11-14 — Phase 52 execution started
 
 ## Session Continuity
 
-**Last session:** 2026-11-14T11:00:44.006Z
-**Stopped at:** Completed 52-01-PLAN.md
+**Last session:** 2026-11-14T11:46:41.872Z
+**Stopped at:** Completed 52-03-PLAN.md
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
@@ -149,3 +151,5 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 51]: 51-04 : aucune nouvelle fiche QUA-51-07+ — code mort voyages `useVoyages().remove` rattaché à la surface QUA-51-06 existante (grep daté 08:37Z, câblages D-09 cités) ; observations sous le seuil consignées au journal sans fiche (messages media_url TTL 30 j, prestataires prose guide, notes color-column, recettes anglicismes/label invité, routines/taches libellés, voyages typo+nuance guide)
 - [Phase 51]: 51-04 : couverture modules complète (22 relus + documents verrouillé D-11 + racines) — journal Axe 4 en 3 sections, écriture incrémentale, `git status --porcelain app/` vide après chaque tâche ; critère de réussite 1 roadmap (transverse + modules) atteint
 - [Phase 52]: SEC-45-01 : forme lint-0006-safe (SELECT merged + écritures admin par commande), lint 0006 → 0 rows daté 2026-11-14 — Fusion for all membre-OU-admin interdite (escalade §2.6) ; le critère D-02 (lint 0 rows) est le juge
+- [Phase 52]: QUA-51-04 regex notes : /[[\]]/g remplace /[\[\]]/g — équivalence prouvée — une classe vide ([] ) ne matche rien en JS, ordre des échappements compte
+- [Phase 52]: Retrait des 13 deps mortes QUA-51-05 via npm uninstall ; workbox-core/precaching/routing conservés (imports sw.ts vérifiés avant retrait)
