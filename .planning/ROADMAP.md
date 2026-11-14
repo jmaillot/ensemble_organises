@@ -213,7 +213,7 @@ Plans:
   3. Avant de classer du code mort, les quatre câblages invisibles sont vérifiés (pg_cron, testkit SQL, deploy-functions.sh, mode démo Dexie) — l'absence affirmée porte sa preuve (§2.7-I)
   4. La SPEC définit le seuil et la stop-list (conventions intouchables §2.7 — un constat dont le fix toucherait §2.7 est reclassé moyen/mineur) ; la phase est read-only
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -229,7 +229,7 @@ Plans:
 - [x] 51-04-PLAN.md — Revue des 24 modules (D-05, documents verrouillé D-11)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 51-05-PLAN.md — Dérive docs/code QUA-51-DD-* (QUA-02, D-04) + clôture de 51-AUDIT (chaîne §2.7, anti-fuite, synthèse, consolidation 52)
+- [x] 51-05-PLAN.md — Dérive docs/code QUA-51-DD-* (QUA-02, D-04) + clôture de 51-AUDIT (chaîne §2.7, anti-fuite, synthèse, consolidation 52)
 
 ### Phase 52: Fixes qualité + closing du jalon
 
@@ -253,5 +253,5 @@ Plans:
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
 | 50. Fixes a11y majeurs | 6/6 | Complete    | 2026-11-13 |
-| 51. Audit qualité transverse | 4/5 | In Progress|  |
+| 51. Audit qualité transverse | 5/5 | In Progress|  |
 | 52. Fixes qualité + closing | 0/? | Not started | - |
