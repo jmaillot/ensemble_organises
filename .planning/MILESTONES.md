@@ -1,5 +1,37 @@
 # Milestones
 
+## v1.5 Audit complet & durcissement (Shipped: 2026-11-14)
+
+**Phases completed:** 8 phases, 31 plans, 20 tasks
+
+**Key accomplishments:**
+- Seuil TRA-01 + stop-list SEC-04 écrits dans 45-SPEC.md, preuves wave 0 datées (conteneur `db` démarré, `auth.uid()` lit `request.jwt.claims`), squelette du rapport unique 45-AUDIT.md, et SQL officiel des 10 lints récupéré du dépôt supabase/splinter tag 2026.09.1 avec provenance consignée.
+- 9 lints officiels splinter (2026.09.1) versionnés sous `supabase/tests/lints/`, chacun prouvé rouge-avant-vert sur un objet fautif jetable rollbacké, résultats réels datés consignés dans 45-AUDIT.md avec 2 fiches candidats (SEC-45-01, SEC-45-02)
+- Matrice RLS de 80 tables `public` × SELECT/INSERT/UPDATE/DELETE produite par exécution SQL en `authenticated` (script traversant idempotent, 610 sondes, rollback complet) — 0 table non couverte, 3 hors périmètre, 6 couverture indirecte, SEC-45-02 reclassée mineur.
+- Revue humaine des 16 Edge Functions (D-08, 16/16 cohérentes), Storage (3 buckets privés), 212 helpers SECURITY DEFINER (0 search_path mutable) et secrets (noms/canaux, zéro fuite) — rapport consolidé final avec 2 fiches mineures, prêt pour la phase 46.
+- SEC-03 clôturée sans aucun fix : preuves d'absence fraîches datées (lints 0006/0008/0011/0013, requêtes d'absence, secrets, chaîne §2.7 verte 2006 tests + 163 e2e + 105 fichiers SQL), addendum « Clôture SEC-03 » en tête de 45-AUDIT.md avec « Consolidation phase 52 », entrée backlog SEC-45-01 dans ROADMAP-TODO.md.
+- Traversant courses audité de bout en bout sous la grammaire de preuve §2.7-I (seed rollbacké 600 lignes → gardes-fous → 3 EXPLAIN ANALYZE/BUFFERS datés en `authenticated` sous RLS → fiche PERF-47-01) + baseline bundle source-map-explorer consignée (122 chunks, 2 624 KiB, 97,6 % mappés) — phase read-only, zéro fichier applicatif modifié.
+- Fiches PERF-47-03..10 écrites pour les 6 parcours (connexion, rejoindre, dashboard, courses, tâches, ardoise) + 3 traversants SQL exécutés par stdin (dashboard, tâches, ardoise — seed rollbacké 300-800 lignes, EXPLAIN ANALYZE/BUFFERS sous RLS en `authenticated`, garde-fou auth.uid()) avec blocs datés ajoutés aux fiches + récapitulatif axe 2 consolidé : 1 feeder majeur phase 48 (ardoise_balances ×3, ≈ 1,6 s redondants par settlement), 1 fiche réfutée par la preuve d'exécution (PERF-47-06), 6 classements backlog/absence de constat — phase read-only, zéro fichier applicatif modifié.
+- Section « Axe 3 — Re-renders » écrite dans 47-AUDIT.md avec les fiches PERF-47-11..16 (6 parcours D-01) au gabarit validé (D-10) : composants mesurés + revue statique du chemin de re-renders (preuve fichier:ligne) par parcours, créneaux de mesures Profiler explicitement EN ATTENTE de la revue humaine (D-09) — gate human-action atteinte, aucune mesure fabriquée, aucun détecteur automatisé, aucune instrumentation committée (D-11).
+- Mesures Profiler des 6 parcours re-renders prises et consignées en texte dans 48-SOUS-RAPPORT.md (instrumentation temporaire, retirée) — aucune fiche majeure au seuil TRA-01, donc aucun fix re-renders pour le plan 48-03.
+- Migration 0182 non destructive : les soldes d'ardoise ne s'exécutent plus qu'UNE fois par règlement (facteur 3 → 1), preuve avant/après datée : 31,064 → 10,343 ms (−67 %).
+- Aucun majeur re-render produit par les mesures 48-01 — aucun memo posé (résultat valide consigné), PERF-03 couverte par le fix SQL 48-02 ; circuit d'éligibilité prouvé sur le candidat courses avec verdict « props instables » ; e2e §2.7 verte (163 passed).
+- 49-SPEC.md verrouillée : seuil majeur/moyen hérité de 45-SPEC §1 par référence (jamais redéfini), stop-list fermée à 7 entrées, classification bloquant/informatif/design-verrouillé, périmètre axe avec `withRules(['target-size'])` obligatoire — les plans 02/03 classent chaque violation sans interprétation.
+- `@axe-core/playwright@4.14.0` + spec e2e d'audit : les 6 parcours clés × 2 projets scannés par axe (`target-size` activé), collecte sans échec (D-04), 18 exports JSON bruts dans `brut/` (gitigné) prêts pour la classification du plan 03.
+- Rapport 49-AUDIT.md verrouillé : 6 parcours clavier réels exécutés en desktop (preuve pas-à-pas du focus datée), 21 primitives revues avant les pages, 20 scans axe à règles par défaut en complément des 18 du plan 02, classification complète — 1 fiche bloquant (cibles < 44 px des pages publiques), 7 informatif (→ QUA-04), 1 design-verrouillé, allowlist D-05 consignée.
+- Harnais axe corrigé (withRules supprimé, règles WCAG 2.2 réactivées via options.rules, exports redirigés vers le brut de la phase 50) — preuve datée que 89–91 règles s'exécutent avec `target-size` sur les 2 projets.
+- Classe de base partagée `input.tsx` corrigée d'une ligne (`focus-visible:outline-solid`) — l'outline de focus clavier passe de `outline-style:none` silencieux à `solid/3px` sur tous les champs Input/Textarea/Select/SearchInput de l'app, preuve rouge→vert par mesure `getComputedStyle` dans le navigateur réel.
+- Six cibles tactiles de 14–38 px sur /connexion, /foyer/rejoindre (et /foyer/nouveau, hypothèse A1 confirmée) portées à ≥ 44 px par classes des pages publiques uniquement — preuve rouge→vert par getBoundingClientRect sur chromium et mobile Pixel 7, primitives intouchées.
+- Skip-link à tabIndex dynamique miroir du voile modal Radix (piste (b), MutationObserver aria-hidden) — preuve e2e rouge-avant-vert permanente et résultat axe aria-hidden-focus réduit d'exactement 1 nœud sur chacune des 6 surfaces sous voile.
+- Label in Name corrigé sur les 3 surfaces (tuiles, recherche, préférences) — cause racine axe 4.14 établie par lecture du moteur : le texte visible on-screen est concaténé sans séparateur, l'espace sécateur + noms alignés sur le rendu font passer le re-scan de 15 nœuds à 0 sur les deux projets.
+- 18 scans finaux axe à règles par défaut (≥ 89 règles incl. `target-size`) sur 6 parcours × 2 projets prouvent le critère 4 : zéro violation bloquante nouvelle — les 47 nœuds restants sont les 8 nœuds allowlistés A11Y-49-10 (faux positif d'animation, ratios exacts repris) et les 39 nœuds informatifs A11Y-49-05 hérités vers QUA-04.
+- 51-SPEC verrouillée (seuil 45-SPEC §1, stop-list D-11, knip@6.45.1 / oxlint@1.93.0 épinglés), quatre câblages invisibles prouvés à l'exécution (CABL-51-01..04) et pistes knip/oxlint journalisées en brut/ pour le triage D-03
+- Relecture finale des 11 fichiers fraîchement fixés (aucune régression au-dessus du seuil) et triage complet des 306 pistes knip/oxlint en 7 fiches QUA-51 + 69 rejets prouvés — knip jamais preuve primaire, grep daté D-03 pour chaque verdict.
+- 3 fiches qualité D-01 corrigées en 3 commits atomiques : 2 re-exports morts supprimés, 5 micro-défauts oxlint corrigés, 2 fichiers morts supprimés — 196 lignes de code mortes en moins, chaîne §2.7 verte à chaque étape.
+- Retrait par `npm uninstall` des 10 dependencies + 3 devDependencies identifiées mortes par 51-AUDIT, lockfile cohérent, build PWA et e2e verts — un commit atomique (QUA-03).
+
+---
+
 ## v1.4 Preuve & décision (Shipped: 2026-11-12)
 
 **Known verification overrides : 69 items acquittés à la clôture (4 debug sessions, 10 uat_gaps, 5 verification_gaps, 50 différés), 0 reporté d'une clôture antérieure — voir STATE.md « Deferred Items ».**
