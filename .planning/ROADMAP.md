@@ -71,7 +71,7 @@
 - [x] **Phase 48: Fixes perf majeurs** - Preuve avant/après mesurée par fix, jamais de mémo préventif (PERF-03) (completed 2026-11-13)
 - [x] **Phase 49: Audit accessibilité WCAG 2.2 AA** - axe-core sur les parcours clés + revue primitives, read-only (A11Y-01, A11Y-02)
 - [x] **Phase 50: Fixes a11y majeurs** - Primitives d'abord, design photo-overlay intouché (A11Y-03) — 6/6 plans, 2026-11-13
-- [ ] **Phase 51: Audit qualité transverse** - Code mort, duplications, cohérence, zones jamais relues depuis v0.9 — revue finale des fichiers que les fixes ont modifiés (QUA-01, QUA-02)
+- [x] **Phase 51: Audit qualité transverse** - Code mort, duplications, cohérence, zones jamais relues depuis v0.9 — revue finale des fichiers que les fixes ont modifiés (QUA-01, QUA-02) (completed 2026-11-14)
 - [ ] **Phase 52: Fixes qualité + closing du jalon** - Fixes majeurs, consolidation docs/AUDIT-*.md, backlog durable, chaîne §2.7 verte consignée (QUA-03, QUA-04, TRA-03)
 
 ### Phase Details
@@ -213,7 +213,7 @@ Plans:
   3. Avant de classer du code mort, les quatre câblages invisibles sont vérifiés (pg_cron, testkit SQL, deploy-functions.sh, mode démo Dexie) — l'absence affirmée porte sa preuve (§2.7-I)
   4. La SPEC définit le seuil et la stop-list (conventions intouchables §2.7 — un constat dont le fix toucherait §2.7 est reclassé moyen/mineur) ; la phase est read-only
 
-**Plans:** 5/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 **Wave 1**
@@ -253,5 +253,5 @@ Plans:
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
 | 50. Fixes a11y majeurs | 6/6 | Complete    | 2026-11-13 |
-| 51. Audit qualité transverse | 5/5 | In Progress|  |
+| 51. Audit qualité transverse | 5/5 | Complete    | 2026-11-14 |
 | 52. Fixes qualité + closing | 0/? | Not started | - |
