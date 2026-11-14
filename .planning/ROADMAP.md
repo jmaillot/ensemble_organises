@@ -257,7 +257,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 45. Audit sécurité/RLS | 4/4 | Complete    | 2026-11-12 |
-| 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 || 47. Audit performance/requêtes | 0/? | Not started | - |
+| 46. Fixes RLS majeurs | 1/1 | Complete    | 2026-11-12 |
+| 47. Audit performance/requêtes | 0/? | Not started | - |
 | 48. Fixes perf majeurs | 3/3 | Complete    | 2026-11-13 |
 | 49. Audit accessibilité WCAG 2.2 AA | 3/3 | Complete    | 2026-11-13 |
 | 50. Fixes a11y majeurs | 6/6 | Complete    | 2026-11-13 |
