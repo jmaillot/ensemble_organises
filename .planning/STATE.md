@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-13)
+See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** PWA foyers
-**Current focus:** Phase 51 — Audit qualité transverse
+**Current focus:** Phase 52 — Fixes qualité + closing du jalon
 
 ## Current Position
 
@@ -79,6 +79,7 @@ Last activity: 2026-11-14 — Phase 51 complete, transitioned to Phase 52
 - Harnais axe (49-02) : collecte sans échec (D-04), aucune assertion sur les violations ; exports étiquetés avec les règles exécutées (passes+inapplicable) pour prouver que `target-size` a tourné ; tiroir mobile scanné sur l'app-shell seul (le pré-écran /foyer/rejoindre n'a ni barre basse ni tiroir) ; 3 échecs vitest pré-existants en calendrier-page.test.tsx (vérifiés sur HEAD~1), hors périmètre read-only.
 - Fixes SQL = migrations forward-only 0182+ uniquement ; `test-db.sh` obligatoire pour tout changement SQL ; les migrations appliquées ne sont jamais réécrites.
 - Phase 50 P06 (classement D-06) : zéro bloquant nouveau — critère 4 VRAI, prouvé par 18 scans finaux à règles par défaut (≥ 89 règles incl. target-size) ; 47 nœuds restants = 8 allowlistés A11Y-49-10 (faux positif d'animation) + 39 informatifs A11Y-49-05 hérités vers QUA-04, aucun fix opportuniste.
+- Phase 51 (audit qualité) : 51-AUDIT.md clos — 6 fiches fix 52 (QUA-51-01..06 : re-exports morts, duplications, 13 dépendances npm, 2 fichiers morts, 5 micro-défauts oxlint ; 170 exports → backlog QUA-04), 3 fiches QUA-51-DD (dérive docs/code → fix 52, D-04), 4 fiches CABL-51 (câblages D-09 prouvés), 90 pistes rejetées consignées ; chaîne §2.7 verte (2006 tests) ; phase read-only tenue.
 
 ### Todos
 
@@ -91,8 +92,8 @@ Last activity: 2026-11-14 — Phase 51 complete, transitioned to Phase 52
 
 ## Session Continuity
 
-**Last session:** 2026-11-14T08:52:00Z
-**Stopped at:** Phase 51 complete, ready to plan Phase 52
+**Last session:** 2026-11-14T10:30:00Z
+**Stopped at:** Phase 51 complete (vérification passed), ready to plan Phase 52
 **Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.

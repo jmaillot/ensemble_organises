@@ -101,6 +101,37 @@ permissives, migration forward-only 0182+). Régime git observé : artefacts
 `.planning/*` gitignés (`.gitignore:86`), preuve par le contenu — jamais
 `git add -f` (A3 résolu).
 
+ ## État courant — phase 51 close le 2026-11-14 (audit qualité transverse)
+
+**Phase 51 (audit qualité transverse)** : rapport `51-AUDIT.md` clos — 4 fiches
+CABL-51 (câblages D-09 prouvés datés : pg_cron 14 jobs/50 548 runs, testkit 105
+verts, deploy-functions 16 fonctions, Dexie+10 suites), triage D-03 des 306
+pistes knip (170 exports → backlog QUA-04 ; 6 fiches QUA-51-01..06 → fix 52 :
+re-exports morts, duplications, 13 dépendances npm, 2 fichiers morts, 5
+micro-défauts oxlint) ; revue transverse 119 fichiers (lib/hooks/stores/ui/shared)
++ 22 modules fichier par fichier — aucune nouvelle fiche au-dessus du seuil ;
+3 fiches QUA-51-DD (dérive docs/code : module `documents` absent d'AGENTS.md
+§3/§5, liste deploy-functions.sh, guide prestataires) → fix 52 (D-04 : la 51
+mesure, la 52 corrige). Chaîne §2.7 verte consignée (typecheck 0, 2006 tests,
+build 0, garde no-eslint-directive 3/3) ; anti-fuite secrets 0 ; phase
+strictement read-only (`git status --porcelain` vide à chaque contrôle).
+Vérification `passed` (5/5, QUA-01 Complete, QUA-02 justifiée/différée 52).
+Régime inchangé : artefacts `.planning/*` gitignés.
+
+ ## État courant — phase 48 close le 2026-11-13 (fixes perf majeurs)
+
+**Phase 48 (fixes perf majeurs)** : PERF-47-09 clos — migration 0182
+(single-pass settlement ardoise via helper privé `ardoise_settlement_data`),
+gain prouvé −67 % (31,064 → 10,343 ms, preuve avant/après datée), sécurité
+préservée (refus enfant 0115 recopié verbatim, revoke/grant ré-émis, garde
+has_function_privilege, search_path=''). 3 plans : mesures Profiler
+(PERF-47-11..16, 72 blocs datés, aucune fiche majeure → aucun memo), fix SQL
+0182 (unique commit d413769), dispositions. UAT 2/2 pass, vérification
+`passed`, audit sécurité SECURED (10/10 menaces, 2 risques acceptés low :
+T-48-02, T-48-04 — à consigner au journal des risques), Nyquist 9/9 +
+Wave 0 (test-db.sh 105 verts re-exécuté). Régime inchangé : artefacts
+`.planning/*` gitignés.
+
  ## État courant — phase 47 close le 2026-11-13 (audit performance/requêtes)
 
 **Phase 47 (audit performance/requêtes)** : rapport `47-AUDIT.md` (3 axes :
@@ -196,4 +227,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-13 after Phase 47 (audit performance/requêtes, UAT 2/2 pass)*
+*Last updated: 2026-11-14 after Phase 51 (audit qualité transverse — 51-AUDIT.md clos, 6 fiches fix 52, vérification passed)*
