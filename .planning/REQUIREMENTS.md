@@ -31,7 +31,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 - [x] **QUA-01** : Les 25 modules + `lib/`, `hooks/`, `stores/`, `components/` sont audités par revue humaine (code mort, duplications, cohérence des patterns, gestion d'erreur, zones jamais relues depuis v0.9) ; `knip` et `oxlint` en one-shot jetables (rien de persisté, aucune directive — la garde `no-eslint-directive.test.ts` reste verte)
 - [x] **QUA-02** : La dérive docs/code est corrigée : le module `documents` est documenté dans AGENTS.md §3 (ou l'écart est justifié) — l'audit mesure le code, pas la prose
 - [x] **QUA-03** : Tout constat majeur de qualité est corrigé atomiquement ; les tests SQL périmés (assertions sur des définitions dépassées) sont corrigés vers la définition effective
-- [ ] **QUA-04** : Les rapports consolidés sont versionnés sous `docs/AUDIT-*.md` (un par axe : preuve par constat, verdict majeur/moyen/mineur, disposition fix/backlog/verrouillé) ; le backlog durable des moyens/mineurs est créé ; AGENTS.md est mis à jour si une convention évolue
+- [x] **QUA-04** : Les rapports consolidés sont versionnés sous `docs/AUDIT-*.md` (un par axe : preuve par constat, verdict majeur/moyen/mineur, disposition fix/backlog/verrouillé) ; le backlog durable des moyens/mineurs est créé ; AGENTS.md est mis à jour si une convention évolue
 
 ### Transverse (tous les axes)
 
@@ -77,7 +77,7 @@ Jalon v1.5 « Audit complet & durcissement » — auditer tout le dépôt sur 4 
 | QUA-01 | Phase 51 | Complete |
 | QUA-02 | Phase 51 | Complete |
 | QUA-03 | Phase 52 | Complete |
-| QUA-04 | Phase 52 | Pending |
+| QUA-04 | Phase 52 | Complete |
 | TRA-01 | Phase 45 | Complete |
 | TRA-02 | Phase 45 | Complete |
 | TRA-03 | Phase 52 | Pending |
