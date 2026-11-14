@@ -4,16 +4,16 @@ milestone: v1.5
 milestone_name: Audit complet & durcissement
 current_phase: 51
 current_phase_name: Audit qualité transverse
-status: planning
-stopped_at: Phase 51 context gathered
-last_updated: "2026-11-13T16:39:27.085Z"
-last_activity: 2026-11-13
-last_activity_desc: Phase 50 complete, transitioned to Phase 51
-state_head: 7fb9c412ccdda6afeae34390d14686296c5e6ac1
+status: executing
+stopped_at: Completed 51-01-PLAN.md (plan 1/5)
+last_updated: "2026-11-14T07:16:26.894Z"
+last_activity: 2026-11-14
+last_activity_desc: Phase 51 execution started
+state_head: 5a3295ee532fec84ca661722ebeb0a3a87338683
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 20
+  total_plans: 25
   completed_plans: 20
   percent: 75
 ---
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-13)
 
 **Core value:** PWA foyers
-**Current focus:** Phase 50 — Fixes a11y majeurs
+**Current focus:** Phase 51 — Audit qualité transverse
 
 ## Current Position
 
-Phase: 51 — Audit qualité transverse
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-13 — Phase 50 complete, transitioned to Phase 51
+Phase: 51 (Audit qualité transverse) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-11-14 — Phase 51 execution started
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Last activity: 2026-11-13 — Phase 50 complete, transitioned to Phase 51
 | Phase 50 P04 | 20 min | 3 tasks | 2 files |
 | Phase 50 P05 | 85 min | 3 tasks | 2 files |
 | Phase 50 P06 | 10 min | 2 tasks | 2 files |
+| Phase 51 P01 | 5 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -87,9 +88,9 @@ Last activity: 2026-11-13 — Phase 50 complete, transitioned to Phase 51
 
 ## Session Continuity
 
-**Last session:** 2026-11-13T16:39:26.998Z
-**Stopped at:** Phase 51 context gathered
-**Resume file:** .planning/phases/51-audit-qualit-transverse/51-CONTEXT.md
+**Last session:** 2026-11-14T07:16:25.841Z
+**Stopped at:** Completed 51-01-PLAN.md (plan 1/5)
+**Resume file:** None
 
 - Roadmap v1.5 créé : 8 phases, 17 exigences mappées, couverture 17/17.
 - Prochain pas : `/gsd-plan-phase 45` (recherche plus profonde recommandée pour la méthode d'exécution des tests négatifs des 83 tables).
@@ -137,3 +138,6 @@ Items inherited from previous milestone close (see .planning/milestones/ archive
 - [Phase 50]: Fix A11Y-49-02 par focus-visible:outline-solid ajouté à outline-none dans la classe de base partagée input.tsx — une seule classe réparant tous les formulaires (§2.7-E), preuve rouge→vert par getComputedStyle
 - [Phase 50]: Fix A11Y-49-07 par piste (b) — miroir aria-hidden Radix sur le skip-link (MutationObserver sous-arbre body, closest depuis le skip-link : Radix marque les descendants individuels, pas la racine du shell) ; le piège de focus Radix intercepte Tab donc la preuve rouge exige axe sous voile, la navigation seule est verte avant fix
 - [Phase 50]: Classement D-06 scans finaux : zero bloquant nouveau, critere 4 VRAI (47 noeuds restants : 8 allowlistes A11Y-49-10 faux positif animation, 39 informatifs A11Y-49-05 herites vers QUA-04) — 18 exports a regles par defaut (>=89 incl. target-size) prouvent le critere 4 ; aucun fix opportuniste (D-06)
+- [Phase 51]: 51-01 : SPEC verrouillée (seuil cité 45-SPEC §1, stop-list D-11 à 9 entrées, versions épinglées knip@6.45.1 / oxlint@1.93.0, listes fermées datées — 23 répertoires modules ≠ 24 de RESEARCH, 21 fichiers data/ ≠ 20) — Les compteurs de prose divergent du disque (Pitfall 4) ; le ls daté fait foi pour les plans 02-05
+- [Phase 51]: 51-01 : quatre câblages invisibles prouvés à l'exécution (CABL-51-01..04) — test-db.sh 105 fichiers tous verts le 2026-11-14, cron.job 14 jobs sans secret + 50548 runs réussis, deploy-functions --list 16 fonctions, Dexie câblé au barrel data/index.ts avec 10 suites contrat — Docker disponible → preuve réelle (D-10), jamais grep seul ; toute fiche de code mort des plans 02-04 citera ces fiches (D-03)
+- [Phase 51]: 51-01 : instruments one-shot tournés sans rien persister — knip 306 lignes de pistes en brut/, oxlint 0 erreur / warnings seulement, garde no-eslint-directive verte (3 passed) ; pistes NON classées (triage D-03 au plan 02) — D-07/D-08 : npx épinglé jetable, aucune devDependency ; knip jamais preuve primaire
